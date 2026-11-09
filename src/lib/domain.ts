@@ -2,7 +2,7 @@ import type {
   BankrollTransaction,
   Match,
   Outcome,
-  Pick,
+  Pick as BetPick,
   Prediction,
   PredictionType,
   Settlement,
@@ -13,12 +13,12 @@ export const COUPON_SIZE = 3;
 /** Coupon candidates must be STRICTLY above this probability (in %). */
 export const CANDIDATE_MIN_PROBABILITY = 75;
 
-export const PICKS: Record<PredictionType, Pick[]> = {
+export const PICKS: Record<PredictionType, BetPick[]> = {
   "1X2": ["1", "X", "2"],
   DC: ["1X", "X2", "12"],
 };
 
-export const PICK_LABELS: Record<Pick, string> = {
+export const PICK_LABELS: Record<BetPick, string> = {
   "1": "1 · gospodarze",
   X: "X · remis",
   "2": "2 · goście",
@@ -50,7 +50,7 @@ export const TX_LABELS: Record<TxType, string> = {
   adjustment: "Korekta (±)",
 };
 
-export function isValidPick(type: PredictionType, pick: string): pick is Pick {
+export function isValidPick(type: PredictionType, pick: string): pick is BetPick {
   return (PICKS[type] as string[]).includes(pick);
 }
 
@@ -60,7 +60,7 @@ export function outcomeFromScore(home: number, away: number): Outcome {
   return "X";
 }
 
-export function settlePick(type: PredictionType, pick: Pick, outcome: Outcome): "won" | "lost" {
+export function settlePick(type: PredictionType, pick: BetPick, outcome: Outcome): "won" | "lost" {
   if (type === "1X2") return pick === outcome ? "won" : "lost";
   return pick.includes(outcome) ? "won" : "lost";
 }
@@ -123,7 +123,7 @@ export function isCouponCandidate(p: Prediction, m: Match | undefined, nowMs: nu
  * Builds up to `count` coupons of exactly 3 distinct matches.
  * One leg per match (highest probability), and no match is reused across the batch.
  */
-export function buildCouponBatch<T extends Pick_<Prediction>>(candidates: T[], count: number): T[][] {
+export function buildCouponBatch<T extends Pick<Prediction, "match_id" | "probability">>(candidates: T[], count: number): T[][] {
   const best = new Map<string, T>();
   for (const c of candidates) {
     if (c.probability == null || Number(c.probability) <= CANDIDATE_MIN_PROBABILITY) continue;
@@ -137,9 +137,6 @@ export function buildCouponBatch<T extends Pick_<Prediction>>(candidates: T[], c
   }
   return out;
 }
-type Pick_<T> = Pick<T, "match_id" | "probability"> & Partial<T>;
-// Local alias so the generic above reads clearly without shadowing the Pick type import.
-type Pick<T, K extends keyof T> = { [P in K]: T[P] };
 
 export function validateCoupon(
   legs: { match_id: string; probability: number | null }[],
