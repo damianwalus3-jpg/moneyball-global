@@ -14,10 +14,14 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as AuthenticatedBankrollRouteImport } from './routes/_authenticated/bankroll'
 import { Route as AuthenticatedDoubleChanceRouteImport } from './routes/_authenticated/double-chance'
+import { Route as AuthenticatedHistoriaRouteImport } from './routes/_authenticated/historia'
+import { Route as AuthenticatedKuponyRouteImport } from './routes/_authenticated/kupony'
 import { Route as AuthenticatedMeczeRouteImport } from './routes/_authenticated/mecze'
 import { Route as AuthenticatedPanelRouteImport } from './routes/_authenticated/panel'
 import { Route as AuthenticatedPrognozy1x2RouteImport } from './routes/_authenticated/prognozy-1x2'
+import { Route as AuthenticatedStatystykiRouteImport } from './routes/_authenticated/statystyki'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -43,12 +47,27 @@ const SetupRoute = SetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedBankrollRoute = AuthenticatedBankrollRouteImport.update({
+  id: '/bankroll',
+  path: '/bankroll',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDoubleChanceRoute =
   AuthenticatedDoubleChanceRouteImport.update({
     id: '/double-chance',
     path: '/double-chance',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedHistoriaRoute = AuthenticatedHistoriaRouteImport.update({
+  id: '/historia',
+  path: '/historia',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedKuponyRoute = AuthenticatedKuponyRouteImport.update({
+  id: '/kupony',
+  path: '/kupony',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedMeczeRoute = AuthenticatedMeczeRouteImport.update({
   id: '/mecze',
   path: '/mecze',
@@ -65,26 +84,39 @@ const AuthenticatedPrognozy1x2Route =
     path: '/prognozy-1x2',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedStatystykiRoute = AuthenticatedStatystykiRouteImport.update({
+  id: '/statystyki',
+  path: '/statystyki',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
+  '/bankroll': typeof AuthenticatedBankrollRoute
   '/double-chance': typeof AuthenticatedDoubleChanceRoute
+  '/historia': typeof AuthenticatedHistoriaRoute
+  '/kupony': typeof AuthenticatedKuponyRoute
   '/mecze': typeof AuthenticatedMeczeRoute
   '/panel': typeof AuthenticatedPanelRoute
   '/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
+  '/statystyki': typeof AuthenticatedStatystykiRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
+  '/bankroll': typeof AuthenticatedBankrollRoute
   '/double-chance': typeof AuthenticatedDoubleChanceRoute
+  '/historia': typeof AuthenticatedHistoriaRoute
+  '/kupony': typeof AuthenticatedKuponyRoute
   '/mecze': typeof AuthenticatedMeczeRoute
   '/panel': typeof AuthenticatedPanelRoute
   '/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
+  '/statystyki': typeof AuthenticatedStatystykiRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -93,10 +125,14 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
+  '/_authenticated/bankroll': typeof AuthenticatedBankrollRoute
   '/_authenticated/double-chance': typeof AuthenticatedDoubleChanceRoute
+  '/_authenticated/historia': typeof AuthenticatedHistoriaRoute
+  '/_authenticated/kupony': typeof AuthenticatedKuponyRoute
   '/_authenticated/mecze': typeof AuthenticatedMeczeRoute
   '/_authenticated/panel': typeof AuthenticatedPanelRoute
   '/_authenticated/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
+  '/_authenticated/statystyki': typeof AuthenticatedStatystykiRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -105,20 +141,28 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/setup'
+    | '/bankroll'
     | '/double-chance'
+    | '/historia'
+    | '/kupony'
     | '/mecze'
     | '/panel'
     | '/prognozy-1x2'
+    | '/statystyki'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/reset-password'
     | '/setup'
+    | '/bankroll'
     | '/double-chance'
+    | '/historia'
+    | '/kupony'
     | '/mecze'
     | '/panel'
     | '/prognozy-1x2'
+    | '/statystyki'
   id:
     | '__root__'
     | '/'
@@ -126,10 +170,14 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/setup'
+    | '/_authenticated/bankroll'
     | '/_authenticated/double-chance'
+    | '/_authenticated/historia'
+    | '/_authenticated/kupony'
     | '/_authenticated/mecze'
     | '/_authenticated/panel'
     | '/_authenticated/prognozy-1x2'
+    | '/_authenticated/statystyki'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -177,11 +225,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/bankroll': {
+      id: '/_authenticated/bankroll'
+      path: '/bankroll'
+      fullPath: '/bankroll'
+      preLoaderRoute: typeof AuthenticatedBankrollRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/double-chance': {
       id: '/_authenticated/double-chance'
       path: '/double-chance'
       fullPath: '/double-chance'
       preLoaderRoute: typeof AuthenticatedDoubleChanceRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/historia': {
+      id: '/_authenticated/historia'
+      path: '/historia'
+      fullPath: '/historia'
+      preLoaderRoute: typeof AuthenticatedHistoriaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/kupony': {
+      id: '/_authenticated/kupony'
+      path: '/kupony'
+      fullPath: '/kupony'
+      preLoaderRoute: typeof AuthenticatedKuponyRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/mecze': {
@@ -205,21 +274,36 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPrognozy1x2RouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/statystyki': {
+      id: '/_authenticated/statystyki'
+      path: '/statystyki'
+      fullPath: '/statystyki'
+      preLoaderRoute: typeof AuthenticatedStatystykiRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedBankrollRoute: typeof AuthenticatedBankrollRoute
   AuthenticatedDoubleChanceRoute: typeof AuthenticatedDoubleChanceRoute
+  AuthenticatedHistoriaRoute: typeof AuthenticatedHistoriaRoute
+  AuthenticatedKuponyRoute: typeof AuthenticatedKuponyRoute
   AuthenticatedMeczeRoute: typeof AuthenticatedMeczeRoute
   AuthenticatedPanelRoute: typeof AuthenticatedPanelRoute
   AuthenticatedPrognozy1x2Route: typeof AuthenticatedPrognozy1x2Route
+  AuthenticatedStatystykiRoute: typeof AuthenticatedStatystykiRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedBankrollRoute: AuthenticatedBankrollRoute,
   AuthenticatedDoubleChanceRoute: AuthenticatedDoubleChanceRoute,
+  AuthenticatedHistoriaRoute: AuthenticatedHistoriaRoute,
+  AuthenticatedKuponyRoute: AuthenticatedKuponyRoute,
   AuthenticatedMeczeRoute: AuthenticatedMeczeRoute,
   AuthenticatedPanelRoute: AuthenticatedPanelRoute,
   AuthenticatedPrognozy1x2Route: AuthenticatedPrognozy1x2Route,
+  AuthenticatedStatystykiRoute: AuthenticatedStatystykiRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
