@@ -14,24 +14,19 @@ export function ScanImportDialog({ open, onOpenChange }: { open: boolean; onOpen
   const matches = useTable("matches");
   const [text, setText] = useState("");
   const [source, setSource] = useState("");
-  const [parseError, setParseError] = useState("");
-
   useEffect(() => {
     if (open) {
       setText("");
       setSource("");
-      setParseError("");
     }
   }, [open]);
 
-  const parsed: ParsedScan | null = useMemo(() => {
-    if (!text.trim()) return null;
+  const { parsed, parseError } = useMemo((): { parsed: ParsedScan | null; parseError: string } => {
+    if (!text.trim()) return { parsed: null, parseError: "" };
     try {
-      setParseError("");
-      return parseScanRows(parseCsv(text));
+      return { parsed: parseScanRows(parseCsv(text)), parseError: "" };
     } catch (e) {
-      setParseError(e instanceof Error ? e.message : "Błąd pliku.");
-      return null;
+      return { parsed: null, parseError: e instanceof Error ? e.message : "Błąd pliku." };
     }
   }, [text]);
 
