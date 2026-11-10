@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AuthenticatedDoubleChanceRouteImport } from './routes/_authenticated/double-chance'
+import { Route as AuthenticatedMeczeRouteImport } from './routes/_authenticated/mecze'
 import { Route as AuthenticatedPanelRouteImport } from './routes/_authenticated/panel'
 import { Route as AuthenticatedPrognozy1x2RouteImport } from './routes/_authenticated/prognozy-1x2'
 
@@ -48,6 +49,11 @@ const AuthenticatedDoubleChanceRoute =
     path: '/double-chance',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedMeczeRoute = AuthenticatedMeczeRouteImport.update({
+  id: '/mecze',
+  path: '/mecze',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPanelRoute = AuthenticatedPanelRouteImport.update({
   id: '/panel',
   path: '/panel',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/double-chance': typeof AuthenticatedDoubleChanceRoute
+  '/mecze': typeof AuthenticatedMeczeRoute
   '/panel': typeof AuthenticatedPanelRoute
   '/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
 }
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/double-chance': typeof AuthenticatedDoubleChanceRoute
+  '/mecze': typeof AuthenticatedMeczeRoute
   '/panel': typeof AuthenticatedPanelRoute
   '/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
 }
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/_authenticated/double-chance': typeof AuthenticatedDoubleChanceRoute
+  '/_authenticated/mecze': typeof AuthenticatedMeczeRoute
   '/_authenticated/panel': typeof AuthenticatedPanelRoute
   '/_authenticated/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
 }
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/setup'
     | '/double-chance'
+    | '/mecze'
     | '/panel'
     | '/prognozy-1x2'
   fileRoutesByTo: FileRoutesByTo
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/setup'
     | '/double-chance'
+    | '/mecze'
     | '/panel'
     | '/prognozy-1x2'
   id:
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/setup'
     | '/_authenticated/double-chance'
+    | '/_authenticated/mecze'
     | '/_authenticated/panel'
     | '/_authenticated/prognozy-1x2'
   fileRoutesById: FileRoutesById
@@ -172,6 +184,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDoubleChanceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/mecze': {
+      id: '/_authenticated/mecze'
+      path: '/mecze'
+      fullPath: '/mecze'
+      preLoaderRoute: typeof AuthenticatedMeczeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/panel': {
       id: '/_authenticated/panel'
       path: '/panel'
@@ -191,12 +210,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDoubleChanceRoute: typeof AuthenticatedDoubleChanceRoute
+  AuthenticatedMeczeRoute: typeof AuthenticatedMeczeRoute
   AuthenticatedPanelRoute: typeof AuthenticatedPanelRoute
   AuthenticatedPrognozy1x2Route: typeof AuthenticatedPrognozy1x2Route
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDoubleChanceRoute: AuthenticatedDoubleChanceRoute,
+  AuthenticatedMeczeRoute: AuthenticatedMeczeRoute,
   AuthenticatedPanelRoute: AuthenticatedPanelRoute,
   AuthenticatedPrognozy1x2Route: AuthenticatedPrognozy1x2Route,
 }
