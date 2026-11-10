@@ -22,6 +22,7 @@ import { Route as AuthenticatedMeczeRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedPanelRouteImport } from './routes/_authenticated/panel'
 import { Route as AuthenticatedPrognozy1x2RouteImport } from './routes/_authenticated/prognozy-1x2'
 import { Route as AuthenticatedStatystykiRouteImport } from './routes/_authenticated/statystyki'
+import { Route as AuthenticatedUstawieniaRouteImport } from './routes/_authenticated/ustawienia'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -89,6 +90,11 @@ const AuthenticatedStatystykiRoute = AuthenticatedStatystykiRouteImport.update({
   path: '/statystyki',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedUstawieniaRoute = AuthenticatedUstawieniaRouteImport.update({
+  id: '/ustawienia',
+  path: '/ustawienia',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -103,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/panel': typeof AuthenticatedPanelRoute
   '/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
   '/statystyki': typeof AuthenticatedStatystykiRoute
+  '/ustawienia': typeof AuthenticatedUstawieniaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/panel': typeof AuthenticatedPanelRoute
   '/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
   '/statystyki': typeof AuthenticatedStatystykiRoute
+  '/ustawienia': typeof AuthenticatedUstawieniaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/_authenticated/panel': typeof AuthenticatedPanelRoute
   '/_authenticated/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
   '/_authenticated/statystyki': typeof AuthenticatedStatystykiRoute
+  '/_authenticated/ustawienia': typeof AuthenticatedUstawieniaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -149,6 +158,7 @@ export interface FileRouteTypes {
     | '/panel'
     | '/prognozy-1x2'
     | '/statystyki'
+    | '/ustawienia'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -163,6 +173,7 @@ export interface FileRouteTypes {
     | '/panel'
     | '/prognozy-1x2'
     | '/statystyki'
+    | '/ustawienia'
   id:
     | '__root__'
     | '/'
@@ -178,6 +189,7 @@ export interface FileRouteTypes {
     | '/_authenticated/panel'
     | '/_authenticated/prognozy-1x2'
     | '/_authenticated/statystyki'
+    | '/_authenticated/ustawienia'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -281,6 +293,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedStatystykiRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ustawienia': {
+      id: '/_authenticated/ustawienia'
+      path: '/ustawienia'
+      fullPath: '/ustawienia'
+      preLoaderRoute: typeof AuthenticatedUstawieniaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -293,6 +312,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPanelRoute: typeof AuthenticatedPanelRoute
   AuthenticatedPrognozy1x2Route: typeof AuthenticatedPrognozy1x2Route
   AuthenticatedStatystykiRoute: typeof AuthenticatedStatystykiRoute
+  AuthenticatedUstawieniaRoute: typeof AuthenticatedUstawieniaRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -304,6 +324,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPanelRoute: AuthenticatedPanelRoute,
   AuthenticatedPrognozy1x2Route: AuthenticatedPrognozy1x2Route,
   AuthenticatedStatystykiRoute: AuthenticatedStatystykiRoute,
+  AuthenticatedUstawieniaRoute: AuthenticatedUstawieniaRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
