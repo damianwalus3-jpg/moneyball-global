@@ -23,7 +23,8 @@ export function toCsv(rows: Record<string, unknown>[]): string {
 
 export function parseCsv(text: string): Record<string, unknown>[] {
   const res = Papa.parse<Record<string, string>>(text.trim(), { header: true, skipEmptyLines: true });
-  if (res.errors.length) throw new Error(`Błąd CSV (wiersz ${(res.errors[0].row ?? 0) + 2}): ${res.errors[0].message}`);
+  const firstErr = res.errors[0];
+  if (firstErr) throw new Error(`Błąd CSV (wiersz ${(firstErr.row ?? 0) + 2}): ${firstErr.message}`);
   return res.data.map((r) => {
     const o: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(r)) o[k.trim()] = v === "" ? null : v;

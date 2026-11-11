@@ -84,6 +84,7 @@ export async function insertRows<K extends TableName>(
 
 export async function insertRow<K extends TableName>(table: K, row: Record<string, unknown>) {
   const [r] = await insertRows(table, [row]);
+  if (!r) throw new Error("Zapis nie zwrócił rekordu. Sprawdź uprawnienia (RLS).");
   return r;
 }
 
@@ -106,12 +107,12 @@ export async function upsertSkipExisting(table: TableName, rows: Record<string, 
   for (let i = 0; i < rows.length; i += 500) {
     const chunk = rows.slice(i, i + 500).map((r) => {
       const c = clean(r);
-      delete c.user_id;
-      delete c.owner_id;
+      delete c["user_id"];
+      delete c["owner_id"];
       return { ...c, [col]: uid };
     });
-    const withId = chunk.filter((r) => r.id);
-    const withoutId = chunk.filter((r) => !r.id);
+    const withId = chunk.filter((r) => r["id"]);
+    const withoutId = chunk.filter((r) => !r["id"]);
     if (withId.length) {
       const { error } = await requireSupabase()
         .from(table)

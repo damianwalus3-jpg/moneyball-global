@@ -121,7 +121,7 @@ export function OddsForm({
   onOpenChange: (o: boolean) => void;
   snapshot?: OddsSnapshot | null;
   matches: Match[];
-  defaultMatchId?: string;
+  defaultMatchId?: string | undefined;
 }) {
   const [f, setF] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -139,9 +139,9 @@ export function OddsForm({
   const save = useAction(
     async () => {
       const row: Record<string, unknown> = {
-        match_id: f.match_id,
-        bookmaker: f.bookmaker.trim() || null,
-        captured_at: brusselsInputToISO(f.captured),
+        match_id: f["match_id"],
+        bookmaker: (f["bookmaker"] ?? "").trim() || null,
+        captured_at: brusselsInputToISO(f["captured"] ?? ""),
       };
       for (const [k] of ODDS_KEYS) row[k] = parseDecimal(f[k] ?? "");
       if (snapshot) await updateRow("odds_snapshots", snapshot.id, row);
@@ -151,8 +151,8 @@ export function OddsForm({
   );
   function submit() {
     const e: Record<string, string> = {};
-    if (!f.match_id) e.match_id = "Wybierz mecz.";
-    if (!brusselsInputToISO(f.captured ?? "")) e.captured = "Podaj czas.";
+    if (!f["match_id"]) e["match_id"] = "Wybierz mecz.";
+    if (!brusselsInputToISO(f["captured"] ?? "")) e["captured"] = "Podaj czas.";
     let any = false;
     for (const [k] of ODDS_KEYS) {
       if (!f[k]?.trim()) continue;
@@ -160,21 +160,21 @@ export function OddsForm({
       const v = parseDecimal(f[k]);
       if (v == null || v <= 1) e[k] = "> 1,00";
     }
-    if (!any) e.odds_1 = "Podaj co najmniej jeden kurs.";
+    if (!any) e["odds_1"] = "Podaj co najmniej jeden kurs.";
     setErrors(e);
     if (Object.keys(e).length === 0) save.mutate(undefined);
   }
   return (
     <FormDialog open={open} onOpenChange={onOpenChange} title={snapshot ? "Edytuj kursy" : "Nowy snapshot kursów"} pending={save.isPending} onSubmit={submit}>
-      <Field label="Mecz" error={errors.match_id}>
-        <MatchPicker matches={matches} value={f.match_id ?? ""} onChange={(id) => setF({ ...f, match_id: id })} />
+      <Field label="Mecz" error={errors["match_id"]}>
+        <MatchPicker matches={matches} value={f["match_id"] ?? ""} onChange={(id) => setF({ ...f, match_id: id })} />
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Bukmacher">
-          <Input value={f.bookmaker ?? ""} onChange={(e) => setF({ ...f, bookmaker: e.target.value })} />
+          <Input value={f["bookmaker"] ?? ""} onChange={(e) => setF({ ...f, bookmaker: e.target.value })} />
         </Field>
-        <Field label="Czas (Bruksela)" error={errors.captured}>
-          <Input type="datetime-local" value={f.captured ?? ""} onChange={(e) => setF({ ...f, captured: e.target.value })} />
+        <Field label="Czas (Bruksela)" error={errors["captured"]}>
+          <Input type="datetime-local" value={f["captured"] ?? ""} onChange={(e) => setF({ ...f, captured: e.target.value })} />
         </Field>
       </div>
       <div className="grid grid-cols-3 gap-3">
@@ -226,9 +226,9 @@ export function TransactionForm({
   );
   function submit() {
     const e: Record<string, string> = {};
-    if (!brusselsInputToISO(f.when)) e.when = "Podaj datę.";
-    if (amount == null || amount === 0) e.amount = "Podaj kwotę różną od zera.";
-    else if (f.type !== "adjustment" && amount < 0) e.amount = "Kwota dodatnia — kierunek wynika z typu.";
+    if (!brusselsInputToISO(f.when)) e["when"] = "Podaj datę.";
+    if (amount == null || amount === 0) e["amount"] = "Podaj kwotę różną od zera.";
+    else if (f.type !== "adjustment" && amount < 0) e["amount"] = "Kwota dodatnia — kierunek wynika z typu.";
     setErrors(e);
     if (Object.keys(e).length === 0) save.mutate(undefined);
   }
@@ -249,11 +249,11 @@ export function TransactionForm({
             </SelectContent>
           </Select>
         </Field>
-        <Field label="Kwota" error={errors.amount} hint={f.type === "adjustment" ? "Może być ujemna" : undefined}>
+        <Field label="Kwota" error={errors["amount"]} hint={f.type === "adjustment" ? "Może być ujemna" : undefined}>
           <Input inputMode="decimal" className="num" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
         </Field>
       </div>
-      <Field label="Data (Bruksela)" error={errors.when}>
+      <Field label="Data (Bruksela)" error={errors["when"]}>
         <Input type="datetime-local" value={f.when} onChange={(e) => setF({ ...f, when: e.target.value })} />
       </Field>
       <Field label="Notatka">
@@ -275,7 +275,7 @@ export function ResultForm({
   open: boolean;
   onOpenChange: (o: boolean) => void;
   match: Match | null;
-  result?: MatchResult;
+  result?: MatchResult | undefined;
   onSave: (v: { kind: "score"; home: number; away: number } | { kind: "void"; status: "cancelled" | "postponed" }) => void;
   pending: boolean;
 }) {

@@ -16,7 +16,8 @@ function tzParts(date: Date) {
   });
   const p: Record<string, string> = {};
   for (const part of f.formatToParts(date)) p[part.type] = part.value;
-  return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour, mi: +p.minute, s: +p.second };
+  const n = (k: string) => Number(p[k] ?? 0);
+  return { y: n("year"), m: n("month"), d: n("day"), h: n("hour"), mi: n("minute"), s: n("second") };
 }
 
 function offsetMs(date: Date) {
@@ -29,7 +30,7 @@ function offsetMs(date: Date) {
 export function brusselsInputToISO(value: string): string | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(value.trim());
   if (!m) return null;
-  const guess = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  const guess = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]));
   let ts = guess - offsetMs(new Date(guess));
   ts = guess - offsetMs(new Date(ts));
   const d = new Date(ts);

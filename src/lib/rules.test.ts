@@ -36,7 +36,7 @@ describe("scan import", () => {
     expect(r.errors).toEqual([]);
     expect(r.matches).toHaveLength(2);
     expect(r.predictions.map((p) => p.selection_status)).toEqual(["ODRZUCONY", "WYBRANY"]);
-    expect(r.predictions[1].prediction_type).toBe("DC");
+    expect(r.predictions[1]?.prediction_type).toBe("DC");
   });
   it("reports invalid rows instead of skipping them silently", () => {
     const r = parseScanRows([{ kickoff: "", league: "L", home_team: "A", away_team: "B" }]);

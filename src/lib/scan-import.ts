@@ -43,7 +43,7 @@ const ALIASES: Record<string, string[]> = {
 
 function get(row: Record<string, unknown>, field: string): string {
   const keys = Object.keys(row);
-  for (const alias of ALIASES[field]) {
+  for (const alias of ALIASES[field] ?? []) {
     const k = keys.find((x) => x.trim().toLowerCase() === alias);
     if (k != null && row[k] != null && String(row[k]).trim() !== "") return String(row[k]).trim();
   }
@@ -108,18 +108,18 @@ export function parseScanRows(
   const predictions: ParsedPrediction[] = [];
   const errors: ParsedScan["errors"] = [];
 
-  rows.forEach((row, i) => {
+  rows.forEach((row, i): void => {
     const n = i + 2; // header is row 1
     const home = get(row, "home");
     const away = get(row, "away");
     const league = get(row, "league");
     const kickoff = parseKickoff(get(row, "kickoff"));
-    if (!home || !away) return errors.push({ row: n, message: "Brak drużyn (home_team / away_team)." });
+    if (!home || !away) return void errors.push({ row: n, message: "Brak drużyn (home_team / away_team)." });
     if (home.toLowerCase() === away.toLowerCase())
-      return errors.push({ row: n, message: "Gospodarze i goście są tacy sami." });
-    if (!league) return errors.push({ row: n, message: "Brak ligi (league)." });
+      return void errors.push({ row: n, message: "Gospodarze i goście są tacy sami." });
+    if (!league) return void errors.push({ row: n, message: "Brak ligi (league)." });
     if (!kickoff)
-      return errors.push({ row: n, message: "Brak lub zły format daty (kickoff, np. 2026-11-14 20:45)." });
+      return void errors.push({ row: n, message: "Brak lub zły format daty (kickoff, np. 2026-11-14 20:45)." });
 
     const key = matchKey(kickoff, home, away);
     if (!matches.has(key))
@@ -136,15 +136,15 @@ export function parseScanRows(
     if (!rawPick) return; // match without prediction is still stored
     const pick = normalizePick(rawPick);
     const type = parseType(get(row, "type"), pick);
-    if (!type) return errors.push({ row: n, message: `Nieznany typ prognozy dla wyboru "${rawPick}".` });
+    if (!type) return void errors.push({ row: n, message: `Nieznany typ prognozy dla wyboru "${rawPick}".` });
     if (!isValidPick(type, pick))
-      return errors.push({ row: n, message: `Wybór "${rawPick}" nie pasuje do typu ${type}.` });
+      return void errors.push({ row: n, message: `Wybór "${rawPick}" nie pasuje do typu ${type}.` });
     const probability = parseProbability(get(row, "probability"));
     if (probability == null)
-      return errors.push({ row: n, message: "Brak lub zły format prawdopodobieństwa (0–100)." });
+      return void errors.push({ row: n, message: "Brak lub zły format prawdopodobieństwa (0–100)." });
     const odds = parseNumber(get(row, "odds"));
     if (odds != null && odds <= 1)
-      return errors.push({ row: n, message: "Kurs musi być większy niż 1.00." });
+      return void errors.push({ row: n, message: "Kurs musi być większy niż 1.00." });
 
     const rawStatus = get(row, "status").toUpperCase();
     const status: SelectionStatus =

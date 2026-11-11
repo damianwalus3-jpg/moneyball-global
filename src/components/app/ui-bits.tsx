@@ -136,7 +136,7 @@ export function DataError({ error, reset }: ErrorComponentProps) {
         <AlertTriangle className="size-5" />
         <h2 className="text-xl font-semibold uppercase">Nie udało się pobrać danych</h2>
       </div>
-      <p className="mt-2 break-words text-sm text-muted-foreground">{error.message}</p>
+      <p className="mt-2 break-words text-sm text-muted-foreground">{error instanceof Error ? error.message : String(error)}</p>
       <p className="mt-2 text-sm text-muted-foreground">
         Jeśli to niezgodność tabel lub kolumn, uruchom diagnostykę schematu w ustawieniach.
       </p>
@@ -166,9 +166,9 @@ export function Field({
   className,
 }: {
   label: string;
-  htmlFor?: string;
-  error?: string;
-  hint?: string;
+  htmlFor?: string | undefined;
+  error?: string | undefined;
+  hint?: string | undefined;
   children: ReactNode;
   className?: string;
 }) {

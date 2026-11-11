@@ -89,10 +89,10 @@ export function PredictionForm({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const err: Record<string, string> = {};
-    if (!f.match_id) err.match_id = "Wybierz mecz.";
-    if (!(PICKS[type] as string[]).includes(f.pick)) err.pick = "Wybierz typ.";
-    if (prob == null || prob < 0 || prob > 100) err.probability = "Podaj wartość 0–100.";
-    if (f.odds.trim() && (odds == null || odds <= 1)) err.odds = "Kurs musi być większy niż 1,00.";
+    if (!f.match_id) err["match_id"] = "Wybierz mecz.";
+    if (!(PICKS[type] as string[]).includes(f.pick)) err["pick"] = "Wybierz typ.";
+    if (prob == null || prob < 0 || prob > 100) err["probability"] = "Podaj wartość 0–100.";
+    if (f.odds.trim() && (odds == null || odds <= 1)) err["odds"] = "Kurs musi być większy niż 1,00.";
     setErrors(err);
     if (Object.keys(err).length === 0) save.mutate(undefined);
   }
@@ -106,10 +106,10 @@ export function PredictionForm({
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
-          <Field label="Mecz" error={errors.match_id}>
+          <Field label="Mecz" error={errors["match_id"]}>
             <MatchPicker matches={matches} value={f.match_id} onChange={(id) => setF((s) => ({ ...s, match_id: id }))} />
           </Field>
-          <Field label="Typ" error={errors.pick}>
+          <Field label="Typ" error={errors["pick"]}>
             <ToggleGroup
               type="single"
               value={f.pick}
@@ -132,12 +132,12 @@ export function PredictionForm({
             <Field
               label="Prawdopodobieństwo %"
               htmlFor="prob"
-              error={errors.probability}
+              error={errors["probability"]}
               hint={prob != null && prob > CANDIDATE_MIN_PROBABILITY ? "Kandydat na kupon (>75%)" : "Szacunek modelu"}
             >
               <Input id="prob" inputMode="decimal" value={f.probability} onChange={(e) => setF((s) => ({ ...s, probability: e.target.value }))} />
             </Field>
-            <Field label="Kurs bukmachera" htmlFor="odds" error={errors.odds} hint={implied != null ? `Implikowane: ${fmtPct(implied)}` : "Opcjonalnie"}>
+            <Field label="Kurs bukmachera" htmlFor="odds" error={errors["odds"]} hint={implied != null ? `Implikowane: ${fmtPct(implied)}` : "Opcjonalnie"}>
               <Input id="odds" inputMode="decimal" value={f.odds} onChange={(e) => setF((s) => ({ ...s, odds: e.target.value }))} />
             </Field>
             <Field label="Pewność">

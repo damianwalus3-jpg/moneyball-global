@@ -19,7 +19,7 @@ export type KeyCheck = { ok: true; kind: "publishable" | "anon-jwt" } | { ok: fa
 
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
-    const part = token.split(".")[1];
+    const part = token.split(".")[1] ?? "";
     const b64 = part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=");
     return JSON.parse(atob(b64));
   } catch {
@@ -29,7 +29,7 @@ function decodeJwtPayload(token: string): Record<string, unknown> | null {
 
 export function projectRefFromUrl(url: string): string | null {
   const m = /^https:\/\/([a-z0-9]+)\.supabase\.co\/?$/i.exec(url.trim());
-  return m ? m[1].toLowerCase() : null;
+  return m?.[1] ? m[1].toLowerCase() : null;
 }
 
 export function validateSupabaseUrl(url: string): string | null {
@@ -57,25 +57,25 @@ export function validatePublicKey(rawKey: string, url = DEFAULT_SUPABASE_URL): K
   if (parts.length === 3) {
     const payload = decodeJwtPayload(key);
     if (!payload) return { ok: false, reason: "Nie można odczytać klucza JWT." };
-    if (payload.role === "service_role")
+    if (payload["role"] === "service_role")
       return {
         ok: false,
         reason: "To jest klucz service_role (sekretny). Użyj klucza anon/publishable.",
       };
-    if (payload.role !== "anon") return { ok: false, reason: "Klucz nie ma roli anon." };
+    if (payload["role"] !== "anon") return { ok: false, reason: "Klucz nie ma roli anon." };
     const ref = projectRefFromUrl(url);
-    if (ref && typeof payload.ref === "string" && payload.ref !== ref)
-      return { ok: false, reason: `Klucz należy do innego projektu (${payload.ref}).` };
+    if (ref && typeof payload["ref"] === "string" && payload["ref"] !== ref)
+      return { ok: false, reason: `Klucz należy do innego projektu (${payload["ref"]}).` };
     return { ok: true, kind: "anon-jwt" };
   }
   return { ok: false, reason: "Nieznany format klucza. Oczekiwano sb_publishable_… lub klucza anon (JWT)." };
 }
 
-function envConfig(): { url?: string; key?: string } {
+function envConfig(): { url?: string | undefined; key?: string | undefined } {
   const env = import.meta.env as Record<string, string | undefined>;
   return {
-    url: env.VITE_SUPABASE_URL,
-    key: env.VITE_SUPABASE_ANON_KEY ?? env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    url: env["VITE_SUPABASE_URL"],
+    key: env["VITE_SUPABASE_ANON_KEY"] ?? env["VITE_SUPABASE_PUBLISHABLE_KEY"],
   };
 }
 

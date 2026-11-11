@@ -4,7 +4,7 @@ import type { Coupon, CouponLeg, Match, MatchResult, Prediction, Settlement } fr
 
 export interface SettleInput {
   match: Match;
-  existingResult?: MatchResult;
+  existingResult?: MatchResult | undefined;
   predictions: Prediction[];
   legs: CouponLeg[];
   coupons: Coupon[];

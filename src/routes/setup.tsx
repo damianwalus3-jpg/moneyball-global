@@ -29,7 +29,7 @@ function Setup() {
   const [url, setUrl] = useState(defaultUrl());
   const [key, setKey] = useState("");
   const [show, setShow] = useState(false);
-  const [err, setErr] = useState<{ url?: string; key?: string }>({});
+  const [err, setErr] = useState<{ url?: string | undefined; key?: string | undefined }>({});
   const [testing, setTesting] = useState(false);
   const [current, setCurrent] = useState<ReturnType<typeof readConfig>>(null);
 

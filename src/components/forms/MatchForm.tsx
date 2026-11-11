@@ -72,12 +72,12 @@ export function MatchForm({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const err: Record<string, string> = {};
-    if (!f.home_team.trim()) err.home_team = "Podaj gospodarzy.";
-    if (!f.away_team.trim()) err.away_team = "Podaj gości.";
+    if (!f.home_team.trim()) err["home_team"] = "Podaj gospodarzy.";
+    if (!f.away_team.trim()) err["away_team"] = "Podaj gości.";
     if (f.home_team.trim() && f.home_team.trim().toLowerCase() === f.away_team.trim().toLowerCase())
-      err.away_team = "Drużyny muszą być różne.";
-    if (!f.league.trim()) err.league = "Podaj ligę.";
-    if (!brusselsInputToISO(f.kickoff)) err.kickoff = "Podaj datę i godzinę.";
+      err["away_team"] = "Drużyny muszą być różne.";
+    if (!f.league.trim()) err["league"] = "Podaj ligę.";
+    if (!brusselsInputToISO(f.kickoff)) err["kickoff"] = "Podaj datę i godzinę.";
     setErrors(err);
     if (Object.keys(err).length === 0) save.mutate(undefined);
   }
@@ -93,19 +93,19 @@ export function MatchForm({
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Gospodarze" htmlFor="home" error={errors.home_team}>
+            <Field label="Gospodarze" htmlFor="home" error={errors["home_team"]}>
               <Input id="home" value={f.home_team} onChange={set("home_team")} />
             </Field>
-            <Field label="Goście" htmlFor="away" error={errors.away_team}>
+            <Field label="Goście" htmlFor="away" error={errors["away_team"]}>
               <Input id="away" value={f.away_team} onChange={set("away_team")} />
             </Field>
-            <Field label="Liga" htmlFor="league" error={errors.league}>
+            <Field label="Liga" htmlFor="league" error={errors["league"]}>
               <Input id="league" value={f.league} onChange={set("league")} />
             </Field>
             <Field label="Kraj" htmlFor="country">
               <Input id="country" value={f.country} onChange={set("country")} />
             </Field>
-            <Field label="Start (czas Brukseli)" htmlFor="kickoff" error={errors.kickoff}>
+            <Field label="Start (czas Brukseli)" htmlFor="kickoff" error={errors["kickoff"]}>
               <Input id="kickoff" type="datetime-local" value={f.kickoff} onChange={set("kickoff")} />
             </Field>
             <Field label="Status">
