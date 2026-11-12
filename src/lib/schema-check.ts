@@ -1,6 +1,8 @@
+import { createClient } from "@supabase/supabase-js";
 import { readConfig } from "./config";
+import { currentUserId, humanizeError } from "./db";
 import { requireSupabase } from "./supabase";
-import { expectedColumns } from "./schema";
+import { COLUMNS, OWNER_COLUMN } from "./schema";
 import { TABLES_IN_ORDER, type TableName } from "./types";
 
 export type TableCheck =
@@ -11,51 +13,43 @@ export type TableCheck =
 
 export interface SchemaReport {
   checkedAt: string;
-  ownerColumn: string;
-  detectedOwnerColumn: "user_id" | "owner_id" | null;
+  ownerColumn: typeof OWNER_COLUMN;
   tables: TableCheck[];
   warnings: string[];
+  anonymousAccess: "blocked" | "no_rows" | "exposed" | "unknown";
 }
 
 const isMissingTable = (code?: string) => code === "42P01" || code === "PGRST205";
 const isMissingColumn = (code?: string) => code === "42703" || code === "PGRST204";
+const isPermissionDenied = (code?: string) => code === "42501" || code === "PGRST301";
 
-async function columnExists(table: string, col: string) {
-  const { error } = await requireSupabase().from(table).select(col).limit(1);
-  if (!error) return true;
-  if (isMissingColumn(error.code)) return false;
-  throw new Error(error.message);
+async function countOwned(table: TableName, uid: string) {
+  const { count, error } = await requireSupabase()
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq(OWNER_COLUMN, uid);
+  if (error) throw new Error(humanizeError(error, table));
+  return count ?? null;
 }
 
-/** Read-only check of every expected table/column against the live database. */
+/** Read-only diagnostics. It never generates SQL or changes the database. */
 export async function runSchemaCheck(): Promise<SchemaReport> {
+  const cfg = readConfig();
+  if (!cfg) throw new Error("Najpierw skonfiguruj bezpieczne połączenie z Supabase.");
+  const uid = await currentUserId();
   const sb = requireSupabase();
-  const owner = readConfig()?.ownerColumn ?? "owner_id";
   const tables: TableCheck[] = [];
   const warnings: string[] = [];
 
-  let detected: SchemaReport["detectedOwnerColumn"] = null;
-  try {
-    if (await columnExists("matches", "user_id")) detected = "user_id";
-    else if (await columnExists("matches", "owner_id")) detected = "owner_id";
-  } catch {
-    detected = null;
-  }
-  if (detected && detected !== owner)
-    warnings.push(
-      `Tabele używają kolumny właściciela "${detected}", a aplikacja jest ustawiona na "${owner}". Zmień ustawienie poniżej.`,
-    );
-
   for (const table of TABLES_IN_ORDER) {
-    const cols = expectedColumns(table, owner);
-    const { error } = await sb.from(table).select(cols.join(",")).limit(1);
-    let count: number | null = null;
-    if (!error || isMissingColumn(error.code)) {
-      const c = await sb.from(table).select("id", { count: "exact", head: true });
-      count = c.count ?? null;
-    }
+    const columns = COLUMNS[table];
+    const { error } = await sb
+      .from(table)
+      .select(columns.join(","))
+      .eq(OWNER_COLUMN, uid)
+      .limit(1);
     if (!error) {
-      tables.push({ table, status: "ok", count });
+      tables.push({ table, status: "ok", count: await countOwned(table, uid) });
       continue;
     }
     if (isMissingTable(error.code)) {
@@ -64,30 +58,40 @@ export async function runSchemaCheck(): Promise<SchemaReport> {
     }
     if (isMissingColumn(error.code)) {
       const missing: string[] = [];
-      for (const col of cols) {
-        try {
-          if (!(await columnExists(table, col))) missing.push(col);
-        } catch {
-          /* ignore individual failures */
-        }
+      for (const column of columns) {
+        const probe = await sb.from(table).select(column).eq(OWNER_COLUMN, uid).limit(1);
+        if (isMissingColumn(probe.error?.code)) missing.push(column);
       }
+      let count: number | null = null;
+      try { count = await countOwned(table, uid); } catch { /* count is optional during schema mismatch */ }
       tables.push({ table, status: "missing_columns", missing, count });
       continue;
     }
     tables.push({ table, status: "error", message: `${error.code ?? ""} ${error.message}`.trim() });
   }
 
-  // Probability scale sanity check (app stores 0–100).
+  // A separate anonymous client has no user session. Any visible row is a warning.
+  let anonymousAccess: SchemaReport["anonymousAccess"] = "unknown";
   try {
-    const { data } = await sb.from("predictions").select("probability").not("probability", "is", null).limit(200);
-    const vals = (data ?? []).map((r: { probability: number }) => Number(r.probability));
-    if (vals.length > 0 && vals.every((v) => v <= 1))
-      warnings.push(
-        "Wszystkie zapisane prawdopodobieństwa są ≤ 1 — wygląda na skalę 0–1. Aplikacja używa skali 0–100 (%).",
-      );
+    const anon = createClient(cfg.url, cfg.anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+    let sawRows = false;
+    let sawPermissionBlock = false;
+    for (const table of TABLES_IN_ORDER) {
+      const { data, error } = await anon.from(table).select("id").limit(1);
+      if (data?.length) sawRows = true;
+      if (isPermissionDenied(error?.code)) sawPermissionBlock = true;
+      if (error && !isPermissionDenied(error.code) && !isMissingTable(error.code)) {
+        warnings.push(`Nie udało się w pełni sprawdzić dostępu anonimowego dla ${table}: ${error.message}`);
+      }
+    }
+    anonymousAccess = sawRows ? "exposed" : sawPermissionBlock ? "blocked" : "no_rows";
+    if (sawRows) warnings.push("Uwaga: klient anonimowy odczytał co najmniej jeden rekord. Sprawdź polityki RLS.");
   } catch {
-    /* table may be missing; reported above */
+    anonymousAccess = "unknown";
+    warnings.push("Nie udało się zweryfikować dostępu anonimowego.");
   }
 
-  return { checkedAt: new Date().toISOString(), ownerColumn: owner, detectedOwnerColumn: detected, tables, warnings };
+  return { checkedAt: new Date().toISOString(), ownerColumn: OWNER_COLUMN, tables, warnings, anonymousAccess };
 }
