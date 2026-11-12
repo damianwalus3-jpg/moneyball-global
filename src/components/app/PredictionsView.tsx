@@ -14,7 +14,7 @@ import type { Market, Prediction } from "@/lib/types";
 function sourceLabel(source?: string | null) {
   if (!source) return "brak źródła";
   if (source === "NO_VERIFIED_SOURCE") return "brak potwierdzonych danych";
-  return source.replaceAll("_", " ");
+  return source.replace(/_/g, " ");
 }
 
 function coverageLabel(coverage?: Record<string, unknown> | null) {
