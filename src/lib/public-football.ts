@@ -67,7 +67,18 @@ export interface PublicFixture {
 }
 
 function dateKey(date: Date) {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels" }).format(date).replaceAll("-", "");
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${values.year}${values.month}${values.day}`;
+}
+
+function naturalMatchKey(kickoff: string | null, home: string | null, away: string | null) {
+  if (!kickoff || !home || !away) return null;
+  const minute = new Date(kickoff);
+  if (Number.isNaN(minute.getTime())) return null;
+  return `${minute.toISOString().slice(0, 16)}|${home.trim().toLocaleLowerCase()}|${away.trim().toLocaleLowerCase()}`;
 }
 
 export function eventToFixture(event: EspnEvent, league: (typeof PUBLIC_SOCCER_LEAGUES)[number]): PublicFixture | null {
@@ -162,7 +173,13 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
     fetchAll("matches"), fetchAll("predictions"), fetchAll("coupon_legs"), fetchAll("coupons"), fetchAll("match_results"),
   ]);
   const byExternal = new Map(existing.filter((m) => m.external_id).map((m) => [m.external_id!, m]));
-  const toInsert = deduped.filter((f) => !byExternal.has(f.external_id));
+  const byNatural = new Map(existing.map((m) => [naturalMatchKey(m.kickoff_at, m.home_team, m.away_team), m]).filter((entry): entry is [string, Match] => entry[0] !== null));
+  const resolved = new Map<string, Match>();
+  const toInsert = deduped.filter((f) => {
+    const found = byExternal.get(f.external_id) ?? byNatural.get(naturalMatchKey(f.kickoff_at, f.home_team, f.away_team) ?? "");
+    if (found) { resolved.set(f.external_id, found); return false; }
+    return true;
+  });
   const inserted = await insertRows("matches", toInsert.map((f) => ({
     scan_run_id: scan.id,
     external_id: f.external_id,
@@ -177,15 +194,17 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
 
   let updated = 0;
   for (const fixture of deduped) {
-    const old = byExternal.get(fixture.external_id);
+    const old = resolved.get(fixture.external_id) ?? byExternal.get(fixture.external_id);
     if (!old) continue;
-    const patch: Partial<Match> = {};
+    const patch: Record<string, unknown> = {};
+    if (!old.external_id) patch.external_id = fixture.external_id;
     if (old.status !== fixture.status) patch.status = fixture.status;
     if (old.kickoff_at !== fixture.kickoff_at) patch.kickoff_at = fixture.kickoff_at;
     if (Object.keys(patch).length) { await updateRow("matches", old.id, patch); updated++; }
   }
 
   const matchByExternal = new Map(existing.filter((m) => m.external_id).map((m) => [m.external_id!, m]));
+  for (const [externalId, match] of resolved) matchByExternal.set(externalId, match);
   for (const m of inserted) if (m.external_id) matchByExternal.set(m.external_id, m);
   let settledResults = 0;
   const settlementErrors: string[] = [];
