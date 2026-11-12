@@ -5,21 +5,12 @@ import { defineConfig } from "vite";
 import viteReact from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-// Direct Vite/TanStack/Nitro configuration; no hosted app-builder plugin.
-// Keep Cloudflare's production preset out of dev mode to preserve local Vite development.
+// Nitro auto-detects the production host (Vercel, Cloudflare, Netlify, etc.).
+// Do not pin a Cloudflare preset: the public Moneyball deployment is on Vercel.
 export default defineConfig({
   plugins: [
     tanstackStart({ server: { entry: "server" } }),
-    nitro(process.env["NODE_ENV"] === "production" ? {
-      preset: "cloudflare_module",
-      cloudflare: {
-        wrangler: {
-          name: "moneyball-global",
-          compatibility_date: "2026-11-12",
-          compatibility_flags: ["nodejs_compat"],
-        },
-      },
-    } : {}),
+    nitro(),
     viteReact(),
     tailwindcss(),
     tsconfigPaths(),
