@@ -68,6 +68,7 @@ export function PredictionForm({
       const match = matches.find((m) => m.id === f.match_id);
       const row = {
         match_id: f.match_id,
+        model_version: prediction?.model_version ?? "MANUAL",
         scan_run_id: prediction?.scan_run_id ?? match?.scan_run_id ?? null,
         prediction_type: type,
         pick: f.pick,
