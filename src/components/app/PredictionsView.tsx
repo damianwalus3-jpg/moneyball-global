@@ -11,6 +11,23 @@ import { useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
 import type { Market, Prediction } from "@/lib/types";
 
+function sourceLabel(source?: string | null) {
+  if (!source) return "brak źródła";
+  if (source === "NO_VERIFIED_SOURCE") return "brak potwierdzonych danych";
+  return source.replaceAll("_", " ");
+}
+
+function coverageLabel(coverage?: Record<string, unknown> | null) {
+  if (!coverage) return "brak metadanych pokrycia";
+  return [
+    "historia " + (coverage.verified_history ? "✓" : "—"),
+    "xG " + (coverage.historical_xg_used ? "✓" : "—"),
+    "Elo " + (coverage.elo_used ? "✓" : "—"),
+    "FootyNomad " + (coverage.footynomad_last5 ? "✓" : "—"),
+    "GitHub " + (coverage.keyless_github_last10 ? "✓" : "—"),
+  ].join(" · ");
+}
+
 export function PredictionsView({ market }: { market: Market }) {
   const matches = useTable("matches");
   const all = useTable("predictions");
@@ -31,7 +48,11 @@ export function PredictionsView({ market }: { market: Market }) {
       const match = byId.get(prediction.match_id);
       return !query || `${matchLabel(match)} ${match?.competition ?? ""} ${match?.country ?? ""}`.toLowerCase().includes(query.toLowerCase());
     })
-    .sort((a, b) => (byId.get(b.match_id)?.kickoff_at ?? "").localeCompare(byId.get(a.match_id)?.kickoff_at ?? ""));
+    .sort((a, b) => {
+      const aMatch = byId.get(a.match_id);
+      const bMatch = byId.get(b.match_id);
+      return (bMatch?.kickoff_at ?? bMatch?.kickoff_date ?? "").localeCompare(aMatch?.kickoff_at ?? aMatch?.kickoff_date ?? "");
+    });
   const settledSelected = visible.filter(
     (prediction) =>
       prediction.market === market &&
@@ -91,9 +112,13 @@ export function PredictionsView({ market }: { market: Market }) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{matchLabel(match)}</div>
-                  <div className="text-xs text-muted-foreground">{match?.competition ?? "—"} · {fmtDateTime(match?.kickoff_at)}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {match?.competition ?? match?.league ?? "—"} · {match?.kickoff_at ? fmtDateTime(match.kickoff_at) : match?.kickoff_date ? match.kickoff_date + " · godzina nieznana" : "brak daty"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Źródło: {sourceLabel(prediction.data_source)} · {coverageLabel(prediction.data_coverage)}</div>
+                  {prediction.probability == null && <div className="text-xs text-warning">Brak wystarczających potwierdzonych danych — prawdopodobieństwo nie zostało wygenerowane.</div>}
                   {prediction.rationale && <div className="text-xs text-muted-foreground">Uzasadnienie: {prediction.rationale}</div>}
-                  {prediction.note && <div className="text-xs text-muted-foreground">{prediction.note}</div>}
+                  {prediction.note && !prediction.note.trim().startsWith("{") && <div className="text-xs text-muted-foreground">{prediction.note}</div>}
                 </div>
                 <div className="num text-right text-sm">
                   <div>{fmtPct(prediction.probability)}</div>
