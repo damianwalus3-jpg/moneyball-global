@@ -1,3 +1,4 @@
+import { combinedProbability } from "./domain";
 import { requireSupabase } from "./supabase";
 import { COLUMNS, OWNER_COLUMN } from "./schema";
 import type { TableName, TableRows } from "./types";
@@ -60,7 +61,7 @@ function whitelist(table: TableName, row: Record<string, unknown>, includeId = f
 
 const PAGE = 1000;
 
-export async function fetchAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
+async function fetchRawAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
   const sb = requireSupabase();
   const uid = await currentUserId();
   const columns = COLUMNS[table].join(",");
@@ -73,8 +74,110 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
       .order("id", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(humanizeError(error, table));
-    rows.push(...((data ?? []) as TableRows[K][]));
+    rows.push(...((data ?? []) as unknown as TableRows[K][]));
     if (!data || data.length < PAGE) break;
+  }
+  return rows;
+}
+
+/**
+ * Adds read-only aliases expected by older screens while keeping all database
+ * reads and writes on the canonical schema. This is a presentation adapter,
+ * not a second database schema.
+ */
+export async function fetchAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
+  const rows = await fetchRawAll(table);
+  if (table === "scan_runs") {
+    return rows.map((row) => ({ ...row, matches_count: row.matches_found })) as TableRows[K][];
+  }
+  if (table === "matches") {
+    return rows.map((row) => ({ ...row, league: row.competition })) as TableRows[K][];
+  }
+  if (table === "predictions") {
+    const matches = await fetchRawAll("matches");
+    const scanRunByMatch = new Map(matches.map((match) => [match.id, match.scan_run_id]));
+    return rows.map((row) => ({
+      ...row,
+      prediction_type: row.market === "DOUBLE_CHANCE" ? "DC" : "1X2",
+      pick: row.selection,
+      selection_status: row.verdict,
+      result_status: row.settlement_status,
+      rejection_reason: row.rationale,
+      notes: row.note,
+      data_source: row.model_version,
+      scan_run_id: scanRunByMatch.get(row.match_id) ?? null,
+      settled_at: null,
+    })) as TableRows[K][];
+  }
+  if (table === "coupon_legs") {
+    const predictions = await fetchRawAll("predictions");
+    const predictionById = new Map(predictions.map((prediction) => [prediction.id, prediction]));
+    return rows.map((row) => {
+      const prediction = predictionById.get(row.prediction_id);
+      return {
+        ...row,
+        match_id: prediction?.match_id ?? null,
+        prediction_type: prediction?.market === "DOUBLE_CHANCE" ? "DC" : "1X2",
+        pick: prediction?.selection ?? "—",
+        probability: prediction?.probability ?? null,
+        result_status: row.status,
+      };
+    }) as TableRows[K][];
+  }
+  if (table === "coupons") {
+    const [legs, predictions] = await Promise.all([
+      fetchRawAll("coupon_legs"),
+      fetchRawAll("predictions"),
+    ]);
+    const predictionById = new Map(predictions.map((prediction) => [prediction.id, prediction]));
+    return rows.map((coupon) => {
+      const probabilities = legs
+        .filter((leg) => leg.coupon_id === coupon.id)
+        .map((leg) => predictionById.get(leg.prediction_id)?.probability ?? null);
+      return {
+        ...coupon,
+        total_odds: coupon.combined_odds,
+        combined_probability: probabilities.length === 3 ? combinedProbability(probabilities) : null,
+      };
+    }) as TableRows[K][];
+  }
+  if (table === "odds_snapshots") {
+    const predictions = await fetchRawAll("predictions");
+    const predictionById = new Map(predictions.map((prediction) => [prediction.id, prediction]));
+    const grouped = new Map<string, Record<string, unknown>>();
+    for (const snapshot of rows) {
+      const prediction = predictionById.get(snapshot.prediction_id ?? "");
+      const matchId = prediction?.match_id ?? null;
+      const key = [matchId ?? "unknown", snapshot.bookmaker, snapshot.captured_at].join("|");
+      const item = grouped.get(key) ?? {
+        ...snapshot,
+        match_id: matchId,
+        odds_1: null,
+        odds_x: null,
+        odds_2: null,
+      };
+      if (prediction?.market === "1X2") {
+        if (prediction.selection === "1") item.odds_1 = snapshot.odds;
+        if (prediction.selection === "X") item.odds_x = snapshot.odds;
+        if (prediction.selection === "2") item.odds_2 = snapshot.odds;
+      }
+      grouped.set(key, item);
+    }
+    return [...grouped.values()] as unknown as TableRows[K][];
+  }
+  if (table === "match_results") {
+    return rows.map((row) => ({
+      ...row,
+      home_goals: row.home_score,
+      away_goals: row.away_score,
+      settled_at: row.finished_at,
+    })) as TableRows[K][];
+  }
+  if (table === "bankroll_transactions") {
+    return rows.map((row) => ({
+      ...row,
+      type: row.transaction_type === "return" ? "payout" : row.transaction_type,
+    })) as TableRows[K][];
   }
   return rows;
 }
@@ -91,7 +194,7 @@ export async function insertRows<K extends TableName>(
     .insert(payload)
     .select(COLUMNS[table].join(","));
   if (error) throw new Error(humanizeError(error, table));
-  return (data ?? []) as TableRows[K][];
+  return (data ?? []) as unknown as TableRows[K][];
 }
 
 export async function insertRow<K extends TableName>(table: K, row: Record<string, unknown>) {
