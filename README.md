@@ -1,26 +1,42 @@
-# Moneyball Global
+# MONEYBALL GLOBAL 2.0
 
-Build a production-ready responsive Polish-language web app named MONEYBALL GLOBAL 2.0 for the owner's football prediction tracking workflow. This is a real usable app, not a mockup. Mobile-first PWA-style layout, dark professional sports analytics dashboard, clean navigation with tabs: Panel, Terminarz/Mecze, Prognozy 1X2, Double Chance, Kupony, Historia/Rozliczenia, Statystyki, Bankroll, Ustawienia. Use Europe/Brussels timezone and Polish labels. The owner already has an EXISTING external Supabase project and wants this app connected to it, not a new separate database: project ref gzgeklcukrclgwbsmbsp, URL https://gzgeklcukrclgwbsmbsp.supabase.co. Inspect and use the existing database tables if accessible: scan_runs, matches, predictions, coupons, coupon_legs, match_results, odds_snapshots, bankroll_transactions. RLS is enabled and owner policies exist. Do not drop, reset, or overwrite existing tables/migrations. If direct connection cannot be completed from the project environment, build the integration using Supabase JS client and environment variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (publishable key), and clearly expose a safe setup screen asking the owner to enter only the publishable/anon key; NEVER ask for or expose service_role/secret keys. Implement Supabase email/password authentication, session persistence, protected app routes, and owner-only data access through RLS. Do not store business data only in localStorage; Supabase is source of truth. Build CRUD flows for matches, predictions, coupons and legs, results/settlement, odds snapshots, bankroll transactions, scan runs. Keep 1X2 and Double Chance as separate prediction types. Status labels WYBRANY and ODRZUCONY; never omit a match from the stored scan just because a prediction is weak. Coupon builder must select exactly 3 distinct matches per coupon, avoid duplicate matches across generated coupons in a batch, and only recommend candidates with probability >75%; never claim guaranteed wins. Store confidence/probability separately from bookmaker odds. Include pending/won/lost/void settlement and calculate hit rates separately for 1X2 and DC, by league and market. Show current bankroll but don't invent its value; if no transactions exist, show 'brak danych'. Include import/export CSV/JSON and a data backup option. Seed no fake match records or results. Add helpful empty states and validation. Add app branding and make it easy to add to Android home screen. Before declaring complete, verify database schema and all queries against the existing tables; if schema mismatch, create a non-destructive migration only after explaining it in the project. Provide a working preview.
+Polish-language football prediction tracker with separate 1X2 and Double Chance models, match history, coupons, settlements, statistics and bankroll tracking. User-facing dates use Europe/Brussels.
 
-This project was built with [Lovable](https://lovable.dev).
+## Stack
 
-**Live app**: https://moneyball-global.lovable.app
+- React + TanStack Start + Vite
+- Supabase JS with the owner's existing Supabase project
+- Tailwind CSS
+- Bun lockfile (`bun.lock`)
 
-## Build with Lovable
+## Data and security
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/fe2e7e73-9cf3-4f7b-aef2-d65b92fb4d1b).
+- Supabase is the source of truth for business data. Do not replace the existing database.
+- The browser accepts only a Supabase publishable/anon key. Never use a `service_role` or secret key in the client.
+- Football fixture/results feeds must not require paid provider keys. Current public ESPN scoreboard support is limited to the competitions listed in `src/lib/public-football.ts`; this is not complete worldwide coverage.
+- The automatic baseline is goals-based Poisson, not xG. It marks predictions ODRZUCONY when either team has fewer than three prior results in the same competition. It must be calibrated against historical data before being treated as a betting edge.
+- No synthetic fixtures, results, odds, lineups or xG values are generated.
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+## Local development
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+bun install --frozen-lockfile
+bun run dev
 ```
+
+## Quality checks
+
+```sh
+bun run lint
+bun run test
+bun run typecheck
+bun run build
+```
+
+## Deployment
+
+The Vite build uses Nitro's `cloudflare_module` preset. Deploying requires a Cloudflare account and a Wrangler deployment setup; no deployment secret is committed to this repository. Configure deployment credentials in GitHub/Cloudflare settings, never in source files.
+
+## Existing database
+
+The app expects the owner's existing Supabase project and tables: `scan_runs`, `matches`, `predictions`, `coupons`, `coupon_legs`, `match_results`, `odds_snapshots`, and `bankroll_transactions`. Schema diagnostics are read-only. Back up the database before any future schema changes.
