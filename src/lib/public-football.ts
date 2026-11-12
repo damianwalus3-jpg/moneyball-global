@@ -38,7 +38,7 @@ export const PUBLIC_SOCCER_LEAGUES = [
   { slug: "fifa.wwc", name: "Mistrzostwa Świata kobiet", country: "Międzynarodowe · kobiety" },
 ] as const;
 
-type EspnEvent = {
+export type EspnEvent = {
   id?: string;
   date?: string;
   name?: string;
@@ -70,7 +70,7 @@ function dateKey(date: Date) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels" }).format(date).replaceAll("-", "");
 }
 
-function eventToFixture(event: EspnEvent, league: (typeof PUBLIC_SOCCER_LEAGUES)[number]): PublicFixture | null {
+export function eventToFixture(event: EspnEvent, league: (typeof PUBLIC_SOCCER_LEAGUES)[number]): PublicFixture | null {
   const kickoff = event.date ? new Date(event.date) : null;
   const competitors = event.competitions?.[0]?.competitors ?? [];
   const home = competitors.find((x) => x.homeAway === "home");
