@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { CalendarDays, Ticket, Trophy, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
-import { bankrollBalance, hitRate, isCouponCandidate } from "@/lib/domain";
+import { ACTIVE_MODEL_VERSION, bankrollBalance, hitRate, isCouponCandidate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { ensureTables, useTable } from "@/lib/queries";
 import { brusselsDayKey } from "@/lib/time";
@@ -23,13 +23,14 @@ function Panel() {
   const results = useTable("match_results");
   const now = Date.now();
   const byId = new Map(matches.map((m) => [m.id, m]));
+  const activePreds = preds.filter((p) => p.model_version === ACTIVE_MODEL_VERSION || !p.data_source);
   const balance = bankrollBalance(txs);
   const today = brusselsDayKey(new Date());
   const todayCount = matches.filter((m) => m.kickoff_at && brusselsDayKey(m.kickoff_at) === today).length;
-  const sel = preds.filter((p) => p.selection_status === "WYBRANY");
+  const sel = activePreds.filter((p) => p.selection_status === "WYBRANY");
   const hr1 = hitRate(sel.filter((p) => p.prediction_type === "1X2").map((p) => p.result_status));
   const hrDc = hitRate(sel.filter((p) => p.prediction_type === "DC").map((p) => p.result_status));
-  const candidates = new Set(preds.filter((p) => isCouponCandidate(p, byId.get(p.match_id), now)).map((p) => p.match_id)).size;
+  const candidates = new Set(activePreds.filter((p) => isCouponCandidate(p, byId.get(p.match_id), now)).map((p) => p.match_id)).size;
   const resultIds = new Set(results.map((r) => r.match_id));
   const toSettle = matches.filter((m) => m.kickoff_at && new Date(m.kickoff_at).getTime() < now && !resultIds.has(m.id) && m.status !== "cancelled" && m.status !== "postponed").length;
 
