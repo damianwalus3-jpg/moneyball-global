@@ -13,6 +13,10 @@ import type {
 export const COUPON_SIZE = 3;
 export const CANDIDATE_MIN_PROBABILITY = 75;
 export const ACTIVE_MODEL_VERSION = "MONEYBALL GLOBAL 3.8";
+
+export function isActivePredictionVersion(version: string | null | undefined): boolean {
+  return version === ACTIVE_MODEL_VERSION || (version ?? "").startsWith("MANUAL");
+}
 export const isActivePredictionVersion = (version?: string | null) =>
   version === ACTIVE_MODEL_VERSION || version === "MANUAL" || version === "MANUAL_IMPORT";
 
