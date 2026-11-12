@@ -1,115 +1,126 @@
-export type PredictionType = "1X2" | "DC";
-export type Pick1X2 = "1" | "X" | "2";
-export type PickDC = "1X" | "X2" | "12";
-export type Pick = Pick1X2 | PickDC;
-export type Outcome = Pick1X2;
-export type SelectionStatus = "WYBRANY" | "ODRZUCONY";
+export type Market = "1X2" | "DOUBLE_CHANCE";
+export type Selection1X2 = "1" | "X" | "2";
+export type SelectionDC = "1X" | "X2" | "12";
+export type Selection = Selection1X2 | SelectionDC;
+export type Outcome = Selection1X2;
+export type Verdict = "WYBRANY" | "ODRZUCONY";
 export type Settlement = "pending" | "won" | "lost" | "void";
-export type MatchStatus = "scheduled" | "live" | "finished" | "postponed" | "cancelled";
-export type TxType = "deposit" | "withdrawal" | "stake" | "payout" | "adjustment";
+export type CouponStatus = Settlement | "cancelled";
+export type MatchStatus = "scheduled" | "live" | "finished" | "postponed" | "cancelled" | "unknown";
+export type Gender = "men" | "women" | "mixed" | "unknown";
+export type ScanRunStatus = "started" | "completed" | "partial" | "failed";
+export type CouponType = "TEST" | "MAIN" | "MEGA" | "EXTRA";
+export type TransactionType = "deposit" | "withdrawal" | "stake" | "return" | "adjustment";
 
 export interface ScanRun {
   id: string;
-  started_at: string | null;
-  source: string | null;
+  owner_id: string;
+  scan_date: string;
+  source: string;
+  started_at: string;
+  completed_at: string | null;
+  status: ScanRunStatus;
+  matches_found: number;
   notes: string | null;
-  matches_count: number | null;
-  created_at: string | null;
+  created_at: string;
 }
 
 export interface Match {
   id: string;
+  owner_id: string;
   scan_run_id: string | null;
-  kickoff_at: string | null;
-  league: string | null;
-  country: string | null;
-  home_team: string | null;
-  away_team: string | null;
-  status: MatchStatus | null;
   external_id: string | null;
-  notes: string | null;
-  created_at: string | null;
+  source: string;
+  competition: string | null;
+  country: string | null;
+  gender: Gender;
+  home_team: string;
+  away_team: string;
+  kickoff_at: string | null;
+  status: MatchStatus;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Prediction {
   id: string;
-  model_version?: string | null;
-  data_source?: string | null;
+  owner_id: string;
   match_id: string;
-  scan_run_id: string | null;
-  prediction_type: PredictionType;
-  pick: Pick;
+  model_version: string;
+  market: Market;
+  selection: Selection | "—";
   probability: number | null;
   confidence: string | null;
+  verdict: Verdict;
+  rationale: string | null;
+  created_at: string;
+  group_name: string;
   odds: number | null;
-  selection_status: SelectionStatus | null;
-  rejection_reason: string | null;
-  result_status: Settlement | null;
-  settled_at: string | null;
-  notes: string | null;
-  created_at: string | null;
+  settlement_status: Settlement;
+  verified: boolean;
+  note: string | null;
 }
 
 export interface Coupon {
   id: string;
-  name: string | null;
-  batch_id: string | null;
+  owner_id: string;
+  scan_run_id: string | null;
+  name: string;
+  coupon_type: CouponType;
+  status: CouponStatus;
+  target_legs: 3;
+  combined_odds: number | null;
   stake: number | null;
-  total_odds: number | null;
-  combined_probability: number | null;
-  status: Settlement | null;
+  potential_return: number | null;
+  created_at: string;
   settled_at: string | null;
   notes: string | null;
-  created_at: string | null;
 }
 
 export interface CouponLeg {
   id: string;
+  owner_id: string;
   coupon_id: string;
-  prediction_id: string | null;
-  match_id: string;
-  prediction_type: PredictionType;
-  pick: Pick;
-  probability: number | null;
+  prediction_id: string;
+  leg_number: 1 | 2 | 3;
   odds: number | null;
-  result_status: Settlement | null;
-  created_at: string | null;
+  status: Settlement;
+  created_at: string;
 }
 
 export interface MatchResult {
   id: string;
+  owner_id: string;
   match_id: string;
-  home_goals: number | null;
-  away_goals: number | null;
-  outcome_1x2: Outcome | null;
+  home_score: number;
+  away_score: number;
+  outcome_1x2: Outcome;
+  verified: boolean;
   source: string | null;
-  settled_at: string | null;
-  notes: string | null;
-  created_at: string | null;
+  finished_at: string | null;
+  verified_at: string | null;
+  created_at: string;
 }
 
 export interface OddsSnapshot {
   id: string;
-  match_id: string;
-  bookmaker: string | null;
-  captured_at: string | null;
-  odds_1: number | null;
-  odds_x: number | null;
-  odds_2: number | null;
-  odds_1x: number | null;
-  odds_x2: number | null;
-  odds_12: number | null;
-  created_at: string | null;
+  owner_id: string;
+  prediction_id: string;
+  bookmaker: string;
+  odds: number;
+  captured_at: string;
+  source_url: string | null;
 }
 
 export interface BankrollTransaction {
   id: string;
-  occurred_at: string | null;
-  type: TxType;
+  owner_id: string;
+  transaction_type: TransactionType;
   amount: number;
+  balance_after: number | null;
   coupon_id: string | null;
+  occurred_at: string;
   note: string | null;
-  created_at: string | null;
 }
 
 export interface TableRows {
@@ -124,13 +135,13 @@ export interface TableRows {
 }
 export type TableName = keyof TableRows;
 
-/** Insert order respects foreign keys (parents first). */
+/** Parent tables are inserted before their dependent records. */
 export const TABLES_IN_ORDER: TableName[] = [
   "scan_runs",
   "matches",
-  "odds_snapshots",
   "match_results",
   "predictions",
+  "odds_snapshots",
   "coupons",
   "coupon_legs",
   "bankroll_transactions",
@@ -141,8 +152,8 @@ export const TABLE_LABELS: Record<TableName, string> = {
   matches: "Mecze",
   predictions: "Prognozy",
   coupons: "Kupony",
-  coupon_legs: "Zdarzenia kuponów",
+  coupon_legs: "Nogi kuponów",
   match_results: "Wyniki meczów",
-  odds_snapshots: "Kursy (snapshoty)",
+  odds_snapshots: "Kursy",
   bankroll_transactions: "Transakcje bankrolla",
 };
