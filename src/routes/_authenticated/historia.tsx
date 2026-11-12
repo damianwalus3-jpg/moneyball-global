@@ -46,7 +46,6 @@ function Historia() {
   const resultBy = useMemo(() => new Map(results.map((r) => [r.match_id, r])), [results]);
   const now = Date.now();
 
-  const isVoided = (m: Match) => m.status === "cancelled" || m.status === "postponed";
   const todo = matches
     .filter((m) => {
       const result = resultBy.get(m.id);
