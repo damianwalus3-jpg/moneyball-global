@@ -38,6 +38,8 @@ export function validateSupabaseUrl(url: string): string | null {
   } catch {
     return "Nieprawidłowy adres URL.";
   }
+  if (projectRefFromUrl(u) !== EXPECTED_PROJECT_REF)
+    return "Ta aplikacja może łączyć się wyłącznie z istniejącą bazą MONEYBALL GLOBAL.";
   return null;
 }
 
@@ -88,11 +90,11 @@ export function readConfig(): AppConfig | null {
   }
   if (env.key) {
     const url = env.url ?? DEFAULT_SUPABASE_URL;
-    if (validatePublicKey(env.key, url).ok) return { url, anonKey: env.key, source: "env" };
+    if (!validateSupabaseUrl(url) && validatePublicKey(env.key, url).ok) return { url, anonKey: env.key, source: "env" };
   }
   if (stored.anonKey) {
     const url = stored.url || env.url || DEFAULT_SUPABASE_URL;
-    if (validatePublicKey(stored.anonKey, url).ok)
+    if (!validateSupabaseUrl(url) && validatePublicKey(stored.anonKey, url).ok)
       return { url, anonKey: stored.anonKey, source: "local" };
   }
   return null;
@@ -100,10 +102,12 @@ export function readConfig(): AppConfig | null {
 
 export function defaultUrl(): string {
   const envUrl = envConfig().url;
-  return envUrl ?? DEFAULT_SUPABASE_URL;
+  return envUrl && !validateSupabaseUrl(envUrl) ? envUrl : DEFAULT_SUPABASE_URL;
 }
 
 export function saveConfig(cfg: { url: string; anonKey: string }) {
+  const urlError = validateSupabaseUrl(cfg.url);
+  if (urlError) throw new Error(urlError);
   const check = validatePublicKey(cfg.anonKey, cfg.url);
   if (!check.ok) throw new Error(check.reason);
   window.localStorage.setItem(
