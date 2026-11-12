@@ -71,7 +71,7 @@ function Ustawienia() {
         <h2 className="text-xl font-semibold uppercase">Połączenie z bazą</h2>
         <div className="text-sm text-muted-foreground">
           <div>Adres: <span className="num">{cfg?.url ?? "—"}</span></div>
-          <div>Klucz publiczny: <span className="num">{cfg ? maskKey(cfg.anonKey) : "—"}</span> ({cfg?.source === "env" ? "zmienna środowiskowa" : "to urządzenie"})</div>
+          <div>Klucz publiczny: <span className="num">{cfg ? maskKey(cfg.anonKey) : "—"}</span> ({cfg?.source === "env" ? "zmienna środowiskowa" : cfg?.source === "default" ? "domyślny klucz publiczny MONEYBALL" : "to urządzenie"})</div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild><Link to="/setup">Zmień klucz</Link></Button>

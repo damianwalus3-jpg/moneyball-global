@@ -34,7 +34,7 @@ function Index() {
           <span className="block text-primary">Global 2.0</span>
         </h1>
         <p className="mt-4 text-muted-foreground">
-          Skany, prognozy 1X2 i Double Chance, kupony 3-meczowe, rozliczenia i bankroll — w jednym miejscu.
+          Skany, prognozy 1X2 i Double Chance, kupony pojedyncze i AKO, rozliczenia i bankroll — w jednym miejscu.
         </p>
         <Button asChild size="lg" className="mt-8 w-full text-base">
           <Link to="/panel">
@@ -44,7 +44,7 @@ function Index() {
         <div className="mt-10 grid grid-cols-3 gap-3 text-left">
           {[
             { icon: ShieldCheck, t: "Twoja baza", d: "Dane tylko w Twoim projekcie" },
-            { icon: Ticket, t: "Kupony", d: "3 mecze, >75%" },
+            { icon: Ticket, t: "Kupony", d: "Pojedyncze i AKO" },
             { icon: BarChart3, t: "Statystyki", d: "1X2 i DC osobno" },
           ].map((x) => (
             <div key={x.t} className="surface-card p-3">
