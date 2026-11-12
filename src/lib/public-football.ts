@@ -92,11 +92,12 @@ export function eventToFixture(event: EspnEvent, league: (typeof PUBLIC_SOCCER_L
   if (!event.id || !kickoff || Number.isNaN(kickoff.getTime()) || !homeName || !awayName) return null;
 
   const state = event.status?.type?.state;
+  const description = event.status?.type?.description ?? "";
   const status: PublicFixture["status"] =
+    /postponed|delayed/i.test(description) ? "postponed" :
+    /cancelled|canceled/i.test(description) ? "cancelled" :
     state === "in" ? "live" :
     state === "post" ? "finished" :
-    /postponed|delayed/i.test(event.status?.type?.description ?? "") ? "postponed" :
-    /cancelled|canceled/i.test(event.status?.type?.description ?? "") ? "cancelled" :
     "scheduled";
   const homeScore = home?.score == null || String(home.score).trim() === "" ? null : Number(home.score);
   const awayScore = away?.score == null || String(away.score).trim() === "" ? null : Number(away.score);
