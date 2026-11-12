@@ -61,7 +61,7 @@ function Mecze() {
   const [editScan, setEditScan] = useState<ScanRun | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const publicScan = useAction(scanPublicFootball, {
-    success: (r) => `Źródło publiczne: ${r.inserted} nowych meczów, ${r.updated} aktualizacji, ${r.settledResults} rozliczonych wyników; ligi ${r.successfulLeagues}/${r.requestedLeagues}.`,
+    success: (r) => `Źródło publiczne: ${r.inserted} nowych meczów, ${r.updated} aktualizacji, ${r.settledResults} rozliczonych wyników, ${r.predictionsGenerated} nowych prognoz 1X2/DC; ligi ${r.successfulLeagues}/${r.requestedLeagues}.`,
   });
 
   const resultBy = useMemo(() => new Map(results.map((r) => [r.match_id, r])), [results]);
@@ -115,7 +115,7 @@ function Mecze() {
       <PageHeader
         eyebrow="Europe/Brussels"
         title="Terminarz / Mecze"
-        description="Wszystkie zeskanowane mecze — także ODRZUCONY. Skan publiczny pobiera terminarze i dostępne wyniki z wybranych lig ESPN; nie jest to pełne pokrycie światowe."
+        description="Wszystkie zeskanowane mecze — także ODRZUCONY. Skan publiczny pobiera terminarze i wyniki z wybranych lig ESPN oraz tworzy eksperymentalne prognozy bramkowe 1X2/DC; nie jest to pełne pokrycie światowe ani model xG."
         actions={
           <>
             <Button variant="outline" onClick={() => publicScan.mutate({ daysBack: 3, daysForward: 10 })} disabled={publicScan.isPending}>
