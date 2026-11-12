@@ -33,6 +33,13 @@ bun install
 bun run dev
 ```
 
+## Current audit
+
+- Active model: `MONEYBALL GLOBAL 3.8`.
+- Canonical Supabase fields are mapped to legacy read-only view aliases in `src/lib/db.ts`.
+- Fixture scan and prediction are separate authenticated Edge Function calls; result sync is chained by the fixture sync.
+- The `main` branch CI checks tests, TypeScript and production build.
+
 ## Validation
 
 ```sh
