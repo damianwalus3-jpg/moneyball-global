@@ -1,105 +1,101 @@
 import { CANDIDATE_MIN_PROBABILITY, isValidPick } from "./domain";
 import { brusselsInputToISO } from "./time";
-import type { Pick, PredictionType, SelectionStatus } from "./types";
+import type { Gender, Market, Selection, Verdict } from "./types";
 
 export interface ParsedMatch {
   key: string;
   kickoff_at: string;
-  league: string;
+  competition: string | null;
   country: string | null;
+  gender: Gender;
   home_team: string;
   away_team: string;
 }
+
 export interface ParsedPrediction {
   matchKey: string;
-  prediction_type: PredictionType;
-  pick: Pick;
-  probability: number;
+  market: Market;
+  selection: Selection;
+  probability: number | null;
   odds: number | null;
   confidence: string | null;
-  selection_status: SelectionStatus;
-  rejection_reason: string | null;
+  verdict: Verdict;
+  rationale: string | null;
+  model_version: string;
+  group_name: string;
 }
+
 export interface ParsedScan {
   matches: ParsedMatch[];
   predictions: ParsedPrediction[];
   errors: { row: number; message: string }[];
 }
 
-const ALIASES: Record<string, string[]> = {
-  kickoff: ["kickoff", "kickoff_at", "data", "date", "datetime", "termin"],
-  league: ["league", "liga", "competition"],
-  country: ["country", "kraj"],
-  home: ["home_team", "home", "gospodarze", "gospodarz"],
-  away: ["away_team", "away", "goscie", "goście", "gosc"],
-  type: ["prediction_type", "type", "typ", "rynek", "market"],
-  pick: ["pick", "wybor", "wybór", "selection"],
-  probability: ["probability", "prob", "prawdopodobienstwo", "prawdopodobieństwo", "p"],
-  odds: ["odds", "kurs"],
-  confidence: ["confidence", "pewnosc", "pewność"],
-  status: ["status", "selection_status"],
-  reason: ["rejection_reason", "powod", "powód", "reason"],
-};
-
-function get(row: Record<string, unknown>, field: string): string {
-  const keys = Object.keys(row);
-  for (const alias of ALIASES[field] ?? []) {
-    const k = keys.find((x) => x.trim().toLowerCase() === alias);
-    if (k != null && row[k] != null && String(row[k]).trim() !== "") return String(row[k]).trim();
-  }
-  return "";
+function value(row: Record<string, unknown>, key: string): string {
+  const raw = row[key];
+  return raw == null ? "" : String(raw).trim();
 }
 
-export function parseNumber(v: string): number | null {
-  if (!v) return null;
-  const n = Number(v.replace("%", "").replace(",", ".").trim());
-  return Number.isFinite(n) ? n : null;
+export function parseNumber(raw: string): number | null {
+  if (!raw) return null;
+  const number = Number(raw.replace("%", "").replace(",", ".").trim());
+  return Number.isFinite(number) ? number : null;
 }
 
-/** Accepts 82, "82%", "82,5" or 0.82 and returns a percentage (0–100). */
-export function parseProbability(v: string): number | null {
-  const n = parseNumber(v);
-  if (n == null) return null;
-  const pct = n > 0 && n <= 1 && !v.includes("%") ? n * 100 : n;
-  return pct >= 0 && pct <= 100 ? Math.round(pct * 100) / 100 : null;
+export function parseProbability(raw: string): number | null {
+  const number = parseNumber(raw);
+  if (number == null) return null;
+  const percent = number > 0 && number <= 1 && !raw.includes("%") ? number * 100 : number;
+  return percent >= 0 && percent <= 100 ? Math.round(percent * 100) / 100 : null;
 }
 
-export function normalizePick(v: string): string {
-  const p = v.toUpperCase().replace(/\s|\//g, "");
-  if (p === "X1") return "1X";
-  if (p === "2X") return "X2";
-  if (p === "21") return "12";
-  return p;
+export function normalizeSelection(raw: string): string {
+  return raw.toUpperCase().replace(/\s/g, "");
 }
 
-function parseType(v: string, pick: string): PredictionType | null {
-  const t = v.toUpperCase().replace(/\s|_/g, "");
-  if (t === "1X2") return "1X2";
-  if (t === "DC" || t === "DOUBLECHANCE" || t === "PODWÓJNASZANSA") return "DC";
-  if (!t) {
-    if (["1", "X", "2"].includes(pick)) return "1X2";
-    if (["1X", "X2", "12"].includes(pick)) return "DC";
+function parseMarket(raw: string, selection: string): Market | null {
+  const market = raw.trim().toUpperCase().replace(/\s/g, "_");
+  if (market === "1X2") return "1X2";
+  if (market === "DOUBLE_CHANCE") return "DOUBLE_CHANCE";
+  if (!market) {
+    if (["1", "X", "2"].includes(selection)) return "1X2";
+    if (["1X", "X2", "12"].includes(selection)) return "DOUBLE_CHANCE";
   }
   return null;
 }
 
-function parseKickoff(v: string): string | null {
-  if (!v) return null;
-  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(v)) {
-    const d = new Date(v);
-    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+function parseGender(raw: string): Gender {
+  const gender = raw.trim().toLowerCase();
+  if (gender === "men" || gender === "women" || gender === "mixed") return gender;
+  return "unknown";
+}
+
+function parseKickoff(raw: string): string | null {
+  if (!raw) return null;
+  if (/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)) {
+    const date = new Date(raw);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
-  return brusselsInputToISO(v);
+  return brusselsInputToISO(raw);
 }
 
-export function matchKey(kickoffIso: string, home: string, away: string) {
-  return `${kickoffIso.slice(0, 16)}|${home.trim().toLowerCase()}|${away.trim().toLowerCase()}`;
+export function matchKey(
+  kickoffIso: string,
+  home: string,
+  away: string,
+  competition = "",
+  gender: Gender | null = "unknown",
+) {
+  return [
+    kickoffIso.slice(0, 16),
+    home.trim().toLowerCase(),
+    away.trim().toLowerCase(),
+    (competition ?? "").trim().toLowerCase(),
+    gender ?? "unknown",
+  ].join("|");
 }
 
-/**
- * Every valid row becomes a stored match. Weak predictions are kept with
- * status ODRZUCONY — rows are never silently dropped.
- */
+/** Canonical CSV parser. It stores every valid match and never invents a prediction. */
 export function parseScanRows(
   rows: Record<string, unknown>[],
   threshold = CANDIDATE_MIN_PROBABILITY,
@@ -108,64 +104,80 @@ export function parseScanRows(
   const predictions: ParsedPrediction[] = [];
   const errors: ParsedScan["errors"] = [];
 
-  rows.forEach((row, i): void => {
-    const n = i + 2; // header is row 1
-    const home = get(row, "home");
-    const away = get(row, "away");
-    const league = get(row, "league");
-    const kickoff = parseKickoff(get(row, "kickoff"));
-    if (!home || !away) return void errors.push({ row: n, message: "Brak drużyn (home_team / away_team)." });
-    if (home.toLowerCase() === away.toLowerCase())
-      return void errors.push({ row: n, message: "Gospodarze i goście są tacy sami." });
-    if (!league) return void errors.push({ row: n, message: "Brak ligi (league)." });
-    if (!kickoff)
-      return void errors.push({ row: n, message: "Brak lub zły format daty (kickoff, np. 2026-11-14 20:45)." });
+  rows.forEach((row, index) => {
+    const rowNumber = index + 2;
+    const home = value(row, "home_team");
+    const away = value(row, "away_team");
+    const competition = value(row, "competition") || null;
+    const kickoff = parseKickoff(value(row, "kickoff_at"));
+    const gender = parseGender(value(row, "gender"));
 
-    const key = matchKey(kickoff, home, away);
-    if (!matches.has(key))
+    if (!home || !away) {
+      errors.push({ row: rowNumber, message: "Brak home_team lub away_team." });
+      return;
+    }
+    if (home.toLowerCase() === away.toLowerCase()) {
+      errors.push({ row: rowNumber, message: "home_team i away_team nie mogą być takie same." });
+      return;
+    }
+    if (!kickoff) {
+      errors.push({ row: rowNumber, message: "Brak lub błędny kickoff_at (czas lokalny Europe/Brussels albo ISO)." });
+      return;
+    }
+
+    const key = matchKey(kickoff, home, away, competition ?? "", gender);
+    if (!matches.has(key)) {
       matches.set(key, {
         key,
         kickoff_at: kickoff,
-        league,
-        country: get(row, "country") || null,
+        competition,
+        country: value(row, "country") || null,
+        gender,
         home_team: home,
         away_team: away,
       });
+    }
 
-    const rawPick = get(row, "pick");
-    if (!rawPick) return; // match without prediction is still stored
-    const pick = normalizePick(rawPick);
-    const type = parseType(get(row, "type"), pick);
-    if (!type) return void errors.push({ row: n, message: `Nieznany typ prognozy dla wyboru "${rawPick}".` });
-    if (!isValidPick(type, pick))
-      return void errors.push({ row: n, message: `Wybór "${rawPick}" nie pasuje do typu ${type}.` });
-    const probability = parseProbability(get(row, "probability"));
-    if (probability == null)
-      return void errors.push({ row: n, message: "Brak lub zły format prawdopodobieństwa (0–100)." });
-    const odds = parseNumber(get(row, "odds"));
-    if (odds != null && odds <= 1)
-      return void errors.push({ row: n, message: "Kurs musi być większy niż 1.00." });
+    const rawMarket = value(row, "market");
+    const rawSelection = value(row, "selection");
+    if (!rawMarket && !rawSelection) return;
+    const selection = normalizeSelection(rawSelection);
+    const market = parseMarket(rawMarket, selection);
+    if (!market || !isValidPick(market, selection)) {
+      errors.push({ row: rowNumber, message: "market/selection nie pasują. Użyj 1X2 z 1/X/2 albo DOUBLE_CHANCE z 1X/X2/12." });
+      return;
+    }
 
-    const rawStatus = get(row, "status").toUpperCase();
-    const status: SelectionStatus =
-      rawStatus === "WYBRANY" || rawStatus === "ODRZUCONY"
-        ? rawStatus
-        : probability > threshold
+    const probability = parseProbability(value(row, "probability"));
+    const odds = parseNumber(value(row, "odds"));
+    if (odds != null && odds <= 1) {
+      errors.push({ row: rowNumber, message: "odds musi być większe niż 1.00." });
+      return;
+    }
+    if (value(row, "probability") && probability == null) {
+      errors.push({ row: rowNumber, message: "probability musi być liczbą od 0 do 100." });
+      return;
+    }
+
+    const rawVerdict = value(row, "verdict").toUpperCase();
+    const verdict: Verdict =
+      rawVerdict === "WYBRANY" || rawVerdict === "ODRZUCONY"
+        ? rawVerdict
+        : probability != null && probability > threshold
           ? "WYBRANY"
           : "ODRZUCONY";
-    const reason =
-      get(row, "reason") ||
-      (status === "ODRZUCONY" && !rawStatus ? `Prawdopodobieństwo ≤ ${threshold}%` : "");
 
     predictions.push({
       matchKey: key,
-      prediction_type: type,
-      pick: pick as Pick,
+      market,
+      selection: selection as Selection,
       probability,
       odds,
-      confidence: get(row, "confidence") || null,
-      selection_status: status,
-      rejection_reason: reason || null,
+      confidence: value(row, "confidence") || null,
+      verdict,
+      rationale: value(row, "rationale") || null,
+      model_version: value(row, "model_version") || "MANUAL IMPORT",
+      group_name: value(row, "group_name") || "TEST",
     });
   });
 
@@ -173,5 +185,5 @@ export function parseScanRows(
 }
 
 export const SCAN_TEMPLATE_CSV =
-  "kickoff,league,country,home_team,away_team,prediction_type,pick,probability,odds,confidence\n" +
-  "2026-11-14 20:45,Liga,Kraj,Drużyna A,Drużyna B,1X2,1,78,1.65,wysoka\n";
+  "kickoff_at,competition,country,gender,home_team,away_team,market,selection,probability,odds,confidence,verdict,rationale,model_version,group_name\n" +
+  "2026-11-14 20:45,Premier League,England,men,Team A,Team B,1X2,1,78,1.65,wysoka,WYBRANY,Przykładowe uzasadnienie,MONEYBALL GLOBAL 3.8,TEST\n";
