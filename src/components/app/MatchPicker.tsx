@@ -42,7 +42,7 @@ export function MatchPicker({
               {sorted.map((m) => (
                 <CommandItem
                   key={m.id}
-                  value={`${matchLabel(m)} ${m.league ?? ""} ${m.id}`}
+                  value={`${matchLabel(m)} ${m.competition ?? ""} ${m.country ?? ""} ${m.gender ?? "unknown"} ${m.id}`}
                   onSelect={() => {
                     onChange(m.id);
                     setOpen(false);
@@ -52,7 +52,7 @@ export function MatchPicker({
                   <div className="min-w-0">
                     <div className="truncate">{matchLabel(m)}</div>
                     <div className="text-xs text-muted-foreground">
-                      {m.league ?? "—"} · {fmtDateTime(m.kickoff_at)}
+                      {m.competition ?? "—"} · {m.country ?? "—"} · {m.gender ?? "unknown"} · {fmtDateTime(m.kickoff_at)}
                     </div>
                   </div>
                 </CommandItem>
