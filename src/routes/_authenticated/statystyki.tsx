@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { BarChart3 } from "lucide-react";
 import { useMemo } from "react";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
-import { couponPayout, groupHitRates, hitRate, type HitRate } from "@/lib/domain";
+import { ACTIVE_MODEL_VERSION, couponPayout, groupHitRates, hitRate, type HitRate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { ensureTables, useTable } from "@/lib/queries";
 import type { Prediction, PredictionType } from "@/lib/types";
@@ -41,6 +41,7 @@ function Statystyki() {
   const preds = useTable("predictions");
   const coupons = useTable("coupons");
   const legs = useTable("coupon_legs");
+  const activePreds = preds.filter((p) => p.model_version === ACTIVE_MODEL_VERSION || !p.data_source);
   const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
 
   const settledCoupons = coupons.filter((c) => c.status && c.status !== "pending");
@@ -65,14 +66,14 @@ function Statystyki() {
   return (
     <div>
       <PageHeader
-        eyebrow="1X2 i DC liczone osobno"
+        eyebrow="Aktywny model 3.8 · 1X2 i DC osobno"
         title="Statystyki"
-        description="Skuteczność = wygrane / (wygrane + przegrane). Zwroty i oczekujące nie są wliczane."
+        description="Statystyki pokazują aktywny model i wpisy ręczne; stare wersje pozostają w historii. Skuteczność = wygrane / (wygrane + przegrane)."
       />
 
       <div className="grid gap-6">
         {(["1X2", "DC"] as PredictionType[]).map((t) => (
-          <MarketBlock key={t} type={t} preds={preds.filter((p) => p.prediction_type === t)} leagueOf={(p) => byId.get(p.match_id)?.league ?? "—"} />
+          <MarketBlock key={t} type={t} preds={activePreds.filter((p) => p.prediction_type === t)} leagueOf={(p) => byId.get(p.match_id)?.league ?? "—"} />
         ))}
 
         <section>
