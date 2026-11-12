@@ -63,6 +63,10 @@ function Mecze() {
   const [scanOpen, setScanOpen] = useState(false);
   const [scanDate, setScanDate] = useState(() => brusselsDayKey(new Date()));
 
+  const delScan = useAction((id: string) => deleteRow("scan_runs", id), {
+    success: "Usunięto skan",
+  });
+
   const runEngine = useAction(async (date: string) => {
     const sb = getSupabase();
     if (!sb) throw new Error("Brak połączenia z Supabase. Sprawdź Ustawienia → Połączenie z bazą.");
