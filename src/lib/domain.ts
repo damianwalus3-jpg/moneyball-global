@@ -119,7 +119,6 @@ export function isCouponCandidate(prediction: Prediction, match: Match | undefin
   if (!match) return false;
   if (prediction.verdict !== "WYBRANY") return false;
   if (prediction.settlement_status !== "pending") return false;
-  if (prediction.verified) return false;
   if (prediction.probability == null || Number(prediction.probability) <= CANDIDATE_MIN_PROBABILITY) return false;
   if (isFinishedStatus(match.status) || match.status === "live") return false;
   if (!match.kickoff_at || new Date(match.kickoff_at).getTime() <= nowMs) return false;
