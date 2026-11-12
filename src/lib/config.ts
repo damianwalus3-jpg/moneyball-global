@@ -2,11 +2,12 @@
 // Only the publishable/anon key is ever accepted; secret/service_role keys are rejected.
 export const DEFAULT_SUPABASE_URL = "https://gzgeklcukrclgwbsmbsp.supabase.co";
 export const EXPECTED_PROJECT_REF = "gzgeklcukrclgwbsmbsp";
+export const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_YdT4Nm50NkbmjKnoQE8bNQ_aGeqzG3S";
 
 export interface AppConfig {
   url: string;
   anonKey: string;
-  source: "env" | "local";
+  source: "env" | "local" | "default";
 }
 
 const STORAGE_KEY = "moneyball.connection.v1";
@@ -97,6 +98,8 @@ export function readConfig(): AppConfig | null {
     if (!validateSupabaseUrl(url) && validatePublicKey(stored.anonKey, url).ok)
       return { url, anonKey: stored.anonKey, source: "local" };
   }
+  if (validatePublicKey(DEFAULT_SUPABASE_PUBLISHABLE_KEY, DEFAULT_SUPABASE_URL).ok)
+    return { url: DEFAULT_SUPABASE_URL, anonKey: DEFAULT_SUPABASE_PUBLISHABLE_KEY, source: "default" };
   return null;
 }
 
