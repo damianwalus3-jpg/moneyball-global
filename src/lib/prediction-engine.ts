@@ -65,7 +65,9 @@ export function generateMatchPredictions(
   const leagueGoals: number[] = [];
 
   for (const result of historicalResults) {
-    if (result.home_goals == null || result.away_goals == null) continue;
+    const homeGoals = result.home_goals ?? result.home_score;
+    const awayGoals = result.away_goals ?? result.away_score;
+    if (homeGoals == null || awayGoals == null) continue;
     const prior = matchById.get(result.match_id);
     if (!prior?.kickoff_at || new Date(prior.kickoff_at).getTime() >= cutoff) continue;
     if (match.league && prior.league !== match.league) continue;
@@ -73,12 +75,12 @@ export function generateMatchPredictions(
     const awayKey = prior.away_team?.trim().toLocaleLowerCase();
     if (!homeKey || !awayKey) continue;
     const home = form.get(homeKey) ?? { played: 0, goalsFor: 0, goalsAgainst: 0 };
-    home.played++; home.goalsFor += result.home_goals; home.goalsAgainst += result.away_goals;
+    home.played++; home.goalsFor += homeGoals; home.goalsAgainst += awayGoals;
     form.set(homeKey, home);
     const away = form.get(awayKey) ?? { played: 0, goalsFor: 0, goalsAgainst: 0 };
-    away.played++; away.goalsFor += result.away_goals; away.goalsAgainst += result.home_goals;
+    away.played++; away.goalsFor += awayGoals; away.goalsAgainst += homeGoals;
     form.set(awayKey, away);
-    leagueGoals.push(result.home_goals, result.away_goals);
+    leagueGoals.push(homeGoals, awayGoals);
   }
 
   const homeKey = match.home_team.trim().toLocaleLowerCase();
