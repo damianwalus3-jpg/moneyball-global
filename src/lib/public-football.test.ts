@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eventToFixture, PUBLIC_SOCCER_LEAGUES, type EspnEvent } from "./public-football";
 
 describe("public ESPN soccer feed parser", () => {
-  const league = PUBLIC_SOCCER_LEAGUES[0];
+  const league = PUBLIC_SOCCER_LEAGUES[0]!;
   it("normalizes teams, UTC kickoff and scheduled status", () => {
     const event: EspnEvent = {
       id: "123",
