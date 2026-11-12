@@ -22,7 +22,7 @@ interface TeamForm {
 
 function poisson(lambda: number, maxGoals = 8): number[] {
   const values = [Math.exp(-lambda)];
-  for (let i = 1; i <= maxGoals; i++) values.push(values[i - 1] * lambda / i);
+  for (let i = 1; i <= maxGoals; i++) values.push(values[i - 1]! * lambda / i);
   const total = values.reduce((sum, value) => sum + value, 0);
   return values.map((value) => value / total);
 }
@@ -87,7 +87,7 @@ export function generateMatchPredictions(
   const ap = poisson(lambdaAway);
   let one = 0, draw = 0, two = 0;
   for (let h = 0; h < hp.length; h++) for (let a = 0; a < ap.length; a++) {
-    const p = hp[h] * ap[a];
+    const p = hp[h]! * ap[a]!;
     if (h > a) one += p;
     else if (h === a) draw += p;
     else two += p;
