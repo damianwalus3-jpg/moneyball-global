@@ -57,7 +57,42 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
     await updateRow("matches", match.id, { status: mode.status });
   }
 
-  if (!verified) return { changedPredictions: 0, changedCoupons: 0, verified: false };
+  if (!verified) {
+    // If a previously verified score is corrected and saved as unverified,
+    // revert its downstream settlement until the new score is confirmed.
+    if (input.existingResult?.verified) {
+      const affected = input.predictions.filter((prediction) => prediction.match_id === match.id);
+      for (const prediction of affected) {
+        if (prediction.settlement_status !== "pending" || prediction.verified) {
+          await updateRow("predictions", prediction.id, { settlement_status: "pending", verified: false });
+          prediction.settlement_status = "pending";
+          prediction.verified = false;
+        }
+      }
+      const predictionIds = new Set(affected.map((prediction) => prediction.id));
+      const touchedLegs = input.legs.filter((leg) => predictionIds.has(leg.prediction_id));
+      const touchedCouponIds = new Set(touchedLegs.map((leg) => leg.coupon_id));
+      for (const leg of touchedLegs) {
+        if (leg.status !== "pending") {
+          await updateRow("coupon_legs", leg.id, { status: "pending" });
+          leg.status = "pending";
+        }
+      }
+      let changedCoupons = 0;
+      for (const couponId of touchedCouponIds) {
+        const coupon = input.coupons.find((item) => item.id === couponId);
+        if (!coupon) continue;
+        const status = couponStatus(input.legs.filter((leg) => leg.coupon_id === couponId).map((leg) => leg.status));
+        if (coupon.status !== status) {
+          await updateRow("coupons", couponId, { status, settled_at: null });
+          coupon.status = status;
+          changedCoupons++;
+        }
+      }
+      return { changedPredictions: affected.length, changedCoupons, verified: false };
+    }
+    return { changedPredictions: 0, changedCoupons: 0, verified: false };
+  }
 
   const resolve = (prediction: Prediction): Settlement => {
     if (mode.kind === "void" || prediction.selection === "—") return "void";
