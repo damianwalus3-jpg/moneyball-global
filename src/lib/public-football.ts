@@ -222,7 +222,7 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
       .filter((p) => !existingTypes.has(p.prediction_type));
     generated.push(...missing);
   }
-  if (generated.length) await insertRows("predictions", generated);
+  if (generated.length) await insertRows("predictions", generated as unknown as Record<string, unknown>[]);
 
   let settledResults = 0;
   const settlementErrors: string[] = [];
