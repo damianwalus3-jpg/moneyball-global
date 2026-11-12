@@ -1,5 +1,5 @@
-import { couponStatus, outcomeFromScore, settlePick } from "./domain";
-import { insertRow, updateRow } from "./db";
+import { couponStatus, outcomeFromScore, settlePick, signedAmount } from "./domain";
+import { fetchAll, insertRow, updateRow } from "./db";
 import type { Coupon, CouponLeg, Match, MatchResult, Prediction, Settlement } from "./types";
 
 export interface SettleInput {
@@ -14,9 +14,56 @@ export type SettleMode =
   | { kind: "score"; home: number; away: number; source?: string; verified?: boolean }
   | { kind: "void"; status: "cancelled" | "postponed"; source?: string; verified?: boolean };
 
+async function reconcileCouponLedger(coupon: Coupon, status: Settlement, occurredAt: string) {
+  const transactions = await fetchAll("bankroll_transactions");
+  const related = transactions.filter((transaction) => transaction.coupon_id === coupon.id);
+  // Automatic payout reconciliation is enabled only when the stake was recorded.
+  if (!related.some((transaction) => transaction.transaction_type === "stake")) return;
+
+  let desiredReturn: number | null = null;
+  if (status === "won") {
+    desiredReturn = coupon.potential_return ??
+      (coupon.stake != null && coupon.combined_odds != null
+        ? Math.round(coupon.stake * coupon.combined_odds * 100) / 100
+        : null);
+  } else if (status === "void") {
+    desiredReturn = coupon.stake;
+  } else if (status === "lost" || status === "pending") {
+    desiredReturn = 0;
+  }
+  if (desiredReturn == null) return;
+
+  const recordedNet = related
+    .filter((transaction) => transaction.transaction_type === "return" || transaction.transaction_type === "adjustment")
+    .reduce((sum, transaction) => sum + signedAmount(transaction), 0);
+  const difference = Math.round((desiredReturn - recordedNet) * 100) / 100;
+  if (Math.abs(difference) < 0.01) return;
+
+  const transactionType = recordedNet === 0 && desiredReturn > 0 ? "return" : "adjustment";
+  await insertRow("bankroll_transactions", {
+    transaction_type: transactionType,
+    amount: transactionType === "return" ? desiredReturn : difference,
+    balance_after: null,
+    coupon_id: coupon.id,
+    occurred_at: occurredAt,
+    note: transactionType === "return"
+      ? `Zwrot / wygrana kuponu: ${coupon.name}`
+      : `Korekta rozliczenia kuponu: ${coupon.name}`,
+  });
+
+  const updated = await fetchAll("bankroll_transactions");
+  let balance = 0;
+  for (const transaction of [...updated].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))) {
+    balance = Math.round((balance + signedAmount(transaction)) * 100) / 100;
+    if (transaction.balance_after !== balance)
+      await updateRow("bankroll_transactions", transaction.id, { balance_after: balance });
+  }
+}
+
 /**
  * Saves a result first. Nothing is settled until the user explicitly verifies it.
- * A corrected verified result is applied again to all predictions and coupon legs.
+ * Correcting or un-verifying a result recalculates predictions, coupon legs and
+ * any previously recorded coupon return using compensating ledger transactions.
  */
 export async function settleMatch(input: SettleInput, mode: SettleMode) {
   const now = new Date().toISOString();
@@ -58,8 +105,6 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
   }
 
   if (!verified) {
-    // If a previously verified score is corrected and saved as unverified,
-    // revert its downstream settlement until the new score is confirmed.
     if (input.existingResult?.verified) {
       const affected = input.predictions.filter((prediction) => prediction.match_id === match.id);
       for (const prediction of affected) {
@@ -88,6 +133,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
           coupon.status = status;
           changedCoupons++;
         }
+        await reconcileCouponLedger(coupon, status, now);
       }
       return { changedPredictions: affected.length, changedCoupons, verified: false };
     }
@@ -145,6 +191,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
       coupon.status = status;
       changedCoupons++;
     }
+    await reconcileCouponLedger(coupon, status, now);
   }
 
   return { changedPredictions, changedCoupons, verified: true };
