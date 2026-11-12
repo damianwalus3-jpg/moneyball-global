@@ -61,30 +61,61 @@ function Mecze() {
   const [settle, setSettle] = useState<Match | null>(null);
   const [editScan, setEditScan] = useState<ScanRun | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
-  const [scanDate, setScanDate] = useState(() => brusselsDayKey(new Date()));
+  const [predictionProgress, setPredictionProgress] = useState("");
 
   const delScan = useAction((id: string) => deleteRow("scan_runs", id), {
     success: "Usunięto skan",
   });
 
-  const runEngine = useAction(async (date: string) => {
+  const runEngine = useAction(async (_requestedDate: string) => {
+    const date = brusselsDayKey(new Date());
     const sb = getSupabase();
     if (!sb) throw new Error("Brak połączenia z Supabase. Sprawdź Ustawienia → Połączenie z bazą.");
     const { data: sessionData, error: sessionError } = await sb.auth.getSession();
     if (sessionError || !sessionData.session?.access_token)
       throw new Error("Sesja logowania wygasła. Zaloguj się ponownie.");
 
-    const sync = await sb.functions.invoke("footynomad-sync", { body: { date } });
-    if (sync.error) throw new Error("Skan terminarza nie powiódł się: " + sync.error.message);
-    if (sync.data?.error || sync.data?.ok === false)
-      throw new Error("Skan terminarza nie powiódł się: " + (sync.data?.error ?? "Nieznany błąd źródła."));
+    try {
+      setPredictionProgress("Odświeżam dzisiejszy terminarz…");
+      const sync = await sb.functions.invoke("footynomad-sync", { body: { date } });
+      if (sync.error) throw new Error("Skan terminarza nie powiódł się: " + sync.error.message);
+      if (sync.data?.error || sync.data?.ok === false)
+        throw new Error("Skan terminarza nie powiódł się: " + (sync.data?.error ?? "Nieznany błąd źródła."));
 
-    const prediction = await sb.functions.invoke("moneyball-predict", { body: { date } });
-    if (prediction.error) throw new Error("Prognozowanie nie powiodło się: " + prediction.error.message);
-    if (prediction.data?.ok === false)
-      throw new Error("Prognozowanie nie powiodło się: " + (prediction.data?.error ?? "Nieznany błąd silnika."));
+      const totals = {
+        matches: 0, predictions: 0, created: 0, updated: 0, preserved: 0,
+        selected: 0, covered: 0, missing: 0, footy_form_matches: 0,
+        github_form_matches: 0, batches: 0,
+      };
+      let offset = 0;
+      let hasMore = true;
+      const maxBatches = 100;
 
-    return { sync: sync.data, prediction: prediction.data };
+      while (hasMore && totals.batches < maxBatches) {
+        setPredictionProgress("Analiza partii " + (totals.batches + 1) + " · od meczu " + (offset + 1) + "…");
+        const prediction = await sb.functions.invoke("moneyball-predict", { body: { date, offset } });
+        if (prediction.error) throw new Error("Prognozowanie partii " + (totals.batches + 1) + " nie powiodło się: " + prediction.error.message);
+        if (!prediction.data || prediction.data.ok === false)
+          throw new Error("Prognozowanie partii " + (totals.batches + 1) + " nie powiodło się: " + (prediction.data?.error ?? "Nieznany błąd silnika."));
+
+        for (const key of [
+          "matches", "predictions", "created", "updated", "preserved", "selected",
+          "covered", "missing", "footy_form_matches", "github_form_matches",
+        ] as const) {
+          totals[key] += Number(prediction.data[key] ?? 0);
+        }
+        totals.batches += 1;
+        hasMore = prediction.data.has_more === true;
+        if (hasMore) offset += Math.max(1, Number(prediction.data.batch_size) || 30);
+      }
+
+      if (hasMore)
+        throw new Error("Skan zatrzymano po " + maxBatches + " partiach. Uruchom go ponownie, aby dokończyć pozostałe mecze.");
+
+      return { sync: sync.data, prediction: totals };
+    } finally {
+      setPredictionProgress("");
+    }
   }, {
     success: (r) => "Skan: " + (r.sync?.combined_count ?? r.sync?.total_found ?? 0) +
       " meczów; prognozy: " + (r.prediction?.predictions ?? 0) +
@@ -92,7 +123,8 @@ function Mecze() {
       "; pełne dane: " + (r.prediction?.covered ?? 0) +
       "; braki danych: " + (r.prediction?.missing ?? 0) +
       "; forma FootyNomad/GitHub: " + (r.prediction?.footy_form_matches ?? 0) + "/" + (r.prediction?.github_form_matches ?? 0) +
-      "; kupony 3/3: generator dostępny w zakładce Kupony" +
+      "; partie: " + (r.prediction?.batches ?? 0) +
+      "; kupony pojedyncze i AKO: generator dostępny w zakładce Kupony" +
       "; wyniki: " + (r.sync?.result_sync?.ok ? "zsynchronizowane" : "wymagają kontroli") + ".",
   });
 
@@ -166,15 +198,11 @@ function Mecze() {
         description="Wszystkie zeskanowane mecze — także te z prognozami ODRZUCONY."
         actions={
           <>
-            <Input
-              type="date"
-              aria-label="Data skanu"
-              value={scanDate}
-              onChange={(e) => setScanDate(e.target.value)}
-              className="h-9 w-40"
-            />
-            <Button onClick={() => runEngine.mutate(scanDate)} disabled={!scanDate || runEngine.isPending}>
-              <ScanLine /> {runEngine.isPending ? "Skanowanie i analiza…" : "Skanuj i analizuj"}
+            <div className="num flex h-9 items-center rounded-md border border-border px-3 text-sm text-muted-foreground">
+              Dzisiaj · {brusselsDayKey(new Date())}
+            </div>
+            <Button onClick={() => runEngine.mutate(brusselsDayKey(new Date()))} disabled={runEngine.isPending}>
+              <ScanLine /> {runEngine.isPending ? predictionProgress || "Skanowanie i analiza…" : "Skanuj i analizuj"}
             </Button>
             <Button variant="outline" onClick={() => setImportOpen(true)}>
               <FileUp /> Import CSV
