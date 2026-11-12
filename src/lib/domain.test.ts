@@ -101,7 +101,7 @@ describe("coupon builder", () => {
     ];
     const batch = buildSingleCouponBatch(candidates, 3);
     expect(batch).toHaveLength(3);
-    expect(batch.map((coupon) => coupon[0].id)).toEqual(["a2", "b", "c"]);
+    expect(batch.map((coupon) => coupon[0]?.id)).toEqual(["a2", "b", "c"]);
     expect(batch.every((coupon) => coupon.length === 1)).toBe(true);
     expect(validateBatch(batch, 1)).toEqual([]);
   });
