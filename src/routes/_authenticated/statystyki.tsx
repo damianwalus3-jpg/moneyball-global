@@ -44,7 +44,7 @@ function Statystyki() {
   const activePreds = preds.filter((prediction) => isActivePredictionVersion(prediction.model_version));
   const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
 
-  const settledCoupons = coupons.filter((c) => c.status && c.status !== "pending");
+  const settledCoupons = coupons.filter((c) => c.status === "won" || c.status === "lost" || c.status === "void");
   const staked = settledCoupons.filter((c) => c.stake != null);
   const stakeSum = staked.reduce((s, c) => s + Number(c.stake), 0);
   const payoutSum = staked.reduce(
@@ -53,7 +53,7 @@ function Statystyki() {
   );
   const profit = Math.round((payoutSum - stakeSum) * 100) / 100;
   const roi = stakeSum > 0 ? Math.round((profit / stakeSum) * 1000) / 10 : null;
-  const chr = hitRate(coupons.map((c) => c.status));
+  const chr = hitRate(settledCoupons.map((c) => c.status));
 
   if (preds.length === 0 && coupons.length === 0)
     return (
@@ -94,14 +94,14 @@ function Statystyki() {
 function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Prediction[]; leagueOf: (p: Prediction) => string }) {
   const sel = preds.filter((prediction) => prediction.verdict === "WYBRANY");
   const rej = preds.filter((prediction) => prediction.verdict === "ODRZUCONY");
-  const hrSel = hitRate(sel.map((prediction) => prediction.settlement_status));
-  const hrRej = hitRate(rej.map((prediction) => prediction.settlement_status));
-  const byBucket = groupHitRates(sel, (p) => bucketOf(p.probability), (prediction) => prediction.settlement_status).sort(
+  const verifiedSettled = sel.filter((prediction) => prediction.verified && (prediction.settlement_status === "won" || prediction.settlement_status === "lost"));
+  const hrSel = hitRate(verifiedSettled.map((prediction) => prediction.settlement_status));
+  const byBucket = groupHitRates(verifiedSettled, (p) => bucketOf(p.probability), (prediction) => prediction.settlement_status).sort(
     (a, b) => BUCKETS.findIndex((x) => x.key === a.key) - BUCKETS.findIndex((x) => x.key === b.key),
   );
-  const byLeague = groupHitRates(sel, leagueOf, (prediction) => prediction.settlement_status).slice(0, 12);
+  const byLeague = groupHitRates(verifiedSettled, leagueOf, (prediction) => prediction.settlement_status).slice(0, 12);
   const avgProb = (key: string) => {
-    const ps = sel.filter((p) => bucketOf(p.probability) === key && (p.settlement_status === "won" || p.settlement_status === "lost"));
+    const ps = verifiedSettled.filter((p) => bucketOf(p.probability) === key);
     return ps.length ? ps.reduce((s, p) => s + Number(p.probability), 0) / ps.length : null;
   };
 
@@ -110,9 +110,9 @@ function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Predictio
       <h2 className="mb-3 text-2xl font-semibold uppercase">{type === "DOUBLE_CHANCE" ? "Double Chance" : "1X2"}</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Skuteczność WYBRANE" value={fmtPct(hrSel.rate)} hint={`${hrSel.won}/${hrSel.settled}`} tone="primary" />
-        <StatCard label="Skuteczność ODRZUCONE" value={fmtPct(hrRej.rate)} hint={`${hrRej.won}/${hrRej.settled} — kontrola filtra`} />
         <StatCard label="Prognozy" value={preds.length} hint={`${sel.length} wybranych · ${rej.length} odrzuconych`} />
-        <StatCard label="Oczekujące" value={hrSel.pending + hrRej.pending} />
+        <StatCard label="Zweryfikowane rozliczenia" value={hrSel.settled} />
+        <StatCard label="Oczekujące" value={preds.filter((prediction) => prediction.settlement_status === "pending").length} />
       </div>
       {hrSel.settled > 0 && (
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
