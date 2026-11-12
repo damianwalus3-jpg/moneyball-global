@@ -29,6 +29,8 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
       match_id: match.id,
       home_goals: mode.home,
       away_goals: mode.away,
+      home_score: mode.home,
+      away_score: mode.away,
       outcome_1x2: outcome,
       source: mode.source ?? "ręcznie",
       settled_at: now,
@@ -46,7 +48,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
   for (const p of input.predictions.filter((x) => x.match_id === match.id)) {
     const s = resolve(p.prediction_type, p.pick);
     if (p.result_status !== s) {
-      await updateRow("predictions", p.id, { result_status: s, settled_at: now });
+      await updateRow("predictions", p.id, { result_status: s, settlement_status: s, settled_at: now });
       changedPredictions++;
     }
   }
@@ -57,7 +59,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
     const s = resolve(l.prediction_type, l.pick);
     touchedCoupons.add(l.coupon_id);
     if (l.result_status !== s) {
-      await updateRow("coupon_legs", l.id, { result_status: s });
+      await updateRow("coupon_legs", l.id, { result_status: s, status: s });
       l.result_status = s;
     }
   }
