@@ -57,6 +57,7 @@ export function generateMatchPredictions(
     if (result.home_goals == null || result.away_goals == null) continue;
     const prior = matchById.get(result.match_id);
     if (!prior?.kickoff_at || new Date(prior.kickoff_at).getTime() >= cutoff) continue;
+    if (match.league && prior.league !== match.league) continue;
     const homeKey = prior.home_team?.trim().toLocaleLowerCase();
     const awayKey = prior.away_team?.trim().toLocaleLowerCase();
     if (!homeKey || !awayKey) continue;
