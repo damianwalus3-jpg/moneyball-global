@@ -1,7 +1,7 @@
-// Connection config for the owner's existing Supabase project.
-// Only the publishable/anon key is ever accepted; secret/service_role keys are rejected.
-export const DEFAULT_SUPABASE_URL = "https://gzgeklcukrclgwbsmbsp.supabase.co";
-export const EXPECTED_PROJECT_REF = "gzgeklcukrclgwbsmbsp";
+// Connection config for the dedicated MONEYBALL GLOBAL free Supabase project.
+// The historical project is intentionally left untouched and must not receive new app writes.
+export const DEFAULT_SUPABASE_URL = "https://xwrgfaarmwnguymresjy.supabase.co";
+export const EXPECTED_PROJECT_REF = "xwrgfaarmwnguymresjy";
 
 export type OwnerColumn = "user_id" | "owner_id";
 
@@ -41,6 +41,8 @@ export function validateSupabaseUrl(url: string): string | null {
   } catch {
     return "Nieprawidłowy adres URL.";
   }
+  if (projectRefFromUrl(u) !== EXPECTED_PROJECT_REF)
+    return "Ta aplikacja jest przypisana do moneyball-global-free. Stara baza z historią pozostaje nietknięta.";
   return null;
 }
 
@@ -89,24 +91,29 @@ export function readConfig(): AppConfig | null {
       stored = {};
     }
   }
-  const ownerColumn: OwnerColumn = stored.ownerColumn === "user_id" ? "user_id" : "owner_id";
+  const ownerColumn: OwnerColumn =
+    stored.ownerColumn === "owner_id" ? "owner_id" : "user_id";
   if (env.key) {
     const url = env.url ?? DEFAULT_SUPABASE_URL;
-    if (validatePublicKey(env.key, url).ok) return { url, anonKey: env.key, ownerColumn, source: "env" };
+    if (!validateSupabaseUrl(url) && validatePublicKey(env.key, url).ok)
+      return { url, anonKey: env.key, ownerColumn: "user_id", source: "env" };
   }
   if (stored.anonKey) {
     const url = stored.url || env.url || DEFAULT_SUPABASE_URL;
-    if (validatePublicKey(stored.anonKey, url).ok)
+    if (!validateSupabaseUrl(url) && validatePublicKey(stored.anonKey, url).ok)
       return { url, anonKey: stored.anonKey, ownerColumn, source: "local" };
   }
   return null;
 }
 
 export function defaultUrl(): string {
-  return envConfig().url ?? DEFAULT_SUPABASE_URL;
+  const envUrl = envConfig().url;
+  return envUrl && projectRefFromUrl(envUrl) === EXPECTED_PROJECT_REF ? envUrl : DEFAULT_SUPABASE_URL;
 }
 
 export function saveConfig(cfg: { url: string; anonKey: string; ownerColumn?: OwnerColumn }) {
+  const urlError = validateSupabaseUrl(cfg.url);
+  if (urlError) throw new Error(urlError);
   const check = validatePublicKey(cfg.anonKey, cfg.url);
   if (!check.ok) throw new Error(check.reason);
   const prev = readConfig();
@@ -115,12 +122,14 @@ export function saveConfig(cfg: { url: string; anonKey: string; ownerColumn?: Ow
     JSON.stringify({
       url: cfg.url.trim().replace(/\/$/, ""),
       anonKey: cfg.anonKey.trim(),
-      ownerColumn: cfg.ownerColumn ?? prev?.ownerColumn ?? "owner_id",
+      ownerColumn: "user_id",
     }),
   );
 }
 
 export function setOwnerColumn(ownerColumn: OwnerColumn) {
+  // The dedicated moneyball-global-free schema uses user_id on all app tables.
+  if (ownerColumn !== "user_id") throw new Error("Ta baza używa kolumny user_id.");
   const raw = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}");
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...raw, ownerColumn }));
 }
