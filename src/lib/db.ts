@@ -108,7 +108,7 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
       result_status: row.settlement_status,
       rejection_reason: row.rationale,
       notes: row.note,
-      data_source: row.data_source ?? row.model_version,
+      data_source: row.data_source,
       data_coverage: row.data_coverage ?? null,
       scan_run_id: row.scan_run_id ?? scanRunByMatch.get(row.match_id) ?? null,
       settled_at: null,
