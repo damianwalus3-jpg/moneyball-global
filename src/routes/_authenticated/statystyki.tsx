@@ -99,7 +99,7 @@ function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Predictio
   const byBucket = groupHitRates(sel, (p) => bucketOf(p.probability), (prediction) => prediction.settlement_status).sort(
     (a, b) => BUCKETS.findIndex((x) => x.key === a.key) - BUCKETS.findIndex((x) => x.key === b.key),
   );
-  const byLeague = groupHitRates(sel, leagueOf, (p) => p.result_status).slice(0, 12);
+  const byLeague = groupHitRates(sel, leagueOf, (prediction) => prediction.settlement_status).slice(0, 12);
   const avgProb = (key: string) => {
     const ps = sel.filter((p) => bucketOf(p.probability) === key && (p.settlement_status === "won" || p.settlement_status === "lost"));
     return ps.length ? ps.reduce((s, p) => s + Number(p.probability), 0) / ps.length : null;
