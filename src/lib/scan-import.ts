@@ -176,7 +176,7 @@ export function parseScanRows(
       confidence: value(row, "confidence") || null,
       verdict,
       rationale: value(row, "rationale") || null,
-      model_version: value(row, "model_version") || "MANUAL IMPORT",
+      model_version: value(row, "model_version") || "MANUAL_IMPORT",
       group_name: value(row, "group_name") || "TEST",
     });
   });
