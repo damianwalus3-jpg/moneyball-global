@@ -1,70 +1,133 @@
-import { insertRow, insertRows, updateRow } from "./db";
+import { fetchAll, insertRow, insertRows, updateRow } from "./db";
 import { matchKey, type ParsedScan } from "./scan-import";
-import type { Match } from "./types";
+import { brusselsDayKey } from "./time";
+import type { Match, Prediction } from "./types";
 
-/**
- * Stores a parsed scan: one scan_run, every match (reusing identical existing
- * matches), and every prediction including ODRZUCONY ones.
- */
-export async function importScan(parsed: ParsedScan, existing: Match[], source: string) {
+/** Imports canonical CSV rows. Existing matches and predictions are skipped, never overwritten. */
+export async function importScan(parsed: ParsedScan, existingMatches: Match[], source: string) {
   if (parsed.errors.length) throw new Error("Popraw błędy w pliku przed importem.");
   if (parsed.matches.length === 0) throw new Error("Plik nie zawiera meczów.");
 
   const scan = await insertRow("scan_runs", {
-    started_at: new Date().toISOString(),
+    scan_date: brusselsDayKey(new Date()),
     source: source.trim() || "import CSV",
-    matches_count: parsed.matches.length,
+    started_at: new Date().toISOString(),
+    status: "started",
+    matches_found: 0,
+    notes: null,
   });
 
-  const existingByKey = new Map<string, Match>();
-  for (const m of existing)
-    if (m.kickoff_at && m.home_team && m.away_team)
-      existingByKey.set(matchKey(new Date(m.kickoff_at).toISOString(), m.home_team, m.away_team), m);
+  try {
+    const existingByKey = new Map<string, Match>();
+    for (const match of existingMatches) {
+      if (!match.kickoff_at) continue;
+      const key = matchKey(
+        match.kickoff_at,
+        match.home_team,
+        match.away_team,
+        match.competition ?? "",
+        match.gender,
+      );
+      if (!existingByKey.has(key)) existingByKey.set(key, match);
+    }
 
-  const idByKey = new Map<string, string>();
-  const toInsert = parsed.matches.filter((m) => {
-    const e = existingByKey.get(m.key);
-    if (e) idByKey.set(m.key, e.id);
-    return !e;
-  });
+    const matchIdByKey = new Map<string, string>();
+    const newMatches = parsed.matches.filter((match) => {
+      const existing = existingByKey.get(match.key);
+      if (existing) {
+        matchIdByKey.set(match.key, existing.id);
+        return false;
+      }
+      return true;
+    });
 
-  const inserted = await insertRows(
-    "matches",
-    toInsert.map((m) => ({
-      scan_run_id: scan.id,
-      kickoff_at: m.kickoff_at,
-      league: m.league,
-      country: m.country,
-      home_team: m.home_team,
-      away_team: m.away_team,
-      status: "scheduled",
-    })),
-  );
-  for (const m of inserted)
-    idByKey.set(matchKey(new Date(m.kickoff_at!).toISOString(), m.home_team!, m.away_team!), m.id);
+    const insertedMatches = await insertRows(
+      "matches",
+      newMatches.map((match) => ({
+        scan_run_id: scan.id,
+        external_id: null,
+        source: source.trim() || "import CSV",
+        competition: match.competition,
+        country: match.country,
+        gender: match.gender,
+        home_team: match.home_team,
+        away_team: match.away_team,
+        kickoff_at: match.kickoff_at,
+        status: "scheduled",
+      })),
+    );
 
-  const preds = parsed.predictions.map((p) => {
-    const match_id = idByKey.get(p.matchKey);
-    if (!match_id) throw new Error("Nie udało się powiązać prognozy z meczem.");
+    for (const match of insertedMatches) {
+      const key = matchKey(
+        match.kickoff_at ?? "",
+        match.home_team,
+        match.away_team,
+        match.competition ?? "",
+        match.gender,
+      );
+      matchIdByKey.set(key, match.id);
+    }
+
+    const existingPredictions = await fetchAll("predictions");
+    const existingPredictionKeys = new Set(
+      existingPredictions.map((prediction) =>
+        [prediction.match_id, prediction.model_version, prediction.market, prediction.selection].join("|"),
+      ),
+    );
+
+    const predictionsToInsert: Record<string, unknown>[] = [];
+    for (const parsedPrediction of parsed.predictions) {
+      const matchId = matchIdByKey.get(parsedPrediction.matchKey);
+      if (!matchId) throw new Error("Nie udało się powiązać prognozy z meczem.");
+      const key = [
+        matchId,
+        parsedPrediction.model_version,
+        parsedPrediction.market,
+        parsedPrediction.selection,
+      ].join("|");
+      if (existingPredictionKeys.has(key)) continue;
+      existingPredictionKeys.add(key);
+      predictionsToInsert.push({
+        match_id: matchId,
+        model_version: parsedPrediction.model_version,
+        market: parsedPrediction.market,
+        selection: parsedPrediction.selection,
+        probability: parsedPrediction.probability,
+        confidence: parsedPrediction.confidence,
+        verdict: parsedPrediction.verdict,
+        rationale: parsedPrediction.rationale,
+        group_name: parsedPrediction.group_name,
+        odds: parsedPrediction.odds,
+        settlement_status: "pending",
+        verified: false,
+        note: null,
+      });
+    }
+
+    let insertedPredictions = 0;
+    for (let index = 0; index < predictionsToInsert.length; index += 500) {
+      const batch = await insertRows("predictions", predictionsToInsert.slice(index, index + 500));
+      insertedPredictions += batch.length;
+    }
+
+    await updateRow("scan_runs", scan.id, {
+      status: "completed",
+      matches_found: parsed.matches.length,
+      completed_at: new Date().toISOString(),
+      notes: `Nowe mecze: ${insertedMatches.length}; ponownie użyte: ${parsed.matches.length - insertedMatches.length}; nowe prognozy: ${insertedPredictions}.`,
+    });
+
     return {
-      match_id,
-      scan_run_id: scan.id,
-      prediction_type: p.prediction_type,
-      pick: p.pick,
-      probability: p.probability,
-      odds: p.odds,
-      confidence: p.confidence,
-      selection_status: p.selection_status,
-      rejection_reason: p.rejection_reason,
-      result_status: "pending",
+      newMatches: insertedMatches.length,
+      reusedMatches: parsed.matches.length - insertedMatches.length,
+      predictions: insertedPredictions,
     };
-  });
-  for (let i = 0; i < preds.length; i += 500) await insertRows("predictions", preds.slice(i, i + 500));
-
-  await updateRow("scan_runs", scan.id, { matches_count: parsed.matches.length });
-  return {
-    newMatches: inserted.length,
-    reusedMatches: parsed.matches.length - inserted.length,
-    predictions: preds.length,
-  };
+  } catch (error) {
+    await updateRow("scan_runs", scan.id, {
+      status: "failed",
+      completed_at: new Date().toISOString(),
+      notes: error instanceof Error ? error.message : "Nieznany błąd importu.",
+    }).catch(() => undefined);
+    throw error;
+  }
 }
