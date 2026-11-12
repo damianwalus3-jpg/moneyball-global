@@ -7,13 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/app/ui-bits";
-import { MatchPicker } from "@/components/app/MatchPicker";
-import { insertRow, updateRow } from "@/lib/db";
-import { TX_LABELS } from "@/lib/domain";
+import { insertRow, updateRow, fetchAll } from "@/lib/db";
+import { bankrollBalance, signedAmount, TX_LABELS, PICK_LABELS, MARKET_LABELS } from "@/lib/domain";
 import { matchLabel, parseDecimal } from "@/lib/format";
 import { useAction } from "@/lib/queries";
-import { brusselsInputToISO, isoToBrusselsInput, nowBrusselsInput } from "@/lib/time";
-import type { BankrollTransaction, Match, MatchResult, OddsSnapshot, ScanRun, TxType } from "@/lib/types";
+import { brusselsInputToISO, brusselsDayKey, isoToBrusselsInput, nowBrusselsInput } from "@/lib/time";
+import type { BankrollTransaction, Coupon, Match, MatchResult, OddsSnapshot, Prediction, ScanRun, TransactionType } from "@/lib/types";
+
+const NONE = "__none__";
 
 function FormDialog({
   open,
@@ -24,7 +25,7 @@ function FormDialog({
   children,
 }: {
   open: boolean;
-  onOpenChange: (o: boolean) => void;
+  onOpenChange: (open: boolean) => void;
   title: string;
   onSubmit: () => void;
   pending: boolean;
@@ -33,24 +34,12 @@ function FormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92vh] overflow-y-auto bg-card">
-        <DialogHeader>
-          <DialogTitle className="font-display text-2xl uppercase">{title}</DialogTitle>
-        </DialogHeader>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit();
-          }}
-          className="grid gap-4"
-        >
+        <DialogHeader><DialogTitle className="font-display text-2xl uppercase">{title}</DialogTitle></DialogHeader>
+        <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }} className="grid gap-4">
           {children}
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-              Anuluj
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Zapisywanie…" : "Zapisz"}
-            </Button>
+            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Anuluj</Button>
+            <Button type="submit" disabled={pending}>{pending ? "Zapisywanie…" : "Zapisz"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -59,206 +48,209 @@ function FormDialog({
 }
 
 /* ---------------- Scan runs ---------------- */
-export function ScanRunForm({ open, onOpenChange, scan }: { open: boolean; onOpenChange: (o: boolean) => void; scan?: ScanRun | null }) {
-  const [f, setF] = useState({ started: "", source: "", notes: "" });
-  const [err, setErr] = useState("");
+export function ScanRunForm({ open, onOpenChange, scan }: { open: boolean; onOpenChange: (open: boolean) => void; scan?: ScanRun | null }) {
+  const [form, setForm] = useState({ started: "", source: "", status: "completed", matches_found: "0", notes: "" });
+  const [error, setError] = useState("");
   useEffect(() => {
-    if (open) {
-      setErr("");
-      setF({ started: isoToBrusselsInput(scan?.started_at) || nowBrusselsInput(), source: scan?.source ?? "", notes: scan?.notes ?? "" });
-    }
+    if (!open) return;
+    setError("");
+    setForm({
+      started: isoToBrusselsInput(scan?.started_at) || nowBrusselsInput(),
+      source: scan?.source ?? "",
+      status: scan?.status ?? "completed",
+      matches_found: String(scan?.matches_found ?? 0),
+      notes: scan?.notes ?? "",
+    });
   }, [open, scan]);
-  const save = useAction(
-    async () => {
-      const row = { started_at: brusselsInputToISO(f.started), source: f.source.trim() || null, notes: f.notes.trim() || null };
-      if (scan) await updateRow("scan_runs", scan.id, row);
-      else await insertRow("scan_runs", row);
-    },
-    { success: "Zapisano skan", onDone: () => onOpenChange(false) },
-  );
+  const save = useAction(async () => {
+    const startedAt = brusselsInputToISO(form.started);
+    const row = {
+      scan_date: form.started.slice(0, 10),
+      source: form.source.trim() || "manual",
+      started_at: startedAt,
+      completed_at: form.status === "started" ? null : (scan?.completed_at ?? new Date().toISOString()),
+      status: form.status,
+      matches_found: Math.max(0, Math.floor(Number(form.matches_found) || 0)),
+      notes: form.notes.trim() || null,
+    };
+    if (scan) await updateRow("scan_runs", scan.id, row);
+    else await insertRow("scan_runs", row);
+  }, { success: "Zapisano skan", onDone: () => onOpenChange(false) });
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title={scan ? "Edytuj skan" : "Nowy skan"}
-      pending={save.isPending}
-      onSubmit={() => {
-        if (!brusselsInputToISO(f.started)) return setErr("Podaj datę skanu.");
-        save.mutate(undefined);
-      }}
-    >
-      <Field label="Data skanu (Bruksela)" error={err}>
-        <Input type="datetime-local" value={f.started} onChange={(e) => setF({ ...f, started: e.target.value })} />
-      </Field>
-      <Field label="Źródło / model">
-        <Input value={f.source} onChange={(e) => setF({ ...f, source: e.target.value })} placeholder="np. model v2" />
-      </Field>
-      <Field label="Notatki">
-        <Textarea rows={2} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} />
-      </Field>
+    <FormDialog open={open} onOpenChange={onOpenChange} title={scan ? "Edytuj skan" : "Nowy skan"} pending={save.isPending} onSubmit={() => {
+      if (!brusselsInputToISO(form.started)) return setError("Podaj datę skanu.");
+      setError("");
+      save.mutate(undefined);
+    }}>
+      <Field label="Data skanu (Bruksela)" error={error}><Input type="datetime-local" value={form.started} onChange={(event) => setForm({ ...form, started: event.target.value })} /></Field>
+      <Field label="Źródło"><Input value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })} placeholder="np. FootyNomad + źródła publiczne" /></Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Status">
+          <Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="started">started</SelectItem>
+              <SelectItem value="completed">completed</SelectItem>
+              <SelectItem value="partial">partial</SelectItem>
+              <SelectItem value="failed">failed</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Liczba znalezionych meczów"><Input inputMode="numeric" value={form.matches_found} onChange={(event) => setForm({ ...form, matches_found: event.target.value })} /></Field>
+      </div>
+      <Field label="Notatki"><Textarea rows={2} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
     </FormDialog>
   );
 }
 
 /* ---------------- Odds snapshots ---------------- */
-const ODDS_KEYS = [
-  ["odds_1", "1"],
-  ["odds_x", "X"],
-  ["odds_2", "2"],
-  ["odds_1x", "1X"],
-  ["odds_x2", "X2"],
-  ["odds_12", "12"],
-] as const;
-
 export function OddsForm({
   open,
   onOpenChange,
   snapshot,
+  predictions,
   matches,
-  defaultMatchId,
+  defaultPredictionId,
 }: {
   open: boolean;
-  onOpenChange: (o: boolean) => void;
+  onOpenChange: (open: boolean) => void;
   snapshot?: OddsSnapshot | null;
+  predictions: Prediction[];
   matches: Match[];
-  defaultMatchId?: string | undefined;
+  defaultPredictionId?: string;
 }) {
-  const [f, setF] = useState<Record<string, string>>({});
+  const [form, setForm] = useState({ prediction_id: "", bookmaker: "", odds: "", captured: "", source_url: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const matchById = new Map(matches.map((match) => [match.id, match]));
   useEffect(() => {
     if (!open) return;
     setErrors({});
-    const o: Record<string, string> = {
-      match_id: snapshot?.match_id ?? defaultMatchId ?? "",
+    setForm({
+      prediction_id: snapshot?.prediction_id ?? defaultPredictionId ?? "",
       bookmaker: snapshot?.bookmaker ?? "",
+      odds: snapshot?.odds != null ? String(snapshot.odds) : "",
       captured: isoToBrusselsInput(snapshot?.captured_at) || nowBrusselsInput(),
+      source_url: snapshot?.source_url ?? "",
+    });
+  }, [open, snapshot, defaultPredictionId]);
+  const save = useAction(async () => {
+    const row = {
+      prediction_id: form.prediction_id,
+      bookmaker: form.bookmaker.trim(),
+      odds: parseDecimal(form.odds),
+      captured_at: brusselsInputToISO(form.captured),
+      source_url: form.source_url.trim() || null,
     };
-    for (const [k] of ODDS_KEYS) o[k] = snapshot?.[k] != null ? String(snapshot[k]) : "";
-    setF(o);
-  }, [open, snapshot, defaultMatchId]);
-  const save = useAction(
-    async () => {
-      const row: Record<string, unknown> = {
-        match_id: f["match_id"],
-        bookmaker: (f["bookmaker"] ?? "").trim() || null,
-        captured_at: brusselsInputToISO(f["captured"] ?? ""),
-      };
-      for (const [k] of ODDS_KEYS) row[k] = parseDecimal(f[k] ?? "");
-      if (snapshot) await updateRow("odds_snapshots", snapshot.id, row);
-      else await insertRow("odds_snapshots", row);
-    },
-    { success: "Zapisano kursy", onDone: () => onOpenChange(false) },
-  );
+    if (snapshot) await updateRow("odds_snapshots", snapshot.id, row);
+    else await insertRow("odds_snapshots", row);
+  }, { success: "Zapisano kurs", onDone: () => onOpenChange(false) });
   function submit() {
-    const e: Record<string, string> = {};
-    if (!f["match_id"]) e["match_id"] = "Wybierz mecz.";
-    if (!brusselsInputToISO(f["captured"] ?? "")) e["captured"] = "Podaj czas.";
-    let any = false;
-    for (const [k] of ODDS_KEYS) {
-      if (!f[k]?.trim()) continue;
-      any = true;
-      const v = parseDecimal(f[k]);
-      if (v == null || v <= 1) e[k] = "> 1,00";
-    }
-    if (!any) e["odds_1"] = "Podaj co najmniej jeden kurs.";
-    setErrors(e);
-    if (Object.keys(e).length === 0) save.mutate(undefined);
+    const next: Record<string, string> = {};
+    if (!form.prediction_id) next["prediction_id"] = "Wybierz prognozę.";
+    if (!form.bookmaker.trim()) next["bookmaker"] = "Podaj bukmachera.";
+    const odd = parseDecimal(form.odds);
+    if (odd == null || odd <= 1) next["odds"] = "Kurs musi być większy niż 1,00.";
+    if (!brusselsInputToISO(form.captured)) next["captured"] = "Podaj czas.";
+    setErrors(next);
+    if (!Object.keys(next).length) save.mutate(undefined);
   }
   return (
-    <FormDialog open={open} onOpenChange={onOpenChange} title={snapshot ? "Edytuj kursy" : "Nowy snapshot kursów"} pending={save.isPending} onSubmit={submit}>
-      <Field label="Mecz" error={errors["match_id"]}>
-        <MatchPicker matches={matches} value={f["match_id"] ?? ""} onChange={(id) => setF({ ...f, match_id: id })} />
+    <FormDialog open={open} onOpenChange={onOpenChange} title={snapshot ? "Edytuj kurs" : "Nowy snapshot kursu"} pending={save.isPending} onSubmit={submit}>
+      <Field label="Prognoza" error={errors["prediction_id"]}>
+        <Select value={form.prediction_id} onValueChange={(value) => setForm({ ...form, prediction_id: value })}>
+          <SelectTrigger><SelectValue placeholder="Wybierz prognozę" /></SelectTrigger>
+          <SelectContent>
+            {predictions.map((prediction) => {
+              const match = matchById.get(prediction.match_id);
+              return <SelectItem key={prediction.id} value={prediction.id}>{matchLabel(match)} · {prediction.market} · {prediction.selection}</SelectItem>;
+            })}
+          </SelectContent>
+        </Select>
       </Field>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Bukmacher">
-          <Input value={f["bookmaker"] ?? ""} onChange={(e) => setF({ ...f, bookmaker: e.target.value })} />
-        </Field>
-        <Field label="Czas (Bruksela)" error={errors["captured"]}>
-          <Input type="datetime-local" value={f["captured"] ?? ""} onChange={(e) => setF({ ...f, captured: e.target.value })} />
-        </Field>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {ODDS_KEYS.map(([k, label]) => (
-          <Field key={k} label={label} error={errors[k]}>
-            <Input inputMode="decimal" className="num" value={f[k] ?? ""} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
-          </Field>
-        ))}
+        <Field label="Bukmacher" error={errors["bookmaker"]}><Input value={form.bookmaker} onChange={(event) => setForm({ ...form, bookmaker: event.target.value })} /></Field>
+        <Field label="Kurs" error={errors["odds"]}><Input inputMode="decimal" className="num" value={form.odds} onChange={(event) => setForm({ ...form, odds: event.target.value })} /></Field>
+        <Field label="Czas (Bruksela)" error={errors["captured"]}><Input type="datetime-local" value={form.captured} onChange={(event) => setForm({ ...form, captured: event.target.value })} /></Field>
+        <Field label="URL źródła"><Input value={form.source_url} onChange={(event) => setForm({ ...form, source_url: event.target.value })} placeholder="https://…" /></Field>
       </div>
     </FormDialog>
   );
 }
 
 /* ---------------- Bankroll transactions ---------------- */
-export function TransactionForm({
-  open,
-  onOpenChange,
-  tx,
-}: {
+async function rebuildBalances() {
+  const transactions = await fetchAll("bankroll_transactions");
+  let balance = 0;
+  const ordered = [...transactions].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+  for (const transaction of ordered) {
+    balance = Math.round((balance + signedAmount(transaction)) * 100) / 100;
+    if (transaction.balance_after !== balance)
+      await updateRow("bankroll_transactions", transaction.id, { balance_after: balance });
+  }
+}
+
+export function TransactionForm({ open, onOpenChange, tx, coupons = [] }: {
   open: boolean;
-  onOpenChange: (o: boolean) => void;
+  onOpenChange: (open: boolean) => void;
   tx?: BankrollTransaction | null;
+  coupons?: Coupon[];
 }) {
-  const [f, setF] = useState({ when: "", type: "deposit" as TxType, amount: "", note: "" });
+  const [form, setForm] = useState({ when: "", transaction_type: "deposit" as TransactionType, amount: "", note: "", coupon_id: NONE });
   const [errors, setErrors] = useState<Record<string, string>>({});
   useEffect(() => {
     if (!open) return;
     setErrors({});
-    setF({
+    setForm({
       when: isoToBrusselsInput(tx?.occurred_at) || nowBrusselsInput(),
-      type: tx?.type ?? "deposit",
+      transaction_type: tx?.transaction_type ?? "deposit",
       amount: tx ? String(tx.amount) : "",
       note: tx?.note ?? "",
+      coupon_id: tx?.coupon_id ?? NONE,
     });
   }, [open, tx]);
-  const amount = parseDecimal(f.amount);
-  const save = useAction(
-    async () => {
-      const row = {
-        occurred_at: brusselsInputToISO(f.when),
-        type: f.type,
-        amount: f.type === "adjustment" ? amount : Math.abs(amount ?? 0),
-        note: f.note.trim() || null,
-      };
-      if (tx) await updateRow("bankroll_transactions", tx.id, row);
-      else await insertRow("bankroll_transactions", row);
-    },
-    { success: "Zapisano transakcję", onDone: () => onOpenChange(false) },
-  );
+  const amount = parseDecimal(form.amount);
+  const save = useAction(async () => {
+    const row = {
+      occurred_at: brusselsInputToISO(form.when),
+      transaction_type: form.transaction_type,
+      amount: form.transaction_type === "adjustment" ? amount : Math.abs(amount ?? 0),
+      balance_after: null,
+      coupon_id: form.coupon_id === NONE ? null : form.coupon_id,
+      note: form.note.trim() || null,
+    };
+    if (tx) await updateRow("bankroll_transactions", tx.id, row);
+    else await insertRow("bankroll_transactions", row);
+    await rebuildBalances();
+  }, { success: "Zapisano transakcję i przeliczono saldo", onDone: () => onOpenChange(false) });
   function submit() {
-    const e: Record<string, string> = {};
-    if (!brusselsInputToISO(f.when)) e["when"] = "Podaj datę.";
-    if (amount == null || amount === 0) e["amount"] = "Podaj kwotę różną od zera.";
-    else if (f.type !== "adjustment" && amount < 0) e["amount"] = "Kwota dodatnia — kierunek wynika z typu.";
-    setErrors(e);
-    if (Object.keys(e).length === 0) save.mutate(undefined);
+    const next: Record<string, string> = {};
+    if (!brusselsInputToISO(form.when)) next["when"] = "Podaj datę.";
+    if (amount == null || amount === 0) next["amount"] = "Podaj kwotę różną od zera.";
+    else if (form.transaction_type !== "adjustment" && amount < 0) next["amount"] = "Kwota dodatnia — kierunek wynika z typu.";
+    setErrors(next);
+    if (!Object.keys(next).length) save.mutate(undefined);
   }
   return (
     <FormDialog open={open} onOpenChange={onOpenChange} title={tx ? "Edytuj transakcję" : "Nowa transakcja"} pending={save.isPending} onSubmit={submit}>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Typ">
-          <Select value={f.type} onValueChange={(v) => setF({ ...f, type: v as TxType })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(TX_LABELS).map(([k, v]) => (
-                <SelectItem key={k} value={k}>
-                  {v}
-                </SelectItem>
-              ))}
-            </SelectContent>
+          <Select value={form.transaction_type} onValueChange={(value) => setForm({ ...form, transaction_type: value as TransactionType })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{Object.entries(TX_LABELS).map(([key, label]) => <SelectItem key={key} value={key}>{label}</SelectItem>)}</SelectContent>
           </Select>
         </Field>
-        <Field label="Kwota" error={errors["amount"]} hint={f.type === "adjustment" ? "Może być ujemna" : undefined}>
-          <Input inputMode="decimal" className="num" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} />
+        <Field label="Kwota" error={errors["amount"]} hint={form.transaction_type === "adjustment" ? "Może być ujemna" : "Wpisz kwotę dodatnią"}>
+          <Input inputMode="decimal" className="num" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} />
+        </Field>
+        <Field label="Data (Bruksela)" error={errors["when"]}><Input type="datetime-local" value={form.when} onChange={(event) => setForm({ ...form, when: event.target.value })} /></Field>
+        <Field label="Powiązany kupon">
+          <Select value={form.coupon_id} onValueChange={(value) => setForm({ ...form, coupon_id: value })}>
+            <SelectTrigger><SelectValue placeholder="Bez kuponu" /></SelectTrigger>
+            <SelectContent><SelectItem value={NONE}>Bez kuponu</SelectItem>{coupons.map((coupon) => <SelectItem key={coupon.id} value={coupon.id}>{coupon.name}</SelectItem>)}</SelectContent>
+          </Select>
         </Field>
       </div>
-      <Field label="Data (Bruksela)" error={errors["when"]}>
-        <Input type="datetime-local" value={f.when} onChange={(e) => setF({ ...f, when: e.target.value })} />
-      </Field>
-      <Field label="Notatka">
-        <Input value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} />
-      </Field>
+      <Field label="Notatka"><Input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></Field>
     </FormDialog>
   );
 }
@@ -273,65 +265,70 @@ export function ResultForm({
   pending,
 }: {
   open: boolean;
-  onOpenChange: (o: boolean) => void;
+  onOpenChange: (open: boolean) => void;
   match: Match | null;
-  result?: MatchResult | undefined;
-  onSave: (v: { kind: "score"; home: number; away: number } | { kind: "void"; status: "cancelled" | "postponed" }) => void;
+  result?: MatchResult;
+  onSave: (
+    value:
+      | { kind: "score"; home: number; away: number; source: string; verified: boolean }
+      | { kind: "void"; status: "cancelled" | "postponed"; source: string; verified: boolean },
+  ) => void;
   pending: boolean;
 }) {
   const [home, setHome] = useState("");
   const [away, setAway] = useState("");
   const [isVoid, setVoid] = useState(false);
   const [voidStatus, setVoidStatus] = useState<"cancelled" | "postponed">("cancelled");
-  const [err, setErr] = useState("");
+  const [source, setSource] = useState("ręcznie");
+  const [verified, setVerified] = useState(false);
+  const [error, setError] = useState("");
   useEffect(() => {
     if (!open) return;
-    setErr("");
-    setHome(result?.home_goals != null ? String(result.home_goals) : "");
-    setAway(result?.away_goals != null ? String(result.away_goals) : "");
-    setVoid(false);
-  }, [open, result]);
+    setError("");
+    setHome(result?.home_score != null ? String(result.home_score) : "");
+    setAway(result?.away_score != null ? String(result.away_score) : "");
+    setVoid(result?.home_score == null && result?.away_score == null && !!result);
+    setVoidStatus(match?.status === "postponed" ? "postponed" : "cancelled");
+    setSource(result?.source ?? "ręcznie");
+    setVerified(result?.verified ?? false);
+  }, [open, result, match]);
   function submit() {
-    if (isVoid) return onSave({ kind: "void", status: voidStatus });
-    const h = Number(home);
-    const a = Number(away);
-    if (home === "" || away === "" || !Number.isInteger(h) || !Number.isInteger(a) || h < 0 || a < 0)
-      return setErr("Podaj wynik jako liczby całkowite ≥ 0.");
-    onSave({ kind: "score", home: h, away: a });
+    if (isVoid) return onSave({ kind: "void", status: voidStatus, source, verified });
+    const homeScore = Number(home);
+    const awayScore = Number(away);
+    if (home === "" || away === "" || !Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0)
+      return setError("Podaj wynik jako liczby całkowite ≥ 0.");
+    onSave({ kind: "score", home: homeScore, away: awayScore, source, verified });
   }
   return (
-    <FormDialog open={open} onOpenChange={onOpenChange} title="Wynik i rozliczenie" pending={pending} onSubmit={submit}>
+    <FormDialog open={open} onOpenChange={onOpenChange} title="Wynik i weryfikacja" pending={pending} onSubmit={submit}>
       <div className="text-sm text-muted-foreground">{matchLabel(match)}</div>
       {!isVoid && (
         <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3">
-          <Field label={match?.home_team ?? "Gospodarze"}>
-            <Input inputMode="numeric" className="num text-center text-2xl" value={home} onChange={(e) => setHome(e.target.value)} />
-          </Field>
+          <Field label={match?.home_team ?? "Gospodarze"}><Input inputMode="numeric" className="num text-center text-2xl" value={home} onChange={(event) => setHome(event.target.value)} /></Field>
           <span className="pb-2 text-2xl text-muted-foreground">:</span>
-          <Field label={match?.away_team ?? "Goście"}>
-            <Input inputMode="numeric" className="num text-center text-2xl" value={away} onChange={(e) => setAway(e.target.value)} />
-          </Field>
+          <Field label={match?.away_team ?? "Goście"}><Input inputMode="numeric" className="num text-center text-2xl" value={away} onChange={(event) => setAway(event.target.value)} /></Field>
         </div>
       )}
-      {err && <p className="text-xs text-destructive">{err}</p>}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <Field label="Źródło wyniku"><Input value={source} onChange={(event) => setSource(event.target.value)} /></Field>
       <div className="flex items-center gap-2">
-        <Checkbox id="void" checked={isVoid} onCheckedChange={(v) => setVoid(v === true)} />
-        <Label htmlFor="void">Mecz odwołany / przełożony — rozlicz jako zwrot</Label>
+        <Checkbox id="result-void" checked={isVoid} onCheckedChange={(value) => setVoid(value === true)} />
+        <Label htmlFor="result-void">Mecz odwołany / przełożony — zwrot</Label>
       </div>
       {isVoid && (
-        <Select value={voidStatus} onValueChange={(v) => setVoidStatus(v as "cancelled" | "postponed")}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="cancelled">Odwołany</SelectItem>
-            <SelectItem value="postponed">Przełożony</SelectItem>
-          </SelectContent>
+        <Select value={voidStatus} onValueChange={(value) => setVoidStatus(value as "cancelled" | "postponed")}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="cancelled">Odwołany</SelectItem><SelectItem value="postponed">Przełożony</SelectItem></SelectContent>
         </Select>
       )}
-      <p className="text-xs text-muted-foreground">
-        Zapis rozlicza automatycznie wszystkie prognozy 1X2 i DC tego meczu oraz powiązane kupony.
-      </p>
+      <div className="flex items-start gap-2 rounded-lg border border-border p-3">
+        <Checkbox id="result-verified" checked={verified} onCheckedChange={(value) => setVerified(value === true)} />
+        <div className="grid gap-1">
+          <Label htmlFor="result-verified">Weryfikuję wynik</Label>
+          <p className="text-xs text-muted-foreground">Rozliczenie prognoz i kuponów nastąpi wyłącznie po zaznaczeniu tej opcji.</p>
+        </div>
+      </div>
     </FormDialog>
   );
 }
