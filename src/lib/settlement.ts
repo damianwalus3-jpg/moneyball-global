@@ -126,7 +126,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
       let changedCoupons = 0;
       for (const couponId of touchedCouponIds) {
         const coupon = input.coupons.find((item) => item.id === couponId);
-        if (!coupon) continue;
+        if (!coupon || coupon.status === "cancelled") continue;
         const status = couponStatus(input.legs.filter((leg) => leg.coupon_id === couponId).map((leg) => leg.status));
         if (coupon.status !== status) {
           await updateRow("coupons", couponId, { status, settled_at: null });
@@ -179,7 +179,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
   let changedCoupons = 0;
   for (const couponId of touchedCouponIds) {
     const coupon = input.coupons.find((item) => item.id === couponId);
-    if (!coupon) continue;
+    if (!coupon || coupon.status === "cancelled") continue;
     const status = couponStatus(
       input.legs.filter((leg) => leg.coupon_id === couponId).map((leg) => leg.status),
     );
