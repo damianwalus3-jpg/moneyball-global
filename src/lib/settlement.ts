@@ -1,4 +1,4 @@
-import { couponStatus, outcomeFromScore, settlePick, signedAmount } from "./domain";
+import { couponStatus, effectiveOdds, outcomeFromScore, settlePick, signedAmount } from "./domain";
 import { fetchAll, insertRow, updateRow } from "./db";
 import type { Coupon, CouponLeg, Match, MatchResult, Prediction, Settlement } from "./types";
 
@@ -17,7 +17,6 @@ export type SettleMode =
 async function reconcileCouponLedger(coupon: Coupon, status: Settlement, occurredAt: string) {
   const transactions = await fetchAll("bankroll_transactions");
   const related = transactions.filter((transaction) => transaction.coupon_id === coupon.id);
-  // Automatic payout reconciliation is enabled only when the stake was recorded.
   if (!related.some((transaction) => transaction.transaction_type === "stake")) return;
 
   let desiredReturn: number | null = null;
@@ -60,10 +59,38 @@ async function reconcileCouponLedger(coupon: Coupon, status: Settlement, occurre
   }
 }
 
+async function refreshCouponTotals(coupon: Coupon, legs: CouponLeg[], status: Settlement, occurredAt: string) {
+  const odds = effectiveOdds(legs);
+  const combinedOdds = odds ?? coupon.combined_odds;
+  const potentialReturn =
+    coupon.stake != null && combinedOdds != null
+      ? Math.round(coupon.stake * combinedOdds * 100) / 100
+      : coupon.potential_return;
+  const settledAt = status === "pending" ? null : occurredAt;
+  if (
+    coupon.status !== status ||
+    coupon.combined_odds !== combinedOdds ||
+    coupon.potential_return !== potentialReturn ||
+    coupon.settled_at !== settledAt
+  ) {
+    await updateRow("coupons", coupon.id, {
+      status,
+      combined_odds: combinedOdds,
+      potential_return: potentialReturn,
+      settled_at: settledAt,
+    });
+    coupon.status = status;
+    coupon.combined_odds = combinedOdds;
+    coupon.potential_return = potentialReturn;
+    coupon.settled_at = settledAt;
+  }
+  await reconcileCouponLedger(coupon, status, occurredAt);
+}
+
 /**
  * Saves a result first. Nothing is settled until the user explicitly verifies it.
- * Correcting or un-verifying a result recalculates predictions, coupon legs and
- * any previously recorded coupon return using compensating ledger transactions.
+ * Correcting or un-verifying a result recalculates predictions, coupon legs,
+ * effective odds and any previously recorded coupon return.
  */
 export async function settleMatch(input: SettleInput, mode: SettleMode) {
   const now = new Date().toISOString();
@@ -127,13 +154,10 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
       for (const couponId of touchedCouponIds) {
         const coupon = input.coupons.find((item) => item.id === couponId);
         if (!coupon || coupon.status === "cancelled") continue;
-        const status = couponStatus(input.legs.filter((leg) => leg.coupon_id === couponId).map((leg) => leg.status));
-        if (coupon.status !== status) {
-          await updateRow("coupons", couponId, { status, settled_at: null });
-          coupon.status = status;
-          changedCoupons++;
-        }
-        await reconcileCouponLedger(coupon, status, now);
+        const couponLegs = input.legs.filter((leg) => leg.coupon_id === couponId);
+        const status = couponStatus(couponLegs.map((leg) => leg.status));
+        if (coupon.status !== status) changedCoupons++;
+        await refreshCouponTotals(coupon, couponLegs, status, now);
       }
       return { changedPredictions: affected.length, changedCoupons, verified: false };
     }
@@ -180,30 +204,11 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
   for (const couponId of touchedCouponIds) {
     const coupon = input.coupons.find((item) => item.id === couponId);
     if (!coupon || coupon.status === "cancelled") continue;
-    const status = couponStatus(
-      input.legs.filter((leg) => leg.coupon_id === couponId).map((leg) => leg.status),
-    );
-    if (coupon.status !== status) {
-      await updateRow("coupons", couponId, {
-        status,
-        settled_at: status === "pending" ? null : now,
-      });
-      coupon.status = status;
-      changedCoupons++;
-    }
-    await reconcileCouponLedger(coupon, status, now);
+    const couponLegs = input.legs.filter((leg) => leg.coupon_id === couponId);
+    const status = couponStatus(couponLegs.map((leg) => leg.status));
+    if (coupon.status !== status) changedCoupons++;
+    await refreshCouponTotals(coupon, couponLegs, status, now);
   }
 
   return { changedPredictions, changedCoupons, verified: true };
-}
-
-export async function recomputeCoupon(coupon: Coupon, legs: CouponLeg[]) {
-  const status = couponStatus(legs.filter((leg) => leg.coupon_id === coupon.id).map((leg) => leg.status));
-  if (status !== coupon.status) {
-    await updateRow("coupons", coupon.id, {
-      status,
-      settled_at: status === "pending" ? null : new Date().toISOString(),
-    });
-  }
-  return status;
 }
