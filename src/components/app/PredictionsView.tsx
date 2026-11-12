@@ -5,102 +5,106 @@ import { Input } from "@/components/ui/input";
 import { ConfirmDelete, EmptyState, PageHeader, SelectionBadge, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { PredictionForm } from "@/components/forms/PredictionForm";
 import { deleteRow, updateRow } from "@/lib/db";
-import { ACTIVE_MODEL_VERSION, hitRate, impliedProbability } from "@/lib/domain";
+import { ACTIVE_MODEL_VERSION, hitRate, impliedProbability, MARKET_LABELS } from "@/lib/domain";
 import { fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
-import type { Prediction, PredictionType } from "@/lib/types";
+import type { Market, Prediction } from "@/lib/types";
 
-export function PredictionsView({ type }: { type: PredictionType }) {
+export function PredictionsView({ market }: { market: Market }) {
   const matches = useTable("matches");
   const all = useTable("predictions");
-  const [sel, setSel] = useState<"all" | "WYBRANY" | "ODRZUCONY">("all");
+  const [verdictFilter, setVerdictFilter] = useState<"all" | "WYBRANY" | "ODRZUCONY">("all");
   const [modelScope, setModelScope] = useState<"current" | "all">("current");
-  const [q, setQ] = useState("");
-  const [edit, setEdit] = useState<Prediction | null>(null);
+  const [query, setQuery] = useState("");
+  const [editing, setEditing] = useState<Prediction | null>(null);
   const [open, setOpen] = useState(false);
-  const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
-  const visible = modelScope === "all" ? all : all.filter((p) => p.model_version === ACTIVE_MODEL_VERSION || !p.data_source);
+  const byId = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
+  const visible = modelScope === "all"
+    ? all
+    : all.filter((prediction) => prediction.model_version === ACTIVE_MODEL_VERSION || prediction.model_version === "MANUAL");
   const list = visible
-    .filter((p) => p.prediction_type === type)
-    .filter((p) => sel === "all" || p.selection_status === sel)
-    .filter((p) => {
-      const m = byId.get(p.match_id);
-      return !q || `${matchLabel(m)} ${m?.league ?? ""}`.toLowerCase().includes(q.toLowerCase());
+    .filter((prediction) => prediction.market === market)
+    .filter((prediction) => verdictFilter === "all" || prediction.verdict === verdictFilter)
+    .filter((prediction) => {
+      const match = byId.get(prediction.match_id);
+      return !query || `${matchLabel(match)} ${match?.competition ?? ""} ${match?.country ?? ""}`.toLowerCase().includes(query.toLowerCase());
     })
     .sort((a, b) => (byId.get(b.match_id)?.kickoff_at ?? "").localeCompare(byId.get(a.match_id)?.kickoff_at ?? ""));
-  const hr = hitRate(visible.filter((p) => p.prediction_type === type && p.selection_status === "WYBRANY").map((p) => p.result_status));
-  const toggle = useAction((p: Prediction) =>
-    updateRow("predictions", p.id, { selection_status: p.selection_status === "ODRZUCONY" ? "WYBRANY" : "ODRZUCONY" }),
+  const settledSelected = visible.filter(
+    (prediction) =>
+      prediction.market === market &&
+      prediction.verdict === "WYBRANY" &&
+      prediction.verified &&
+      (prediction.settlement_status === "won" || prediction.settlement_status === "lost"),
   );
-  const del = useAction((id: string) => deleteRow("predictions", id), { success: "Usunięto prognozę" });
-  const title = type === "DC" ? "Double Chance" : "Prognozy 1X2";
+  const rate = hitRate(settledSelected.map((prediction) => prediction.settlement_status));
+  const toggle = useAction((prediction: Prediction) =>
+    updateRow("predictions", prediction.id, {
+      verdict: prediction.verdict === "ODRZUCONY" ? "WYBRANY" : "ODRZUCONY",
+    }),
+  );
+  const remove = useAction((id: string) => deleteRow("predictions", id), { success: "Usunięto prognozę" });
 
   return (
     <div>
       <PageHeader
-        eyebrow={type === "DC" ? "1X · X2 · 12" : "1 · X · 2"}
-        title={title}
-        description="Prawdopodobieństwo modelu jest zapisywane osobno od kursu bukmachera."
-        actions={
-          <Button onClick={() => { setEdit(null); setOpen(true); }} disabled={matches.length === 0}>
-            <Plus /> Dodaj prognozę
-          </Button>
-        }
+        eyebrow={market === "DOUBLE_CHANCE" ? "1X · X2 · 12" : "1 · X · 2"}
+        title={market === "DOUBLE_CHANCE" ? "Double Chance" : "Prognozy 1X2"}
+        description="Prawdopodobieństwo modelu jest oddzielone od kursu bukmachera. Skuteczność obejmuje wyłącznie zweryfikowane rozliczenia."
+        actions={<Button onClick={() => { setEditing(null); setOpen(true); }} disabled={matches.length === 0}><Plus /> Dodaj prognozę</Button>}
       />
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Skuteczność (WYBRANE)" value={fmtPct(hr.rate)} hint={`${hr.won}/${hr.settled} rozliczonych`} tone="primary" />
-        <StatCard label="Oczekujące" value={hr.pending} />
+        <StatCard label="Skuteczność WYBRANE" value={fmtPct(rate.rate)} hint={`${rate.won}/${rate.settled} zweryfikowanych`} tone="primary" />
+        <StatCard label="Rozliczone" value={rate.settled} />
+        <StatCard label="Oczekujące" value={list.filter((prediction) => prediction.settlement_status === "pending").length} />
+        <StatCard label="Wszystkie" value={list.length} />
       </div>
       <div className="mb-2 flex flex-wrap gap-2">
-        <Button size="sm" variant={modelScope === "current" ? "default" : "outline"} onClick={() => setModelScope("current")}>
-          Aktywny model 3.8
-        </Button>
-        <Button size="sm" variant={modelScope === "all" ? "default" : "outline"} onClick={() => setModelScope("all")}>
-          Wszystkie wersje ({all.length})
-        </Button>
+        <Button size="sm" variant={modelScope === "current" ? "default" : "outline"} onClick={() => setModelScope("current")}>Aktywny model</Button>
+        <Button size="sm" variant={modelScope === "all" ? "default" : "outline"} onClick={() => setModelScope("all")}>Wszystkie wersje ({all.length})</Button>
       </div>
       <div className="mb-4 flex flex-wrap gap-2">
-        {(["all", "WYBRANY", "ODRZUCONY"] as const).map((s) => (
-          <Button key={s} size="sm" variant={sel === s ? "default" : "outline"} onClick={() => setSel(s)}>
-            {s === "all" ? "Wszystkie" : s}
+        {(["all", "WYBRANY", "ODRZUCONY"] as const).map((verdict) => (
+          <Button key={verdict} size="sm" variant={verdictFilter === verdict ? "default" : "outline"} onClick={() => setVerdictFilter(verdict)}>
+            {verdict === "all" ? "Wszystkie" : verdict}
           </Button>
         ))}
-        <Input placeholder="Szukaj…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 max-w-xs" />
+        <Input placeholder="Szukaj…" value={query} onChange={(event) => setQuery(event.target.value)} className="h-8 max-w-xs" />
       </div>
       {list.length === 0 ? (
-        <EmptyState
-          icon={Target}
-          title="Brak prognoz"
-          description={matches.length === 0 ? "Najpierw dodaj mecze lub zaimportuj skan w Terminarzu." : "Dodaj prognozę lub zmień filtry."}
-        />
+        <EmptyState icon={Target} title="Brak prognoz" description={matches.length === 0 ? "Najpierw dodaj mecze lub zaimportuj skan w Terminarzu." : "Dodaj prognozę lub zmień filtry."} />
       ) : (
         <div className="grid gap-2">
-          {list.map((p) => {
-            const m = byId.get(p.match_id);
-            const imp = impliedProbability(p.odds);
+          {list.map((prediction) => {
+            const match = byId.get(prediction.match_id);
+            const implied = impliedProbability(prediction.odds);
             return (
-              <div key={p.id} className="surface-card flex flex-wrap items-center gap-3 p-3">
-                <div className="num flex size-12 items-center justify-center rounded-lg bg-primary/10 text-lg font-semibold text-primary">{p.pick}</div>
+              <div key={prediction.id} className="surface-card flex flex-wrap items-center gap-3 p-3">
+                <div className="num flex size-12 items-center justify-center rounded-lg bg-primary/10 text-lg font-semibold text-primary">
+                  {prediction.selection}
+                </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium">{matchLabel(m)}</div>
-                  <div className="text-xs text-muted-foreground">{m?.league ?? "—"} · {fmtDateTime(m?.kickoff_at)}</div>
-                  {p.rejection_reason && <div className="text-xs text-muted-foreground">Powód: {p.rejection_reason}</div>}
+                  <div className="truncate font-medium">{matchLabel(match)}</div>
+                  <div className="text-xs text-muted-foreground">{match?.competition ?? "—"} · {fmtDateTime(match?.kickoff_at)}</div>
+                  {prediction.rationale && <div className="text-xs text-muted-foreground">Uzasadnienie: {prediction.rationale}</div>}
+                  {prediction.note && <div className="text-xs text-muted-foreground">{prediction.note}</div>}
                 </div>
                 <div className="num text-right text-sm">
-                  <div>{fmtPct(p.probability)}</div>
-                  <div className="text-xs text-muted-foreground">kurs {fmtOdds(p.odds)}{imp != null && ` · imp. ${fmtPct(imp)}`}</div>
+                  <div>{fmtPct(prediction.probability)}</div>
+                  <div className="text-xs text-muted-foreground">kurs {fmtOdds(prediction.odds)}{implied != null && ` · imp. ${fmtPct(implied)}`}</div>
                 </div>
-                <button onClick={() => toggle.mutate(p)} title="Przełącz status"><SelectionBadge status={p.selection_status} /></button>
-                <SettlementBadge status={p.result_status} />
-                <Button variant="ghost" size="icon" aria-label="Edytuj" onClick={() => { setEdit(p); setOpen(true); }}><Pencil /></Button>
-                <ConfirmDelete onConfirm={() => del.mutate(p.id)} />
+                <button onClick={() => toggle.mutate(prediction)} title="Przełącz werdykt"><SelectionBadge status={prediction.verdict} /></button>
+                <SettlementBadge status={prediction.settlement_status} />
+                {prediction.verified && <span className="text-xs text-success">zweryfikowano</span>}
+                <Button variant="ghost" size="icon" aria-label="Edytuj" onClick={() => { setEditing(prediction); setOpen(true); }}><Pencil /></Button>
+                <ConfirmDelete onConfirm={() => remove.mutate(prediction.id)} />
               </div>
             );
           })}
         </div>
       )}
-      <PredictionForm open={open} onOpenChange={setOpen} type={type} prediction={edit} matches={matches} />
+      <PredictionForm open={open} onOpenChange={setOpen} market={market} prediction={editing} matches={matches} />
     </div>
   );
 }
