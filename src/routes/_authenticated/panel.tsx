@@ -27,12 +27,17 @@ function Panel() {
   const balance = bankrollBalance(txs);
   const today = brusselsDayKey(new Date());
   const todayCount = matches.filter((m) => m.kickoff_at && brusselsDayKey(m.kickoff_at) === today).length;
-  const sel = activePreds.filter((prediction) => prediction.verdict === "WYBRANY");
+  const sel = activePreds.filter(
+    (prediction) =>
+      prediction.verdict === "WYBRANY" &&
+      prediction.verified &&
+      (prediction.settlement_status === "won" || prediction.settlement_status === "lost"),
+  );
   const hr1 = hitRate(sel.filter((prediction) => prediction.market === "1X2").map((prediction) => prediction.settlement_status));
   const hrDc = hitRate(sel.filter((prediction) => prediction.market === "DOUBLE_CHANCE").map((prediction) => prediction.settlement_status));
   const candidates = new Set(activePreds.filter((p) => isCouponCandidate(p, byId.get(p.match_id), now)).map((p) => p.match_id)).size;
-  const resultIds = new Set(results.map((r) => r.match_id));
-  const toSettle = matches.filter((m) => m.kickoff_at && new Date(m.kickoff_at).getTime() < now && !resultIds.has(m.id) && m.status !== "cancelled" && m.status !== "postponed").length;
+  const verifiedResultIds = new Set(results.filter((result) => result.verified).map((result) => result.match_id));
+  const toSettle = matches.filter((m) => m.kickoff_at && new Date(m.kickoff_at).getTime() < now && !verifiedResultIds.has(m.id)).length;
 
   return (
     <div>
