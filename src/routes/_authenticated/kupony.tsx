@@ -125,6 +125,7 @@ function Kupony() {
       await insertRow("bankroll_transactions", {
         occurred_at: new Date().toISOString(),
         type: "payout",
+        transaction_type: "return",
         amount,
         coupon_id: coupon.id,
         note: `Wygrana: ${coupon.name ?? "kupon"}`,
