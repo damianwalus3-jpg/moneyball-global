@@ -117,7 +117,7 @@ export function OddsForm({
   snapshot?: OddsSnapshot | null;
   predictions: Prediction[];
   matches: Match[];
-  defaultPredictionId?: string;
+  defaultPredictionId?: string | undefined;
 }) {
   const [form, setForm] = useState({ prediction_id: "", bookmaker: "", odds: "", captured: "", source_url: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -267,7 +267,7 @@ export function ResultForm({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   match: Match | null;
-  result?: MatchResult;
+  result?: MatchResult | undefined;
   onSave: (
     value:
       | { kind: "score"; home: number; away: number; source: string; verified: boolean }

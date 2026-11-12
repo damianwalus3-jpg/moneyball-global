@@ -36,6 +36,8 @@ export const Route = createFileRoute("/_authenticated/historia")({
   component: Historia,
 });
 
+const isVoided = (match: Match) => match.status === "cancelled" || match.status === "postponed";
+
 function Historia() {
   const matches = useTable("matches");
   const preds = useTable("predictions");

@@ -10,7 +10,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   plugins: [
     tanstackStart({ server: { entry: "server" } }),
-    nitro(process.env.NODE_ENV === "production" ? { preset: "cloudflare_module" } : {}),
+    nitro(process.env["NODE_ENV"] === "production" ? { preset: "cloudflare_module" } : {}),
     viteReact(),
     tailwindcss(),
     tsconfigPaths(),
