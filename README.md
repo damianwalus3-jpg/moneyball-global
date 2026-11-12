@@ -56,7 +56,7 @@ The `.github/workflows/ci.yml` workflow is configured to run the tests, TypeScri
 
 The Vite config uses TanStack Start and Nitro with automatic host detection. The intended production host is Vercel.
 
-The repository includes `.github/workflows/deploy-vercel.yml`. After adding these repository Actions secrets, every push to `main` can build and deploy the Worker:
+The repository includes `.github/workflows/deploy-vercel.yml`. After adding these repository Actions secrets, every push to `main` can build and deploy the application:
 
 - `VERCEL_TOKEN` — Vercel deployment token.
 - `VERCEL_ORG_ID` — Vercel team or account ID.
