@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, PageHeader } from "@/components/app/ui-bits";
 import { buildBackup, downloadFile, importTableCsv, restoreBackup, stamp, toCsv } from "@/lib/backup";
-import { maskKey, readConfig, readPrefs, savePrefs } from "@/lib/config";
+import { maskKey, readConfig, readPrefs, savePrefs, setOwnerColumn, type OwnerColumn } from "@/lib/config";
 import { fetchAll } from "@/lib/db";
 import { canInstall, isStandalone, promptInstall, subscribeInstall } from "@/lib/install";
 import { useAction } from "@/lib/queries";
@@ -86,7 +86,13 @@ function Ustawienia() {
           <div>Klucz publiczny: <span className="num">{cfg ? maskKey(cfg.anonKey) : "—"}</span> ({cfg?.source === "env" ? "zmienna środowiskowa" : "to urządzenie"})</div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" asChild><Link to="/setup">Zmień klucz</Link></Button>        </div>
+          <Button variant="outline" asChild><Link to="/setup">Zmień klucz</Link></Button>
+          {(["user_id", "owner_id"] as OwnerColumn[]).map((c) => (
+            <Button key={c} size="sm" variant={cfg?.ownerColumn === c ? "default" : "outline"} onClick={() => { setOwnerColumn(c); setCfg(readConfig()); toast.success(`Kolumna właściciela: ${c}`); }}>
+              {c}
+            </Button>
+          ))}
+        </div>
         <Field label="Waluta (wyświetlanie)" hint="Tylko etykieta, np. PLN lub EUR.">
           <Input className="max-w-40" value={currency} onChange={(e) => { setCurrency(e.target.value); savePrefs({ currency: e.target.value.trim() }); }} />
         </Field>
