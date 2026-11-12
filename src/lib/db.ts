@@ -153,9 +153,9 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
       const key = [matchId ?? "unknown", snapshot.bookmaker, snapshot.captured_at].join("|");
       const item = grouped.get(key) ?? { ...snapshot, match_id: matchId, odds_1: null, odds_x: null, odds_2: null };
       if (prediction?.market === "1X2") {
-        if (prediction.selection === "1") item.odds_1 = snapshot.odds;
-        if (prediction.selection === "X") item.odds_x = snapshot.odds;
-        if (prediction.selection === "2") item.odds_2 = snapshot.odds;
+        if (prediction.selection === "1") item["odds_1"] = snapshot.odds;
+        if (prediction.selection === "X") item["odds_x"] = snapshot.odds;
+        if (prediction.selection === "2") item["odds_2"] = snapshot.odds;
       }
       grouped.set(key, item);
     }
