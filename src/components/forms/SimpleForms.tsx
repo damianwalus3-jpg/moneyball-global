@@ -216,6 +216,7 @@ export function TransactionForm({
       const row = {
         occurred_at: brusselsInputToISO(f.when),
         type: f.type,
+        transaction_type: f.type === "payout" ? "return" : f.type,
         amount: f.type === "adjustment" ? amount : Math.abs(amount ?? 0),
         note: f.note.trim() || null,
       };
