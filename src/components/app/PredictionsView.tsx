@@ -20,11 +20,11 @@ function sourceLabel(source?: string | null) {
 function coverageLabel(coverage?: Record<string, unknown> | null) {
   if (!coverage) return "brak metadanych pokrycia";
   return [
-    "historia " + (coverage.verified_history ? "✓" : "—"),
-    "xG " + (coverage.historical_xg_used ? "✓" : "—"),
-    "Elo " + (coverage.elo_used ? "✓" : "—"),
-    "FootyNomad " + (coverage.footynomad_last5 ? "✓" : "—"),
-    "GitHub " + (coverage.keyless_github_last10 ? "✓" : "—"),
+    "historia " + (coverage["verified_history"] ? "✓" : "—"),
+    "xG " + (coverage["historical_xg_used"] ? "✓" : "—"),
+    "Elo " + (coverage["elo_used"] ? "✓" : "—"),
+    "FootyNomad " + (coverage["footynomad_last5"] ? "✓" : "—"),
+    "GitHub " + (coverage["keyless_github_last10"] ? "✓" : "—"),
   ].join(" · ");
 }
 
