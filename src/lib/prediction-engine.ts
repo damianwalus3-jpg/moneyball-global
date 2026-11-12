@@ -4,6 +4,11 @@ export interface GeneratedPrediction {
   match_id: string;
   scan_run_id: string | null;
   prediction_type: PredictionType;
+  market: "1X2" | "DOUBLE_CHANCE";
+  selection: Pick;
+  model_version: string;
+  group_name: string;
+  verdict: SelectionStatus;
   pick: Pick;
   probability: number;
   confidence: string;
@@ -11,6 +16,12 @@ export interface GeneratedPrediction {
   selection_status: SelectionStatus;
   rejection_reason: string | null;
   result_status: "pending";
+  settlement_status: "pending";
+  verified: false;
+  rationale: string;
+  note: string | null;
+  data_source: string;
+  data_coverage: Record<string, unknown>;
   notes: string;
 }
 
@@ -104,6 +115,11 @@ export function generateMatchPredictions(
       match_id: match.id,
       scan_run_id: scanRunId,
       prediction_type: type,
+      market: type === "DC" ? "DOUBLE_CHANCE" : "1X2",
+      selection: pick,
+      model_version: "MONEYBALL PUBLIC POISSON BASELINE v1",
+      group_name: "PUBLIC_BASELINE",
+      verdict: selected ? "WYBRANY" : "ODRZUCONY",
       pick,
       probability,
       confidence,
@@ -111,6 +127,12 @@ export function generateMatchPredictions(
       selection_status: selected ? "WYBRANY" : "ODRZUCONY",
       rejection_reason: selected ? null : !enoughHistory ? "Za mało historycznych wyników dla obu drużyn (minimum 3)." : "Prawdopodobieństwo modelu nie przekracza 75%.",
       result_status: "pending",
+      settlement_status: "pending",
+      verified: false,
+      rationale: selected ? "Model Poissona: próg >75% i minimum 3 wyniki historyczne na drużynę." : "Eksperymentalny model bramkowy; typ odrzucony z powodu progu lub braku historii.",
+      note: selected ? null : (!enoughHistory ? "Za mało wyników historycznych." : "Prawdopodobieństwo ≤75%."),
+      data_source: "ESPN public scoreboard + Supabase match_results",
+      data_coverage: { home_matches: homeForm.played, away_matches: awayForm.played, league: match.league, xg: false, lineups: false },
       notes: "Model Poissona oparty na golach historycznych; bez xG, składów i kontuzji. Wynik eksperymentalny, wymaga kalibracji.",
     };
   };
