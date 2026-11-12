@@ -31,9 +31,12 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
       const outcome = outcomeFromScore(mode.home, mode.away);
       const row = {
         match_id: match.id,
+        home_score: mode.home,
+        away_score: mode.away,
         home_goals: mode.home,
         away_goals: mode.away,
         outcome_1x2: outcome,
+        finished_at: now,
         source: mode.source ?? "ręcznie",
         settled_at: now,
       };
@@ -41,9 +44,12 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
         const old = input.existingResult;
         await updateRow("match_results", old.id, row);
         rollbackActions.push(() => updateRow("match_results", old.id, {
+          home_score: old.home_score,
+          away_score: old.away_score,
           home_goals: old.home_goals,
           away_goals: old.away_goals,
           outcome_1x2: old.outcome_1x2,
+          finished_at: old.finished_at,
           source: old.source,
           settled_at: old.settled_at,
         }));
@@ -67,10 +73,12 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
       if (prediction.result_status !== settled) {
         await updateRow("predictions", prediction.id, {
           result_status: settled,
+          settlement_status: settled,
           settled_at: now,
         });
         rollbackActions.push(() => updateRow("predictions", prediction.id, {
           result_status: prediction.result_status,
+          settlement_status: prediction.settlement_status,
           settled_at: prediction.settled_at,
         }));
         changedPredictions++;
@@ -83,8 +91,8 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
       const settled = resolve(leg.prediction_type, leg.pick);
       touchedCoupons.add(leg.coupon_id);
       if (leg.result_status !== settled) {
-        await updateRow("coupon_legs", leg.id, { result_status: settled });
-        rollbackActions.push(() => updateRow("coupon_legs", leg.id, { result_status: leg.result_status }));
+        await updateRow("coupon_legs", leg.id, { result_status: settled, status: settled });
+        rollbackActions.push(() => updateRow("coupon_legs", leg.id, { result_status: leg.result_status, status: leg.status }));
         leg.result_status = settled;
       }
     }
