@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { EmptyState, Field, NoGuarantee, PageHeader, PageLoader, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { saveCouponBatch } from "@/lib/coupons";
 import { deleteRow, fetchAll, insertRow, updateRow } from "@/lib/db";
-import { ACTIVE_MODEL_VERSION, buildCouponBatch, couponPayout, effectiveOdds, isCouponCandidate, MARKET_LABELS, signedAmount } from "@/lib/domain";
+import { ACTIVE_MODEL_VERSION, bankrollBalance, buildCouponBatch, couponPayout, effectiveOdds, isCouponCandidate, MARKET_LABELS, signedAmount } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel, parseDecimal } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -109,11 +109,7 @@ function Kupony() {
   const bookPayout = useAction(async ({ coupon, amount }: { coupon: Coupon; amount: number }) => {
     if (transactions.some((transaction) => transaction.coupon_id === coupon.id && transaction.transaction_type === "return"))
       throw new Error("Zwrot lub wygrana dla tego kuponu jest już zaksięgowana.");
-    const currentBalance = (await fetchAll("bankroll_transactions")).reduce((latest, transaction) => {
-      if (transaction.balance_after != null) return Math.max(latest, transaction.balance_after);
-      return latest;
-    }, Number.NEGATIVE_INFINITY);
-    const knownBalance = Number.isFinite(currentBalance) ? currentBalance : null;
+    const knownBalance = bankrollBalance(await fetchAll("bankroll_transactions"));
     await insertRow("bankroll_transactions", {
       transaction_type: "return",
       amount,
@@ -199,7 +195,6 @@ function Kupony() {
           <>
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {preview.map((couponPredictions, index) => {
-                const odds = couponPredictions.map((prediction) => prediction.odds);
                 const combined = effectiveOdds(couponPredictions.map((prediction) => ({ odds: prediction.odds, status: "pending" as const })));
                 return (
                   <div key={index} className="rounded-lg border border-border p-3">
@@ -247,7 +242,6 @@ function Kupony() {
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((coupon) => {
             const couponLegs = legs.filter((leg) => leg.coupon_id === coupon.id);
-            const legPredictions = couponLegs.map((leg) => predictionById.get(leg.prediction_id)).filter((prediction): prediction is Prediction => !!prediction);
             const payout = couponPayout(coupon.stake, couponLegs);
             const hasReturn = transactions.some((transaction) => transaction.coupon_id === coupon.id && transaction.transaction_type === "return");
             return (
