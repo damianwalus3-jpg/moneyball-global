@@ -178,7 +178,7 @@ export function OddsForm({
 }
 
 /* ---------------- Bankroll transactions ---------------- */
-async function rebuildBalances() {
+export async function rebuildBalances() {
   const transactions = await fetchAll("bankroll_transactions");
   let balance = 0;
   const ordered = [...transactions].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
