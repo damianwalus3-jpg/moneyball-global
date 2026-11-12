@@ -117,7 +117,7 @@ export function OddsForm({
   snapshot?: OddsSnapshot | null;
   predictions: Prediction[];
   matches: Match[];
-  defaultPredictionId?: string;
+  defaultPredictionId?: string | undefined;
 }) {
   const [form, setForm] = useState({ prediction_id: "", bookmaker: "", odds: "", captured: "", source_url: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -178,7 +178,7 @@ export function OddsForm({
 }
 
 /* ---------------- Bankroll transactions ---------------- */
-export async function rebuildBalances() {
+async function rebuildBalances() {
   const transactions = await fetchAll("bankroll_transactions");
   let balance = 0;
   const ordered = [...transactions].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
@@ -267,7 +267,7 @@ export function ResultForm({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   match: Match | null;
-  result?: MatchResult;
+  result?: MatchResult | undefined;
   onSave: (
     value:
       | { kind: "score"; home: number; away: number; source: string; verified: boolean }
