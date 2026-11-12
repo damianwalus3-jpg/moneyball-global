@@ -87,6 +87,10 @@ function Ustawienia() {
         <Button className="w-fit" onClick={check} disabled={checking}><Database /> {checking ? "Sprawdzanie…" : "Sprawdź tabele"}</Button>
         {report && (
           <div className="grid gap-1 text-sm">
+            <div className="rounded-lg border border-border p-3">
+              <div>Kolumna właściciela: <b className="num">owner_id</b></div>
+              <div>Dostęp anonimowy: <b>{report.anonymousAccess}</b></div>
+            </div>
             {report.warnings.map((w) => <p key={w} className="text-warning">{w}</p>)}
             {report.tables.map((t) => (
               <div key={t.table} className="flex justify-between gap-2 border-b border-border py-1">
