@@ -23,6 +23,7 @@ import { saveCouponBatch } from "@/lib/coupons";
 import { deleteRow, insertRow, updateRow } from "@/lib/db";
 import {
   buildCouponBatch,
+  ACTIVE_MODEL_VERSION,
   CANDIDATE_MIN_PROBABILITY,
   combinedProbability,
   couponPayout,
@@ -80,6 +81,7 @@ function Kupony() {
 
   const now = Date.now();
   const candidates = preds
+    .filter((p) => p.model_version === ACTIVE_MODEL_VERSION || !p.data_source)
     .filter((p) => isCouponCandidate(p, byId.get(p.match_id), now))
     .filter((p) => market === "all" || p.prediction_type === market)
     .filter((p) => !excludeActive || !activeMatchIds.has(p.match_id))
