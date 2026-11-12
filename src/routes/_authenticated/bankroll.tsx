@@ -10,7 +10,7 @@ import { bankrollBalance, signedAmount, TX_LABELS } from "@/lib/domain";
 import { fmtMoney } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
-import type { BankrollTransaction, TxType } from "@/lib/types";
+import type { BankrollTransaction, TransactionType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/bankroll")({
@@ -37,7 +37,7 @@ function Bankroll() {
   const [open, setOpen] = useState(false);
   const del = useAction((id: string) => deleteRow("bankroll_transactions", id), { success: "Usunięto transakcję" });
   const balance = bankrollBalance(txs);
-  const sum = (t: TxType) => txs.filter((x) => x.type === t).reduce((s, x) => s + Math.abs(Number(x.amount)), 0);
+  const sum = (type: TransactionType) => txs.filter((transaction) => transaction.transaction_type === type).reduce((s, x) => s + Math.abs(Number(x.amount)), 0);
   const sorted = [...txs].sort((a, b) => (b.occurred_at ?? "").localeCompare(a.occurred_at ?? ""));
   const couponName = (id: string | null) => (id ? coupons.find((c) => c.id === id)?.name ?? "kupon" : null);
 
@@ -72,7 +72,7 @@ function Bankroll() {
         <StatCard label="Wpłaty" value={txs.length ? fmtMoney(sum("deposit")) : "—"} />
         <StatCard label="Wypłaty" value={txs.length ? fmtMoney(sum("withdrawal")) : "—"} />
         <StatCard label="Stawki" value={txs.length ? fmtMoney(sum("stake")) : "—"} />
-        <StatCard label="Wygrane" value={txs.length ? fmtMoney(sum("payout")) : "—"} />
+        <StatCard label="Wygrane" value={txs.length ? fmtMoney(sum("return")) : "—"} />
       </div>
 
       {sorted.length === 0 ? (
@@ -94,7 +94,7 @@ function Bankroll() {
             return (
               <div key={t.id} className="surface-card flex items-center gap-3 p-3">
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium">{TX_LABELS[t.type] ?? t.type}</div>
+                  <div className="font-medium">{TX_LABELS[t.transaction_type] ?? t.transaction_type}</div>
                   <div className="truncate text-xs text-muted-foreground">
                     {fmtDateTime(t.occurred_at)}
                     {cn_ ? ` · ${cn_}` : ""}
