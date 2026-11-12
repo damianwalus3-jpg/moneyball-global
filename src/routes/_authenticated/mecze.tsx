@@ -312,7 +312,7 @@ function Mecze() {
                       </div>
                       {r ? (
                         <div className="num rounded-md bg-secondary px-2 py-1 text-lg font-semibold">
-                          {r.home_goals}:{r.away_goals}
+                          {r.home_goals ?? r.home_score}:{r.away_goals ?? r.away_score}
                         </div>
                       ) : (
                         <Badge variant={m.status === "cancelled" || m.status === "postponed" ? "muted" : "outline"}>
