@@ -1,5 +1,6 @@
-import { insertRow, insertRows, updateRow } from "./db";
-import type { Match } from "./types";
+import { fetchAll, insertRow, insertRows, updateRow } from "./db";
+import { settleMatch } from "./settlement";
+import type { Coupon, CouponLeg, Match, MatchResult, Prediction } from "./types";
 
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer";
 
@@ -119,6 +120,8 @@ export interface PublicScanResult {
   inserted: number;
   updated: number;
   duplicates: number;
+  settledResults: number;
+  settlementErrors: string[];
   from: string;
   to: string;
 }
@@ -155,7 +158,9 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
     notes: `Zakres ${dateKey(from)}–${dateKey(to)}; ligi pobrane ${successfulLeagues}/${PUBLIC_SOCCER_LEAGUES.length}; błędy: ${failedLeagues.length}`,
   });
 
-  const existing = await (await import("./db")).fetchAll("matches");
+  const [existing, predictions, couponLegs, coupons, results] = await Promise.all([
+    fetchAll("matches"), fetchAll("predictions"), fetchAll("coupon_legs"), fetchAll("coupons"), fetchAll("match_results"),
+  ]);
   const byExternal = new Map(existing.filter((m) => m.external_id).map((m) => [m.external_id!, m]));
   const toInsert = deduped.filter((f) => !byExternal.has(f.external_id));
   const inserted = await insertRows("matches", toInsert.map((f) => ({
@@ -180,6 +185,30 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
     if (Object.keys(patch).length) { await updateRow("matches", old.id, patch); updated++; }
   }
 
+  const matchByExternal = new Map(existing.filter((m) => m.external_id).map((m) => [m.external_id!, m]));
+  for (const m of inserted) if (m.external_id) matchByExternal.set(m.external_id, m);
+  let settledResults = 0;
+  const settlementErrors: string[] = [];
+  for (const fixture of deduped) {
+    const match = matchByExternal.get(fixture.external_id);
+    if (!match) continue;
+    try {
+      if (fixture.status === "finished" && fixture.home_goals != null && fixture.away_goals != null) {
+        const existingResult = results.find((r) => r.match_id === match.id);
+        await settleMatch({ match, existingResult, predictions: predictions as Prediction[], legs: couponLegs as CouponLeg[], coupons: coupons as Coupon[] }, {
+          kind: "score", home: fixture.home_goals, away: fixture.away_goals, source: "ESPN public scoreboard",
+        });
+        settledResults++;
+      } else if (fixture.status === "postponed" || fixture.status === "cancelled") {
+        await settleMatch({ match, existingResult: results.find((r) => r.match_id === match.id), predictions: predictions as Prediction[], legs: couponLegs as CouponLeg[], coupons: coupons as Coupon[] }, {
+          kind: "void", status: fixture.status,
+        });
+      }
+    } catch (error) {
+      settlementErrors.push(`${fixture.league}: ${fixture.home_team} – ${fixture.away_team}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   return {
     source: "ESPN public soccer scoreboard",
     requestedLeagues: PUBLIC_SOCCER_LEAGUES.length,
@@ -189,6 +218,8 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
     inserted: inserted.length,
     updated,
     duplicates: fixtures.length - deduped.length,
+    settledResults,
+    settlementErrors,
     from: from.toISOString(),
     to: to.toISOString(),
   };
