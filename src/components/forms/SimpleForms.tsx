@@ -288,8 +288,8 @@ export function ResultForm({
   useEffect(() => {
     if (!open) return;
     setErr("");
-    setHome(result?.home_goals != null ? String(result.home_goals) : "");
-    setAway(result?.away_goals != null ? String(result.away_goals) : "");
+    setHome((result?.home_goals ?? result?.home_score) != null ? String(result.home_goals ?? result.home_score) : "");
+    setAway((result?.away_goals ?? result?.away_score) != null ? String(result.away_goals ?? result.away_score) : "");
     setVoid(false);
   }, [open, result]);
   function submit() {
