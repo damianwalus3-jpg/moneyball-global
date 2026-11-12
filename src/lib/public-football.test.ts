@@ -35,6 +35,7 @@ describe("public ESPN soccer feed parser", () => {
       status: "finished", home_goals: 2, away_goals: 1,
     });
     expect(eventToFixture({ ...base, status: { type: { state: "in" } } }, league)?.status).toBe("live");
+    expect(eventToFixture({ ...base, status: { type: { state: "post", description: "Postponed" } } }, league)?.status).toBe("postponed");
   });
 
   it("rejects malformed events rather than inventing fixture data", () => {
