@@ -17,7 +17,9 @@ export async function importScan(parsed: ParsedScan, existing: Match[], source: 
   const scan = await insertRow("scan_runs", {
     started_at: new Date().toISOString(),
     source: source.trim() || "import CSV",
+    status: "started",
     matches_count: parsed.matches.length,
+    matches_found: parsed.matches.length,
   });
 
   let insertedMatches: Match[] = [];
@@ -42,8 +44,12 @@ export async function importScan(parsed: ParsedScan, existing: Match[], source: 
       "matches",
       toInsert.map((m) => ({
         scan_run_id: scan.id,
+        source: "CSV",
         kickoff_at: m.kickoff_at,
+        kickoff_date: m.kickoff_at.slice(0, 10),
         league: m.league,
+        competition: m.league,
+        gender: "unknown",
         country: m.country,
         home_team: m.home_team,
         away_team: m.away_team,
@@ -63,13 +69,25 @@ export async function importScan(parsed: ParsedScan, existing: Match[], source: 
         match_id,
         scan_run_id: scan.id,
         prediction_type: p.prediction_type,
+        market: p.prediction_type === "DC" ? "DOUBLE_CHANCE" : "1X2",
+        selection: p.pick,
         pick: p.pick,
+        model_version: "MONEYBALL GLOBAL 2.0 CSV IMPORT",
+        group_name: "CSV_IMPORT",
+        verdict: p.selection_status,
         probability: p.probability,
         odds: p.odds,
         confidence: p.confidence,
         selection_status: p.selection_status,
         rejection_reason: p.rejection_reason,
         result_status: "pending",
+        settlement_status: "pending",
+        verified: false,
+        rationale: p.rejection_reason || "Prognoza zaimportowana z pliku CSV.",
+        note: p.rejection_reason,
+        notes: "Import CSV; wynik i prawdopodobieństwo nie zostały zweryfikowane automatycznie.",
+        data_source: source.trim() || "import CSV",
+        data_coverage: { source: "CSV", confidence: p.confidence },
       };
     });
 
@@ -78,7 +96,12 @@ export async function importScan(parsed: ParsedScan, existing: Match[], source: 
       insertedPredictionIds.push(...saved.map((p) => p.id));
     }
 
-    await updateRow("scan_runs", scan.id, { matches_count: parsed.matches.length });
+    await updateRow("scan_runs", scan.id, {
+      matches_count: parsed.matches.length,
+      matches_found: parsed.matches.length,
+      status: "completed",
+      completed_at: new Date().toISOString(),
+    });
     return {
       newMatches: insertedMatches.length,
       reusedMatches: parsed.matches.length - insertedMatches.length,
