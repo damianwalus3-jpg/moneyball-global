@@ -14,6 +14,7 @@ import { MATCH_STATUS_LABELS } from "@/lib/domain";
 import { fmtOdds } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { brusselsDayKey, fmtDateTime, fmtDayLong, fmtTime } from "@/lib/time";
+import { getSupabase } from "@/lib/supabase";
 import type { Match, ScanRun } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/mecze")({
@@ -59,6 +60,32 @@ function Mecze() {
   const [settle, setSettle] = useState<Match | null>(null);
   const [editScan, setEditScan] = useState<ScanRun | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const [scanDate, setScanDate] = useState(() => brusselsDayKey(new Date()));
+
+  const runEngine = useAction(async (date: string) => {
+    const sb = getSupabase();
+    if (!sb) throw new Error("Brak połączenia z Supabase. Sprawdź Ustawienia → Połączenie z bazą.");
+    const { data: sessionData, error: sessionError } = await sb.auth.getSession();
+    if (sessionError || !sessionData.session?.access_token)
+      throw new Error("Sesja logowania wygasła. Zaloguj się ponownie.");
+
+    const sync = await sb.functions.invoke("footynomad-sync", { body: { date } });
+    if (sync.error) throw new Error("Skan terminarza nie powiódł się: " + sync.error.message);
+    if (sync.data?.error || sync.data?.ok === false)
+      throw new Error("Skan terminarza nie powiódł się: " + (sync.data?.error ?? "Nieznany błąd źródła."));
+
+    const prediction = await sb.functions.invoke("moneyball-predict", { body: { date } });
+    if (prediction.error) throw new Error("Prognozowanie nie powiodło się: " + prediction.error.message);
+    if (prediction.data?.ok === false)
+      throw new Error("Prognozowanie nie powiodło się: " + (prediction.data?.error ?? "Nieznany błąd silnika."));
+
+    return { sync: sync.data, prediction: prediction.data };
+  }, {
+    success: (r) => "Skan zakończony: " + (r.sync?.combined_count ?? r.sync?.total_found ?? 0) +
+      " meczów; prognozy: " + (r.prediction?.predictions ?? 0) +
+      "; wybrane: " + (r.prediction?.selected ?? 0) +
+      "; bez pełnych danych: " + (r.prediction?.missing ?? 0) + ".",
+  });
 
   const resultBy = useMemo(() => new Map(results.map((r) => [r.match_id, r])), [results]);
   const latestOdds = useMemo(() => {
@@ -114,8 +141,18 @@ function Mecze() {
         description="Wszystkie zeskanowane mecze — także te z prognozami ODRZUCONY."
         actions={
           <>
+            <Input
+              type="date"
+              aria-label="Data skanu"
+              value={scanDate}
+              onChange={(e) => setScanDate(e.target.value)}
+              className="h-9 w-40"
+            />
+            <Button onClick={() => runEngine.mutate(scanDate)} disabled={!scanDate || runEngine.isPending}>
+              <ScanLine /> {runEngine.isPending ? "Skanowanie i analiza…" : "Skanuj i analizuj"}
+            </Button>
             <Button variant="outline" onClick={() => setImportOpen(true)}>
-              <FileUp /> Import skanu
+              <FileUp /> Import CSV
             </Button>
             <Button
               onClick={() => {
