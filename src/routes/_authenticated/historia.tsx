@@ -48,10 +48,14 @@ function Historia() {
 
   const isVoided = (m: Match) => m.status === "cancelled" || m.status === "postponed";
   const todo = matches
-    .filter((m) => m.kickoff_at && new Date(m.kickoff_at).getTime() < now && !resultBy.has(m.id) && !isVoided(m))
+    .filter((m) => {
+      const result = resultBy.get(m.id);
+      const started = m.kickoff_at && new Date(m.kickoff_at).getTime() < now;
+      return !!started && (!result || !result.verified);
+    })
     .sort((a, b) => (a.kickoff_at ?? "").localeCompare(b.kickoff_at ?? ""));
   const done = matches
-    .filter((m) => resultBy.has(m.id) || isVoided(m))
+    .filter((m) => resultBy.get(m.id)?.verified === true)
     .sort((a, b) => (b.kickoff_at ?? "").localeCompare(a.kickoff_at ?? ""));
   const list = (tab === "todo" ? todo : done).filter(
     (m) => !q || `${matchLabel(m)} ${m.competition ?? ""}`.toLowerCase().includes(q.toLowerCase()),
@@ -77,11 +81,11 @@ function Historia() {
       {list.length === 0 ? (
         <EmptyState
           icon={tab === "todo" ? CheckCircle2 : History}
-          title={tab === "todo" ? "Nic do rozliczenia" : "Brak rozliczonych meczów"}
+          title={tab === "todo" ? "Nic do rozliczenia" : "Brak zweryfikowanych wyników"}
           description={
             tab === "todo"
-              ? "Mecze pojawią się tutaj po godzinie rozpoczęcia, jeśli nie mają jeszcze wyniku."
-              : "Po wpisaniu wyniku mecz trafi do historii."
+              ? "Mecze pojawią się tutaj po rozpoczęciu. Wynik bez weryfikacji pozostaje do rozliczenia."
+              : "Dopiero zweryfikowane wyniki trafiają do rozliczonej historii."
           }
         />
       ) : (
@@ -99,8 +103,11 @@ function Historia() {
                     </div>
                   </div>
                   {r ? (
-                    <div className="num rounded-md bg-secondary px-2 py-1 text-lg font-semibold">
-                      {r.home_score}:{r.away_score}
+                    <div className="rounded-md bg-secondary px-2 py-1 text-right">
+                      <div className="num text-lg font-semibold">
+                        {r.home_score == null || r.away_score == null ? "ZWROT" : String(r.home_score) + ":" + String(r.away_score)}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">{r.verified ? "zweryfikowano" : "do weryfikacji"}</div>
                     </div>
                   ) : isVoided(m) ? (
                     <SettlementBadge status="void" />
@@ -113,7 +120,7 @@ function Historia() {
                   <div className="mt-2 grid gap-1 border-t border-border pt-2">
                     {mp.map((p) => (
                       <div key={p.id} className="flex flex-wrap items-center gap-2 text-sm">
-                        <TypeBadge type={p.market === "DOUBLE_CHANCE" ? "DC" : "1X2"} />
+                        <TypeBadge type={p.market} />
                         <span className="num w-7 font-semibold text-primary">{p.selection}</span>
                         <span className="num text-xs text-muted-foreground">{fmtPct(p.probability)}</span>
                         <SelectionBadge status={p.verdict} />
