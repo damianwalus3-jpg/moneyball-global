@@ -133,25 +133,29 @@ function Mecze() {
   }, { success: "Usunięto pusty mecz" });
 
   const now = Date.now();
+  const today = brusselsDayKey(new Date());
+  const matchDay = (match: Match) => match.kickoff_at ? brusselsDayKey(match.kickoff_at) : match.kickoff_date ?? null;
+  const matchSortKey = (match: Match) => match.kickoff_at ?? (match.kickoff_date ? `${match.kickoff_date}T23:59:59Z` : "");
   const filtered = matches
-    .filter((m) => {
-      const t = m.kickoff_at ? new Date(m.kickoff_at).getTime() : 0;
-      if (view === "upcoming") return t >= now - 2 * 3600_000;
-      if (view === "past") return t < now;
+    .filter((match) => {
+      const day = matchDay(match);
+      const time = match.kickoff_at ? new Date(match.kickoff_at).getTime() : null;
+      if (view === "upcoming") return time != null ? time >= now - 2 * 3600_000 : !!day && day >= today;
+      if (view === "past") return time != null ? time < now : !!day && day < today;
       return true;
     })
-    .filter((m) => !q || `${m.home_team} ${m.away_team} ${m.competition} ${m.country}`.toLowerCase().includes(q.toLowerCase()))
+    .filter((match) => !q || `${match.home_team} ${match.away_team} ${match.competition ?? match.league ?? ""} ${match.country ?? ""}`.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) =>
       view === "upcoming"
-        ? (a.kickoff_at ?? "").localeCompare(b.kickoff_at ?? "")
-        : (b.kickoff_at ?? "").localeCompare(a.kickoff_at ?? ""),
+        ? matchSortKey(a).localeCompare(matchSortKey(b))
+        : matchSortKey(b).localeCompare(matchSortKey(a)),
     );
 
   const groups = new Map<string, Match[]>();
-  for (const m of filtered) {
-    const k = m.kickoff_at ? brusselsDayKey(m.kickoff_at) : "brak-daty";
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k)!.push(m);
+  for (const match of filtered) {
+    const key = matchDay(match) ?? "brak-daty";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(match);
   }
 
   return (
@@ -292,7 +296,7 @@ function Mecze() {
         <div className="grid gap-5">
           {[...groups.entries()].map(([day, list]) => (
             <section key={day}>
-              <h2 className="eyebrow mb-2 capitalize">{day === "brak-daty" ? "Bez daty" : fmtDayLong(list[0]?.kickoff_at ?? null)}</h2>
+              <h2 className="eyebrow mb-2 capitalize">{day === "brak-daty" ? "Bez daty" : fmtDayLong(list[0]?.kickoff_at ?? (list[0]?.kickoff_date ? `${list[0].kickoff_date}T12:00:00Z` : null))}</h2>
               <div className="grid gap-2">
                 {list.map((m) => {
                   const r = resultBy.get(m.id);
@@ -301,13 +305,13 @@ function Mecze() {
                   const started = m.kickoff_at ? new Date(m.kickoff_at).getTime() < now : false;
                   return (
                     <div key={m.id} className="surface-card flex flex-wrap items-center gap-3 p-3">
-                      <div className="num w-12 text-center text-sm font-semibold text-primary">{fmtTime(m.kickoff_at)}</div>
+                      <div className="num w-12 text-center text-sm font-semibold text-primary">{m.kickoff_at ? fmtTime(m.kickoff_at) : "Godzina nieznana"}</div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium">
                           {m.home_team} – {m.away_team}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {m.competition ?? "—"}
+                          {m.competition ?? m.league ?? "—"}
                           {m.country ? ` · ${m.country}` : ""}
                           {c ? ` · 1X2: ${c.x12} · DC: ${c.dc} · wybrane: ${c.sel}` : " · brak prognoz"}
                         </div>
