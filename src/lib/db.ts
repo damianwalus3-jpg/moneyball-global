@@ -58,12 +58,17 @@ function whitelist(table: TableName, row: Record<string, unknown>, includeId = f
   );
 }
 
+const READ_COLUMNS: Record<TableName, readonly string[]> = {
+  ...COLUMNS,
+  matches: [...COLUMNS.matches, "league", "kickoff_date"],
+};
+
 const PAGE = 1000;
 
 async function fetchRawAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
   const sb = requireSupabase();
   const uid = await currentUserId();
-  const columns = COLUMNS[table].join(",");
+  const columns = READ_COLUMNS[table].join(",");
   const rows: TableRows[K][] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await sb
@@ -89,7 +94,7 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
   }
   if (table === "matches") {
     const matches = rows as TableRows["matches"][];
-    return matches.map((row) => ({ ...row, league: row.competition })) as TableRows[K][];
+    return matches.map((row) => ({ ...row, competition: row.competition ?? row.league ?? null, league: row.league ?? row.competition ?? null })) as TableRows[K][];
   }
   if (table === "predictions") {
     const predictions = rows as TableRows["predictions"][];
