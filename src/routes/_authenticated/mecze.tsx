@@ -103,7 +103,7 @@ function Mecze() {
     for (const snapshot of odds) {
       if (!snapshot.prediction_id) continue;
       const prediction = predictionById.get(snapshot.prediction_id);
-      if (!prediction) continue;
+      if (!prediction || !isActivePredictionVersion(prediction.model_version)) continue;
       const current = byMatch.get(prediction.match_id);
       if (!current || snapshot.captured_at > current.snapshot.captured_at)
         byMatch.set(prediction.match_id, { snapshot, prediction });
@@ -334,7 +334,7 @@ function Mecze() {
                         </Badge>
                       )}
                       <div className="flex items-center">
-                        <Button variant="ghost" size="icon" aria-label="Kursy" title="Dodaj kursy" disabled={!preds.some((prediction) => prediction.match_id === m.id)} onClick={() => setOddsFor(m.id)}>
+                        <Button variant="ghost" size="icon" aria-label="Kursy" title="Dodaj kursy" disabled={!preds.some((prediction) => prediction.match_id === m.id && isActivePredictionVersion(prediction.model_version))} onClick={() => setOddsFor(m.id)}>
                           <CircleDollarSign />
                         </Button>
                         {(started || r) && (
@@ -374,9 +374,9 @@ function Mecze() {
       <OddsForm
         open={oddsFor != null}
         onOpenChange={(o) => !o && setOddsFor(null)}
-        predictions={preds.filter((prediction) => prediction.match_id === oddsFor)}
+        predictions={preds.filter((prediction) => prediction.match_id === oddsFor && isActivePredictionVersion(prediction.model_version))}
         matches={matches}
-        defaultPredictionId={preds.find((prediction) => prediction.match_id === oddsFor)?.id}
+        defaultPredictionId={preds.find((prediction) => prediction.match_id === oddsFor && isActivePredictionVersion(prediction.model_version))?.id}
       />
       <SettleMatchDialog match={settle} onClose={() => setSettle(null)} />
     </div>
