@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ConfirmDelete, EmptyState, PageHeader, SelectionBadge, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { PredictionForm } from "@/components/forms/PredictionForm";
 import { deleteRow, updateRow } from "@/lib/db";
-import { ACTIVE_MODEL_VERSION, hitRate, impliedProbability, MARKET_LABELS } from "@/lib/domain";
+import { hitRate, impliedProbability, isActivePredictionVersion, MARKET_LABELS } from "@/lib/domain";
 import { fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -22,7 +22,7 @@ export function PredictionsView({ market }: { market: Market }) {
   const byId = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
   const visible = modelScope === "all"
     ? all
-    : all.filter((prediction) => prediction.model_version === ACTIVE_MODEL_VERSION || prediction.model_version === "MANUAL");
+    : all.filter((prediction) => isActivePredictionVersion(prediction.model_version));
   const list = visible
     .filter((prediction) => prediction.market === market)
     .filter((prediction) => verdictFilter === "all" || prediction.verdict === verdictFilter)
