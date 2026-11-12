@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   bankrollBalance,
   buildCouponBatch,
+  buildSingleCouponBatch,
   couponPayout,
   couponStatus,
   hitRate,
@@ -89,6 +90,21 @@ describe("coupon builder", () => {
     expect(matchIds).not.toContain("m8");
     expect(validateBatch(batch)).toEqual([]);
   });
+  it("builds single-pick coupons without repeating a match and keeps the best pick", () => {
+    const candidates = [
+      prediction("a", "m1", 88),
+      prediction("a2", "m1", 91, { market: "DOUBLE_CHANCE", selection: "1X" }),
+      prediction("b", "m2", 86),
+      prediction("c", "m3", 84),
+      prediction("d", "m4", 80),
+      prediction("low", "m5", 75),
+    ];
+    const batch = buildSingleCouponBatch(candidates, 3);
+    expect(batch).toHaveLength(3);
+    expect(batch.map((coupon) => coupon[0].id)).toEqual(["a2", "b", "c"]);
+    expect(batch.every((coupon) => coupon.length === 1)).toBe(true);
+    expect(validateBatch(batch, 1)).toEqual([]);
+  });
   it("rejects incomplete coupons, duplicate matches, low probability and batch reuse", () => {
     expect(validateCoupon([prediction("a", "m1", 90), prediction("b", "m2", 90)])).toContain("Kupon musi mieć dokładnie 3 zdarzenia.");
     expect(validateCoupon([prediction("a", "m1", 90), prediction("b", "m1", 90), prediction("c", "m2", 90)])).toContain("Każde zdarzenie musi dotyczyć innego meczu.");
@@ -109,12 +125,19 @@ describe("settlement", () => {
     expect(settlePick("DOUBLE_CHANCE", "12", "X")).toBe("lost");
     expect(settlePick("DOUBLE_CHANCE", "X2", "2")).toBe("won");
   });
-  it("calculates coupon status from exactly three legs", () => {
+  it("calculates coupon status for single and three-leg coupons", () => {
+    expect(couponStatus(["won"])).toBe("won");
+    expect(couponStatus(["pending"])).toBe("pending");
+    expect(couponStatus(["void"])).toBe("void");
     expect(couponStatus(["won", "pending", "lost"])).toBe("lost");
     expect(couponStatus(["won", "pending", "won"])).toBe("pending");
     expect(couponStatus(["void", "void", "void"])).toBe("void");
     expect(couponStatus(["won", "void", "won"])).toBe("won");
     expect(couponStatus(["won", "won"])).toBe("pending");
+  });
+  it("calculates single-pick odds and payout", () => {
+    expect(couponStatus(["won"])).toBe("won");
+    expect(couponPayout(10, [{ odds: 1.8, status: "won" }])).toBe(18);
   });
   it("treats void legs as odds 1.00 for payout", () => {
     expect(couponPayout(10, [
