@@ -92,7 +92,7 @@ function Mecze() {
       "; pełne dane: " + (r.prediction?.covered ?? 0) +
       "; braki danych: " + (r.prediction?.missing ?? 0) +
       "; forma FootyNomad/GitHub: " + (r.prediction?.footy_form_matches ?? 0) + "/" + (r.prediction?.github_form_matches ?? 0) +
-      "; kupon 3/3: " + (r.prediction?.couponCreated ? "utworzony" : "brak kwalifikujących się typów") +
+      "; kupony 3/3: generator dostępny w zakładce Kupony" +
       "; wyniki: " + (r.sync?.result_sync?.ok ? "zsynchronizowane" : "wymagają kontroli") + ".",
   });
 
