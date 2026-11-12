@@ -237,14 +237,24 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
     const match = matchByExternal.get(fixture.external_id);
     if (!match) continue;
     try {
+      const existingResult = results.find((r) => r.match_id === match.id);
       if (fixture.status === "finished" && fixture.home_goals != null && fixture.away_goals != null) {
-        const existingResult = results.find((r) => r.match_id === match.id);
+        // Never overwrite a result already verified by the primary results pipeline.
+        const home = existingResult?.verified ? (existingResult.home_score ?? existingResult.home_goals) : fixture.home_goals;
+        const away = existingResult?.verified ? (existingResult.away_score ?? existingResult.away_goals) : fixture.away_goals;
+        if (home == null || away == null) {
+          settlementErrors.push(`${fixture.league}: verified result for ${fixture.home_team} – ${fixture.away_team} has no score fields`);
+          continue;
+        }
         await settleMatch({ match, existingResult, predictions: predictions as Prediction[], legs: couponLegs as CouponLeg[], coupons: coupons as Coupon[] }, {
-          kind: "score", home: fixture.home_goals, away: fixture.away_goals, source: "ESPN public scoreboard",
+          kind: "score",
+          home,
+          away,
+          source: existingResult?.verified ? (existingResult.source ?? "verified result") : "ESPN public scoreboard",
         });
         settledResults++;
-      } else if (fixture.status === "postponed" || fixture.status === "cancelled") {
-        await settleMatch({ match, existingResult: results.find((r) => r.match_id === match.id), predictions: predictions as Prediction[], legs: couponLegs as CouponLeg[], coupons: coupons as Coupon[] }, {
+      } else if ((fixture.status === "postponed" || fixture.status === "cancelled") && !existingResult?.verified) {
+        await settleMatch({ match, existingResult, predictions: predictions as Prediction[], legs: couponLegs as CouponLeg[], coupons: coupons as Coupon[] }, {
           kind: "void", status: fixture.status,
         });
       }
