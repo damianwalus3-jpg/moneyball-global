@@ -116,7 +116,6 @@ export function saveConfig(cfg: { url: string; anonKey: string; ownerColumn?: Ow
   if (urlError) throw new Error(urlError);
   const check = validatePublicKey(cfg.anonKey, cfg.url);
   if (!check.ok) throw new Error(check.reason);
-  const prev = readConfig();
   window.localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
