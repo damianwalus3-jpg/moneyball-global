@@ -54,6 +54,17 @@ The `.github/workflows/ci.yml` workflow is configured to run the tests, TypeScri
 
 ## Production build and deployment
 
+The Vite config uses TanStack Start and Nitro with automatic host detection. The intended production host is Vercel.
+
+The repository includes `.github/workflows/deploy-vercel.yml`. After adding these repository Actions secrets, every push to `main` can build and deploy the Worker:
+
+- `VERCEL_TOKEN` — Vercel deployment token.
+- `VERCEL_ORG_ID` — Vercel team or account ID.
+- `VERCEL_PROJECT_ID` — the Vercel project ID for this repository.
+
+Without all three secrets, deployment is deliberately skipped. No production URL is claimed until a deployment is completed and verified. The existing `finalne-typy.vercel.app` address is not referenced by this repository and currently displays the older Tracker loading screen, so it must not be assumed to be this app's verified deployment.
+
+
 The Vite config uses the standard TanStack Start and Nitro plugins. Production builds target the Cloudflare Workers module runtime.
 
 The repository includes `.github/workflows/deploy-cloudflare.yml`. After adding these two repository Actions secrets, every successful push to `main` builds and deploys the Worker:
