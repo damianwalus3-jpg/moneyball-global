@@ -11,6 +11,10 @@ export type Gender = "men" | "women" | "mixed" | "unknown";
 export type ScanRunStatus = "started" | "completed" | "partial" | "failed";
 export type CouponType = "TEST" | "MAIN" | "MEGA" | "EXTRA";
 export type TransactionType = "deposit" | "withdrawal" | "stake" | "return" | "adjustment";
+// Read-only compatibility aliases for legacy UI components; never written to Supabase.
+export type PredictionType = "1X2" | "DC";
+export type SelectionStatus = Verdict;
+export type TxType = "deposit" | "withdrawal" | "stake" | "payout" | "adjustment";
 
 export interface ScanRun {
   id: string;
@@ -21,6 +25,7 @@ export interface ScanRun {
   completed_at: string | null;
   status: ScanRunStatus;
   matches_found: number;
+  matches_count?: number;
   notes: string | null;
   created_at: string;
 }
@@ -40,6 +45,7 @@ export interface Match {
   status: MatchStatus;
   created_at: string;
   updated_at: string;
+  league?: string | null;
 }
 
 export interface Prediction {
@@ -59,6 +65,15 @@ export interface Prediction {
   settlement_status: Settlement;
   verified: boolean;
   note: string | null;
+  prediction_type?: PredictionType;
+  pick?: Selection | "—";
+  selection_status?: Verdict;
+  result_status?: Settlement;
+  rejection_reason?: string | null;
+  scan_run_id?: string | null;
+  settled_at?: string | null;
+  notes?: string | null;
+  data_source?: string | null;
 }
 
 export interface Coupon {
@@ -75,6 +90,8 @@ export interface Coupon {
   created_at: string;
   settled_at: string | null;
   notes: string | null;
+  total_odds?: number | null;
+  combined_probability?: number | null;
 }
 
 export interface CouponLeg {
@@ -86,6 +103,11 @@ export interface CouponLeg {
   odds: number | null;
   status: Settlement;
   created_at: string;
+  match_id?: string | null;
+  prediction_type?: PredictionType;
+  pick?: Selection | "—";
+  probability?: number | null;
+  result_status?: Settlement;
 }
 
 export interface MatchResult {
@@ -100,6 +122,9 @@ export interface MatchResult {
   finished_at: string | null;
   verified_at: string | null;
   created_at: string;
+  home_goals?: number | null;
+  away_goals?: number | null;
+  settled_at?: string | null;
 }
 
 export interface OddsSnapshot {
@@ -110,6 +135,10 @@ export interface OddsSnapshot {
   odds: number;
   captured_at: string;
   source_url: string | null;
+  match_id?: string | null;
+  odds_1?: number | null;
+  odds_x?: number | null;
+  odds_2?: number | null;
 }
 
 export interface BankrollTransaction {
@@ -121,6 +150,7 @@ export interface BankrollTransaction {
   coupon_id: string | null;
   occurred_at: string;
   note: string | null;
+  type?: TxType;
 }
 
 export interface TableRows {
