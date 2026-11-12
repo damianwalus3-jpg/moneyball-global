@@ -12,66 +12,116 @@ import {
   validateBatch,
   validateCoupon,
 } from "./domain";
-import type { Match, Prediction } from "./types";
+import type { BankrollTransaction, Match, Prediction } from "./types";
 
-const pred = (id: string, match_id: string, probability: number, extra: Partial<Prediction> = {}) =>
-  ({ id, match_id, probability, prediction_type: "1X2", pick: "1", selection_status: "WYBRANY", result_status: "pending", ...extra }) as Prediction;
+const prediction = (id: string, match_id: string, probability: number, extra: Partial<Prediction> = {}) =>
+  ({
+    id,
+    owner_id: "owner",
+    match_id,
+    model_version: "MONEYBALL GLOBAL 3.8",
+    market: "1X2",
+    selection: "1",
+    probability,
+    confidence: "high",
+    verdict: "WYBRANY",
+    rationale: null,
+    created_at: "2026-11-10T10:00:00.000Z",
+    group_name: "TEST",
+    odds: 1.8,
+    settlement_status: "pending",
+    verified: false,
+    note: null,
+    ...extra,
+  }) as Prediction;
+
+const match = (id: string, kickoff_at = "2026-11-11T20:00:00.000Z") =>
+  ({
+    id,
+    owner_id: "owner",
+    scan_run_id: null,
+    external_id: null,
+    source: "test",
+    competition: "Test league",
+    country: "Belgium",
+    gender: "men",
+    home_team: "Home",
+    away_team: "Away",
+    kickoff_at,
+    status: "scheduled",
+    created_at: "2026-11-10T10:00:00.000Z",
+    updated_at: "2026-11-10T10:00:00.000Z",
+  }) as Match;
 
 describe("coupon candidates", () => {
   const now = Date.parse("2026-11-10T12:00:00Z");
-  const match = { id: "m1", kickoff_at: "2026-11-11T20:00:00Z", status: "scheduled" } as Match;
-  it("rejects exactly 75% (must be strictly above)", () => {
-    expect(isCouponCandidate(pred("p", "m1", 75), match, now)).toBe(false);
-    expect(isCouponCandidate(pred("p", "m1", 75.1), match, now)).toBe(true);
+  it("requires probability strictly above 75%", () => {
+    expect(isCouponCandidate(prediction("p", "m1", 75), match("m1"), now)).toBe(false);
+    expect(isCouponCandidate(prediction("p", "m1", 75.1), match("m1"), now)).toBe(true);
   });
   it("rejects ODRZUCONY predictions", () => {
-    expect(isCouponCandidate(pred("p", "m1", 90, { selection_status: "ODRZUCONY" }), match, now)).toBe(false);
+    expect(isCouponCandidate(prediction("p", "m1", 90, { verdict: "ODRZUCONY" }), match("m1"), now)).toBe(false);
   });
-  it("rejects matches that already started", () => {
-    expect(isCouponCandidate(pred("p", "m1", 90), { ...match, kickoff_at: "2026-11-10T11:00:00Z" }, now)).toBe(false);
+  it("rejects started and cancelled matches", () => {
+    expect(isCouponCandidate(prediction("p", "m1", 90), match("m1", "2026-11-10T11:00:00Z"), now)).toBe(false);
+    expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), status: "cancelled" }, now)).toBe(false);
   });
 });
 
 describe("coupon builder", () => {
-  it("builds coupons of exactly 3 distinct matches with no match reused in the batch", () => {
-    const cands = [
-      pred("a", "m1", 90), pred("a2", "m1", 85, { prediction_type: "DC", pick: "1X" }),
-      pred("b", "m2", 88), pred("c", "m3", 86), pred("d", "m4", 84), pred("e", "m5", 82),
-      pred("f", "m6", 80), pred("g", "m7", 79), pred("low", "m8", 70),
+  it("builds exactly 3 distinct matches per coupon and never reuses a match in the batch", () => {
+    const candidates = [
+      prediction("a", "m1", 90),
+      prediction("a2", "m1", 85, { market: "DOUBLE_CHANCE", selection: "1X" }),
+      prediction("b", "m2", 88),
+      prediction("c", "m3", 86),
+      prediction("d", "m4", 84),
+      prediction("e", "m5", 82),
+      prediction("f", "m6", 80),
+      prediction("g", "m7", 79),
+      prediction("low", "m8", 75),
     ];
-    const batch = buildCouponBatch(cands, 5);
+    const batch = buildCouponBatch(candidates, 5);
     expect(batch).toHaveLength(2);
-    batch.forEach((c) => expect(new Set(c.map((l) => l.match_id)).size).toBe(3));
-    const all = batch.flat().map((l) => l.match_id);
-    expect(new Set(all).size).toBe(all.length);
-    expect(all).not.toContain("m8");
+    batch.forEach((coupon) => expect(new Set(coupon.map((leg) => leg.match_id)).size).toBe(3));
+    const matchIds = batch.flat().map((leg) => leg.match_id);
+    expect(new Set(matchIds).size).toBe(matchIds.length);
+    expect(matchIds).not.toContain("m8");
     expect(validateBatch(batch)).toEqual([]);
   });
-  it("validation catches wrong size, duplicate match, low probability, reuse", () => {
-    expect(validateCoupon([pred("a", "m1", 90), pred("b", "m2", 90)])).toContain("Kupon musi mieć dokładnie 3 zdarzenia.");
-    expect(validateCoupon([pred("a", "m1", 90), pred("b", "m1", 90), pred("c", "m2", 90)])).toContain("Każde zdarzenie musi dotyczyć innego meczu.");
-    expect(validateCoupon([pred("a", "m1", 75), pred("b", "m2", 90), pred("c", "m3", 90)]).length).toBe(1);
-    expect(validateBatch([[pred("a", "m1", 90), pred("b", "m2", 90), pred("c", "m3", 90)], [pred("d", "m1", 90), pred("e", "m4", 90), pred("f", "m5", 90)]]).length).toBe(1);
+  it("rejects incomplete coupons, duplicate matches, low probability and batch reuse", () => {
+    expect(validateCoupon([prediction("a", "m1", 90), prediction("b", "m2", 90)])).toContain("Kupon musi mieć dokładnie 3 zdarzenia.");
+    expect(validateCoupon([prediction("a", "m1", 90), prediction("b", "m1", 90), prediction("c", "m2", 90)])).toContain("Każde zdarzenie musi dotyczyć innego meczu.");
+    expect(validateCoupon([prediction("a", "m1", 75), prediction("b", "m2", 90), prediction("c", "m3", 90)]).length).toBe(1);
+    expect(validateBatch([
+      [prediction("a", "m1", 90), prediction("b", "m2", 90), prediction("c", "m3", 90)],
+      [prediction("d", "m1", 90), prediction("e", "m4", 90), prediction("f", "m5", 90)],
+    ])).toHaveLength(1);
   });
 });
 
 describe("settlement", () => {
-  it("settles 1X2 and Double Chance separately", () => {
+  it("settles 1X2 and Double Chance independently", () => {
     expect(outcomeFromScore(2, 1)).toBe("1");
     expect(outcomeFromScore(1, 1)).toBe("X");
     expect(settlePick("1X2", "1", "X")).toBe("lost");
-    expect(settlePick("DC", "1X", "X")).toBe("won");
-    expect(settlePick("DC", "12", "X")).toBe("lost");
-    expect(settlePick("DC", "X2", "2")).toBe("won");
+    expect(settlePick("DOUBLE_CHANCE", "1X", "X")).toBe("won");
+    expect(settlePick("DOUBLE_CHANCE", "12", "X")).toBe("lost");
+    expect(settlePick("DOUBLE_CHANCE", "X2", "2")).toBe("won");
   });
-  it("coupon status: lost beats pending, all void is void", () => {
+  it("calculates coupon status from exactly three legs", () => {
     expect(couponStatus(["won", "pending", "lost"])).toBe("lost");
     expect(couponStatus(["won", "pending", "won"])).toBe("pending");
     expect(couponStatus(["void", "void", "void"])).toBe("void");
     expect(couponStatus(["won", "void", "won"])).toBe("won");
+    expect(couponStatus(["won", "won"])).toBe("pending");
   });
-  it("payout treats void legs as odds 1.00", () => {
-    expect(couponPayout(10, [{ odds: 2, result_status: "won" }, { odds: 3, result_status: "void" }, { odds: 1.5, result_status: "won" }])).toBe(30);
+  it("treats void legs as odds 1.00 for payout", () => {
+    expect(couponPayout(10, [
+      { odds: 2, status: "won" },
+      { odds: 3, status: "void" },
+      { odds: 1.5, status: "won" },
+    ])).toBe(30);
   });
 });
 
@@ -80,18 +130,36 @@ describe("hit rates", () => {
     expect(hitRate(["won", "won", "lost", "void", "pending"]).rate).toBe(66.7);
     expect(hitRate([]).rate).toBeNull();
   });
-  it("groups by key", () => {
-    const g = groupHitRates([{ l: "A", s: "won" as const }, { l: "A", s: "lost" as const }, { l: "B", s: "won" as const }], (x) => x.l, (x) => x.s);
-    expect(g.find((x) => x.key === "A")?.rate).toBe(50);
-    expect(g.find((x) => x.key === "B")?.rate).toBe(100);
+  it("groups by competition or market key", () => {
+    const groups = groupHitRates(
+      [{ key: "A", status: "won" as const }, { key: "A", status: "lost" as const }, { key: "B", status: "won" as const }],
+      (item) => item.key,
+      (item) => item.status,
+    );
+    expect(groups.find((group) => group.key === "A")?.rate).toBe(50);
+    expect(groups.find((group) => group.key === "B")?.rate).toBe(100);
   });
 });
 
 describe("bankroll", () => {
-  it("shows no value when there are no transactions", () => {
+  const tx = (transaction_type: BankrollTransaction["transaction_type"], amount: number, occurred_at: string, balance_after: number | null = null) =>
+    ({ id: occurred_at, owner_id: "owner", transaction_type, amount, balance_after, coupon_id: null, occurred_at, note: null }) as BankrollTransaction;
+  it("returns null when there are no transactions", () => {
     expect(bankrollBalance([])).toBeNull();
   });
-  it("sums by transaction type", () => {
-    expect(bankrollBalance([{ type: "deposit", amount: 100 }, { type: "stake", amount: 10 }, { type: "payout", amount: 25 }, { type: "withdrawal", amount: 15 }, { type: "adjustment", amount: -5 }])).toBe(95);
+  it("calculates the signed ledger from canonical transaction_type", () => {
+    expect(bankrollBalance([
+      tx("deposit", 100, "2026-01-01T10:00:00Z"),
+      tx("stake", 10, "2026-01-02T10:00:00Z"),
+      tx("return", 25, "2026-01-03T10:00:00Z"),
+      tx("withdrawal", 15, "2026-01-04T10:00:00Z"),
+      tx("adjustment", -5, "2026-01-05T10:00:00Z"),
+    ])).toBe(95);
+  });
+  it("uses the latest recorded balance_after when available", () => {
+    expect(bankrollBalance([
+      tx("deposit", 100, "2026-01-01T10:00:00Z", 100),
+      tx("stake", 10, "2026-01-02T10:00:00Z", 90),
+    ])).toBe(90);
   });
 });
