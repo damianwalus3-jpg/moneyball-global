@@ -80,7 +80,7 @@ export function settlePick(market: Market, selection: Selection, outcome: Outcom
 }
 
 export function couponStatus(legs: (Settlement | null | undefined)[]): Settlement {
-  if (legs.length !== COUPON_SIZE) return "pending";
+  if (legs.length !== 1 && legs.length !== COUPON_SIZE) return "pending";
   const statuses = legs.map((status) => status ?? "pending");
   if (statuses.includes("lost")) return "lost";
   if (statuses.includes("pending")) return "pending";
@@ -89,7 +89,7 @@ export function couponStatus(legs: (Settlement | null | undefined)[]): Settlemen
 }
 
 export function totalOdds(odds: (number | null | undefined)[]): number | null {
-  if (odds.length !== COUPON_SIZE || odds.some((odd) => odd == null || !Number.isFinite(Number(odd)) || Number(odd) <= 1))
+  if ((odds.length !== 1 && odds.length !== COUPON_SIZE) || odds.some((odd) => odd == null || !Number.isFinite(Number(odd)) || Number(odd) <= 1))
     return null;
   const total = odds.reduce<number>((acc, odd) => acc * Number(odd), 1);
   return Math.round(total * 100) / 100;
@@ -97,7 +97,7 @@ export function totalOdds(odds: (number | null | undefined)[]): number | null {
 
 /** Void legs are treated as 1.00 when calculating the final coupon price. */
 export function effectiveOdds(legs: Pick<CouponLeg, "odds" | "status">[]): number | null {
-  if (legs.length !== COUPON_SIZE) return null;
+  if (legs.length !== 1 && legs.length !== COUPON_SIZE) return null;
   const activeOdds = legs.filter((leg) => leg.status !== "void").map((leg) => leg.odds);
   if (activeOdds.length === 0) return 1;
   if (activeOdds.some((odd) => odd == null || Number(odd) <= 1)) return null;
@@ -105,7 +105,7 @@ export function effectiveOdds(legs: Pick<CouponLeg, "odds" | "status">[]): numbe
 }
 
 export function combinedProbability(probabilities: (number | null | undefined)[]): number | null {
-  if (probabilities.length !== COUPON_SIZE || probabilities.some((p) => p == null || Number(p) < 0 || Number(p) > 100))
+  if ((probabilities.length !== 1 && probabilities.length !== COUPON_SIZE) || probabilities.some((p) => p == null || Number(p) < 0 || Number(p) > 100))
     return null;
   const result = probabilities.reduce<number>((acc, probability) => acc * (Number(probability) / 100), 1) * 100;
   return Math.round(result * 100) / 100;
@@ -148,12 +148,31 @@ export function buildCouponBatch<T extends { match_id: string; probability: numb
   return result;
 }
 
+export function buildSingleCouponBatch<T extends { match_id: string; probability: number | null }>(
+  candidates: T[],
+  count: number,
+): T[][] {
+  const bestByMatch = new Map<string, T>();
+  for (const candidate of candidates) {
+    if (candidate.probability == null || Number(candidate.probability) <= CANDIDATE_MIN_PROBABILITY) continue;
+    const current = bestByMatch.get(candidate.match_id);
+    if (!current || Number(candidate.probability) > Number(current.probability))
+      bestByMatch.set(candidate.match_id, candidate);
+  }
+  return [...bestByMatch.values()]
+    .sort((a, b) => Number(b.probability) - Number(a.probability))
+    .slice(0, Math.max(0, Math.floor(count)))
+    .map((candidate) => [candidate]);
+}
+
 export function validateCoupon(
   legs: { match_id: string; probability: number | null }[],
   usedMatchIds: Set<string> = new Set(),
+  targetLegs: 1 | 3 = COUPON_SIZE,
 ): string[] {
   const errors: string[] = [];
-  if (legs.length !== COUPON_SIZE) errors.push("Kupon musi mieć dokładnie 3 zdarzenia.");
+  if (legs.length !== targetLegs)
+    errors.push(targetLegs === 1 ? "Kupon pojedynczy musi mieć dokładnie 1 zdarzenie." : "Kupon musi mieć dokładnie 3 zdarzenia.");
   if (new Set(legs.map((leg) => leg.match_id)).size !== legs.length)
     errors.push("Każde zdarzenie musi dotyczyć innego meczu.");
   if (legs.some((leg) => leg.probability == null || Number(leg.probability) <= CANDIDATE_MIN_PROBABILITY))
@@ -163,11 +182,11 @@ export function validateCoupon(
   return errors;
 }
 
-export function validateBatch(coupons: { match_id: string; probability: number | null }[][]): string[] {
+export function validateBatch(coupons: { match_id: string; probability: number | null }[][], targetLegs: 1 | 3 = COUPON_SIZE): string[] {
   const used = new Set<string>();
   const errors: string[] = [];
   coupons.forEach((legs, index) => {
-    for (const error of validateCoupon(legs, used)) errors.push(`Kupon ${index + 1}: ${error}`);
+    for (const error of validateCoupon(legs, used, targetLegs)) errors.push(`Kupon ${index + 1}: ${error}`);
     legs.forEach((leg) => used.add(leg.match_id));
   });
   return errors;
@@ -234,7 +253,7 @@ export function couponPayout(
   stake: number | null,
   legs: Pick<CouponLeg, "odds" | "status">[],
 ): number | null {
-  if (stake == null || legs.length !== COUPON_SIZE) return null;
+  if (stake == null || (legs.length !== 1 && legs.length !== COUPON_SIZE)) return null;
   const status = couponStatus(legs.map((leg) => leg.status));
   if (status === "lost") return 0;
   if (status === "void") return Number(stake);

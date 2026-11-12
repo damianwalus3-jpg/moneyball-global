@@ -85,7 +85,7 @@ export interface Coupon {
   name: string;
   coupon_type: CouponType;
   status: CouponStatus;
-  target_legs: 3;
+  target_legs: 1 | 3;
   combined_odds: number | null;
   stake: number | null;
   potential_return: number | null;

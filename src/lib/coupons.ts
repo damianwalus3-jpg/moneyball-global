@@ -9,12 +9,14 @@ export interface SaveBatchOptions {
   stake: number | null;
   recordStake: boolean;
   notes?: string | null;
+  targetLegs?: 1 | 3;
 }
 
-/** Saves only complete 3-leg coupons. A failed batch rolls back only rows created by this call. */
+/** Saves complete single-pick or 3-leg coupons. A failed batch rolls back only rows created by this call. */
 export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatchOptions) {
-  if (!coupons.length) throw new Error("Brak kompletnych kuponów do zapisania.");
-  const errors = validateBatch(coupons);
+  if (!coupons.length) throw new Error("Brak kuponów do zapisania.");
+  const targetLegs = options.targetLegs ?? 3;
+  const errors = validateBatch(coupons, targetLegs);
   if (errors.length) throw new Error(errors.join(" "));
   if (options.recordStake && (options.stake == null || !Number.isFinite(options.stake) || options.stake <= 0))
     throw new Error("Podaj dodatnią stawkę albo wyłącz zapis stawki w bankrollu.");
@@ -36,7 +38,7 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
         name: `${options.namePrefix} #${index + 1}`.trim(),
         coupon_type: options.couponType ?? "TEST",
         status: "pending",
-        target_legs: 3,
+        target_legs: targetLegs,
         combined_odds: odds,
         stake: options.stake,
         potential_return: potentialReturn,
@@ -54,8 +56,9 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
           status: "pending",
         })),
       );
-      if (legs.length !== 3) throw new Error(`Kupon ${coupon.name}: nie zapisano wszystkich trzech nóg.`);
       createdLegs.push(...legs.map((leg) => leg.id));
+      if (legs.length !== predictions.length)
+        throw new Error("Kupon " + coupon.name + ": zapisano " + legs.length + " z " + predictions.length + " zdarzeń.");
 
       if (options.recordStake && options.stake != null && options.stake > 0) {
         const transactionType = "stake" as const;

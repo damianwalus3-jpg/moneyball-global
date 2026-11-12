@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { EmptyState, Field, NoGuarantee, PageHeader, PageLoader, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { saveCouponBatch } from "@/lib/coupons";
 import { deleteRow, fetchAll, insertRow, updateRow } from "@/lib/db";
-import { bankrollBalance, buildCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, MARKET_LABELS, signedAmount } from "@/lib/domain";
+import { bankrollBalance, buildCouponBatch, buildSingleCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, MARKET_LABELS, signedAmount } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel, parseDecimal } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -46,6 +46,7 @@ function Kupony() {
   const predictionById = useMemo(() => new Map(predictions.map((prediction) => [prediction.id, prediction])), [predictions]);
 
   const [couponCount, setCouponCount] = useState("2");
+  const [couponSize, setCouponSize] = useState<1 | 3>(3);
   const [stake, setStake] = useState("");
   const [recordStake, setRecordStake] = useState(true);
   const [couponType, setCouponType] = useState<CouponType>("TEST");
@@ -91,8 +92,9 @@ function Kupony() {
       scanRunId: [...scans].sort((a, b) => b.started_at.localeCompare(a.started_at))[0]?.id ?? null,
       stake: stakeValue,
       recordStake,
+      targetLegs: couponSize,
     }),
-    { success: (count) => `Zapisano ${count} kuponów po 3 zdarzenia`, onDone: () => setGenerated([]) },
+    { success: (count) => `Zapisano ${count} ${couponSize === 1 ? "pojedynczych kuponów" : "kuponów po 3 zdarzenia"}`, onDone: () => setGenerated([]) },
   );
 
   const removeCoupon = useAction(async (coupon: Coupon) => {
@@ -135,15 +137,19 @@ function Kupony() {
   };
 
   function generate() {
-    setGenerated(buildCouponBatch(candidates, requestedCount));
+    setGenerated(couponSize === 1
+      ? buildSingleCouponBatch(candidates, requestedCount)
+      : buildCouponBatch(candidates, requestedCount));
   }
 
   return (
     <div>
       <PageHeader
-        eyebrow="Dokładnie 3 mecze · prawdopodobieństwo >75%"
+        eyebrow={couponSize === 1 ? "Pojedyncze typy · prawdopodobieństwo >75%" : "Dokładnie 3 mecze · prawdopodobieństwo >75%"}
         title="Kupony"
-        description="Każdy kupon zawiera trzy różne mecze. W jednej wygenerowanej partii żaden mecz nie powtarza się w kolejnym kuponie."
+        description={couponSize === 1
+          ? "Każdy kupon zawiera jeden typ. W partii nie powtarzamy tego samego meczu."
+          : "Każdy kupon zawiera trzy różne mecze. W jednej wygenerowanej partii żaden mecz nie powtarza się w kolejnym kuponie."}
       />
       <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="W grze" value={counts.pending} />
@@ -160,6 +166,15 @@ function Kupony() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Liczba kuponów">
             <Input inputMode="numeric" className="num" value={couponCount} onChange={(event) => { setCouponCount(event.target.value); setGenerated([]); }} />
+          </Field>
+          <Field label="Rodzaj kuponu">
+            <Select value={String(couponSize)} onValueChange={(value) => { setCouponSize(value === "1" ? 1 : 3); setGenerated([]); }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">Pojedynczy · 1 mecz</SelectItem>
+                <SelectItem value="3">AKO · 3 mecze</SelectItem>
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="Typ kuponu">
             <Select value={couponType} onValueChange={(value) => { setCouponType(value as CouponType); setGenerated([]); }}>
@@ -185,14 +200,14 @@ function Kupony() {
           </label>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button onClick={generate} disabled={candidates.length < 3}>
+          <Button onClick={generate} disabled={candidates.length < couponSize}>
             <Sparkles /> Generuj kupony
           </Button>
           <Button variant="outline" onClick={() => setGenerated([])}>Wyczyść podgląd</Button>
         </div>
         {preview.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
-            Wybierz „Generuj kupony”. Potrzeba minimum 3 różnych meczów z WYBRANY i prawdopodobieństwem ściśle powyżej 75%.
+            Wybierz „Generuj kupony”. Potrzeba minimum {couponSize} różnych meczów z WYBRANY i prawdopodobieństwem ściśle powyżej 75%.
           </p>
         ) : (
           <>
@@ -225,7 +240,7 @@ function Kupony() {
                 );
               })}
             </div>
-            <Button className="mt-4" disabled={!!stakeError || saveBatch.isPending || preview.some((coupon) => coupon.length !== 3)} onClick={() => saveBatch.mutate(preview)}>
+            <Button className="mt-4" disabled={!!stakeError || saveBatch.isPending || preview.some((coupon) => coupon.length !== couponSize)} onClick={() => saveBatch.mutate(preview)}>
               <Ticket /> {saveBatch.isPending ? "Zapisywanie…" : `Zapisz ${preview.length} kuponów`}
             </Button>
           </>
@@ -252,7 +267,7 @@ function Kupony() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="truncate font-semibold">{coupon.name}</div>
-                    <div className="text-xs text-muted-foreground">{coupon.coupon_type} · {fmtDateTime(coupon.created_at)}</div>
+                    <div className="text-xs text-muted-foreground">{coupon.coupon_type} · {coupon.target_legs === 1 ? "pojedynczy" : "AKO · 3 mecze"} · {fmtDateTime(coupon.created_at)}</div>
                   </div>
                   <CouponStatusBadge status={coupon.status} />
                 </div>
@@ -272,7 +287,7 @@ function Kupony() {
                       </div>
                     );
                   })}
-                  {couponLegs.length !== 3 && <p className="text-xs text-destructive">Kupon ma {couponLegs.length} nóg zamiast 3.</p>}
+                  {couponLegs.length !== coupon.target_legs && <p className="text-xs text-destructive">Kupon ma {couponLegs.length} zdarzeń zamiast {coupon.target_legs}.</p>}
                 </div>
                 <div className="num mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3 text-sm">
                   <div><div className="eyebrow">Stawka</div>{fmtMoney(coupon.stake)}</div>
