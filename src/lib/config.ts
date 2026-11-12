@@ -3,12 +3,9 @@
 export const DEFAULT_SUPABASE_URL = "https://gzgeklcukrclgwbsmbsp.supabase.co";
 export const EXPECTED_PROJECT_REF = "gzgeklcukrclgwbsmbsp";
 
-export type OwnerColumn = "user_id" | "owner_id";
-
 export interface AppConfig {
   url: string;
   anonKey: string;
-  ownerColumn: OwnerColumn;
   source: "env" | "local";
 }
 
@@ -89,15 +86,14 @@ export function readConfig(): AppConfig | null {
       stored = {};
     }
   }
-  const ownerColumn: OwnerColumn = stored.ownerColumn === "user_id" ? "user_id" : "owner_id";
   if (env.key) {
     const url = env.url ?? DEFAULT_SUPABASE_URL;
-    if (validatePublicKey(env.key, url).ok) return { url, anonKey: env.key, ownerColumn, source: "env" };
+    if (validatePublicKey(env.key, url).ok) return { url, anonKey: env.key, source: "env" };
   }
   if (stored.anonKey) {
     const url = stored.url || env.url || DEFAULT_SUPABASE_URL;
     if (validatePublicKey(stored.anonKey, url).ok)
-      return { url, anonKey: stored.anonKey, ownerColumn, source: "local" };
+      return { url, anonKey: stored.anonKey, source: "local" };
   }
   return null;
 }
@@ -107,7 +103,7 @@ export function defaultUrl(): string {
   return envUrl ?? DEFAULT_SUPABASE_URL;
 }
 
-export function saveConfig(cfg: { url: string; anonKey: string; ownerColumn?: OwnerColumn }) {
+export function saveConfig(cfg: { url: string; anonKey: string }) {
   const check = validatePublicKey(cfg.anonKey, cfg.url);
   if (!check.ok) throw new Error(check.reason);
   window.localStorage.setItem(
@@ -115,15 +111,10 @@ export function saveConfig(cfg: { url: string; anonKey: string; ownerColumn?: Ow
     JSON.stringify({
       url: cfg.url.trim().replace(/\/$/, ""),
       anonKey: cfg.anonKey.trim(),
-      ownerColumn: cfg.ownerColumn ?? "owner_id",
     }),
   );
 }
 
-export function setOwnerColumn(ownerColumn: OwnerColumn) {
-  const raw = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "{}");
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...raw, ownerColumn }));
-}
 
 export function clearConfig() {
   window.localStorage.removeItem(STORAGE_KEY);
