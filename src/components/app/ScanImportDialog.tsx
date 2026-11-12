@@ -10,14 +10,15 @@ import { useAction, useTable } from "@/lib/queries";
 import { parseScanRows, SCAN_TEMPLATE_CSV, type ParsedScan } from "@/lib/scan-import";
 import { importScan } from "@/lib/scan-import-service";
 
-export function ScanImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+export function ScanImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const matches = useTable("matches");
   const [text, setText] = useState("");
-  const [source, setSource] = useState("");
+  const [source, setSource] = useState("CSV import");
+
   useEffect(() => {
     if (open) {
       setText("");
-      setSource("");
+      setSource("CSV import");
     }
   }, [open]);
 
@@ -25,110 +26,97 @@ export function ScanImportDialog({ open, onOpenChange }: { open: boolean; onOpen
     if (!text.trim()) return { parsed: null, parseError: "" };
     try {
       return { parsed: parseScanRows(parseCsv(text)), parseError: "" };
-    } catch (e) {
-      return { parsed: null, parseError: e instanceof Error ? e.message : "Błąd pliku." };
+    } catch (error) {
+      return { parsed: null, parseError: error instanceof Error ? error.message : "Błąd pliku." };
     }
   }, [text]);
 
-  const run = useAction(() => importScan(parsed!, matches, source), {
-    success: (r) =>
-      `Zaimportowano: ${r.newMatches} nowych meczów, ${r.reusedMatches} istniejących, ${r.predictions} prognoz`,
-    onDone: () => onOpenChange(false),
-  });
+  const selected = parsed?.predictions.filter((prediction) => prediction.verdict === "WYBRANY").length ?? 0;
+  const rejected = parsed?.predictions.filter((prediction) => prediction.verdict === "ODRZUCONY").length ?? 0;
+  const doubleChance = parsed?.predictions.filter((prediction) => prediction.market === "DOUBLE_CHANCE").length ?? 0;
 
-  const selected = parsed?.predictions.filter((p) => p.selection_status === "WYBRANY").length ?? 0;
-  const rejected = parsed?.predictions.filter((p) => p.selection_status === "ODRZUCONY").length ?? 0;
-  const dc = parsed?.predictions.filter((p) => p.prediction_type === "DC").length ?? 0;
+  const run = useAction(
+    async () => {
+      if (!parsed) throw new Error("Wklej lub wczytaj poprawny CSV.");
+      if (parsed.errors.length) throw new Error("Popraw błędy w wierszach przed importem.");
+      if (!source.trim()) throw new Error("Podaj źródło importu.");
+      return importScan(parsed, matches, source);
+    },
+    {
+      success: (result) => `Import zakończony: ${result.newMatches} nowych meczów, ${result.reusedMatches} istniejących, ${result.predictions} nowych prognoz.`,
+      onDone: () => onOpenChange(false),
+    },
+  );
+
+  function readFile(file?: File) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setText(String(reader.result ?? ""));
+    reader.onerror = () => setText("");
+    reader.readAsText(file);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] overflow-y-auto bg-card sm:max-w-2xl">
+      <DialogContent className="max-h-[92vh] overflow-y-auto bg-card">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl uppercase">Import skanu (CSV)</DialogTitle>
+          <DialogTitle className="font-display text-2xl uppercase">Import skanu CSV</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4">
+        <div className="grid gap-3">
           <p className="text-sm text-muted-foreground">
-            Każdy poprawny wiersz zapisuje mecz. Prognozy z prawdopodobieństwem ≤ 75% trafiają do bazy jako{" "}
-            <strong>ODRZUCONY</strong> — nic nie jest pomijane. Czas bez strefy traktowany jest jako Europe/Brussels.
+            Import używa wyłącznie kanonicznych nagłówków. Istniejące mecze i prognozy są pomijane, nigdy nadpisywane.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" asChild>
+            <Button type="button" variant="outline" onClick={() => downloadFile("moneyball-scan-template.csv", SCAN_TEMPLATE_CSV, "text/csv")}>
+              <Download /> Pobierz szablon CSV
+            </Button>
+            <Button type="button" variant="outline" asChild>
               <label className="cursor-pointer">
-                <FileUp /> Wybierz plik
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (f) setText(await f.text());
-                    e.target.value = "";
-                  }}
-                />
+                <FileUp /> Wczytaj plik
+                <input type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => readFile(event.target.files?.[0])} />
               </label>
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => downloadFile("szablon-skanu.csv", SCAN_TEMPLATE_CSV, "text/csv")}
-            >
-              <Download /> Szablon CSV
-            </Button>
           </div>
-          <Field label="Zawartość CSV" error={parseError}>
+          <Field label="Źródło skanu">
+            <Input value={source} onChange={(event) => setSource(event.target.value)} placeholder="np. FootyNomad" />
+          </Field>
+          <Field label="Dane CSV">
             <Textarea
-              rows={6}
-              className="num text-xs"
+              rows={9}
               value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="kickoff,league,country,home_team,away_team,prediction_type,pick,probability,odds"
+              onChange={(event) => setText(event.target.value)}
+              placeholder="kickoff_at,competition,country,gender,home_team,away_team,market,selection,probability,odds,confidence,verdict,rationale,model_version,group_name"
+              className="font-mono text-xs"
             />
           </Field>
-          <Field label="Źródło / model">
-            <Input value={source} onChange={(e) => setSource(e.target.value)} placeholder="np. skan poranny" />
-          </Field>
+          {parseError && <p className="text-sm text-destructive">{parseError}</p>}
           {parsed && (
-            <div className="surface-card grid gap-2 p-3 text-sm">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <Stat label="Mecze" value={parsed.matches.length} />
-                <Stat label="WYBRANY" value={selected} />
-                <Stat label="ODRZUCONY" value={rejected} />
-                <Stat label="w tym DC" value={dc} />
+            <div className="rounded-lg border border-border p-3 text-sm">
+              <div className="font-semibold">Podgląd importu</div>
+              <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div><div className="eyebrow">Mecze</div><b className="num">{parsed.matches.length}</b></div>
+                <div><div className="eyebrow">Prognozy</div><b className="num">{parsed.predictions.length}</b></div>
+                <div><div className="eyebrow">WYBRANY</div><b className="num">{selected}</b></div>
+                <div><div className="eyebrow">ODRZUCONY</div><b className="num">{rejected}</b></div>
               </div>
+              <p className="mt-2 text-xs text-muted-foreground">Prognozy Double Chance: {doubleChance}. Wartości poniżej 75% są importowane jako ODRZUCONY, jeśli werdykt nie został podany.</p>
               {parsed.errors.length > 0 && (
-                <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs">
-                  <div className="mb-1 font-semibold text-destructive">Błędy ({parsed.errors.length}) — popraw przed importem:</div>
-                  {parsed.errors.map((e, i) => (
-                    <div key={i}>
-                      Wiersz {e.row}: {e.message}
-                    </div>
-                  ))}
+                <div className="mt-3 grid gap-1 text-xs text-destructive">
+                  {parsed.errors.slice(0, 12).map((error) => <p key={error.row}>Wiersz {error.row}: {error.message}</p>)}
+                  {parsed.errors.length > 12 && <p>… i {parsed.errors.length - 12} kolejnych błędów.</p>}
                 </div>
               )}
             </div>
           )}
+          <p className="text-xs text-muted-foreground">CSV musi zawierać id tylko wtedy, gdy używasz importu kopii tabeli. Ten import skanu tworzy nowe rekordy i pomija duplikaty po meczu/prognozie.</p>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Anuluj
-          </Button>
-          <Button
-            disabled={!parsed || parsed.errors.length > 0 || parsed.matches.length === 0 || run.isPending}
-            onClick={() => run.mutate(undefined)}
-          >
-            {run.isPending ? "Importowanie…" : "Importuj"}
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Anuluj</Button>
+          <Button onClick={() => run.mutate(undefined)} disabled={!parsed || parsed.errors.length > 0 || run.isPending}>
+            {run.isPending ? "Importowanie…" : "Importuj skan"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: number }) {
-  return (
-    <div>
-      <div className="eyebrow">{label}</div>
-      <div className="num text-xl font-semibold">{value}</div>
-    </div>
   );
 }
