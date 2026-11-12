@@ -81,10 +81,14 @@ function Mecze() {
 
     return { sync: sync.data, prediction: prediction.data };
   }, {
-    success: (r) => "Skan zakończony: " + (r.sync?.combined_count ?? r.sync?.total_found ?? 0) +
+    success: (r) => "Skan: " + (r.sync?.combined_count ?? r.sync?.total_found ?? 0) +
       " meczów; prognozy: " + (r.prediction?.predictions ?? 0) +
       "; wybrane: " + (r.prediction?.selected ?? 0) +
-      "; bez pełnych danych: " + (r.prediction?.missing ?? 0) + ".",
+      "; pełne dane: " + (r.prediction?.covered ?? 0) +
+      "; braki danych: " + (r.prediction?.missing ?? 0) +
+      "; forma FootyNomad/GitHub: " + (r.prediction?.footy_form_matches ?? 0) + "/" + (r.prediction?.github_form_matches ?? 0) +
+      "; kupon 3/3: " + (r.prediction?.couponCreated ? "utworzony" : "brak kwalifikujących się typów") +
+      "; wyniki: " + (r.sync?.result_sync?.ok ? "zsynchronizowane" : "wymagają kontroli") + ".",
   });
 
   const resultBy = useMemo(() => new Map(results.map((r) => [r.match_id, r])), [results]);
