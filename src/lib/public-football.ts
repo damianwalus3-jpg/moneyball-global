@@ -72,7 +72,7 @@ function dateKey(date: Date) {
     timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
   }).formatToParts(date);
   const values = Object.fromEntries(parts.map((p) => [p.type, p.value]));
-  return `${values.year}${values.month}${values.day}`;
+  return `${values["year"]}${values["month"]}${values["day"]}`;
 }
 
 function naturalMatchKey(kickoff: string | null, home: string | null, away: string | null) {
@@ -204,9 +204,9 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
     const old = resolved.get(fixture.external_id) ?? byExternal.get(fixture.external_id);
     if (!old) continue;
     const patch: Record<string, unknown> = {};
-    if (!old.external_id) patch.external_id = fixture.external_id;
-    if (old.status !== fixture.status) patch.status = fixture.status;
-    if (old.kickoff_at !== fixture.kickoff_at) patch.kickoff_at = fixture.kickoff_at;
+    if (!old.external_id) patch["external_id"] = fixture.external_id;
+    if (old.status !== fixture.status) patch["status"] = fixture.status;
+    if (old.kickoff_at !== fixture.kickoff_at) patch["kickoff_at"] = fixture.kickoff_at;
     if (Object.keys(patch).length) { await updateRow("matches", old.id, patch); updated++; }
   }
 
