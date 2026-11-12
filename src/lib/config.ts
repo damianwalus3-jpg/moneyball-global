@@ -103,19 +103,20 @@ export function readConfig(): AppConfig | null {
 }
 
 export function defaultUrl(): string {
-  const envUrl = envConfig().url;
-  return envUrl ?? DEFAULT_SUPABASE_URL;
+  return envConfig().url ?? DEFAULT_SUPABASE_URL;
 }
 
 export function saveConfig(cfg: { url: string; anonKey: string; ownerColumn?: OwnerColumn }) {
   const check = validatePublicKey(cfg.anonKey, cfg.url);
   if (!check.ok) throw new Error(check.reason);
+  // Preserve the existing owner-column choice when the connection is saved again.
+  const prev = readConfig();
   window.localStorage.setItem(
     STORAGE_KEY,
     JSON.stringify({
       url: cfg.url.trim().replace(/\/$/, ""),
       anonKey: cfg.anonKey.trim(),
-      ownerColumn: cfg.ownerColumn ?? "owner_id",
+      ownerColumn: cfg.ownerColumn ?? prev?.ownerColumn ?? "owner_id",
     }),
   );
 }
