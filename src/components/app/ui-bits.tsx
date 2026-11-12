@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { SETTLEMENT_LABELS } from "@/lib/domain";
-import type { SelectionStatus, Settlement } from "@/lib/types";
+import type { Market, Settlement, Verdict } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function PageHeader({
@@ -108,7 +108,7 @@ export function SettlementBadge({ status }: { status: Settlement | null | undefi
   return <Badge variant={SETTLE_VARIANT[s]}>{SETTLEMENT_LABELS[s]}</Badge>;
 }
 
-export function SelectionBadge({ status }: { status: SelectionStatus | null | undefined }) {
+export function SelectionBadge({ status }: { status: Verdict | null | undefined }) {
   return status === "ODRZUCONY" ? (
     <Badge variant="rejected">ODRZUCONY</Badge>
   ) : (
@@ -116,8 +116,8 @@ export function SelectionBadge({ status }: { status: SelectionStatus | null | un
   );
 }
 
-export function TypeBadge({ type }: { type: string }) {
-  return <Badge variant={type === "DC" ? "info" : "outline"}>{type === "DC" ? "DC" : "1X2"}</Badge>;
+export function TypeBadge({ type }: { type: Market }) {
+  return <Badge variant={type === "DOUBLE_CHANCE" ? "info" : "outline"}>{type === "DOUBLE_CHANCE" ? "Double Chance" : "1X2"}</Badge>;
 }
 
 export function PageLoader() {
