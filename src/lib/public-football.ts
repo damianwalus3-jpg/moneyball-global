@@ -1,5 +1,6 @@
 import { fetchAll, insertRow, insertRows, updateRow } from "./db";
 import { settleMatch } from "./settlement";
+import { generateMatchPredictions } from "./prediction-engine";
 import type { Coupon, CouponLeg, Match, MatchResult, Prediction } from "./types";
 
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer";
@@ -132,6 +133,7 @@ export interface PublicScanResult {
   updated: number;
   duplicates: number;
   settledResults: number;
+  predictionsGenerated: number;
   settlementErrors: string[];
   from: string;
   to: string;
@@ -210,6 +212,18 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
   const matchByExternal = new Map(existing.filter((m) => m.external_id).map((m) => [m.external_id!, m]));
   for (const [externalId, match] of resolved) matchByExternal.set(externalId, match);
   for (const m of inserted) if (m.external_id) matchByExternal.set(m.external_id, m);
+  const generated = [];
+  for (const fixture of deduped) {
+    if (fixture.status !== "scheduled" || new Date(fixture.kickoff_at).getTime() <= now.getTime()) continue;
+    const match = matchByExternal.get(fixture.external_id);
+    if (!match) continue;
+    const existingTypes = new Set(predictions.filter((p) => p.match_id === match.id).map((p) => p.prediction_type));
+    const missing = generateMatchPredictions(match, [...existing, ...inserted], results as MatchResult[], scan.id)
+      .filter((p) => !existingTypes.has(p.prediction_type));
+    generated.push(...missing);
+  }
+  if (generated.length) await insertRows("predictions", generated);
+
   let settledResults = 0;
   const settlementErrors: string[] = [];
   for (const fixture of deduped) {
@@ -242,6 +256,7 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
     updated,
     duplicates: fixtures.length - deduped.length,
     settledResults,
+    predictionsGenerated: generated.length,
     settlementErrors,
     from: from.toISOString(),
     to: to.toISOString(),
