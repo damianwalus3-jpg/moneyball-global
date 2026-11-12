@@ -36,9 +36,9 @@ export function ScanImportDialog({ open, onOpenChange }: { open: boolean; onOpen
     onDone: () => onOpenChange(false),
   });
 
-  const selected = parsed?.predictions.filter((p) => p.selection_status === "WYBRANY").length ?? 0;
-  const rejected = parsed?.predictions.filter((p) => p.selection_status === "ODRZUCONY").length ?? 0;
-  const dc = parsed?.predictions.filter((p) => p.prediction_type === "DC").length ?? 0;
+  const selected = parsed?.predictions.filter((p) => p.verdict === "WYBRANY").length ?? 0;
+  const rejected = parsed?.predictions.filter((p) => p.verdict === "ODRZUCONY").length ?? 0;
+  const dc = parsed?.predictions.filter((p) => p.market === "DOUBLE_CHANCE").length ?? 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -81,7 +81,7 @@ export function ScanImportDialog({ open, onOpenChange }: { open: boolean; onOpen
               className="num text-xs"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="kickoff,league,country,home_team,away_team,prediction_type,pick,probability,odds"
+              placeholder="kickoff_at,competition,country,gender,home_team,away_team,market,selection,probability,odds"
             />
           </Field>
           <Field label="Źródło / model">
