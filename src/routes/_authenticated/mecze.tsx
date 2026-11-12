@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CalendarDays, CircleDollarSign, FileUp, Flag, Pencil, Plus, ScanLine } from "lucide-react";
+import { CalendarDays, CircleDollarSign, FileUp, Flag, Globe, Pencil, Plus, ScanLine } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { SettleMatchDialog } from "@/components/app/SettleMatchDialog";
 import { MatchForm } from "@/components/forms/MatchForm";
 import { OddsForm, ScanRunForm } from "@/components/forms/SimpleForms";
 import { deleteRow } from "@/lib/db";
+import { scanPublicFootball } from "@/lib/public-football";
 import { MATCH_STATUS_LABELS } from "@/lib/domain";
 import { fmtOdds } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
@@ -59,6 +60,9 @@ function Mecze() {
   const [settle, setSettle] = useState<Match | null>(null);
   const [editScan, setEditScan] = useState<ScanRun | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const publicScan = useAction(scanPublicFootball, {
+    success: (r) => `Źródło publiczne: ${r.inserted} nowych meczów, ${r.updated} aktualizacji, ${r.settledResults} rozliczonych wyników; ligi ${r.successfulLeagues}/${r.requestedLeagues}.`,
+  });
 
   const resultBy = useMemo(() => new Map(results.map((r) => [r.match_id, r])), [results]);
   const latestOdds = useMemo(() => {
@@ -111,9 +115,12 @@ function Mecze() {
       <PageHeader
         eyebrow="Europe/Brussels"
         title="Terminarz / Mecze"
-        description="Wszystkie zeskanowane mecze — także te z prognozami ODRZUCONY."
+        description="Wszystkie zeskanowane mecze — także ODRZUCONY. Skan publiczny pobiera terminarze i dostępne wyniki z wybranych lig ESPN; nie jest to pełne pokrycie światowe."
         actions={
           <>
+            <Button variant="outline" onClick={() => publicScan.mutate({ daysBack: 3, daysForward: 10 })} disabled={publicScan.isPending}>
+              <Globe /> {publicScan.isPending ? "Pobieranie danych…" : "Skan publiczny (bez klucza)"}
+            </Button>
             <Button variant="outline" onClick={() => setImportOpen(true)}>
               <FileUp /> Import skanu
             </Button>
@@ -304,6 +311,16 @@ function Mecze() {
         </div>
       )}
 
+      {publicScan.data?.failedLeagues.length ? (
+        <div className="mt-3 rounded-md border border-warning/40 p-3 text-xs text-warning">
+          Nie udało się pobrać części lig: {publicScan.data.failedLeagues.join("; ")}
+        </div>
+      ) : null}
+      {publicScan.data?.settlementErrors.length ? (
+        <div className="mt-3 rounded-md border border-destructive/40 p-3 text-xs text-destructive">
+          Błędy rozliczania wyników: {publicScan.data.settlementErrors.join("; ")}
+        </div>
+      ) : null}
       <MatchForm open={matchOpen} onOpenChange={setMatchOpen} match={editMatch} scanRuns={scans} />
       <ScanImportDialog open={importOpen} onOpenChange={setImportOpen} />
       <ScanRunForm open={scanOpen} onOpenChange={setScanOpen} scan={editScan} />
