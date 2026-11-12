@@ -109,6 +109,7 @@ export function defaultUrl(): string {
 export function saveConfig(cfg: { url: string; anonKey: string; ownerColumn?: OwnerColumn }) {
   const check = validatePublicKey(cfg.anonKey, cfg.url);
   if (!check.ok) throw new Error(check.reason);
+  // Preserve the existing owner-column choice when the connection is saved again.
   const prev = readConfig();
   window.localStorage.setItem(
     STORAGE_KEY,
