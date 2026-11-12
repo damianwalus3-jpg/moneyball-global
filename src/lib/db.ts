@@ -35,7 +35,7 @@ export function humanizeError(e: PgError | null | undefined, table?: string): st
 }
 
 export function ownerColumn() {
-  return readConfig()?.ownerColumn ?? "user_id";
+  return readConfig()?.ownerColumn ?? "owner_id";
 }
 
 export async function currentUserId(): Promise<string> {

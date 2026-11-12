@@ -30,7 +30,7 @@ async function columnExists(table: string, col: string) {
 /** Read-only check of every expected table/column against the live database. */
 export async function runSchemaCheck(): Promise<SchemaReport> {
   const sb = requireSupabase();
-  const owner = readConfig()?.ownerColumn ?? "user_id";
+  const owner = readConfig()?.ownerColumn ?? "owner_id";
   const tables: TableCheck[] = [];
   const warnings: string[] = [];
 
