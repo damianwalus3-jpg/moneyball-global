@@ -8,5 +8,5 @@ export const Route = createFileRoute("/_authenticated/prognozy-1x2")({
   loader: ({ context }) => ensureTables(context.queryClient, ["matches", "predictions"]),
   pendingComponent: PageLoader,
   errorComponent: DataError,
-  component: () => <PredictionsView type="1X2" />,
+  component: () => <PredictionsView market="1X2" />,
 });
