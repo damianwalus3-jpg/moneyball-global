@@ -115,7 +115,7 @@ export function saveConfig(cfg: { url: string; anonKey: string; ownerColumn?: Ow
     JSON.stringify({
       url: cfg.url.trim().replace(/\/$/, ""),
       anonKey: cfg.anonKey.trim(),
-      ownerColumn: cfg.ownerColumn ?? prev?.ownerColumn ?? "owner_id",
+      ownerColumn: cfg.ownerColumn ?? "owner_id",
     }),
   );
 }
