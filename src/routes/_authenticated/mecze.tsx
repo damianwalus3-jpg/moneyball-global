@@ -10,12 +10,12 @@ import { SettleMatchDialog } from "@/components/app/SettleMatchDialog";
 import { MatchForm } from "@/components/forms/MatchForm";
 import { OddsForm, ScanRunForm } from "@/components/forms/SimpleForms";
 import { deleteRow } from "@/lib/db";
-import { MATCH_STATUS_LABELS } from "@/lib/domain";
+import { isActivePredictionVersion, MATCH_STATUS_LABELS } from "@/lib/domain";
 import { fmtOdds } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { brusselsDayKey, fmtDateTime, fmtDayLong, fmtTime } from "@/lib/time";
 import { getSupabase } from "@/lib/supabase";
-import type { Match, ScanRun } from "@/lib/types";
+import type { Match, Prediction, ScanRun } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/mecze")({
   head: () => ({
@@ -91,25 +91,30 @@ function Mecze() {
       "; wyniki: " + (r.sync?.result_sync?.ok ? "zsynchronizowane" : "wymagają kontroli") + ".",
   });
 
-  const resultBy = useMemo(() => new Map(results.map((r) => [r.match_id, r])), [results]);
+  const resultBy = useMemo(() => new Map(results.map((result) => [result.match_id, result])), [results]);
+  const predictionById = useMemo(() => new Map(preds.map((prediction) => [prediction.id, prediction])), [preds]);
   const latestOdds = useMemo(() => {
-    const m = new Map<string, (typeof odds)[number]>();
-    for (const o of odds) {
-      const cur = m.get(o.match_id);
-      if (!cur || (o.captured_at ?? "") > (cur.captured_at ?? "")) m.set(o.match_id, o);
+    const byMatch = new Map<string, { snapshot: (typeof odds)[number]; prediction: Prediction }>();
+    for (const snapshot of odds) {
+      if (!snapshot.prediction_id) continue;
+      const prediction = predictionById.get(snapshot.prediction_id);
+      if (!prediction) continue;
+      const current = byMatch.get(prediction.match_id);
+      if (!current || snapshot.captured_at > current.snapshot.captured_at)
+        byMatch.set(prediction.match_id, { snapshot, prediction });
     }
-    return m;
-  }, [odds]);
+    return byMatch;
+  }, [odds, predictionById]);
   const predCount = useMemo(() => {
-    const m = new Map<string, { x12: number; dc: number; sel: number }>();
-    for (const p of preds) {
-      const c = m.get(p.match_id) ?? { x12: 0, dc: 0, sel: 0 };
-      if (p.prediction_type === "DC") c.dc++;
-      else c.x12++;
-      if (p.selection_status === "WYBRANY") c.sel++;
-      m.set(p.match_id, c);
+    const counts = new Map<string, { x12: number; dc: number; sel: number }>();
+    for (const prediction of preds.filter((item) => isActivePredictionVersion(item.model_version))) {
+      const count = counts.get(prediction.match_id) ?? { x12: 0, dc: 0, sel: 0 };
+      if (prediction.market === "DOUBLE_CHANCE") count.dc++;
+      else count.x12++;
+      if (prediction.verdict === "WYBRANY") count.sel++;
+      counts.set(prediction.match_id, count);
     }
-    return m;
+    return counts;
   }, [preds]);
 
   const del = useAction((id: string) => deleteRow("matches", id), { success: "Usunięto mecz" });
@@ -123,7 +128,7 @@ function Mecze() {
       if (view === "past") return t < now;
       return true;
     })
-    .filter((m) => !q || `${m.home_team} ${m.away_team} ${m.league} ${m.country}`.toLowerCase().includes(q.toLowerCase()))
+    .filter((m) => !q || `${m.home_team} ${m.away_team} ${m.competition} ${m.country}`.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) =>
       view === "upcoming"
         ? (a.kickoff_at ?? "").localeCompare(b.kickoff_at ?? "")
@@ -229,7 +234,7 @@ function Mecze() {
                     <div className="min-w-0 flex-1">
                       <div className="font-medium">{fmtDateTime(s.started_at)}</div>
                       <div className="text-xs text-muted-foreground">
-                        {s.source ?? "—"} · {s.matches_count ?? n} meczów
+                        {s.source ?? "—"} · {s.matches_found ?? n} meczów
                         {s.notes ? ` · ${s.notes}` : ""}
                       </div>
                     </div>
@@ -290,20 +295,19 @@ function Mecze() {
                           {m.home_team} – {m.away_team}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {m.league ?? "—"}
+                          {m.competition ?? "—"}
                           {m.country ? ` · ${m.country}` : ""}
                           {c ? ` · 1X2: ${c.x12} · DC: ${c.dc} · wybrane: ${c.sel}` : " · brak prognoz"}
                         </div>
                         {o && (
                           <div className="num text-xs text-muted-foreground">
-                            Kursy{o.bookmaker ? ` (${o.bookmaker})` : ""}: 1 {fmtOdds(o.odds_1)} · X {fmtOdds(o.odds_x)} · 2{" "}
-                            {fmtOdds(o.odds_2)}
+                            Kurs {fmtOdds(o.snapshot.odds)}{o.snapshot.bookmaker ? ` (${o.snapshot.bookmaker})` : ""} · {o.prediction.selection}
                           </div>
                         )}
                       </div>
                       {r ? (
                         <div className="num rounded-md bg-secondary px-2 py-1 text-lg font-semibold">
-                          {r.home_goals}:{r.away_goals}
+                          {r.home_score}:{r.away_score}
                         </div>
                       ) : (
                         <Badge variant={m.status === "cancelled" || m.status === "postponed" ? "muted" : "outline"}>
@@ -351,8 +355,9 @@ function Mecze() {
       <OddsForm
         open={oddsFor != null}
         onOpenChange={(o) => !o && setOddsFor(null)}
+        predictions={preds.filter((prediction) => prediction.match_id === oddsFor)}
         matches={matches}
-        defaultMatchId={oddsFor ?? undefined}
+        defaultPredictionId={preds.find((prediction) => prediction.match_id === oddsFor)?.id}
       />
       <SettleMatchDialog match={settle} onClose={() => setSettle(null)} />
     </div>
