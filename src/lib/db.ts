@@ -239,9 +239,9 @@ export async function upsertSkipExisting(table: TableName, rows: Record<string, 
   let inserted = 0;
   for (let i = 0; i < rows.length; i += 500) {
     const chunk = rows.slice(i, i + 500);
-    if (chunk.some((row) => typeof row.id !== "string" || !row.id))
+    if (chunk.some((row) => typeof row["id"] !== "string" || !row["id"]))
       throw new Error(`Kopia tabeli ${table} zawiera rekord bez id — import przerwany, aby uniknąć duplikatów.`);
-    const ids = chunk.map((row) => String(row.id));
+    const ids = chunk.map((row) => String(row["id"]));
     const { data: existing, error: lookupError } = await requireSupabase()
       .from(table)
       .select("id")
@@ -250,7 +250,7 @@ export async function upsertSkipExisting(table: TableName, rows: Record<string, 
     if (lookupError) throw new Error(humanizeError(lookupError, table));
     const existingIds = new Set((existing ?? []).map((row: { id: string }) => row.id));
     const missing = chunk
-      .filter((row) => !existingIds.has(String(row.id)))
+      .filter((row) => !existingIds.has(String(row["id"])))
       .map((row) => ({ ...whitelist(table, row, true), [OWNER_COLUMN]: uid }));
     if (!missing.length) continue;
     const { error } = await requireSupabase().from(table).insert(missing);
