@@ -302,7 +302,7 @@ function Mecze() {
                   const r = resultBy.get(m.id);
                   const c = predCount.get(m.id);
                   const o = latestOdds.get(m.id);
-                  const started = m.status === "finished" || (m.kickoff_at ? new Date(m.kickoff_at).getTime() < now : false);
+                  const started = m.status === "live" || m.status === "finished" || (m.kickoff_at ? new Date(m.kickoff_at).getTime() < now : false);
                   return (
                     <div key={m.id} className="surface-card flex flex-wrap items-center gap-3 p-3">
                       <div className="num w-12 text-center text-sm font-semibold text-primary">{m.kickoff_at ? fmtTime(m.kickoff_at) : "Godzina nieznana"}</div>
