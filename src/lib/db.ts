@@ -60,7 +60,7 @@ function whitelist(table: TableName, row: Record<string, unknown>, includeId = f
 
 const PAGE = 1000;
 
-export async function fetchAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
+async function fetchRawAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
   const sb = requireSupabase();
   const uid = await currentUserId();
   const columns = COLUMNS[table].join(",");
@@ -73,8 +73,109 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
       .order("id", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(humanizeError(error, table));
-    rows.push(...((data ?? []) as TableRows[K][]));
+    rows.push(...((data ?? []) as unknown as TableRows[K][]));
     if (!data || data.length < PAGE) break;
+  }
+  return rows;
+}
+
+/** Read adapter for screens still using the previous field names. All writes
+ * remain strictly whitelisted to canonical Supabase columns. */
+export async function fetchAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
+  const rows = await fetchRawAll(table);
+  if (table === "scan_runs") {
+    const scans = rows as TableRows["scan_runs"][];
+    return scans.map((row) => ({ ...row, matches_count: row.matches_found })) as TableRows[K][];
+  }
+  if (table === "matches") {
+    const matches = rows as TableRows["matches"][];
+    return matches.map((row) => ({ ...row, league: row.competition })) as TableRows[K][];
+  }
+  if (table === "predictions") {
+    const predictions = rows as TableRows["predictions"][];
+    const matches = await fetchRawAll("matches");
+    const scanRunByMatch = new Map(matches.map((match) => [match.id, match.scan_run_id]));
+    return predictions.map((row) => ({
+      ...row,
+      prediction_type: row.market === "DOUBLE_CHANCE" ? "DC" : "1X2",
+      pick: row.selection,
+      selection_status: row.verdict,
+      result_status: row.settlement_status,
+      rejection_reason: row.rationale,
+      notes: row.note,
+      data_source: row.model_version,
+      scan_run_id: scanRunByMatch.get(row.match_id) ?? null,
+      settled_at: null,
+    })) as TableRows[K][];
+  }
+  if (table === "coupon_legs") {
+    const legs = rows as TableRows["coupon_legs"][];
+    const predictions = await fetchRawAll("predictions");
+    const byId = new Map(predictions.map((prediction) => [prediction.id, prediction]));
+    return legs.map((leg) => {
+      const prediction = byId.get(leg.prediction_id);
+      return {
+        ...leg,
+        match_id: prediction?.match_id ?? null,
+        prediction_type: prediction?.market === "DOUBLE_CHANCE" ? "DC" : "1X2",
+        pick: prediction?.selection ?? "—",
+        probability: prediction?.probability ?? null,
+        result_status: leg.status,
+      };
+    }) as TableRows[K][];
+  }
+  if (table === "coupons") {
+    const coupons = rows as TableRows["coupons"][];
+    const [legs, predictions] = await Promise.all([
+      fetchRawAll("coupon_legs"),
+      fetchRawAll("predictions"),
+    ]);
+    const byId = new Map(predictions.map((prediction) => [prediction.id, prediction]));
+    return coupons.map((coupon) => {
+      const probabilities = legs
+        .filter((leg) => leg.coupon_id === coupon.id)
+        .map((leg) => byId.get(leg.prediction_id)?.probability ?? null);
+      const valid = probabilities.length === 3 && probabilities.every((p) => p != null);
+      const combined = valid
+        ? Math.round(probabilities.reduce((acc, p) => acc * (Number(p) / 100), 1) * 10000) / 100
+        : null;
+      return { ...coupon, total_odds: coupon.combined_odds, combined_probability: combined };
+    }) as TableRows[K][];
+  }
+  if (table === "odds_snapshots") {
+    const odds = rows as TableRows["odds_snapshots"][];
+    const predictions = await fetchRawAll("predictions");
+    const byId = new Map(predictions.map((prediction) => [prediction.id, prediction]));
+    const grouped = new Map<string, Record<string, unknown>>();
+    for (const snapshot of odds) {
+      const prediction = snapshot.prediction_id ? byId.get(snapshot.prediction_id) : undefined;
+      const matchId = prediction?.match_id ?? null;
+      const key = [matchId ?? "unknown", snapshot.bookmaker, snapshot.captured_at].join("|");
+      const item = grouped.get(key) ?? { ...snapshot, match_id: matchId, odds_1: null, odds_x: null, odds_2: null };
+      if (prediction?.market === "1X2") {
+        if (prediction.selection === "1") item.odds_1 = snapshot.odds;
+        if (prediction.selection === "X") item.odds_x = snapshot.odds;
+        if (prediction.selection === "2") item.odds_2 = snapshot.odds;
+      }
+      grouped.set(key, item);
+    }
+    return [...grouped.values()] as unknown as TableRows[K][];
+  }
+  if (table === "match_results") {
+    const results = rows as TableRows["match_results"][];
+    return results.map((row) => ({
+      ...row,
+      home_goals: row.home_score,
+      away_goals: row.away_score,
+      settled_at: row.finished_at,
+    })) as TableRows[K][];
+  }
+  if (table === "bankroll_transactions") {
+    const transactions = rows as TableRows["bankroll_transactions"][];
+    return transactions.map((row) => ({
+      ...row,
+      type: row.transaction_type === "return" ? "payout" : row.transaction_type,
+    })) as TableRows[K][];
   }
   return rows;
 }
@@ -91,7 +192,7 @@ export async function insertRows<K extends TableName>(
     .insert(payload)
     .select(COLUMNS[table].join(","));
   if (error) throw new Error(humanizeError(error, table));
-  return (data ?? []) as TableRows[K][];
+  return (data ?? []) as unknown as TableRows[K][];
 }
 
 export async function insertRow<K extends TableName>(table: K, row: Record<string, unknown>) {
@@ -128,9 +229,9 @@ export async function upsertSkipExisting(table: TableName, rows: Record<string, 
   let inserted = 0;
   for (let i = 0; i < rows.length; i += 500) {
     const chunk = rows.slice(i, i + 500);
-    if (chunk.some((row) => typeof row.id !== "string" || !row.id))
+    if (chunk.some((row) => typeof row["id"] !== "string" || !row["id"]))
       throw new Error(`Kopia tabeli ${table} zawiera rekord bez id — import przerwany, aby uniknąć duplikatów.`);
-    const ids = chunk.map((row) => String(row.id));
+    const ids = chunk.map((row) => String(row["id"]));
     const { data: existing, error: lookupError } = await requireSupabase()
       .from(table)
       .select("id")
@@ -139,7 +240,7 @@ export async function upsertSkipExisting(table: TableName, rows: Record<string, 
     if (lookupError) throw new Error(humanizeError(lookupError, table));
     const existingIds = new Set((existing ?? []).map((row: { id: string }) => row.id));
     const missing = chunk
-      .filter((row) => !existingIds.has(String(row.id)))
+      .filter((row) => !existingIds.has(String(row["id"])))
       .map((row) => ({ ...whitelist(table, row, true), [OWNER_COLUMN]: uid }));
     if (!missing.length) continue;
     const { error } = await requireSupabase().from(table).insert(missing);
