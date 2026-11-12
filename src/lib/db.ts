@@ -1,5 +1,5 @@
-import { readConfig } from "./config";
 import { requireSupabase } from "./supabase";
+import { COLUMNS, OWNER_COLUMN } from "./schema";
 import type { TableName, TableRows } from "./types";
 
 interface PgError {
@@ -15,10 +15,10 @@ export function humanizeError(e: PgError | null | undefined, table?: string): st
   switch (e.code) {
     case "42P01":
     case "PGRST205":
-      return `Tabela nie istnieje lub nie jest dostępna przez API${where}. Sprawdź Ustawienia → Diagnostyka.`;
+      return `Tabela nie istnieje lub nie jest dostępna przez API${where}.`;
     case "42703":
     case "PGRST204":
-      return `Niezgodność schematu${where}: ${e.message}. Sprawdź Ustawienia → Diagnostyka.`;
+      return `Niezgodność schematu${where}: ${e.message}.`;
     case "42501":
       return `Brak uprawnień${where} (RLS/GRANT). ${e.message ?? ""}`;
     case "23505":
@@ -35,58 +35,41 @@ export function humanizeError(e: PgError | null | undefined, table?: string): st
 }
 
 export function ownerColumn() {
-  return readConfig()?.ownerColumn ?? "owner_id";
+  return OWNER_COLUMN;
 }
 
 export async function currentUserId(): Promise<string> {
-  const { data } = await requireSupabase().auth.getSession();
-  const id = data.session?.user.id;
-  if (!id) throw new Error("Sesja wygasła. Zaloguj się ponownie.");
-  return id;
+  const { data, error } = await requireSupabase().auth.getUser();
+  if (error || !data.user?.id) throw new Error("Sesja wygasła. Zaloguj się ponownie.");
+  return data.user.id;
 }
 
 function clean(row: Record<string, unknown>) {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(row)) if (v !== undefined) out[k] = v;
-  return out;
+  return Object.fromEntries(Object.entries(row).filter(([, value]) => value !== undefined));
 }
 
-/** Keep normalized app fields synchronized with required legacy database columns. */
-function compatibleRow(table: TableName, row: Record<string, unknown>) {
-  const out = clean(row);
-  if (table === "predictions") {
-    if (out["prediction_type"] !== undefined && out["market"] === undefined)
-      out["market"] = out["prediction_type"] === "DC" ? "DOUBLE_CHANCE" : out["prediction_type"];
-    if (out["pick"] !== undefined && out["selection"] === undefined) out["selection"] = out["pick"];
-    if (out["selection_status"] !== undefined && out["verdict"] === undefined)
-      out["verdict"] = out["selection_status"];
-    if (out["result_status"] !== undefined && out["settlement_status"] === undefined)
-      out["settlement_status"] = out["result_status"];
-  }
-  if (table === "coupon_legs" && out["result_status"] !== undefined && out["status"] === undefined)
-    out["status"] = out["result_status"];
-  if (table === "bankroll_transactions") {
-    if (out["type"] !== undefined && out["transaction_type"] === undefined)
-      out["transaction_type"] = out["type"];
-    if (out["transaction_type"] !== undefined && out["type"] === undefined)
-      out["type"] = out["transaction_type"];
-  }
-  if (table === "match_results") {
-    if (out["home_goals"] !== undefined && out["home_score"] === undefined) out["home_score"] = out["home_goals"];
-    if (out["away_goals"] !== undefined && out["away_score"] === undefined) out["away_score"] = out["away_goals"];
-  }
-  return out;
+/** Only canonical columns are ever sent to PostgREST. */
+function whitelist(table: TableName, row: Record<string, unknown>, includeId = false) {
+  const allowed = new Set(COLUMNS[table]);
+  return Object.fromEntries(
+    Object.entries(clean(row)).filter(([key]) =>
+      allowed.has(key) && key !== OWNER_COLUMN && (includeId || key !== "id"),
+    ),
+  );
 }
 
 const PAGE = 1000;
 
 export async function fetchAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
   const sb = requireSupabase();
+  const uid = await currentUserId();
+  const columns = COLUMNS[table].join(",");
   const rows: TableRows[K][] = [];
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await sb
       .from(table)
-      .select("*")
+      .select(columns)
+      .eq(OWNER_COLUMN, uid)
       .order("id", { ascending: true })
       .range(from, from + PAGE - 1);
     if (error) throw new Error(humanizeError(error, table));
@@ -102,55 +85,66 @@ export async function insertRows<K extends TableName>(
 ): Promise<TableRows[K][]> {
   if (rows.length === 0) return [];
   const uid = await currentUserId();
-  const col = ownerColumn();
-  const payload = rows.map((r) => ({ ...compatibleRow(table, r), [col]: uid }));
-  const { data, error } = await requireSupabase().from(table).insert(payload).select();
+  const payload = rows.map((row) => ({ ...whitelist(table, row), [OWNER_COLUMN]: uid }));
+  const { data, error } = await requireSupabase()
+    .from(table)
+    .insert(payload)
+    .select(COLUMNS[table].join(","));
   if (error) throw new Error(humanizeError(error, table));
   return (data ?? []) as TableRows[K][];
 }
 
 export async function insertRow<K extends TableName>(table: K, row: Record<string, unknown>) {
-  const [r] = await insertRows(table, [row]);
-  if (!r) throw new Error("Zapis nie zwrócił rekordu. Sprawdź uprawnienia (RLS).");
-  return r;
+  const [inserted] = await insertRows(table, [row]);
+  if (!inserted) throw new Error("Zapis nie zwrócił rekordu. Sprawdź uprawnienia (RLS).");
+  return inserted;
 }
 
 export async function updateRow(table: TableName, id: string, patch: Record<string, unknown>) {
-  const { error } = await requireSupabase().from(table).update(compatibleRow(table, patch)).eq("id", id);
+  const uid = await currentUserId();
+  const safePatch = whitelist(table, patch);
+  const { error } = await requireSupabase()
+    .from(table)
+    .update(safePatch)
+    .eq("id", id)
+    .eq(OWNER_COLUMN, uid);
   if (error) throw new Error(humanizeError(error, table));
 }
 
 export async function deleteRow(table: TableName, id: string) {
-  const { error } = await requireSupabase().from(table).delete().eq("id", id);
+  const uid = await currentUserId();
+  const { error } = await requireSupabase()
+    .from(table)
+    .delete()
+    .eq("id", id)
+    .eq(OWNER_COLUMN, uid);
   if (error) throw new Error(humanizeError(error, table));
 }
 
-/** Insert-or-skip by id: never overwrites rows that already exist. */
+/** Restore by id only: existing rows are skipped, never overwritten. */
 export async function upsertSkipExisting(table: TableName, rows: Record<string, unknown>[]) {
   if (rows.length === 0) return 0;
   const uid = await currentUserId();
-  const col = ownerColumn();
-  let n = 0;
+  let inserted = 0;
   for (let i = 0; i < rows.length; i += 500) {
-    const chunk = rows.slice(i, i + 500).map((r) => {
-      const c = compatibleRow(table, r);
-      delete c["user_id"];
-      delete c["owner_id"];
-      return { ...c, [col]: uid };
-    });
-    const withId = chunk.filter((r) => r["id"]);
-    const withoutId = chunk.filter((r) => !r["id"]);
-    if (withId.length) {
-      const { error } = await requireSupabase()
-        .from(table)
-        .upsert(withId, { onConflict: "id", ignoreDuplicates: true });
-      if (error) throw new Error(humanizeError(error, table));
-    }
-    if (withoutId.length) {
-      const { error } = await requireSupabase().from(table).insert(withoutId);
-      if (error) throw new Error(humanizeError(error, table));
-    }
-    n += chunk.length;
+    const chunk = rows.slice(i, i + 500);
+    if (chunk.some((row) => typeof row.id !== "string" || !row.id))
+      throw new Error(`Kopia tabeli ${table} zawiera rekord bez id — import przerwany, aby uniknąć duplikatów.`);
+    const ids = chunk.map((row) => String(row.id));
+    const { data: existing, error: lookupError } = await requireSupabase()
+      .from(table)
+      .select("id")
+      .eq(OWNER_COLUMN, uid)
+      .in("id", ids);
+    if (lookupError) throw new Error(humanizeError(lookupError, table));
+    const existingIds = new Set((existing ?? []).map((row: { id: string }) => row.id));
+    const missing = chunk
+      .filter((row) => !existingIds.has(String(row.id)))
+      .map((row) => ({ ...whitelist(table, row, true), [OWNER_COLUMN]: uid }));
+    if (!missing.length) continue;
+    const { error } = await requireSupabase().from(table).insert(missing);
+    if (error) throw new Error(humanizeError(error, table));
+    inserted += missing.length;
   }
-  return n;
+  return inserted;
 }
