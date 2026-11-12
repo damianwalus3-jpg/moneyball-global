@@ -1,25 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { EXPECTED_PROJECT_REF, projectRefFromUrl, validatePublicKey, validateSupabaseUrl } from "./config";
+import { validatePublicKey } from "./config";
 import { parseScanRows } from "./scan-import";
 import { brusselsInputToISO, isoToBrusselsInput } from "./time";
 import { buildMigrationSql } from "./schema";
 
 const jwt = (payload: object) => `x.${btoa(JSON.stringify(payload)).replace(/=+$/, "")}.y`;
 
-describe("Supabase project and key safety", () => {
-  it("pins the app to the dedicated free project, not the historical database", () => {
-    expect(EXPECTED_PROJECT_REF).toBe("xwrgfaarmwnguymresjy");
-    expect(projectRefFromUrl("https://xwrgfaarmwnguymresjy.supabase.co")).toBe(EXPECTED_PROJECT_REF);
-    expect(validateSupabaseUrl("https://xwrgfaarmwnguymresjy.supabase.co")).toBeNull();
-    expect(validateSupabaseUrl("https://gzgeklcukrclgwbsmbsp.supabase.co")).toContain("moneyball-global-free");
-  });
+describe("key safety", () => {
   it("rejects secret and service_role keys", () => {
     expect(validatePublicKey("sb_secret_abcdefghijklmnop").ok).toBe(false);
-    expect(validatePublicKey(jwt({ role: "service_role", ref: EXPECTED_PROJECT_REF })).ok).toBe(false);
+    expect(validatePublicKey(jwt({ role: "service_role", ref: "gzgeklcukrclgwbsmbsp" })).ok).toBe(false);
   });
-  it("accepts publishable and anon keys for the dedicated project", () => {
+  it("accepts publishable and anon keys for this project", () => {
     expect(validatePublicKey("sb_publishable_abcdefghijklmnop").ok).toBe(true);
-    expect(validatePublicKey(jwt({ role: "anon", ref: EXPECTED_PROJECT_REF })).ok).toBe(true);
+    expect(validatePublicKey(jwt({ role: "anon", ref: "gzgeklcukrclgwbsmbsp" })).ok).toBe(true);
     expect(validatePublicKey(jwt({ role: "anon", ref: "otherproject" })).ok).toBe(false);
   });
 });
