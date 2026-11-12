@@ -7,6 +7,7 @@ import type {
   Market,
   Prediction,
   Settlement,
+  CouponStatus,
   TransactionType,
 } from "./types";
 
@@ -88,7 +89,7 @@ export function couponStatus(legs: (Settlement | null | undefined)[]): Settlemen
 export function totalOdds(odds: (number | null | undefined)[]): number | null {
   if (odds.length !== COUPON_SIZE || odds.some((odd) => odd == null || !Number.isFinite(Number(odd)) || Number(odd) <= 1))
     return null;
-  const total = odds.reduce((acc, odd) => acc * Number(odd), 1);
+  const total = odds.reduce<number>((acc, odd) => acc * Number(odd), 1);
   return Math.round(total * 100) / 100;
 }
 
@@ -98,7 +99,7 @@ export function effectiveOdds(legs: Pick<CouponLeg, "odds" | "status">[]): numbe
   const activeOdds = legs.filter((leg) => leg.status !== "void").map((leg) => leg.odds);
   if (activeOdds.length === 0) return 1;
   if (activeOdds.some((odd) => odd == null || Number(odd) <= 1)) return null;
-  return Math.round(activeOdds.reduce((acc, odd) => acc * Number(odd), 1) * 100) / 100;
+  return Math.round(activeOdds.reduce<number>((acc, odd) => acc * Number(odd), 1) * 100) / 100;
 }
 
 export function combinedProbability(probabilities: (number | null | undefined)[]): number | null {
@@ -180,9 +181,9 @@ export interface HitRate {
   rate: number | null;
 }
 
-export function hitRate(statuses: (Settlement | null | undefined)[]): HitRate {
+export function hitRate(statuses: (Settlement | CouponStatus | null | undefined)[]): HitRate {
   const result = { total: statuses.length, won: 0, lost: 0, void: 0, pending: 0 };
-  for (const status of statuses) result[(status ?? "pending") as Settlement]++;
+  for (const status of statuses) result[(status === "cancelled" ? "void" : status ?? "pending") as Settlement]++;
   const settled = result.won + result.lost;
   return { ...result, settled, rate: settled ? Math.round((result.won / settled) * 1000) / 10 : null };
 }
@@ -190,7 +191,7 @@ export function hitRate(statuses: (Settlement | null | undefined)[]): HitRate {
 export function groupHitRates<T>(
   items: T[],
   keyFn: (item: T) => string,
-  statusFn: (item: T) => Settlement | null | undefined,
+  statusFn: (item: T) => Settlement | CouponStatus | null | undefined,
 ): (HitRate & { key: string })[] {
   const groups = new Map<string, (Settlement | null | undefined)[]>();
   for (const item of items) {
