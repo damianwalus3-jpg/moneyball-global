@@ -169,6 +169,8 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
     started_at: now.toISOString(),
     source: "ESPN public soccer scoreboard (no API key)",
     matches_count: deduped.length,
+    matches_found: deduped.length,
+    status: "started",
     notes: `Zakres ${dateKey(from)}–${dateKey(to)}; ligi pobrane ${successfulLeagues}/${PUBLIC_SOCCER_LEAGUES.length}; błędy: ${failedLeagues.length}`,
   });
 
@@ -190,8 +192,12 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
   const inserted = await insertRows("matches", toInsert.map((f) => ({
     scan_run_id: scan.id,
     external_id: f.external_id,
+    source: "ESPN public scoreboard",
     kickoff_at: f.kickoff_at,
+    kickoff_date: f.kickoff_at.slice(0, 10),
     league: f.league,
+    competition: f.league,
+    gender: f.country.includes("kobiety") ? "women" : "men",
     country: f.country,
     home_team: f.home_team,
     away_team: f.away_team,
@@ -246,6 +252,13 @@ export async function scanPublicFootball(options: { daysBack?: number; daysForwa
       settlementErrors.push(`${fixture.league}: ${fixture.home_team} – ${fixture.away_team}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  await updateRow("scan_runs", scan.id, {
+    matches_count: deduped.length,
+    matches_found: deduped.length,
+    status: failedLeagues.length || settlementErrors.length ? "partial" : "completed",
+    completed_at: new Date().toISOString(),
+  });
 
   return {
     source: "ESPN public soccer scoreboard",
