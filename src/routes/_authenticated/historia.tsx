@@ -54,7 +54,7 @@ function Historia() {
     .filter((m) => resultBy.has(m.id) || isVoided(m))
     .sort((a, b) => (b.kickoff_at ?? "").localeCompare(a.kickoff_at ?? ""));
   const list = (tab === "todo" ? todo : done).filter(
-    (m) => !q || `${matchLabel(m)} ${m.league}`.toLowerCase().includes(q.toLowerCase()),
+    (m) => !q || `${matchLabel(m)} ${m.competition ?? ""}`.toLowerCase().includes(q.toLowerCase()),
   );
 
   return (
@@ -95,12 +95,12 @@ function Historia() {
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-medium">{matchLabel(m)}</div>
                     <div className="text-xs text-muted-foreground">
-                      {m.league ?? "—"} · {fmtDateTime(m.kickoff_at)}
+                      {m.competition ?? "—"} · {fmtDateTime(m.kickoff_at)}
                     </div>
                   </div>
                   {r ? (
                     <div className="num rounded-md bg-secondary px-2 py-1 text-lg font-semibold">
-                      {r.home_goals}:{r.away_goals}
+                      {r.home_score}:{r.away_score}
                     </div>
                   ) : isVoided(m) ? (
                     <SettlementBadge status="void" />
@@ -113,12 +113,12 @@ function Historia() {
                   <div className="mt-2 grid gap-1 border-t border-border pt-2">
                     {mp.map((p) => (
                       <div key={p.id} className="flex flex-wrap items-center gap-2 text-sm">
-                        <TypeBadge type={p.prediction_type} />
-                        <span className="num w-7 font-semibold text-primary">{p.pick}</span>
+                        <TypeBadge type={p.market === "DOUBLE_CHANCE" ? "DC" : "1X2"} />
+                        <span className="num w-7 font-semibold text-primary">{p.selection}</span>
                         <span className="num text-xs text-muted-foreground">{fmtPct(p.probability)}</span>
-                        <SelectionBadge status={p.selection_status} />
+                        <SelectionBadge status={p.verdict} />
                         <span className="flex-1" />
-                        <SettlementBadge status={p.result_status} />
+                        <SettlementBadge status={p.settlement_status} />
                       </div>
                     ))}
                   </div>
