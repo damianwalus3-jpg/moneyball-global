@@ -1,7 +1,7 @@
 import { fetchAll, insertRow, insertRows, updateRow } from "./db";
 import { matchKey, type ParsedScan } from "./scan-import";
 import { brusselsDayKey } from "./time";
-import type { Match, Prediction } from "./types";
+import type { Match } from "./types";
 
 /** Imports canonical CSV rows. Existing matches and predictions are skipped, never overwritten. */
 export async function importScan(parsed: ParsedScan, existingMatches: Match[], source: string) {
