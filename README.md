@@ -47,10 +47,9 @@ GitHub Actions runs the same tests, type-check and production build on pushes an
 
 The Vite config uses the standard TanStack Start and Nitro plugins. Production builds target the Cloudflare Workers module runtime.
 
-```sh
-bun run build
-bunx wrangler login
-bunx wrangler deploy
-```
+The repository includes `.github/workflows/deploy-cloudflare.yml`. After adding these two repository Actions secrets, every successful push to `main` builds and deploys the Worker:
 
-Deployment requires access to the intended Cloudflare account. No live URL is claimed until a deployment is completed and verified.
+- `CLOUDFLARE_API_TOKEN` — Cloudflare API token with permission to edit Workers scripts.
+- `CLOUDFLARE_ACCOUNT_ID` — target Cloudflare account ID.
+
+You can also run the workflow manually from GitHub Actions. Without both secrets, deployment is deliberately skipped; the build and tests still run. No live URL is claimed until a deployment is completed and verified.
