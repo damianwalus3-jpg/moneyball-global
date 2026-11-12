@@ -14,6 +14,7 @@ import type { Market, Prediction } from "@/lib/types";
 export function PredictionsView({ market }: { market: Market }) {
   const matches = useTable("matches");
   const all = useTable("predictions");
+  const couponLegs = useTable("coupon_legs");
   const [verdictFilter, setVerdictFilter] = useState<"all" | "WYBRANY" | "ODRZUCONY">("all");
   const [modelScope, setModelScope] = useState<"current" | "all">("current");
   const [query, setQuery] = useState("");
@@ -44,7 +45,11 @@ export function PredictionsView({ market }: { market: Market }) {
       verdict: prediction.verdict === "ODRZUCONY" ? "WYBRANY" : "ODRZUCONY",
     }),
   );
-  const remove = useAction((id: string) => deleteRow("predictions", id), { success: "Usunięto prognozę" });
+  const remove = useAction(async (id: string) => {
+    if (couponLegs.some((leg) => leg.prediction_id === id))
+      throw new Error("Nie można usunąć prognozy użytej w kuponie. Zachowaj historię i zmień werdykt na ODRZUCONY.");
+    await deleteRow("predictions", id);
+  }, { success: "Usunięto prognozę" });
 
   return (
     <div>
@@ -97,8 +102,8 @@ export function PredictionsView({ market }: { market: Market }) {
                 <button onClick={() => toggle.mutate(prediction)} title="Przełącz werdykt"><SelectionBadge status={prediction.verdict} /></button>
                 <SettlementBadge status={prediction.settlement_status} />
                 {prediction.verified && <span className="text-xs text-success">zweryfikowano</span>}
-                <Button variant="ghost" size="icon" aria-label="Edytuj" onClick={() => { setEditing(prediction); setOpen(true); }}><Pencil /></Button>
-                <ConfirmDelete onConfirm={() => remove.mutate(prediction.id)} />
+                <Button variant="ghost" size="icon" aria-label="Edytuj" title={couponLegs.some((leg) => leg.prediction_id === prediction.id) ? "Prognoza jest użyta w kuponie" : "Edytuj"} disabled={couponLegs.some((leg) => leg.prediction_id === prediction.id)} onClick={() => { setEditing(prediction); setOpen(true); }}><Pencil /></Button>
+                {!couponLegs.some((leg) => leg.prediction_id === prediction.id) && <ConfirmDelete onConfirm={() => remove.mutate(prediction.id)} />}
               </div>
             );
           })}
