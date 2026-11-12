@@ -2,10 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { BarChart3 } from "lucide-react";
 import { useMemo } from "react";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
-import { ACTIVE_MODEL_VERSION, couponPayout, groupHitRates, hitRate, type HitRate } from "@/lib/domain";
+import { couponPayout, groupHitRates, hitRate, isActivePredictionVersion, type HitRate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { ensureTables, useTable } from "@/lib/queries";
-import type { Prediction, PredictionType } from "@/lib/types";
+import type { Market, Prediction } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/statystyki")({
   head: () => ({
@@ -41,7 +41,7 @@ function Statystyki() {
   const preds = useTable("predictions");
   const coupons = useTable("coupons");
   const legs = useTable("coupon_legs");
-  const activePreds = preds.filter((p) => p.model_version === ACTIVE_MODEL_VERSION || !p.data_source);
+  const activePreds = preds.filter((prediction) => isActivePredictionVersion(prediction.model_version));
   const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
 
   const settledCoupons = coupons.filter((c) => c.status && c.status !== "pending");
@@ -72,8 +72,8 @@ function Statystyki() {
       />
 
       <div className="grid gap-6">
-        {(["1X2", "DC"] as PredictionType[]).map((t) => (
-          <MarketBlock key={t} type={t} preds={activePreds.filter((p) => p.prediction_type === t)} leagueOf={(p) => byId.get(p.match_id)?.league ?? "—"} />
+        {(["1X2", "DOUBLE_CHANCE"] as Market[]).map((t) => (
+          <MarketBlock key={t} type={t} preds={activePreds.filter((prediction) => prediction.market === t)} leagueOf={(p) => byId.get(p.match_id)?.competition ?? "—"} />
         ))}
 
         <section>
@@ -91,23 +91,23 @@ function Statystyki() {
   );
 }
 
-function MarketBlock({ type, preds, leagueOf }: { type: PredictionType; preds: Prediction[]; leagueOf: (p: Prediction) => string }) {
-  const sel = preds.filter((p) => p.selection_status === "WYBRANY");
-  const rej = preds.filter((p) => p.selection_status === "ODRZUCONY");
-  const hrSel = hitRate(sel.map((p) => p.result_status));
-  const hrRej = hitRate(rej.map((p) => p.result_status));
-  const byBucket = groupHitRates(sel, (p) => bucketOf(p.probability), (p) => p.result_status).sort(
+function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Prediction[]; leagueOf: (p: Prediction) => string }) {
+  const sel = preds.filter((prediction) => prediction.verdict === "WYBRANY");
+  const rej = preds.filter((prediction) => prediction.verdict === "ODRZUCONY");
+  const hrSel = hitRate(sel.map((prediction) => prediction.settlement_status));
+  const hrRej = hitRate(rej.map((prediction) => prediction.settlement_status));
+  const byBucket = groupHitRates(sel, (p) => bucketOf(p.probability), (prediction) => prediction.settlement_status).sort(
     (a, b) => BUCKETS.findIndex((x) => x.key === a.key) - BUCKETS.findIndex((x) => x.key === b.key),
   );
   const byLeague = groupHitRates(sel, leagueOf, (p) => p.result_status).slice(0, 12);
   const avgProb = (key: string) => {
-    const ps = sel.filter((p) => bucketOf(p.probability) === key && (p.result_status === "won" || p.result_status === "lost"));
+    const ps = sel.filter((p) => bucketOf(p.probability) === key && (p.settlement_status === "won" || p.settlement_status === "lost"));
     return ps.length ? ps.reduce((s, p) => s + Number(p.probability), 0) / ps.length : null;
   };
 
   return (
     <section>
-      <h2 className="mb-3 text-2xl font-semibold uppercase">{type === "DC" ? "Double Chance" : "1X2"}</h2>
+      <h2 className="mb-3 text-2xl font-semibold uppercase">{type === "DOUBLE_CHANCE" ? "Double Chance" : "1X2"}</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Skuteczność WYBRANE" value={fmtPct(hrSel.rate)} hint={`${hrSel.won}/${hrSel.settled}`} tone="primary" />
         <StatCard label="Skuteczność ODRZUCONE" value={fmtPct(hrRej.rate)} hint={`${hrRej.won}/${hrRej.settled} — kontrola filtra`} />
