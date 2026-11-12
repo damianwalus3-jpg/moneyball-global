@@ -42,6 +42,7 @@ export interface Match {
   home_team: string;
   away_team: string;
   kickoff_at: string | null;
+  kickoff_date?: string | null;
   status: MatchStatus;
   created_at: string;
   updated_at: string;
