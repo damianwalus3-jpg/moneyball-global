@@ -74,6 +74,7 @@ export interface Prediction {
   settled_at?: string | null;
   notes?: string | null;
   data_source?: string | null;
+  data_coverage?: Record<string, unknown> | null;
 }
 
 export interface Coupon {
