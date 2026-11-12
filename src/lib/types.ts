@@ -33,7 +33,7 @@ export interface Match {
   source: string;
   competition: string | null;
   country: string | null;
-  gender: Gender;
+  gender: Gender | null;
   home_team: string;
   away_team: string;
   kickoff_at: string | null;
@@ -92,9 +92,9 @@ export interface MatchResult {
   id: string;
   owner_id: string;
   match_id: string;
-  home_score: number;
-  away_score: number;
-  outcome_1x2: Outcome;
+  home_score: number | null;
+  away_score: number | null;
+  outcome_1x2: Outcome | null;
   verified: boolean;
   source: string | null;
   finished_at: string | null;
@@ -105,7 +105,7 @@ export interface MatchResult {
 export interface OddsSnapshot {
   id: string;
   owner_id: string;
-  prediction_id: string;
+  prediction_id: string | null;
   bookmaker: string;
   odds: number;
   captured_at: string;
