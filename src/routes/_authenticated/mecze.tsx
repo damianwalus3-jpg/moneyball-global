@@ -51,6 +51,7 @@ function Mecze() {
   const preds = useTable("predictions");
   const results = useTable("match_results");
   const odds = useTable("odds_snapshots");
+  const couponLegs = useTable("coupon_legs");
   const [view, setView] = useState<View>("upcoming");
   const [q, setQ] = useState("");
   const [editMatch, setEditMatch] = useState<Match | null>(null);
@@ -117,8 +118,15 @@ function Mecze() {
     return counts;
   }, [preds]);
 
-  const del = useAction((id: string) => deleteRow("matches", id), { success: "Usunięto mecz" });
-  const delScan = useAction((id: string) => deleteRow("scan_runs", id), { success: "Usunięto skan" });
+  const del = useAction(async (id: string) => {
+    const linkedPredictions = preds.filter((prediction) => prediction.match_id === id);
+    const predictionIds = new Set(linkedPredictions.map((prediction) => prediction.id));
+    const linkedLegs = couponLegs.filter((leg) => predictionIds.has(leg.prediction_id));
+    const hasResult = results.some((result) => result.match_id === id);
+    if (linkedPredictions.length || linkedLegs.length || hasResult)
+      throw new Error("Nie można usunąć meczu z historią prognoz, kuponów lub wyników. Zmień jego status na cancelled, aby zachować dane.");
+    await deleteRow("matches", id);
+  }, { success: "Usunięto pusty mecz" });
 
   const now = Date.now();
   const filtered = matches
@@ -306,8 +314,11 @@ function Mecze() {
                         )}
                       </div>
                       {r ? (
-                        <div className="num rounded-md bg-secondary px-2 py-1 text-lg font-semibold">
-                          {r.home_score}:{r.away_score}
+                        <div className="rounded-md bg-secondary px-2 py-1 text-right">
+                          <div className="num text-lg font-semibold">
+                            {r.home_score == null || r.away_score == null ? "ZWROT" : String(r.home_score) + ":" + String(r.away_score)}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">{r.verified ? "zweryfikowano" : "do weryfikacji"}</div>
                         </div>
                       ) : (
                         <Badge variant={m.status === "cancelled" || m.status === "postponed" ? "muted" : "outline"}>
@@ -315,7 +326,7 @@ function Mecze() {
                         </Badge>
                       )}
                       <div className="flex items-center">
-                        <Button variant="ghost" size="icon" aria-label="Kursy" title="Dodaj kursy" onClick={() => setOddsFor(m.id)}>
+                        <Button variant="ghost" size="icon" aria-label="Kursy" title="Dodaj kursy" disabled={!preds.some((prediction) => prediction.match_id === m.id)} onClick={() => setOddsFor(m.id)}>
                           <CircleDollarSign />
                         </Button>
                         {(started || r) && (
@@ -336,7 +347,7 @@ function Mecze() {
                         </Button>
                         <ConfirmDelete
                           title="Usunąć mecz?"
-                          description="Usunięcie meczu może usunąć też jego prognozy i wynik (zależnie od ustawień bazy). Tej operacji nie można cofnąć."
+                          description="Można usunąć tylko pusty mecz bez prognoz, wyników i nóg kuponów. Historię zachowujemy."
                           onConfirm={() => del.mutate(m.id)}
                         />
                       </div>
