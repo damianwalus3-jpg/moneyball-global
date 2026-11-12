@@ -109,9 +109,10 @@ function Kupony() {
   }, { success: "Kupon usunięty lub bezpiecznie anulowany" });
 
   const bookPayout = useAction(async ({ coupon, amount }: { coupon: Coupon; amount: number }) => {
-    if (transactions.some((transaction) => transaction.coupon_id === coupon.id && transaction.transaction_type === "return"))
+    const currentTransactions = await fetchAll("bankroll_transactions");
+    if (currentTransactions.some((transaction) => transaction.coupon_id === coupon.id && transaction.transaction_type === "return"))
       throw new Error("Zwrot lub wygrana dla tego kuponu jest już zaksięgowana.");
-    const knownBalance = bankrollBalance(await fetchAll("bankroll_transactions"));
+    const knownBalance = bankrollBalance(currentTransactions);
     await insertRow("bankroll_transactions", {
       transaction_type: "return",
       amount,
