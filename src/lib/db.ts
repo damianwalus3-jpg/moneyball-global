@@ -88,15 +88,18 @@ async function fetchRawAll<K extends TableName>(table: K): Promise<TableRows[K][
 export async function fetchAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
   const rows = await fetchRawAll(table);
   if (table === "scan_runs") {
-    return rows.map((row) => ({ ...row, matches_count: row.matches_found })) as TableRows[K][];
+    const scanRows = rows as TableRows["scan_runs"][];
+    return scanRows.map((row) => ({ ...row, matches_count: row.matches_found })) as TableRows[K][];
   }
   if (table === "matches") {
-    return rows.map((row) => ({ ...row, league: row.competition })) as TableRows[K][];
+    const matchRows = rows as TableRows["matches"][];
+    return matchRows.map((row) => ({ ...row, league: row.competition })) as TableRows[K][];
   }
   if (table === "predictions") {
+    const predictionRows = rows as TableRows["predictions"][];
     const matches = await fetchRawAll("matches");
     const scanRunByMatch = new Map(matches.map((match) => [match.id, match.scan_run_id]));
-    return rows.map((row) => ({
+    return predictionRows.map((row) => ({
       ...row,
       prediction_type: row.market === "DOUBLE_CHANCE" ? "DC" : "1X2",
       pick: row.selection,
@@ -110,9 +113,10 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
     })) as TableRows[K][];
   }
   if (table === "coupon_legs") {
+    const legRows = rows as TableRows["coupon_legs"][];
     const predictions = await fetchRawAll("predictions");
     const predictionById = new Map(predictions.map((prediction) => [prediction.id, prediction]));
-    return rows.map((row) => {
+    return legRows.map((row) => {
       const prediction = predictionById.get(row.prediction_id);
       return {
         ...row,
@@ -125,12 +129,13 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
     }) as TableRows[K][];
   }
   if (table === "coupons") {
+    const couponRows = rows as TableRows["coupons"][];
     const [legs, predictions] = await Promise.all([
       fetchRawAll("coupon_legs"),
       fetchRawAll("predictions"),
     ]);
     const predictionById = new Map(predictions.map((prediction) => [prediction.id, prediction]));
-    return rows.map((coupon) => {
+    return couponRows.map((coupon) => {
       const probabilities = legs
         .filter((leg) => leg.coupon_id === coupon.id)
         .map((leg) => predictionById.get(leg.prediction_id)?.probability ?? null);
@@ -142,10 +147,11 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
     }) as TableRows[K][];
   }
   if (table === "odds_snapshots") {
+    const oddsRows = rows as TableRows["odds_snapshots"][];
     const predictions = await fetchRawAll("predictions");
     const predictionById = new Map(predictions.map((prediction) => [prediction.id, prediction]));
     const grouped = new Map<string, Record<string, unknown>>();
-    for (const snapshot of rows) {
+    for (const snapshot of oddsRows) {
       const prediction = predictionById.get(snapshot.prediction_id ?? "");
       const matchId = prediction?.match_id ?? null;
       const key = [matchId ?? "unknown", snapshot.bookmaker, snapshot.captured_at].join("|");
@@ -166,7 +172,8 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
     return [...grouped.values()] as unknown as TableRows[K][];
   }
   if (table === "match_results") {
-    return rows.map((row) => ({
+    const resultRows = rows as TableRows["match_results"][];
+    return resultRows.map((row) => ({
       ...row,
       home_goals: row.home_score,
       away_goals: row.away_score,
@@ -174,7 +181,8 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
     })) as TableRows[K][];
   }
   if (table === "bankroll_transactions") {
-    return rows.map((row) => ({
+    const transactionRows = rows as TableRows["bankroll_transactions"][];
+    return transactionRows.map((row) => ({
       ...row,
       type: row.transaction_type === "return" ? "payout" : row.transaction_type,
     })) as TableRows[K][];
