@@ -17,7 +17,7 @@ export function SettleMatchDialog({ match, onClose }: { match: Match | null; onC
       return settleMatch({ match, existingResult: existing, predictions, legs, coupons }, mode);
     },
     {
-      success: (r) => `Rozliczono: ${r.changedPredictions} prognoz, ${r.changedCoupons} kuponów`,
+      success: (r) => r.verified ? `Rozliczono: ${r.changedPredictions} prognoz, ${r.changedCoupons} kuponów` : "Zapisano wynik bez weryfikacji — rozliczenie wstrzymane.",
       onDone: onClose,
     },
   );
