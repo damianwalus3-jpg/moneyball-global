@@ -51,6 +51,33 @@ function clean(row: Record<string, unknown>) {
   return out;
 }
 
+/** Keep normalized app fields synchronized with required legacy database columns. */
+function compatibleRow(table: TableName, row: Record<string, unknown>) {
+  const out = clean(row);
+  if (table === "predictions") {
+    if (out["prediction_type"] !== undefined && out["market"] === undefined)
+      out["market"] = out["prediction_type"] === "DC" ? "DOUBLE_CHANCE" : out["prediction_type"];
+    if (out["pick"] !== undefined && out["selection"] === undefined) out["selection"] = out["pick"];
+    if (out["selection_status"] !== undefined && out["verdict"] === undefined)
+      out["verdict"] = out["selection_status"];
+    if (out["result_status"] !== undefined && out["settlement_status"] === undefined)
+      out["settlement_status"] = out["result_status"];
+  }
+  if (table === "coupon_legs" && out["result_status"] !== undefined && out["status"] === undefined)
+    out["status"] = out["result_status"];
+  if (table === "bankroll_transactions") {
+    if (out["type"] !== undefined && out["transaction_type"] === undefined)
+      out["transaction_type"] = out["type"];
+    if (out["transaction_type"] !== undefined && out["type"] === undefined)
+      out["type"] = out["transaction_type"];
+  }
+  if (table === "match_results") {
+    if (out["home_goals"] !== undefined && out["home_score"] === undefined) out["home_score"] = out["home_goals"];
+    if (out["away_goals"] !== undefined && out["away_score"] === undefined) out["away_score"] = out["away_goals"];
+  }
+  return out;
+}
+
 const PAGE = 1000;
 
 export async function fetchAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
@@ -76,7 +103,7 @@ export async function insertRows<K extends TableName>(
   if (rows.length === 0) return [];
   const uid = await currentUserId();
   const col = ownerColumn();
-  const payload = rows.map((r) => ({ ...clean(r), [col]: uid }));
+  const payload = rows.map((r) => ({ ...compatibleRow(table, r), [col]: uid }));
   const { data, error } = await requireSupabase().from(table).insert(payload).select();
   if (error) throw new Error(humanizeError(error, table));
   return (data ?? []) as TableRows[K][];
@@ -89,7 +116,7 @@ export async function insertRow<K extends TableName>(table: K, row: Record<strin
 }
 
 export async function updateRow(table: TableName, id: string, patch: Record<string, unknown>) {
-  const { error } = await requireSupabase().from(table).update(clean(patch)).eq("id", id);
+  const { error } = await requireSupabase().from(table).update(compatibleRow(table, patch)).eq("id", id);
   if (error) throw new Error(humanizeError(error, table));
 }
 
@@ -106,7 +133,7 @@ export async function upsertSkipExisting(table: TableName, rows: Record<string, 
   let n = 0;
   for (let i = 0; i < rows.length; i += 500) {
     const chunk = rows.slice(i, i + 500).map((r) => {
-      const c = clean(r);
+      const c = compatibleRow(table, r);
       delete c["user_id"];
       delete c["owner_id"];
       return { ...c, [col]: uid };
