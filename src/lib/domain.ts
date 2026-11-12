@@ -195,7 +195,7 @@ export function groupHitRates<T>(
   keyFn: (item: T) => string,
   statusFn: (item: T) => Settlement | CouponStatus | null | undefined,
 ): (HitRate & { key: string })[] {
-  const groups = new Map<string, (Settlement | null | undefined)[]>();
+  const groups = new Map<string, (Settlement | CouponStatus | null | undefined)[]>();
   for (const item of items) {
     const key = keyFn(item);
     if (!groups.has(key)) groups.set(key, []);
