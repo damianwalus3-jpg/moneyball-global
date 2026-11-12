@@ -33,6 +33,8 @@ export interface Match {
 
 export interface Prediction {
   id: string;
+  model_version?: string | null;
+  data_source?: string | null;
   match_id: string;
   scan_run_id: string | null;
   prediction_type: PredictionType;
