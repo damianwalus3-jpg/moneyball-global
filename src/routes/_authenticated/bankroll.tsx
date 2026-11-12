@@ -3,7 +3,7 @@ import { Download, Pencil, Plus, Wallet } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDelete, DataError, EmptyState, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
-import { TransactionForm } from "@/components/forms/SimpleForms";
+import { rebuildBalances, TransactionForm } from "@/components/forms/SimpleForms";
 import { downloadFile, stamp, toCsv } from "@/lib/backup";
 import { deleteRow } from "@/lib/db";
 import { bankrollBalance, signedAmount, TX_LABELS } from "@/lib/domain";
@@ -35,7 +35,7 @@ function Bankroll() {
   const coupons = useTable("coupons");
   const [edit, setEdit] = useState<BankrollTransaction | null>(null);
   const [open, setOpen] = useState(false);
-  const del = useAction((id: string) => deleteRow("bankroll_transactions", id), { success: "Usunięto transakcję" });
+  const del = useAction(async (id: string) => { await deleteRow("bankroll_transactions", id); await rebuildBalances(); }, { success: "Usunięto transakcję i przeliczono saldo" });
   const balance = bankrollBalance(txs);
   const sum = (type: TransactionType) => txs.filter((transaction) => transaction.transaction_type === type).reduce((s, x) => s + Math.abs(Number(x.amount)), 0);
   const sorted = [...txs].sort((a, b) => (b.occurred_at ?? "").localeCompare(a.occurred_at ?? ""));
@@ -122,7 +122,7 @@ function Bankroll() {
           })}
         </div>
       )}
-      <TransactionForm open={open} onOpenChange={setOpen} tx={edit} />
+      <TransactionForm open={open} onOpenChange={setOpen} tx={edit} coupons={coupons} />
     </div>
   );
 }
