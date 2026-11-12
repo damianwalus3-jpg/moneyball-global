@@ -144,7 +144,7 @@ function Mecze() {
       <PageHeader
         eyebrow="Europe/Brussels"
         title="Terminarz / Mecze"
-        description="Skan główny korzysta z FootyNomad i silnika Moneyball. Skan publiczny ESPN jest dodatkowym źródłem bez klucza, ale nie obejmuje wszystkich lig świata."
+        description="Skan główny korzysta z FootyNomad i silnika Moneyball. Skan uzupełniający ESPN jest zapasowym źródłem bez klucza; główny silnik korzysta z FootyNomad i dodatkowych publicznych źródeł."
         actions={
           <>
             <Input
@@ -162,7 +162,7 @@ function Mecze() {
               onClick={() => publicScan.mutate({ daysBack: 3, daysForward: 10 })}
               disabled={publicScan.isPending}
             >
-              <Globe /> {publicScan.isPending ? "Pobieranie danych…" : "Skan publiczny (bez klucza)"}
+              <Globe /> {publicScan.isPending ? "Pobieranie danych…" : "Uzupełnij z ESPN"}
             </Button>
             <Button variant="outline" onClick={() => setImportOpen(true)}>
               <FileUp /> Import CSV
