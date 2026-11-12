@@ -8,5 +8,5 @@ export const Route = createFileRoute("/_authenticated/double-chance")({
   loader: ({ context }) => ensureTables(context.queryClient, ["matches", "predictions"]),
   pendingComponent: PageLoader,
   errorComponent: DataError,
-  component: () => <PredictionsView type="DC" />,
+  component: () => <PredictionsView market="DOUBLE_CHANCE" />,
 });
