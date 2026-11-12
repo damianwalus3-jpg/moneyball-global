@@ -4,14 +4,12 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Field, PageHeader } from "@/components/app/ui-bits";
 import { buildBackup, downloadFile, importTableCsv, restoreBackup, stamp, toCsv } from "@/lib/backup";
-import { maskKey, readConfig, readPrefs, savePrefs, setOwnerColumn, type OwnerColumn } from "@/lib/config";
+import { maskKey, readConfig, readPrefs, savePrefs } from "@/lib/config";
 import { fetchAll } from "@/lib/db";
 import { canInstall, isStandalone, promptInstall, subscribeInstall } from "@/lib/install";
 import { useAction } from "@/lib/queries";
-import { buildMigrationSql } from "@/lib/schema";
 import { runSchemaCheck, type SchemaReport } from "@/lib/schema-check";
 import { TABLE_LABELS, TABLES_IN_ORDER, type TableName } from "@/lib/types";
 
@@ -64,16 +62,6 @@ function Ustawienia() {
     success: (n) => `Zaimportowano ${n} wierszy do ${TABLE_LABELS[csvTable]}`,
   });
 
-  const migration =
-    report &&
-    (report.tables.some((t) => t.status === "missing_table" || t.status === "missing_columns")
-      ? buildMigrationSql(report.ownerColumn, {
-          missingTables: report.tables.filter((t) => t.status === "missing_table").map((t) => t.table),
-          missingColumns: Object.fromEntries(
-            report.tables.flatMap((t) => (t.status === "missing_columns" ? [[t.table, t.missing]] : [])),
-          ),
-        })
-      : null);
 
   return (
     <div className="grid gap-6">
@@ -87,11 +75,6 @@ function Ustawienia() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild><Link to="/setup">Zmień klucz</Link></Button>
-          {(["user_id", "owner_id"] as OwnerColumn[]).map((c) => (
-            <Button key={c} size="sm" variant={cfg?.ownerColumn === c ? "default" : "outline"} onClick={() => { setOwnerColumn(c); setCfg(readConfig()); toast.success(`Kolumna właściciela: ${c}`); }}>
-              {c}
-            </Button>
-          ))}
         </div>
         <Field label="Waluta (wyświetlanie)" hint="Tylko etykieta, np. PLN lub EUR.">
           <Input className="max-w-40" value={currency} onChange={(e) => { setCurrency(e.target.value); savePrefs({ currency: e.target.value.trim() }); }} />
@@ -100,7 +83,7 @@ function Ustawienia() {
 
       <section className="surface-card grid gap-3 p-4">
         <h2 className="text-xl font-semibold uppercase">Diagnostyka schematu</h2>
-        <p className="text-sm text-muted-foreground">Tylko odczyt: porównuje Twoje tabele z oczekiwanymi kolumnami. Nic nie zmienia w bazie.</p>
+        <p className="text-sm text-muted-foreground">Tylko odczyt: sprawdza 8 tabel, kanoniczne kolumny, liczbę Twoich rekordów i dostęp anonimowy. Nie generuje SQL i niczego nie zmienia w bazie.</p>
         <Button className="w-fit" onClick={check} disabled={checking}><Database /> {checking ? "Sprawdzanie…" : "Sprawdź tabele"}</Button>
         {report && (
           <div className="grid gap-1 text-sm">
@@ -113,15 +96,6 @@ function Ustawienia() {
                 </span>
               </div>
             ))}
-            {migration && (
-              <div className="mt-2 grid gap-2">
-                <p className="text-xs text-muted-foreground">
-                  Proponowana migracja NIEDESTRUKCYJNA: tylko dodaje brakujące tabele/kolumny, niczego nie usuwa ani nie nadpisuje. Przejrzyj i uruchom samodzielnie w SQL Editor.
-                </p>
-                <Textarea readOnly rows={8} className="num text-xs" value={migration} />
-                <Button size="sm" variant="outline" className="w-fit" onClick={() => { navigator.clipboard.writeText(migration); toast.success("Skopiowano SQL"); }}>Kopiuj SQL</Button>
-              </div>
-            )}
           </div>
         )}
       </section>
