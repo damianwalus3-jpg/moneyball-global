@@ -285,7 +285,7 @@ function Kupony() {
                       <Banknote /> Zaksięguj {fmtMoney(payout)}
                     </Button>
                   )}
-                  {hasReturn && <span className="self-center text-xs text-muted-foreground">Zwrot zaksięgowany</span>}
+                  {hasReturn && <span className="self-center text-xs text-muted-foreground">Rozliczenie ujęte w ledgerze</span>}
                   {coupon.status === "pending" && (
                     <Button size="sm" variant="ghost" onClick={() => removeCoupon.mutate(coupon)} disabled={removeCoupon.isPending}>Anuluj / usuń</Button>
                   )}
