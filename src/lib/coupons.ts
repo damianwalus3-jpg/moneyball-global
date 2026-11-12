@@ -24,7 +24,11 @@ export async function saveCouponBatch(coupons: Prediction[][], opts: SaveBatchOp
         name: `${opts.namePrefix} #${i + 1}`.trim(),
         batch_id: batchId,
         stake: opts.stake,
+        coupon_type: "TEST",
+        target_legs: 3,
         total_odds: totalOdds(legs.map((l) => l.odds)),
+        combined_odds: totalOdds(legs.map((l) => l.odds)),
+        potential_return: opts.stake && opts.stake > 0 ? opts.stake * totalOdds(legs.map((l) => l.odds)) : null,
         combined_probability: combinedProbability(legs.map((l) => l.probability)),
         status: "pending",
       });
@@ -32,8 +36,9 @@ export async function saveCouponBatch(coupons: Prediction[][], opts: SaveBatchOp
 
       const savedLegs = await insertRows(
         "coupon_legs",
-        legs.map((l) => ({
+        legs.map((l, legIndex) => ({
           coupon_id: coupon.id,
+          leg_number: legIndex + 1,
           prediction_id: l.id,
           match_id: l.match_id,
           prediction_type: l.prediction_type,
@@ -49,6 +54,7 @@ export async function saveCouponBatch(coupons: Prediction[][], opts: SaveBatchOp
         const transaction = await insertRow("bankroll_transactions", {
           occurred_at: new Date().toISOString(),
           type: "stake",
+          transaction_type: "stake",
           amount: opts.stake,
           coupon_id: coupon.id,
           note: `Stawka: ${coupon.name ?? "kupon"}`,
