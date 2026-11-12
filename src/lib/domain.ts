@@ -12,6 +12,7 @@ import type {
 export const COUPON_SIZE = 3;
 /** Coupon candidates must be STRICTLY above this probability (in %). */
 export const CANDIDATE_MIN_PROBABILITY = 75;
+export const ACTIVE_MODEL_VERSION = "MONEYBALL GLOBAL 3.8";
 
 export const PICKS: Record<PredictionType, BetPick[]> = {
   "1X2": ["1", "X", "2"],
