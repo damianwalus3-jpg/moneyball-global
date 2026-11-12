@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ConfirmDelete, EmptyState, PageHeader, SelectionBadge, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { PredictionForm } from "@/components/forms/PredictionForm";
 import { deleteRow, updateRow } from "@/lib/db";
-import { hitRate, impliedProbability } from "@/lib/domain";
+import { ACTIVE_MODEL_VERSION, hitRate, impliedProbability } from "@/lib/domain";
 import { fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -15,11 +15,13 @@ export function PredictionsView({ type }: { type: PredictionType }) {
   const matches = useTable("matches");
   const all = useTable("predictions");
   const [sel, setSel] = useState<"all" | "WYBRANY" | "ODRZUCONY">("all");
+  const [modelScope, setModelScope] = useState<"current" | "all">("current");
   const [q, setQ] = useState("");
   const [edit, setEdit] = useState<Prediction | null>(null);
   const [open, setOpen] = useState(false);
   const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
-  const list = all
+  const visible = modelScope === "all" ? all : all.filter((p) => p.model_version === ACTIVE_MODEL_VERSION || !p.data_source);
+  const list = visible
     .filter((p) => p.prediction_type === type)
     .filter((p) => sel === "all" || p.selection_status === sel)
     .filter((p) => {
@@ -27,7 +29,7 @@ export function PredictionsView({ type }: { type: PredictionType }) {
       return !q || `${matchLabel(m)} ${m?.league ?? ""}`.toLowerCase().includes(q.toLowerCase());
     })
     .sort((a, b) => (byId.get(b.match_id)?.kickoff_at ?? "").localeCompare(byId.get(a.match_id)?.kickoff_at ?? ""));
-  const hr = hitRate(all.filter((p) => p.prediction_type === type && p.selection_status === "WYBRANY").map((p) => p.result_status));
+  const hr = hitRate(visible.filter((p) => p.prediction_type === type && p.selection_status === "WYBRANY").map((p) => p.result_status));
   const toggle = useAction((p: Prediction) =>
     updateRow("predictions", p.id, { selection_status: p.selection_status === "ODRZUCONY" ? "WYBRANY" : "ODRZUCONY" }),
   );
@@ -49,6 +51,14 @@ export function PredictionsView({ type }: { type: PredictionType }) {
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Skuteczność (WYBRANE)" value={fmtPct(hr.rate)} hint={`${hr.won}/${hr.settled} rozliczonych`} tone="primary" />
         <StatCard label="Oczekujące" value={hr.pending} />
+      </div>
+      <div className="mb-2 flex flex-wrap gap-2">
+        <Button size="sm" variant={modelScope === "current" ? "default" : "outline"} onClick={() => setModelScope("current")}>
+          Aktywny model 3.8
+        </Button>
+        <Button size="sm" variant={modelScope === "all" ? "default" : "outline"} onClick={() => setModelScope("all")}>
+          Wszystkie wersje ({all.length})
+        </Button>
       </div>
       <div className="mb-4 flex flex-wrap gap-2">
         {(["all", "WYBRANY", "ODRZUCONY"] as const).map((s) => (
