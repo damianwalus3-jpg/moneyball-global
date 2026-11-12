@@ -8,10 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/app/ui-bits";
 import { insertRow, updateRow, fetchAll } from "@/lib/db";
-import { bankrollBalance, signedAmount, TX_LABELS, PICK_LABELS, MARKET_LABELS } from "@/lib/domain";
+import { signedAmount, TX_LABELS } from "@/lib/domain";
 import { matchLabel, parseDecimal } from "@/lib/format";
 import { useAction } from "@/lib/queries";
-import { brusselsInputToISO, brusselsDayKey, isoToBrusselsInput, nowBrusselsInput } from "@/lib/time";
+import { brusselsInputToISO, isoToBrusselsInput, nowBrusselsInput } from "@/lib/time";
 import type { BankrollTransaction, Coupon, Match, MatchResult, OddsSnapshot, Prediction, ScanRun, TransactionType } from "@/lib/types";
 
 const NONE = "__none__";
