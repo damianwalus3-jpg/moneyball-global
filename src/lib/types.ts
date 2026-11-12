@@ -5,7 +5,7 @@ export type Pick = Pick1X2 | PickDC;
 export type Outcome = Pick1X2;
 export type SelectionStatus = "WYBRANY" | "ODRZUCONY";
 export type Settlement = "pending" | "won" | "lost" | "void";
-export type MatchStatus = "scheduled" | "live" | "finished" | "postponed" | "cancelled";
+export type MatchStatus = "scheduled" | "live" | "finished" | "postponed" | "cancelled" | "unknown";
 export type TxType = "deposit" | "withdrawal" | "stake" | "payout" | "adjustment";
 
 export interface ScanRun {
@@ -15,6 +15,10 @@ export interface ScanRun {
   notes: string | null;
   matches_count: number | null;
   created_at: string | null;
+  scan_date?: string | null;
+  completed_at?: string | null;
+  status?: "started" | "completed" | "partial" | "failed" | null;
+  matches_found?: number | null;
 }
 
 export interface Match {
@@ -29,6 +33,11 @@ export interface Match {
   external_id: string | null;
   notes: string | null;
   created_at: string | null;
+  source?: string | null;
+  competition?: string | null;
+  gender?: "men" | "women" | "mixed" | "unknown" | null;
+  kickoff_date?: string | null;
+  updated_at?: string | null;
 }
 
 export interface Prediction {
@@ -46,6 +55,15 @@ export interface Prediction {
   settled_at: string | null;
   notes: string | null;
   created_at: string | null;
+  model_version?: string | null;
+  market?: "1X2" | "DOUBLE_CHANCE" | null;
+  selection?: Pick | "—" | null;
+  verdict?: "WYBRANY" | "ODRZUCONY" | "WSTĘPNY" | "BRAK DANYCH" | null;
+  settlement_status?: Settlement | null;
+  rationale?: string | null;
+  note?: string | null;
+  data_source?: string | null;
+  data_coverage?: Record<string, unknown> | null;
 }
 
 export interface Coupon {
@@ -59,6 +77,10 @@ export interface Coupon {
   settled_at: string | null;
   notes: string | null;
   created_at: string | null;
+  coupon_type?: "TEST" | "MAIN" | "MEGA" | "EXTRA" | null;
+  target_legs?: number | null;
+  combined_odds?: number | null;
+  potential_return?: number | null;
 }
 
 export interface CouponLeg {
@@ -72,6 +94,8 @@ export interface CouponLeg {
   odds: number | null;
   result_status: Settlement | null;
   created_at: string | null;
+  leg_number?: number;
+  status?: Settlement | null;
 }
 
 export interface MatchResult {
@@ -84,6 +108,11 @@ export interface MatchResult {
   settled_at: string | null;
   notes: string | null;
   created_at: string | null;
+  home_score?: number | null;
+  away_score?: number | null;
+  verified?: boolean;
+  finished_at?: string | null;
+  verified_at?: string | null;
 }
 
 export interface OddsSnapshot {
@@ -108,6 +137,8 @@ export interface BankrollTransaction {
   coupon_id: string | null;
   note: string | null;
   created_at: string | null;
+  transaction_type?: "deposit" | "withdrawal" | "stake" | "return" | "adjustment" | null;
+  balance_after?: number | null;
 }
 
 export interface TableRows {
