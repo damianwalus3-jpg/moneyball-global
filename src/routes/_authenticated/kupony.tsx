@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { EmptyState, Field, NoGuarantee, PageHeader, PageLoader, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { saveCouponBatch } from "@/lib/coupons";
 import { deleteRow, fetchAll, insertRow, updateRow } from "@/lib/db";
-import { ACTIVE_MODEL_VERSION, bankrollBalance, buildCouponBatch, couponPayout, effectiveOdds, isCouponCandidate, MARKET_LABELS, signedAmount } from "@/lib/domain";
+import { bankrollBalance, buildCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, MARKET_LABELS, signedAmount } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel, parseDecimal } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -68,7 +68,7 @@ function Kupony() {
   }, [legs, activeCouponIds, predictionById]);
 
   const candidates = predictions
-    .filter((prediction) => prediction.model_version === ACTIVE_MODEL_VERSION || prediction.model_version === "MANUAL")
+    .filter((prediction) => isActivePredictionVersion(prediction.model_version))
     .filter((prediction) => isCouponCandidate(prediction, matchById.get(prediction.match_id), Date.now()))
     .filter((prediction) => !excludeActive || !activeMatchIds.has(prediction.match_id))
     .sort((a, b) => Number(b.probability) - Number(a.probability));
