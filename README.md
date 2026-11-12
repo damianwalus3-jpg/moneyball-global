@@ -37,6 +37,8 @@ bun run dev
 
 - Active model: `MONEYBALL GLOBAL 3.8`.
 - Canonical Supabase fields are mapped to legacy read-only view aliases in `src/lib/db.ts`.
+- Compatibility triggers prefer the field changed by the current write, so stale legacy aliases cannot overwrite canonical updates.
+- Active Edge Function source is tracked under `supabase/functions/`; database changes are tracked under `supabase/migrations/`.
 - Fixture scan and prediction are separate authenticated Edge Function calls; result sync is chained by the fixture sync.
 - The `main` branch CI checks tests, TypeScript and production build.
 
@@ -48,7 +50,7 @@ bunx tsc --noEmit
 bun run build
 ```
 
-GitHub Actions runs the same tests, type-check and production build on pushes and pull requests to `main`.
+The `.github/workflows/ci.yml` workflow is configured to run the tests, TypeScript check and production build on pushes and pull requests to `main`. A successful CI run must be confirmed in GitHub Actions before release.
 
 ## Production build and deployment
 
