@@ -18,7 +18,7 @@ import type { Coupon, CouponStatus, CouponType, Prediction } from "@/lib/types";
 export const Route = createFileRoute("/_authenticated/kupony")({
   head: () => ({ meta: [{ title: "Kupony — MONEYBALL GLOBAL 2.0" }] }),
   loader: ({ context }) =>
-    ensureTables(context.queryClient, ["matches", "predictions", "coupons", "coupon_legs", "bankroll_transactions"]),
+    ensureTables(context.queryClient, ["matches", "predictions", "coupons", "coupon_legs", "bankroll_transactions", "scan_runs"]),
   pendingComponent: PageLoader,
   component: Kupony,
 });
@@ -41,6 +41,7 @@ function Kupony() {
   const coupons = useTable("coupons");
   const legs = useTable("coupon_legs");
   const transactions = useTable("bankroll_transactions");
+  const scans = useTable("scan_runs");
   const matchById = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
   const predictionById = useMemo(() => new Map(predictions.map((prediction) => [prediction.id, prediction])), [predictions]);
 
@@ -80,13 +81,14 @@ function Kupony() {
     : recordStake && !stake.trim()
       ? "Podaj stawkę albo wyłącz zapis w bankrollu."
       : "";
-  const preview = generated.length ? generated : buildCouponBatch(candidates, requestedCount);
+  const preview = generated;
   const uniqueCandidateMatches = new Set(candidates.map((prediction) => prediction.match_id)).size;
 
   const saveBatch = useAction(
     (batch: Prediction[][]) => saveCouponBatch(batch, {
       namePrefix: namePrefix.trim() || "MONEYBALL",
       couponType,
+      scanRunId: [...scans].sort((a, b) => b.started_at.localeCompare(a.started_at))[0]?.id ?? null,
       stake: stakeValue,
       recordStake,
     }),
@@ -189,7 +191,7 @@ function Kupony() {
         </div>
         {preview.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
-            Brak wystarczającej liczby kandydatów. Potrzeba minimum 3 różnych meczów z WYBRANY i prawdopodobieństwem ściśle powyżej 75%.
+            Wybierz „Generuj kupony”. Potrzeba minimum 3 różnych meczów z WYBRANY i prawdopodobieństwem ściśle powyżej 75%.
           </p>
         ) : (
           <>
