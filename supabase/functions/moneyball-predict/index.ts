@@ -511,7 +511,9 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    const futureEligible=!!m.kickoff_at&&["scheduled","unknown"].includes(m.status)&&new Date(m.kickoff_at).getTime()>Date.now();
    const providerQuote=providerOddsMap.get(m.id+"|"+p.market+"|"+p.selection);
    const tipsOdds=coverage.market_source==="TIPSAUDIT_FAIR_MARKET"&&coverage.market_reference_selection===p.selection&&Number(coverage.market_reference_best_soft_odds)>1?Number(coverage.market_reference_best_soft_odds):null;
-   const strikerAmerican=market?.odds?(p.selection==="1"?market.odds.home:p.selection==="X"?market.odds.draw:p.selection==="2"?market.odds.away:null):null;
+   const marketPriceStamp=Date.parse(String(market?.captured_at||market?.generated_at||""));
+   const marketPriceFresh=Number.isFinite(marketPriceStamp)&&Date.now()-marketPriceStamp>=0&&Date.now()-marketPriceStamp<=48*60*60*1000;
+   const strikerAmerican=marketPriceFresh&&market?.odds?(p.selection==="1"?market.odds.home:p.selection==="X"?market.odds.draw:p.selection==="2"?market.odds.away:null):null;
    const strikerOdds=p.market==="1X2"?americanToDecimal(strikerAmerican):null;
    const referenceOdds=providerQuote?Number(providerQuote.odds):tipsOdds??strikerOdds;
    const oddsSource=providerQuote?String(providerQuote.provider||"MoviOdds")+"/"+String(providerQuote.bookmaker||"bookmaker"):tipsOdds?String(coverage.market_reference_bookmaker||"TipsAudit best soft"):strikerOdds?("StrikerAPI median · "+String(market?.books||"multi")+" books"):null;
