@@ -9,11 +9,11 @@ const jwt = (payload: object) => `x.${btoa(JSON.stringify(payload)).replace(/=+$
 describe("key safety", () => {
   it("rejects secret and service_role keys", () => {
     expect(validatePublicKey("sb_secret_abcdefghijklmnop").ok).toBe(false);
-    expect(validatePublicKey(jwt({ role: "service_role", ref: "gzgeklcukrclgwbsmbsp" })).ok).toBe(false);
+    expect(validatePublicKey(jwt({ role: "service_role", ref: "xwrgfaarmwnguymresjy" })).ok).toBe(false);
   });
   it("accepts publishable and anon keys for this project", () => {
     expect(validatePublicKey("sb_publishable_abcdefghijklmnop").ok).toBe(true);
-    expect(validatePublicKey(jwt({ role: "anon", ref: "gzgeklcukrclgwbsmbsp" })).ok).toBe(true);
+    expect(validatePublicKey(jwt({ role: "anon", ref: "xwrgfaarmwnguymresjy" })).ok).toBe(true);
     expect(validatePublicKey(jwt({ role: "anon", ref: "otherproject" })).ok).toBe(false);
   });
 });
