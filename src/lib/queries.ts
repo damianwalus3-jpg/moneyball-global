@@ -3,13 +3,21 @@ import { toast } from "sonner";
 import { fetchAll, fetchDashboardSummary } from "./db";
 import type { TableName } from "./types";
 
+const LIVE_TABLES = new Set<TableName>([
+  "scan_runs", "matches", "predictions", "match_results", "provider_odds",
+  "odds_snapshots", "coupons", "coupon_legs", "bankroll_transactions",
+]);
+
 export function tableQuery<K extends TableName>(table: K) {
+  const isLive = LIVE_TABLES.has(table);
   return queryOptions({
     queryKey: ["table", table] as const,
     queryFn: () => fetchAll(table),
-    staleTime: 120_000,
+    staleTime: isLive ? 15_000 : 120_000,
     gcTime: 600_000,
-    refetchOnWindowFocus: false,
+    refetchInterval: isLive ? 30_000 : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -18,9 +26,11 @@ export function dashboardSummaryQuery() {
   return queryOptions({
     queryKey: ["dashboard-summary"] as const,
     queryFn: fetchDashboardSummary,
-    staleTime: 30_000,
+    staleTime: 15_000,
     gcTime: 600_000,
-    refetchOnWindowFocus: false,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 }
 
