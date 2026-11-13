@@ -473,7 +473,16 @@ function Mecze() {
                           </div>
                         )}
                       </div>
-                      {r ? (
+                      {m.status === "live" ? (
+                        <div className="rounded-md border border-danger/30 bg-danger/10 px-3 py-1.5 text-right">
+                          <div className="num text-lg font-bold">
+                            {m.live_home_score == null || m.live_away_score == null ? "LIVE" : String(m.live_home_score) + ":" + String(m.live_away_score)}
+                          </div>
+                          <div className="text-[10px] font-semibold text-danger">
+                            NA ŻYWO{m.live_updated_at ? " · " + fmtTime(m.live_updated_at) : ""}
+                          </div>
+                        </div>
+                      ) : r ? (
                         <div className="rounded-md bg-secondary px-2 py-1 text-right">
                           <div className="num text-lg font-semibold">
                             {r.home_score == null || r.away_score == null ? "ZWROT" : String(r.home_score) + ":" + String(r.away_score)}
