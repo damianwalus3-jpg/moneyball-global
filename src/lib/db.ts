@@ -102,7 +102,7 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
     const scanRunByMatch = new Map(matches.map((match) => [match.id, match.scan_run_id]));
     return predictions.map((row) => ({
       ...row,
-      prediction_type: row.market === "DOUBLE_CHANCE" ? "DC" : "1X2",
+      prediction_type: row.market === "DOUBLE_CHANCE" ? "DC" : row.market === "GOALS" ? "GOALS" : "1X2",
       pick: row.selection,
       selection_status: row.verdict,
       result_status: row.settlement_status,
