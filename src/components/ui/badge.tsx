@@ -20,7 +20,7 @@ const badgeVariants = cva(
         info: "border-info/40 bg-info/15 text-info",
         muted: "border-border bg-muted text-muted-foreground",
         selected: "border-primary/50 bg-primary/15 text-primary tracking-wider font-display uppercase",
-        rejected: "border-border bg-muted/60 text-muted-foreground tracking-wider font-display uppercase line-through decoration-1",
+        rejected: "border-warning/35 bg-warning/10 text-foreground tracking-wide font-semibold uppercase",
       },
     },
     defaultVariants: {
