@@ -83,11 +83,12 @@ const READ_COLUMNS: Record<TableName, readonly string[]> = {
   matches: [...COLUMNS.matches, "league", "kickoff_date"],
 };
 
-const PAGE = 1000;
+const PAGE = 250;
+const MAX_PARALLEL_PAGES = 3;
+const inFlightTableReads = new Map<string, Promise<unknown>>();
 
-async function fetchRawAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
+async function fetchRawAllUncached<K extends TableName>(table: K, uid: string): Promise<TableRows[K][]> {
   const sb = requireSupabase();
-  const uid = await currentUserId();
   const columns = READ_COLUMNS[table].join(",");
   const { count, error: countError } = await sb
     .from(table)
@@ -96,24 +97,45 @@ async function fetchRawAll<K extends TableName>(table: K): Promise<TableRows[K][
   if (countError) throw new Error(humanizeError(countError, table));
   const pageCount = Math.ceil((count ?? 0) / PAGE);
   if (pageCount === 0) return [];
-  // Fetch independent pages concurrently instead of waiting for each 1,000-row
-  // request to finish before starting the next one.
-  const pages = await Promise.all(
-    Array.from({ length: pageCount }, (_, page) =>
-      sb
-        .from(table)
-        .select(columns)
-        .eq(OWNER_COLUMN, uid)
-        .order("id", { ascending: true })
-        .range(page * PAGE, (page + 1) * PAGE - 1),
-    ),
-  );
+
   const rows: TableRows[K][] = [];
-  for (const page of pages) {
-    if (page.error) throw new Error(humanizeError(page.error, table));
-    rows.push(...((page.data ?? []) as unknown as TableRows[K][]));
+  // Keep each SQL statement small and cap concurrency to avoid saturating
+  // PostgREST when a screen needs several related tables at once.
+  for (let firstPage = 0; firstPage < pageCount; firstPage += MAX_PARALLEL_PAGES) {
+    const batch = await Promise.all(
+      Array.from(
+        { length: Math.min(MAX_PARALLEL_PAGES, pageCount - firstPage) },
+        (_, offset) => {
+          const page = firstPage + offset;
+          return sb
+            .from(table)
+            .select(columns)
+            .eq(OWNER_COLUMN, uid)
+            .order("id", { ascending: true })
+            .range(page * PAGE, (page + 1) * PAGE - 1);
+        },
+      ),
+    );
+    for (const result of batch) {
+      if (result.error) throw new Error(humanizeError(result.error, table));
+      rows.push(...((result.data ?? []) as unknown as TableRows[K][]));
+    }
   }
   return rows;
+}
+
+async function fetchRawAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
+  const uid = await currentUserId();
+  const key = `${uid}:${table}`;
+  const existing = inFlightTableReads.get(key);
+  if (existing) return existing as Promise<TableRows[K][]>;
+  const request = fetchRawAllUncached(table, uid);
+  inFlightTableReads.set(key, request);
+  try {
+    return await request;
+  } finally {
+    if (inFlightTableReads.get(key) === request) inFlightTableReads.delete(key);
+  }
 }
 
 /** Read adapter for screens still using the previous field names. All writes
