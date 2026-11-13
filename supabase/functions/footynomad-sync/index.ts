@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const SUPABASE_URL=Deno.env.get("SUPABASE_URL")||"https://xwrgfaarmwnguymresjy.supabase.co";
 const KEY=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||"sb_publishable_E27tyjResjElwC4AWbmILw_wbtibXhX";
+const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-requested-with, prefer, cache-control, pragma","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Max-Age":"86400","Vary":"Origin"};
 
 
@@ -50,7 +51,8 @@ Deno.serve(async(req)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
  try{
   let date=new URL(req.url).searchParams.get("date")||new Date().toISOString().slice(0,10);
-  if(req.method==="POST"){const b=await req.json();date=b.date||date;}
+  let requestBody:any={};
+  if(req.method==="POST"){requestBody=await req.json();date=requestBody.date||date;}
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error("Nieprawidłowa data skanu.");
   const result=await readFixtures(date);
   if(req.method==="GET")return new Response(JSON.stringify(result),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
@@ -88,12 +90,27 @@ Deno.serve(async(req)=>{
     combined.push(pf);publicOnly++;
    }
   }
-  const token=req.headers.get("Authorization")?.replace(/^Bearer\s+/i,"");
-  if(!token)throw new Error("Brak sesji logowania. Zaloguj się ponownie.");
-  const jwtParts=token.split(".");
-  const jwtPayload=jwtParts.length>1?JSON.parse(atob(jwtParts[1].replace(/-/g,"+").replace(/_/g,"/"))):{};
-  const ownerId=String(jwtPayload.sub||"");
-  if(!ownerId)throw new Error("Nie można odczytać właściciela sesji.");
+  let token=req.headers.get("Authorization")?.replace(/^Bearer\s+/i,"")||"";
+  const cronToken=req.headers.get("x-cron-token")||"";
+  let ownerId="";
+  if(cronToken){
+   if(!SERVICE_KEY)throw new Error("Brak konfiguracji klucza serwisowego dla harmonogramu.");
+   const authResponse=await fetch(SUPABASE_URL+"/rest/v1/rpc/moneyball_cron_token_valid",{
+    method:"POST",
+    headers:{apikey:KEY,Authorization:"Bearer "+(token||KEY),"Content-Type":"application/json"},
+    body:JSON.stringify({p_token:cronToken})
+   });
+   if(!authResponse.ok||(await authResponse.json())!==true)throw new Error("Nieprawidłowy token harmonogramu.");
+   ownerId=String(requestBody.owner_id||"");
+   if(!ownerId)throw new Error("Brak właściciela dla automatycznego skanu.");
+   token=SERVICE_KEY;
+  }else{
+   if(!token)throw new Error("Brak sesji logowania. Zaloguj się ponownie.");
+   const jwtParts=token.split(".");
+   const jwtPayload=jwtParts.length>1?JSON.parse(atob(jwtParts[1].replace(/-/g,"+").replace(/_/g,"/"))):{};
+   ownerId=String(jwtPayload.sub||"");
+   if(!ownerId)throw new Error("Nie można odczytać właściciela sesji.");
+  }
   const runRows=await db("scan_runs",token,"POST",{owner_id:ownerId,scan_date:date,source:"FootyNomad + public sources",status:"started",matches_found:combined.length,notes:"FootyNomad primary; public source enrichment: "+JSON.stringify(publicSourceStatus).slice(0,1500)});
   const run=runRows?.[0];if(!run?.id)throw new Error("Nie udało się utworzyć wpisu skanu.");
   let inserted=0,updated=0,settled=0,matchedByFixture=0,promotedToPrimary=0;
@@ -181,7 +198,7 @@ Deno.serve(async(req)=>{
    while(hasMore&&batches.length<50){
     const predictionResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-predict",{
      method:"POST",
-     headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},
+     headers:{apikey:KEY,Authorization:"Bearer "+token,...(cronToken?{"x-cron-token":cronToken}:{}),"Content-Type":"application/json",Accept:"application/json"},
      body:JSON.stringify({date,offset}),
     });
     const predictionText=await predictionResponse.text();
@@ -206,7 +223,7 @@ Deno.serve(async(req)=>{
   try{
    const syncResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-results-sync?date="+encodeURIComponent(date),{
     method:"POST",
-    headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},
+    headers:{apikey:KEY,Authorization:"Bearer "+token,...(cronToken?{"x-cron-token":cronToken}:{}),"Content-Type":"application/json",Accept:"application/json"},
     body:"{}",
    });
    const syncText=await syncResponse.text();
