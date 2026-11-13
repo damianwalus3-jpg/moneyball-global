@@ -1,4 +1,4 @@
-import { bankrollBalance, signedAmount, totalOdds, validateBatch } from "./domain";
+import { totalOdds, validateBatch } from "./domain";
 import { deleteRow, fetchAll, insertRow, insertRows } from "./db";
 import type { CouponType, Prediction } from "./types";
 
@@ -7,7 +7,6 @@ export interface SaveBatchOptions {
   couponType?: CouponType;
   scanRunId?: string | null;
   stake: number | null;
-  recordStake: boolean;
   notes?: string | null;
   targetLegs?: 1 | 3;
 }
@@ -19,14 +18,8 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
   const requireOdds = options.couponType != null && options.couponType !== "TEST";
   const errors = validateBatch(coupons, targetLegs, requireOdds);
   if (errors.length) throw new Error(errors.join(" "));
-  if (options.recordStake && (options.stake == null || !Number.isFinite(options.stake) || options.stake <= 0))
-    throw new Error("Podaj dodatnią stawkę albo wyłącz zapis stawki w bankrollu.");
-
   const createdCoupons: string[] = [];
   const createdLegs: string[] = [];
-  const createdTransactions: string[] = [];
-  const transactions = options.recordStake ? await fetchAll("bankroll_transactions") : [];
-  let currentBalance = bankrollBalance(transactions);
   try {
     for (const [index, predictions] of coupons.entries()) {
       const odds = totalOdds(predictions.map((prediction) => prediction.odds));
@@ -61,26 +54,9 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
       if (legs.length !== predictions.length)
         throw new Error("Kupon " + coupon.name + ": zapisano " + legs.length + " z " + predictions.length + " zdarzeń.");
 
-      if (options.recordStake && options.stake != null && options.stake > 0) {
-        const transactionType = "stake" as const;
-        const delta = signedAmount({ transaction_type: transactionType, amount: options.stake });
-        const nextBalance = currentBalance == null ? null : Math.round((currentBalance + delta) * 100) / 100;
-        const transaction = await insertRow("bankroll_transactions", {
-          transaction_type: transactionType,
-          amount: options.stake,
-          balance_after: nextBalance,
-          coupon_id: coupon.id,
-          occurred_at: new Date().toISOString(),
-          note: `Stawka: ${coupon.name}`,
-        });
-        createdTransactions.push(transaction.id);
-        currentBalance = nextBalance;
-      }
+
     }
   } catch (error) {
-    for (const id of createdTransactions.reverse()) {
-      try { await deleteRow("bankroll_transactions", id); } catch { /* best-effort rollback of this new batch only */ }
-    }
     for (const id of createdLegs.reverse()) {
       try { await deleteRow("coupon_legs", id); } catch { /* best-effort rollback of this new batch only */ }
     }
