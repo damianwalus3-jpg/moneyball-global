@@ -1,8 +1,8 @@
 // Connection config for the owner's existing Supabase project.
 // Only the publishable/anon key is ever accepted; secret/service_role keys are rejected.
-export const DEFAULT_SUPABASE_URL = "https://gzgeklcukrclgwbsmbsp.supabase.co";
-export const EXPECTED_PROJECT_REF = "gzgeklcukrclgwbsmbsp";
-export const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_YdT4Nm50NkbmjKnoQE8bNQ_aGeqzG3S";
+export const DEFAULT_SUPABASE_URL = "https://xwrgfaarmwnguymresjy.supabase.co";
+export const EXPECTED_PROJECT_REF = "xwrgfaarmwnguymresjy";
+export const DEFAULT_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_E27tyjResjElwC4AWbmILw_wbtibXhX";
 
 export interface AppConfig {
   url: string;
@@ -40,7 +40,7 @@ export function validateSupabaseUrl(url: string): string | null {
     return "Nieprawidłowy adres URL.";
   }
   if (projectRefFromUrl(u) !== EXPECTED_PROJECT_REF)
-    return "Ta aplikacja może łączyć się wyłącznie z istniejącą bazą MONEYBALL GLOBAL.";
+    return "To środowisko testowe może łączyć się wyłącznie z oddzielną bazą MONEYBALL GLOBAL TEST.";
   return null;
 }
 
