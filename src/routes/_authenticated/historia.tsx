@@ -117,7 +117,7 @@ function Historia() {
                     <SettlementBadge status="void" />
                   ) : null}
                   <Button size="sm" variant={r ? "outline" : "default"} onClick={() => setSettle(m)}>
-                    <Flag /> {r || isVoided(m) ? "Popraw" : "Wpisz wynik"}
+                    <Flag /> {isVoided(m) ? "Zwrot" : r ? "Popraw wynik" : "Wpisz wynik"}
                   </Button>
                 </div>
                 {mp.length > 0 && (

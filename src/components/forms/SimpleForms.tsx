@@ -287,10 +287,11 @@ export function ResultForm({
     setError("");
     setHome(result?.home_score != null ? String(result.home_score) : "");
     setAway(result?.away_score != null ? String(result.away_score) : "");
-    setVoid(result?.home_score == null && result?.away_score == null && !!result);
+    const matchIsVoid = match?.status === "postponed" || match?.status === "cancelled";
+    setVoid(result ? result.home_score == null && result.away_score == null : matchIsVoid);
     setVoidStatus(match?.status === "postponed" ? "postponed" : "cancelled");
-    setSource(result?.source ?? "ręcznie");
-    setVerified(result?.verified ?? false);
+    setSource(result?.source ?? (matchIsVoid ? "FootyNomad" : "ręcznie"));
+    setVerified(result?.verified ?? matchIsVoid);
   }, [open, result, match]);
   function submit() {
     if (isVoid) return onSave({ kind: "void", status: voidStatus, source, verified });
@@ -301,7 +302,7 @@ export function ResultForm({
     onSave({ kind: "score", home: homeScore, away: awayScore, source, verified });
   }
   return (
-    <FormDialog open={open} onOpenChange={onOpenChange} title="Wynik i weryfikacja" pending={pending} onSubmit={submit}>
+    <FormDialog open={open} onOpenChange={onOpenChange} title={isVoid ? "Zwrot za mecz przełożony / odwołany" : "Wynik i weryfikacja"} pending={pending} onSubmit={submit}>
       <div className="text-sm text-muted-foreground">{matchLabel(match)}</div>
       {!isVoid && (
         <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3">
