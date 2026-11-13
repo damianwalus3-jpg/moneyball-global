@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "moneyball-global-test",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-11-13",
+  "observability": {
+    "enabled": true
+  }
+}
