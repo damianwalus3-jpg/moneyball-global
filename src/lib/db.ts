@@ -202,7 +202,7 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
         : null;
       const validOdds = prices.length === coupon.target_legs && prices.every((price) => price != null && Number(price) > 1);
       const combinedOdds = validOdds
-        ? Math.round(prices.reduce((acc, price) => acc * Number(price), 1) * 100) / 100
+        ? Math.round(prices.reduce<number>((acc, price) => acc * Number(price ?? 1), 1) * 100) / 100
         : null;
       return {
         ...coupon,
