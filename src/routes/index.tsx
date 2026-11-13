@@ -14,7 +14,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "MONEYBALL GLOBAL 2.0" },
       {
         property: "og:description",
-        content: "Prywatny panel do śledzenia prognoz 1X2 i Double Chance, kuponów, rozliczeń i bankrolla.",
+        content: "Prywatny panel do śledzenia prognoz 1X2 i Double Chance, kuponów i rozliczeń ze stałą stawką analityczną 5 €.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
