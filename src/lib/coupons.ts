@@ -1,5 +1,5 @@
 import { totalOdds, validateBatch } from "./domain";
-import { deleteRow, fetchAll, insertRow, insertRows } from "./db";
+import { deleteRow, insertRow, insertRows } from "./db";
 import type { CouponType, Prediction } from "./types";
 
 export interface SaveBatchOptions {
@@ -53,8 +53,6 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
       createdLegs.push(...legs.map((leg) => leg.id));
       if (legs.length !== predictions.length)
         throw new Error("Kupon " + coupon.name + ": zapisano " + legs.length + " z " + predictions.length + " zdarzeń.");
-
-
     }
   } catch (error) {
     for (const id of createdLegs.reverse()) {
