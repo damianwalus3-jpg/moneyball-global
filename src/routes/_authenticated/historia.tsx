@@ -13,7 +13,7 @@ import {
   TypeBadge,
 } from "@/components/app/ui-bits";
 import { SettleMatchDialog } from "@/components/app/SettleMatchDialog";
-import { fmtPct, matchLabel } from "@/lib/format";
+import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { ensureTables, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
 import type { Match } from "@/lib/types";
@@ -135,7 +135,13 @@ function Historia() {
                         <span className="num text-xs text-muted-foreground">{fmtPct(p.probability)}</span>
                         <SelectionBadge status={p.verdict} />
                         <span className="flex-1" />
-                        {p.verdict === "WYBRANY" ? <SettlementBadge status={p.settlement_status} /> : <span className="text-xs text-muted-foreground">Nie obstawiono · bez rozliczenia</span>}
+                        {p.verdict === "WYBRANY" ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Stawka {fmtMoney(p.stake ?? 5)} · kurs {fmtOdds(p.odds)} · możliwy zwrot {fmtMoney(p.potential_return ?? (p.odds != null ? 5 * Number(p.odds) : null))}</span>
+                            <SettlementBadge status={p.settlement_status} />
+                            {p.verified && <span className={p.profit_loss != null && p.profit_loss > 0 ? "text-xs font-semibold text-success" : p.profit_loss != null && p.profit_loss < 0 ? "text-xs font-semibold text-destructive" : "text-xs text-muted-foreground"}>Wynik {fmtMoney(p.profit_loss)}</span>}
+                          </div>
+                        ) : <span className="text-xs text-muted-foreground">Nie obstawiono · bez rozliczenia</span>}
                       </div>
                     ))}
                   </div>
