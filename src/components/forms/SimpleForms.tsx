@@ -145,6 +145,10 @@ export function OddsForm({
     else await insertRow("odds_snapshots", row);
     const prediction = predictions.find((item) => item.id === row.prediction_id);
     if (!prediction) throw new Error("Nie znaleziono prognozy, do której zapisujesz kurs.");
+    const canPromote = prediction.verdict === "ODRZUCONY"
+      && (prediction.rejection_reason ?? "").includes("Brak potwierdzonego kursu")
+      && Number(prediction.probability) > 75
+      && Number(prediction.confidence) >= 55;
     await updateRow("predictions", prediction.id, {
       odds: row.odds,
       data_source: row.bookmaker,
@@ -155,6 +159,7 @@ export function OddsForm({
         odds_captured_at: row.captured_at,
         odds_suspended: false,
       },
+      ...(canPromote ? { verdict: "WYBRANY", selection_status: "WYBRANY", rejection_reason: null } : {}),
     });
   }, { success: "Zapisano kurs i przypisano go do wybranego typu", onDone: () => onOpenChange(false) });
   function submit() {
