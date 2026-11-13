@@ -534,7 +534,7 @@ function Mecze() {
                                   </div>
                                   <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                                     <div><div className="text-xs text-muted-foreground">Prawdopodobieństwo</div><strong>{p.probability == null ? "Brak" : Number(p.probability).toFixed(1) + "%"}</strong></div>
-                                    <div><div className="text-xs text-muted-foreground">Kurs wybranego typu</div><strong>{fmtOdds(p.odds)}{p.odds != null && asObject(p.data_coverage).odds_bookmaker ? ` · ${String(asObject(p.data_coverage).odds_bookmaker)}` : ""}</strong></div>
+                                    <div><div className="text-xs text-muted-foreground">Kurs wybranego typu</div><strong>{fmtOdds(p.odds)}{p.odds != null && asObject(p.data_coverage)["odds_bookmaker"] ? ` · ${String(asObject(p.data_coverage)["odds_bookmaker"])}` : ""}</strong></div>
                                     <div><div className="text-xs text-muted-foreground">Pewność</div><strong>{p.confidence ?? "—"}</strong></div>
                                     <div><div className="text-xs text-muted-foreground">Rozliczenie</div><strong>{p.settlement_status}</strong></div>
                                   </div>
