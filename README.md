@@ -54,22 +54,8 @@ The `.github/workflows/ci.yml` workflow is configured to run the tests, TypeScri
 
 ## Production build and deployment
 
-The Vite config uses TanStack Start and Nitro with automatic host detection. The intended production host is Vercel.
+The application is deployed through the native Vercel GitHub integration. The Vercel project must be connected to this repository's `main` branch, with the TanStack Start framework preset and the repository root as the Root Directory. Vercel runs the Bun install/build based on `bun.lock` and `package.json`; Nitro detects the Vercel production host automatically.
 
-The repository includes `.github/workflows/deploy-vercel.yml`. After adding these repository Actions secrets, every push to `main` can build and deploy the application:
+The GitHub Actions deployment workflow is optional and requires Vercel credentials. It is not required when the native Vercel Git integration is enabled. Do not add paid services or API keys for deployment.
 
-- `VERCEL_TOKEN` — Vercel deployment token.
-- `VERCEL_ORG_ID` — Vercel team or account ID.
-- `VERCEL_PROJECT_ID` — the Vercel project ID for this repository.
-
-Without all three secrets, deployment is deliberately skipped. No production URL is claimed until a deployment is completed and verified. The existing `finalne-typy.vercel.app` address is not referenced by this repository and currently displays the older Tracker loading screen, so it must not be assumed to be this app's verified deployment.
-
-
-The Vite config uses the standard TanStack Start and Nitro plugins. Production builds target the Cloudflare Workers module runtime.
-
-The repository includes `.github/workflows/deploy-cloudflare.yml`. After adding these two repository Actions secrets, every successful push to `main` builds and deploys the Worker:
-
-- `CLOUDFLARE_API_TOKEN` — Cloudflare API token with permission to edit Workers scripts.
-- `CLOUDFLARE_ACCOUNT_ID` — target Cloudflare account ID.
-
-You can also run the workflow manually from GitHub Actions. Without both secrets, deployment is deliberately skipped; the build and tests still run. No live URL is claimed until a deployment is completed and verified.
+No production URL is considered verified until Vercel reports a successful Production deployment and the public URL responds successfully.
