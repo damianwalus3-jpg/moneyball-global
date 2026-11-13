@@ -91,6 +91,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json bun.lock vite.config.ts wrangler.jsonc
+          git add package.json bun.lock vite.config.ts wrangler.jsonc src/routeTree.gen.ts
           git commit -m "Prepare Cloudflare Workers migration"
           git push origin migration/cloudflare-workers-setup
