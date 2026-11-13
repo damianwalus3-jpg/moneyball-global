@@ -11,7 +11,7 @@ export const Route = createFileRoute("/_authenticated/statystyki")({
   head: () => ({
     meta: [
       { title: "Statystyki — MONEYBALL GLOBAL 2.0" },
-      { name: "description", content: "Skuteczność 1X2 i Double Chance osobno, według lig, przedziałów prawdopodobieństwa i kuponów." },
+      { name: "description", content: "Skuteczność 1X2, Double Chance i Gole / BTTS osobno, według lig, przedziałów prawdopodobieństwa i kuponów." },
       { property: "og:title", content: "Statystyki — MONEYBALL GLOBAL 2.0" },
       { property: "og:description", content: "Skuteczność prognoz i kuponów." },
       { property: "og:type", content: "website" },
@@ -66,13 +66,13 @@ function Statystyki() {
   return (
     <div>
       <PageHeader
-        eyebrow="Aktywny model 3.8 · 1X2 i DC osobno"
+        eyebrow="Aktywny model 3.8 · 1X2, DC i gole osobno"
         title="Statystyki"
         description="Statystyki pokazują aktywny model i wpisy ręczne; stare wersje pozostają w historii. Skuteczność = wygrane / (wygrane + przegrane)."
       />
 
       <div className="grid gap-6">
-        {(["1X2", "DOUBLE_CHANCE"] as Market[]).map((t) => (
+        {(["1X2", "DOUBLE_CHANCE", "GOALS"] as Market[]).map((t) => (
           <MarketBlock key={t} type={t} preds={activePreds.filter((prediction) => prediction.market === t)} leagueOf={(p) => byId.get(p.match_id)?.competition ?? "—"} />
         ))}
 
@@ -107,7 +107,7 @@ function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Predictio
 
   return (
     <section>
-      <h2 className="mb-3 text-2xl font-semibold uppercase">{type === "DOUBLE_CHANCE" ? "Double Chance" : "1X2"}</h2>
+      <h2 className="mb-3 text-2xl font-semibold uppercase">{type === "DOUBLE_CHANCE" ? "Double Chance" : type === "GOALS" ? "Gole / BTTS" : "1X2"}</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Skuteczność WYBRANE" value={fmtPct(hrSel.rate)} hint={`${hrSel.won}/${hrSel.settled}`} tone="primary" />
         <StatCard label="Prognozy" value={preds.length} hint={`${sel.length} wybranych · ${rej.length} odrzuconych`} />

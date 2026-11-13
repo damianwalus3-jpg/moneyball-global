@@ -76,8 +76,8 @@ export function PredictionsView({ market }: { market: Market }) {
   return (
     <div>
       <PageHeader
-        eyebrow={market === "DOUBLE_CHANCE" ? "1X · X2 · 12" : "1 · X · 2"}
-        title={market === "DOUBLE_CHANCE" ? "Double Chance" : "Prognozy 1X2"}
+        eyebrow={market === "DOUBLE_CHANCE" ? "1X · X2 · 12" : market === "GOALS" ? "BTTS · OVER / UNDER" : "1 · X · 2"}
+        title={MARKET_LABELS[market] === "Gole / BTTS" ? "Prognozy goli" : market === "DOUBLE_CHANCE" ? "Double Chance" : "Prognozy 1X2"}
         description="Prawdopodobieństwo modelu jest oddzielone od kursu bukmachera. Skuteczność obejmuje wyłącznie zweryfikowane rozliczenia."
         actions={<Button onClick={() => { setEditing(null); setOpen(true); }} disabled={matches.length === 0}><Plus /> Dodaj prognozę</Button>}
       />

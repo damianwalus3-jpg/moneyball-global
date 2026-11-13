@@ -26,6 +26,7 @@ type NavTo =
   | "/mecze"
   | "/prognozy-1x2"
   | "/double-chance"
+  | "/prognozy-gole"
   | "/kupony"
   | "/historia"
   | "/statystyki"
@@ -37,6 +38,7 @@ const NAV: { to: NavTo; label: string; short: string; icon: LucideIcon }[] = [
   { to: "/mecze", label: "Terminarz / Mecze", short: "Mecze", icon: CalendarDays },
   { to: "/prognozy-1x2", label: "Prognozy 1X2", short: "1X2", icon: Target },
   { to: "/double-chance", label: "Double Chance", short: "DC", icon: ShieldHalf },
+  { to: "/prognozy-gole", label: "Gole / BTTS", short: "Gole", icon: Target },
   { to: "/kupony", label: "Kupony", short: "Kupony", icon: Ticket },
   { to: "/historia", label: "Historia / Rozliczenia", short: "Historia", icon: History },
   { to: "/statystyki", label: "Statystyki", short: "Statystyki", icon: BarChart3 },

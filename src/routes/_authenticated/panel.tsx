@@ -35,6 +35,7 @@ function Panel() {
   );
   const hr1 = hitRate(sel.filter((prediction) => prediction.market === "1X2").map((prediction) => prediction.settlement_status));
   const hrDc = hitRate(sel.filter((prediction) => prediction.market === "DOUBLE_CHANCE").map((prediction) => prediction.settlement_status));
+  const hrGoals = hitRate(sel.filter((prediction) => prediction.market === "GOALS").map((prediction) => prediction.settlement_status));
   const candidates = new Set(activePreds.filter((p) => isCouponCandidate(p, byId.get(p.match_id), now)).map((p) => p.match_id)).size;
   const verifiedResultIds = new Set(results.filter((result) => result.verified).map((result) => result.match_id));
   const toSettle = matches.filter(
@@ -55,6 +56,7 @@ function Panel() {
         <StatCard label="Mecze dziś" value={todayCount} icon={CalendarDays} />
         <StatCard label="Skuteczność 1X2" value={fmtPct(hr1.rate)} hint={`${hr1.won}/${hr1.settled}`} icon={Trophy} />
         <StatCard label="Skuteczność DC" value={fmtPct(hrDc.rate)} hint={`${hrDc.won}/${hrDc.settled}`} icon={Trophy} />
+        <StatCard label="Skuteczność goli" value={fmtPct(hrGoals.rate)} hint={`${hrGoals.won}/${hrGoals.settled}`} icon={Trophy} />
         <StatCard label="Kupony w grze" value={coupons.filter((c) => (c.status ?? "pending") === "pending").length} icon={Ticket} />
         <StatCard label="Kandydaci >75%" value={candidates} hint="mecze do kuponów" />
         <StatCard label="Do rozliczenia" value={toSettle} tone={toSettle ? "warning" : "default"} />

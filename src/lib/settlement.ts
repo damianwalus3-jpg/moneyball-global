@@ -1,4 +1,4 @@
-import { couponStatus, effectiveOdds, outcomeFromScore, settlePick, signedAmount } from "./domain";
+import { couponStatus, effectiveOdds, outcomeFromScore, settlePick, settleGoalsPick, signedAmount } from "./domain";
 import { fetchAll, insertRow, updateRow } from "./db";
 import type { Coupon, CouponLeg, Match, MatchResult, Prediction, Settlement } from "./types";
 
@@ -166,6 +166,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
 
   const resolve = (prediction: Prediction): Settlement => {
     if (mode.kind === "void" || prediction.selection === "—") return "void";
+    if (prediction.market === "GOALS") return settleGoalsPick(prediction.selection, mode.kind === "score" ? mode.home : 0, mode.kind === "score" ? mode.away : 0);
     return settlePick(prediction.market, prediction.selection, outcome!);
   };
 

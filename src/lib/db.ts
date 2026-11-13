@@ -102,7 +102,7 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
     const scanRunByMatch = new Map(matches.map((match) => [match.id, match.scan_run_id]));
     return predictions.map((row) => ({
       ...row,
-      prediction_type: row.market === "DOUBLE_CHANCE" ? "DC" : "1X2",
+      prediction_type: row.market === "DOUBLE_CHANCE" ? "DC" : row.market === "GOALS" ? "GOALS" : "1X2",
       pick: row.selection,
       selection_status: row.verdict,
       result_status: row.settlement_status,
@@ -123,7 +123,7 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
       return {
         ...leg,
         match_id: prediction?.match_id ?? null,
-        prediction_type: prediction?.market === "DOUBLE_CHANCE" ? "DC" : "1X2",
+        prediction_type: prediction?.market === "DOUBLE_CHANCE" ? "DC" : prediction?.market === "GOALS" ? "GOALS" : "1X2",
         pick: prediction?.selection ?? "—",
         probability: prediction?.probability ?? null,
         result_status: leg.status,
@@ -141,7 +141,7 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
       const probabilities = legs
         .filter((leg) => leg.coupon_id === coupon.id)
         .map((leg) => byId.get(leg.prediction_id)?.probability ?? null);
-      const valid = probabilities.length === 3 && probabilities.every((p) => p != null);
+      const valid = probabilities.length === coupon.target_legs && probabilities.every((p) => p != null);
       const combined = valid
         ? Math.round(probabilities.reduce((acc, p) => acc * (Number(p) / 100), 1) * 10000) / 100
         : null;

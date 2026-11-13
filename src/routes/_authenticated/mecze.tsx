@@ -143,10 +143,11 @@ function Mecze() {
     return byMatch;
   }, [odds, predictionById]);
   const predCount = useMemo(() => {
-    const counts = new Map<string, { x12: number; dc: number; sel: number }>();
+    const counts = new Map<string, { x12: number; dc: number; goals: number; sel: number }>();
     for (const prediction of preds.filter((item) => isActivePredictionVersion(item.model_version))) {
-      const count = counts.get(prediction.match_id) ?? { x12: 0, dc: 0, sel: 0 };
+      const count = counts.get(prediction.match_id) ?? { x12: 0, dc: 0, goals: 0, sel: 0 };
       if (prediction.market === "DOUBLE_CHANCE") count.dc++;
+      else if (prediction.market === "GOALS") count.goals++;
       else count.x12++;
       if (prediction.verdict === "WYBRANY") count.sel++;
       counts.set(prediction.match_id, count);

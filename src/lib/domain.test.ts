@@ -10,6 +10,7 @@ import {
   groupHitRates,
   isCouponCandidate,
   settlePick,
+  settleGoalsPick,
   outcomeFromScore,
   validateBatch,
   validateCoupon,
@@ -201,5 +202,27 @@ describe("bankroll", () => {
       tx("deposit", 100, "2026-01-01T10:00:00Z", 100),
       tx("stake", 10, "2026-01-02T10:00:00Z", 90),
     ])).toBe(90);
+  });
+});
+
+
+describe("GOALS market settlement", () => {
+  it("settles BTTS and over/under from the exact score", () => {
+    expect(settleGoalsPick("BTTS_YES", 2, 1)).toBe("won");
+    expect(settleGoalsPick("BTTS_YES", 2, 0)).toBe("lost");
+    expect(settleGoalsPick("BTTS_NO", 0, 2)).toBe("won");
+    expect(settleGoalsPick("OVER_1.5", 1, 1)).toBe("won");
+    expect(settleGoalsPick("UNDER_1.5", 1, 0)).toBe("won");
+    expect(settleGoalsPick("OVER_2.5", 2, 1)).toBe("won");
+    expect(settleGoalsPick("UNDER_2.5", 1, 1)).toBe("won");
+    expect(settleGoalsPick("OVER_3.5", 2, 2)).toBe("won");
+    expect(settleGoalsPick("UNDER_3.5", 2, 1)).toBe("won");
+  });
+  it("rejects invalid score input", () => {
+    expect(() => settleGoalsPick("OVER_2.5", -1, 2)).toThrow();
+  });
+  it("validates every supported goals selection", () => {
+    for (const selection of ["BTTS_YES", "BTTS_NO", "OVER_1.5", "UNDER_1.5", "OVER_2.5", "UNDER_2.5", "OVER_3.5", "UNDER_3.5"])
+      expect(isValidPick("GOALS", selection)).toBe(true);
   });
 });

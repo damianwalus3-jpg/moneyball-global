@@ -105,7 +105,7 @@ export function PredictionForm({
       <DialogContent className="max-h-[92vh] overflow-y-auto bg-card">
         <DialogHeader>
           <DialogTitle className="font-display text-2xl uppercase">
-            {prediction ? "Edytuj" : "Nowa"} prognoza · {market === "DOUBLE_CHANCE" ? "Double Chance" : "1X2"}
+            {prediction ? "Edytuj" : "Nowa"} prognoza · {market === "DOUBLE_CHANCE" ? "Double Chance" : market === "GOALS" ? "Gole / BTTS" : "1X2"}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
