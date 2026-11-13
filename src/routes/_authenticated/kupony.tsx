@@ -47,7 +47,7 @@ function Kupony() {
 
   const [couponCount, setCouponCount] = useState("2");
   const [couponSize, setCouponSize] = useState<1 | 3>(3);
-  const [stake, setStake] = useState("5");
+  const stake = "5";
   const recordStake = false;
   const [couponType, setCouponType] = useState<CouponType>("TEST");
   const [namePrefix, setNamePrefix] = useState("MONEYBALL");
@@ -186,9 +186,10 @@ function Kupony() {
           <Field label="Nazwa partii">
             <Input value={namePrefix} onChange={(event) => setNamePrefix(event.target.value)} />
           </Field>
-          <Field label="Stawka na kupon" error={stakeError} hint="Stała stawka analityczna: 5 € za kupon">
-            <Input inputMode="decimal" className="num" value={stake} onChange={(event) => setStake(event.target.value)} placeholder="np. 2,00" />
-          </Field>
+          <div className="rounded-lg border border-border px-3 py-2">
+            <div className="text-xs text-muted-foreground">Stała stawka na każdy kupon</div>
+            <div className="num text-lg font-semibold">5,00 €</div>
+          </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2">
