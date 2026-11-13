@@ -251,7 +251,6 @@ function Kupony() {
           {list.map((coupon) => {
             const couponLegs = legs.filter((leg) => leg.coupon_id === coupon.id);
             const payout = couponPayout(coupon.stake, couponLegs);
-            const hasReturn = transactions.some((transaction) => transaction.coupon_id === coupon.id && transaction.transaction_type === "return");
             return (
               <div key={coupon.id} className="surface-card p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -288,12 +287,6 @@ function Kupony() {
                   <div><div className="eyebrow">Zwrot</div>{fmtMoney(payout)}</div>
                 </div>
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
-                  {(coupon.status === "won" || coupon.status === "void") && payout != null && payout > 0 && !hasReturn && (
-                    <Button size="sm" variant="outline" disabled={bookPayout.isPending} onClick={() => bookPayout.mutate({ coupon, amount: payout })}>
-                      <Banknote /> Zaksięguj {fmtMoney(payout)}
-                    </Button>
-                  )}
-                  {hasReturn && <span className="self-center text-xs text-muted-foreground">Rozliczenie ujęte w ledgerze</span>}
                   {coupon.status === "pending" && (
                     <Button size="sm" variant="ghost" onClick={() => removeCoupon.mutate(coupon)} disabled={removeCoupon.isPending}>Anuluj / usuń</Button>
                   )}
