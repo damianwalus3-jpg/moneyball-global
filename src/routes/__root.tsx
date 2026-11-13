@@ -85,7 +85,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
       { name: "apple-mobile-web-app-title", content: "MONEYBALL" },
       { property: "og:title", content: "MONEYBALL GLOBAL 2.0" },
-      { property: "og:description", content: "Śledzenie prognoz piłkarskich 1X2 i Double Chance, kupony, rozliczenia i bankroll." },
+      { property: "og:description", content: "Śledzenie prognoz piłkarskich 1X2 i Double Chance, kupony i rozliczenia ze stałą stawką analityczną 5 €." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
