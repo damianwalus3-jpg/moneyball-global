@@ -107,21 +107,24 @@ function fotbalTeamSlug(team:string){
  const aliases:Record<string,string>={"primorje-ajdovscina":"primorje","nk-jesenice":"jesenice","nk-primorje":"primorje"};
  return aliases[s]||s;
 }
-function parseFotbalFormSection(html:string,kickoff:string){
- const sections=[...html.matchAll(/Meciuri recente[\s\S]{0,240}?<\/p>\s*<ul>([\s\S]*?)<\/ul>/gi)];
+function parseFotbalFormSection(markdown:string,kickoff:string){
+ const heading="Meciuri recente, de la cel mai vechi la cel mai recent, în ultimele 5 meciuri.";
+ const sections=String(markdown||"").split(heading).slice(1,3);
  const cutoff=String(kickoff||"").slice(0,10),target=new Date(cutoff+"T12:00:00Z");
  if(!Number.isFinite(target.getTime()))return [];
- return sections.slice(0,2).map((section:any)=>{
+ return sections.map((section:string)=>{
+  const body=section.split("Victorii–egaluri–înfrângeri")[0];
   const games:any[]=[];
-  for(const item of section[1].matchAll(/<li\b[^>]*>([\s\S]*?)<\/li>/gi)){
-   const plain=String(item[1]).replace(/<[^>]*>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/&#39;|&apos;/g,"'").replace(/\s+/g," ").trim();
-   const match=plain.match(/^(\d{1,2})\.(\d{1,2})\s+([DA])\s+(.+?)\s+(\d{1,2})\s*[–−-]\s*(\d{1,2})\s+[VEÎ]$/i);
+  for(const line of body.split(/\\r?\\n/)){
+   if(!/^\\s*\\*/.test(line))continue;
+   const plain=line.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g," $1 ").replace(/\\*\\*/g," ").replace(/\\*/g," ").replace(/\\s+/g," ").trim();
+   const match=plain.match(/^(\\d{1,2})\\.(\\d{1,2})\\s+([DA])\\s+(.+?)\\s+(\\d{1,2})\\s*[–−-]\\s*(\\d{1,2})\\s+([VEÎ])$/i);
    if(!match)continue;
    const day=Number(match[1]),month=Number(match[2]),location=match[3],opponent=match[4].trim(),first=Number(match[5]),second=Number(match[6]);
    let year=target.getUTCFullYear();if(month>target.getUTCMonth()+1||(month===target.getUTCMonth()+1&&day>target.getUTCDate()))year--;
    const date=new Date(Date.UTC(year,month-1,day)).toISOString().slice(0,10);
    if(date>=cutoff)continue;
-   const home=location==="A",gf=home?first:second,ga=home?second:first;
+   const isHome=location==="A",gf=isHome?first:second,ga=isHome?second:first;
    games.push({date,opponent,goals_for:gf,goals_against:ga,result:gf>ga?"W":gf<ga?"L":"D"});
   }
   const last10=games.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
@@ -139,10 +142,12 @@ async function readFotbalInfoForm(m:any){
   const home=fotbalTeamSlug(String(m.home_team)),away=fotbalTeamSlug(String(m.away_team));
   if(!home||!away||!/^\d{4}-\d{2}-\d{2}$/.test(date))return null;
   const url="https://www.fotbalinfo.ro/"+country+"-"+league+"/"+date+"/"+home+"-"+away;
-  const response=await fetch(url,{headers:{"User-Agent":"Mozilla/5.0 MoneyballGlobal/3.8","Accept":"text/html"},signal:AbortSignal.timeout(9000)});
+  // Direct requests from the edge region time out on FotbalInfo; use its public text-reader endpoint.
+  const response=await fetch("https://r.jina.ai/"+url,{headers:{"User-Agent":"Mozilla/5.0 MoneyballGlobal/3.8","Accept":"text/plain"},signal:AbortSignal.timeout(14000)});
   if(!response.ok)return null;
-  const html=await response.text();
-  const forms=parseFotbalFormSection(html,date);
+  const markdown=await response.text();
+  if(!markdown.toLowerCase().includes(String(m.home_team).toLowerCase())||!markdown.toLowerCase().includes(String(m.away_team).toLowerCase()))return null;
+  const forms=parseFotbalFormSection(markdown,date);
   if(forms.length!==2)return null;
   return {home:forms[0],away:forms[1],source:"FOTBALINFO_PREMATCH",fixture_url:url,fetched_at:new Date().toISOString()};
  }catch(_){return null;}
