@@ -106,6 +106,9 @@ export function PredictionsView({ market }: { market: Market }) {
           {list.map((prediction) => {
             const match = byId.get(prediction.match_id);
             const implied = impliedProbability(prediction.odds);
+            const referenceBookmaker = prediction.data_coverage?.["market_reference_selection"] === prediction.selection
+              ? String(prediction.data_coverage?.["market_reference_bookmaker"] ?? "")
+              : "";
             const fairOdds = prediction.data_coverage?.["market_source"] === "TIPSAUDIT_FAIR_MARKET"
               ? prediction.data_coverage["fair_odds"] as { home?: number; draw?: number; away?: number } | null
               : null;
@@ -127,7 +130,7 @@ export function PredictionsView({ market }: { market: Market }) {
                 </div>
                 <div className="num text-right text-sm">
                   <div>{fmtPct(prediction.probability)}</div>
-                  <div className="text-xs text-muted-foreground">kurs {fmtOdds(prediction.odds)}{implied != null && ` · imp. ${fmtPct(implied)}`}</div>
+                  <div className="text-xs text-muted-foreground">kurs {fmtOdds(prediction.odds)}{referenceBookmaker && ` · ${referenceBookmaker}`}{implied != null && ` · imp. ${fmtPct(implied)}`}</div>
                 </div>
                 <button onClick={() => toggle.mutate(prediction)} title="Przełącz werdykt"><SelectionBadge status={prediction.verdict} /></button>
                 <SettlementBadge status={prediction.settlement_status} />
