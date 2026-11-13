@@ -84,9 +84,9 @@ function resultLabel(value?: string): string {
 }
 function readableReason(p: Prediction, home: TeamForm | null, away: TeamForm | null, coverage: Record<string, unknown>): string {
   const selection = String(p.selection);
-  const total = Number(coverage.expected_total_goals);
-  const homeExpected = Number(coverage.expected_home_goals);
-  const awayExpected = Number(coverage.expected_away_goals);
+  const total = Number(coverage["expected_total_goals"]);
+  const homeExpected = Number(coverage["expected_home_goals"]);
+  const awayExpected = Number(coverage["expected_away_goals"]);
   const parts: string[] = [];
   if (p.market === "1X2") {
     const outcomes: Record<string, string> = { "1": "zwycięstwo gospodarzy", X: "remis", "2": "zwycięstwo gości" };
@@ -95,7 +95,7 @@ function readableReason(p: Prediction, home: TeamForm | null, away: TeamForm | n
     const outcomes: Record<string, string> = { "1X": "wygrana gospodarzy lub remis", X2: "remis lub wygrana gości", "12": "zwycięstwo którejkolwiek drużyny, bez remisu" };
     parts.push(`Wybrany wariant oznacza ${outcomes[selection] ?? selection}. Model łączy prawdopodobieństwa składających się na niego wyników.`);
   }
-  if (p.market === "GOALS" && coverage.expected_total_goals != null && coverage.expected_home_goals != null && coverage.expected_away_goals != null && Number.isFinite(total) && Number.isFinite(homeExpected) && Number.isFinite(awayExpected)) {
+  if (p.market === "GOALS" && coverage["expected_total_goals"] != null && coverage["expected_home_goals"] != null && coverage["expected_away_goals"] != null && Number.isFinite(total) && Number.isFinite(homeExpected) && Number.isFinite(awayExpected)) {
     parts.push(`Model przewiduje średnio około ${total.toFixed(2).replace(".", ",")} gola łącznie: ${homeExpected.toFixed(2).replace(".", ",")} dla gospodarzy i ${awayExpected.toFixed(2).replace(".", ",")} dla gości.`);
   }
   const homeScored = averageGoals(home, "goals_for"), homeConceded = averageGoals(home, "goals_against");
@@ -587,7 +587,7 @@ function Mecze() {
                                   })()}
                                   {p.verdict === "WYBRANY" && (
                                     <div className="mt-3">
-                                      <Button size="sm" className="w-full" disabled={p.odds == null || Number(p.odds) <= 1} onClick={() => { setSingleBetStake("2"); setSingleBetPrediction(p); }}>
+                                      <Button size="sm" className="w-full" disabled={p.odds == null || Number(p.odds) <= 1} onClick={() => setSingleBetPrediction(p)}>
                                         {p.odds == null ? "Brak kursu — zakład niedostępny" : "Zapisz jako pojedynczy zakład"}
                                       </Button>
                                       {p.odds == null && (
@@ -602,8 +602,8 @@ function Mecze() {
                                   )}
                                   {(() => {
                                     const coverage = asObject(p.data_coverage);
-                                    const homeForm = asTeamForm(coverage.home_form);
-                                    const awayForm = asTeamForm(coverage.away_form);
+                                    const homeForm = asTeamForm(coverage["home_form"]);
+                                    const awayForm = asTeamForm(coverage["away_form"]);
                                     const reason = readableReason(p, homeForm, awayForm, coverage);
                                     const rejected = p.verdict === "ODRZUCONY";
                                     return (
@@ -611,14 +611,14 @@ function Mecze() {
                                         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
                                           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{rejected ? "Dlaczego typ odrzucono" : "Dlaczego model wybrał ten typ"}</div>
                                           <p className="text-sm leading-relaxed">{rejected && p.rationale?.toLowerCase().includes("brak wymaganych danych") ? reason : reason}</p>
-                                          {p.market === "GOALS" && coverage.expected_total_goals != null && coverage.expected_home_goals != null && coverage.expected_away_goals != null && Number.isFinite(Number(coverage.expected_total_goals)) && (
+                                          {p.market === "GOALS" && coverage["expected_total_goals"] != null && coverage["expected_home_goals"] != null && coverage["expected_away_goals"] != null && Number.isFinite(Number(coverage["expected_total_goals"])) && (
                                             <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                                              <Badge variant="outline">Oczekiwane gole: {Number(coverage.expected_total_goals).toFixed(2)}</Badge>
-                                              <Badge variant="outline">Gospodarze: {Number(coverage.expected_home_goals).toFixed(2)}</Badge>
-                                              <Badge variant="outline">Goście: {Number(coverage.expected_away_goals).toFixed(2)}</Badge>
+                                              <Badge variant="outline">Oczekiwane gole: {Number(coverage["expected_total_goals"]).toFixed(2)}</Badge>
+                                              <Badge variant="outline">Gospodarze: {Number(coverage["expected_home_goals"]).toFixed(2)}</Badge>
+                                              <Badge variant="outline">Goście: {Number(coverage["expected_away_goals"]).toFixed(2)}</Badge>
                                             </div>
                                           )}
-                                          {coverage.xg_used === true
+                                          {coverage["xg_used"] === true
                                             ? <p className="mt-2 text-[11px] text-muted-foreground">Analiza uwzględnia również jakość sytuacji bramkowych (xG), jeśli dane były dostępne.</p>
                                             : <p className="mt-2 text-[11px] text-muted-foreground">Dla tego meczu nie było wiarygodnych danych xG — prognoza opiera się na wynikach, skuteczności i formie obu drużyn.</p>}
                                         </div>
