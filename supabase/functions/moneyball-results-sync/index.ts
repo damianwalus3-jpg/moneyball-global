@@ -183,7 +183,7 @@ function matchFeedToDb(feed:ScoreFeed,matches:any[]){
  return found.length===1?found[0]:null;
 }
 async function saveSourceObservation(m:any,f:ScoreFeed){
- const row={match_id:m.id,source:f.source,external_match_id:f.external_id,source_status:f.status,home_score:f.home_score,away_score:f.away_score,source_url:f.url,fetched_at:new Date().toISOString(),raw:f.raw};
+ const row={owner_id:m.owner_id,match_id:m.id,source:f.source,external_match_id:f.external_id,source_status:f.status,home_score:f.home_score,away_score:f.away_score,source_url:f.url,fetched_at:new Date().toISOString(),raw:f.raw};
  const q=await db("match_result_sources?select=id&match_id=eq."+m.id+"&source=eq."+encodeURIComponent(f.source)+"&external_match_id=eq."+encodeURIComponent(f.external_id));
  if(q?.length)await db("match_result_sources?id=eq."+q[0].id,"PATCH",row);else await db("match_result_sources","POST",row);
 }
