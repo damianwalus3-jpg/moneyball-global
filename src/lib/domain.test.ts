@@ -6,6 +6,7 @@ import {
   couponPayout,
   couponStatus,
   hitRate,
+  isValidPick,
   groupHitRates,
   isCouponCandidate,
   settlePick,
@@ -53,6 +54,15 @@ const match = (id: string, kickoff_at = "2026-11-11T20:00:00.000Z") =>
     created_at: "2026-11-10T10:00:00.000Z",
     updated_at: "2026-11-10T10:00:00.000Z",
   }) as Match;
+
+describe("pick validation", () => {
+  it("safely rejects missing or unknown market values from legacy rows", () => {
+    expect(isValidPick(undefined, "1")).toBe(false);
+    expect(isValidPick(null, "1X")).toBe(false);
+    expect(isValidPick("UNKNOWN" as never, "1")).toBe(false);
+    expect(isValidPick("1X2", "1")).toBe(true);
+  });
+});
 
 describe("coupon candidates", () => {
   const now = Date.parse("2026-11-10T12:00:00Z");
