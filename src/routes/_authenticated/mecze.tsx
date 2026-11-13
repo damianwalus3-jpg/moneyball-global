@@ -580,7 +580,14 @@ function Mecze() {
                                       <Button size="sm" className="w-full" disabled={p.odds == null || Number(p.odds) <= 1} onClick={() => { setSingleBetStake("2"); setSingleBetPrediction(p); }}>
                                         {p.odds == null ? "Brak kursu — zakład niedostępny" : "Zapisz jako pojedynczy zakład"}
                                       </Button>
-                                      {p.odds == null && <p className="mt-1 text-[11px] text-muted-foreground">Nie zapisujemy zakładu bez potwierdzonego kursu bukmachera.</p>}
+                                      {p.odds == null && (
+                                        <div className="mt-2 grid gap-2">
+                                          <p className="text-[11px] text-muted-foreground">Nie zapisujemy zakładu bez potwierdzonego kursu bukmachera.</p>
+                                          {(p.verdict === "WYBRANY" || (p.rejection_reason ?? "").includes("Brak potwierdzonego kursu")) && (
+                                            <Button size="sm" variant="outline" onClick={() => setOddsFor(m.id)}>Wprowadź kurs z Bwin / innego bukmachera</Button>
+                                          )}
+                                        </div>
+                                      )}
                                     </div>
                                   )}
                                   {(() => {
