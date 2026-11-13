@@ -47,7 +47,6 @@ function Kupony() {
   const [couponCount, setCouponCount] = useState("2");
   const [couponSize, setCouponSize] = useState<1 | 3>(3);
   const stake = "5";
-  const recordStake = false;
   const [couponType, setCouponType] = useState<CouponType>("TEST");
   const [namePrefix, setNamePrefix] = useState("MONEYBALL");
   const [excludeActive, setExcludeActive] = useState(true);
@@ -76,11 +75,7 @@ function Kupony() {
 
   const requestedCount = Math.max(1, Math.min(20, Math.floor(Number(couponCount) || 1)));
   const stakeValue = parseDecimal(stake);
-  const stakeError = recordStake && stake.trim() && (stakeValue == null || stakeValue <= 0)
-    ? "Stawka musi być większa od zera."
-    : recordStake && !stake.trim()
-      ? "Podaj stawkę albo wyłącz zapis w bankrollu."
-      : "";
+  const stakeError = stakeValue == null || stakeValue <= 0 ? "Stawka musi być większa od zera." : "";
   const preview = generated;
   const previewMissingOdds = preview.some((coupon) => coupon.some((prediction) => prediction.odds == null || Number(prediction.odds) <= 1));
   const uniqueCandidateMatches = new Set(candidates.map((prediction) => prediction.match_id)).size;
@@ -91,7 +86,6 @@ function Kupony() {
       couponType,
       scanRunId: [...scans].sort((a, b) => b.started_at.localeCompare(a.started_at))[0]?.id ?? null,
       stake: stakeValue,
-      recordStake,
       targetLegs: couponSize,
     }),
     { success: (count) => `Zapisano ${count} ${couponSize === 1 ? "pojedynczych kuponów" : "kuponów po 3 zdarzenia"}`, onDone: () => setGenerated([]) },
