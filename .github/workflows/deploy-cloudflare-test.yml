@@ -11,7 +11,7 @@ on:
       - "package.json"
       - "bun.lock"
       - "vite.config.ts"
-      - "wrangler.jsonc"
+      - "wrangler.jsonc"\n      - "supabase/functions/**"
       - ".github/workflows/deploy-cloudflare-test.yml"
 
 permissions:
