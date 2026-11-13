@@ -62,7 +62,7 @@ function recentGames(form: TeamForm | null): RecentGame[] {
 }
 function averageGoals(form: TeamForm | null, key: "goals_for" | "goals_against"): string | null {
   const games = recentGames(form);
-  const values = games.map((game) => Number(game[key])).filter(Number.isFinite);
+  const values = games.map((game) => game[key] == null ? Number.NaN : Number(game[key])).filter(Number.isFinite);
   if (!values.length) return null;
   return (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1);
 }
@@ -86,7 +86,7 @@ function readableReason(p: Prediction, home: TeamForm | null, away: TeamForm | n
   const homeExpected = Number(coverage.expected_home_goals);
   const awayExpected = Number(coverage.expected_away_goals);
   const parts: string[] = [];
-  if (Number.isFinite(total) && Number.isFinite(homeExpected) && Number.isFinite(awayExpected)) {
+  if (p.market === "GOALS" && coverage.expected_total_goals != null && coverage.expected_home_goals != null && coverage.expected_away_goals != null && Number.isFinite(total) && Number.isFinite(homeExpected) && Number.isFinite(awayExpected)) {
     parts.push(`Model przewiduje średnio około ${total.toFixed(2).replace(".", ",")} gola łącznie: ${homeExpected.toFixed(2).replace(".", ",")} dla gospodarzy i ${awayExpected.toFixed(2).replace(".", ",")} dla gości.`);
   }
   const homeScored = averageGoals(home, "goals_for"), homeConceded = averageGoals(home, "goals_against");
@@ -520,7 +520,7 @@ function Mecze() {
                                         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
                                           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{rejected ? "Dlaczego typ odrzucono" : "Dlaczego model wybrał ten typ"}</div>
                                           <p className="text-sm leading-relaxed">{rejected && p.rationale?.toLowerCase().includes("brak wymaganych danych") ? reason : reason}</p>
-                                          {Number.isFinite(Number(coverage.expected_total_goals)) && coverage.expected_home_goals != null && coverage.expected_away_goals != null && (
+                                          {p.market === "GOALS" && coverage.expected_total_goals != null && coverage.expected_home_goals != null && coverage.expected_away_goals != null && Number.isFinite(Number(coverage.expected_total_goals)) && (
                                             <div className="mt-2 flex flex-wrap gap-2 text-xs">
                                               <Badge variant="outline">Oczekiwane gole: {Number(coverage.expected_total_goals).toFixed(2)}</Badge>
                                               <Badge variant="outline">Gospodarze: {Number(coverage.expected_home_goals).toFixed(2)}</Badge>
