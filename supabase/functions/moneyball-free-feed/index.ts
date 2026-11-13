@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const PROJECT_URL = Deno.env.get("SUPABASE_URL") || "https://gzgeklcukrclgwbsmbsp.supabase.co";
+const PROJECT_URL = Deno.env.get("SUPABASE_URL") || "https://xwrgfaarmwnguymresjy.supabase.co";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
