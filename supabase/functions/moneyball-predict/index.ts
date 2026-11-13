@@ -460,7 +460,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  const githubPublic=await readGitHubPublicTeamHistory();
  const openPlayXg=await readOpenPlayXgData();
  const marketRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI",token);const marketMap=new Map((marketRows||[]).map((x:any)=>[x.match_id,x.provider_data]));
- const providerOddsRows=matches.length?await db("provider_odds?select=match_id,mapped_market,mapped_selection,odds,bookmaker,provider,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&suspended=eq.false&phase=eq.prematch&captured_at=gte."+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+"&mapped_market=not.is.null&mapped_selection=not.is.null&match_id=in.("+matches.map((x:any)=>x.id).join(",")+")&order=captured_at.desc",token).catch(()=>[]):[];
+ const providerOddsRows=matches.length?await db("provider_odds?select=match_id,mapped_market,mapped_selection,odds,bookmaker,provider,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&suspended=eq.false&phase=eq.prematch&captured_at=gte."+encodeURIComponent(new Date(Date.now()-2*60*60*1000).toISOString())+"&mapped_market=not.is.null&mapped_selection=not.is.null&match_id=in.("+matches.map((x:any)=>x.id).join(",")+")&order=captured_at.desc",token).catch(()=>[]):[];
  const providerOddsMap=new Map<string,any>();
  for(const quote of providerOddsRows||[]){const key=String(quote.match_id)+"|"+String(quote.mapped_market)+"|"+String(quote.mapped_selection);if(!providerOddsMap.has(key)&&Number(quote.odds)>1)providerOddsMap.set(key,quote);}
  const americanToDecimal=(value:any)=>{const n=Number(value);if(!Number.isFinite(n)||n===0)return null;return +(n>0?1+n/100:1+100/Math.abs(n)).toFixed(3);};
@@ -521,7 +521,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    const providerQuote=providerOddsMap.get(m.id+"|"+p.market+"|"+p.selection);
    const tipsOdds=coverage.market_source==="TIPSAUDIT_FAIR_MARKET"&&coverage.market_reference_selection===p.selection&&Number(coverage.market_reference_best_soft_odds)>1?Number(coverage.market_reference_best_soft_odds):null;
    const marketPriceStamp=Date.parse(String(market?.captured_at||market?.generated_at||""));
-   const marketPriceFresh=Number.isFinite(marketPriceStamp)&&Date.now()-marketPriceStamp>=0&&Date.now()-marketPriceStamp<=48*60*60*1000;
+   const marketPriceFresh=Number.isFinite(marketPriceStamp)&&Date.now()-marketPriceStamp>=0&&Date.now()-marketPriceStamp<=2*60*60*1000;
    const strikerAmerican=marketPriceFresh&&market?.odds?(p.selection==="1"?market.odds.home:p.selection==="X"?market.odds.draw:p.selection==="2"?market.odds.away:null):null;
    const strikerOdds=p.market==="1X2"?americanToDecimal(strikerAmerican):null;
    const referenceOdds=providerQuote?Number(providerQuote.odds):tipsOdds??strikerOdds;
