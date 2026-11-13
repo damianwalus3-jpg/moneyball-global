@@ -338,7 +338,7 @@ Deno.serve(async(req:Request)=>{
     for(const f of fixtures){
      if(f.status!=="live")continue;
      const m=map.get(String(f.external_id));
-     if(m){const livePatch={status:"live",live_home_score:Number.isInteger(f.home_score)?f.home_score:null,live_away_score:Number.isInteger(f.away_score)?f.away_score:null,live_minute:f.live_minute||null,live_updated_at:new Date().toISOString(),updated_at:new Date().toISOString()};if(m.status!=="live"||m.live_home_score!==livePatch.live_home_score||m.live_away_score!==livePatch.live_away_score)await db("matches?id=eq."+m.id,"PATCH",livePatch);}
+     if(m){const livePatch={status:"live",live_home_score:Number.isInteger(f.home_score)?f.home_score:null,live_away_score:Number.isInteger(f.away_score)?f.away_score:null,live_minute:f.live_minute||null,live_updated_at:new Date().toISOString(),updated_at:new Date().toISOString()};if(m.status!=="live"||m.live_home_score!==livePatch.live_home_score||m.live_away_score!==livePatch.live_away_score||m.live_minute!==livePatch.live_minute)await db("matches?id=eq."+m.id,"PATCH",livePatch);}
     }
     const eligible:any[]=[];
     for(const f of fixtures){
