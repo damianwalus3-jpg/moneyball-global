@@ -110,9 +110,9 @@ export function SettlementBadge({ status }: { status: Settlement | null | undefi
 
 export function SelectionBadge({ status }: { status: Verdict | null | undefined }) {
   return status === "WYBRANY" ? (
-    <Badge variant="rejected">ODRZUCONY</Badge>
-  ) : (
     <Badge variant="selected">WYBRANY</Badge>
+  ) : (
+    <Badge variant="rejected">ODRZUCONY</Badge>
   );
 }
 
