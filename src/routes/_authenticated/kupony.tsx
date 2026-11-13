@@ -83,6 +83,7 @@ function Kupony() {
       ? "Podaj stawkę albo wyłącz zapis w bankrollu."
       : "";
   const preview = generated;
+  const previewMissingOdds = preview.some((coupon) => coupon.some((prediction) => prediction.odds == null || Number(prediction.odds) <= 1));
   const uniqueCandidateMatches = new Set(candidates.map((prediction) => prediction.match_id)).size;
 
   const saveBatch = useAction(
@@ -211,6 +212,11 @@ function Kupony() {
           </p>
         ) : (
           <>
+            {previewMissingOdds && (
+              <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
+                Brak potwierdzonych kursów dla części typów. Możesz zapisać taki kupon wyłącznie jako TEST do analizy skuteczności — nie jest gotowy do zagrania u bukmachera.
+              </p>
+            )}
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {preview.map((couponPredictions, index) => {
                 const combined = effectiveOdds(couponPredictions.map((prediction) => ({ odds: prediction.odds, status: "pending" as const })));
@@ -240,8 +246,8 @@ function Kupony() {
                 );
               })}
             </div>
-            <Button className="mt-4" disabled={!!stakeError || saveBatch.isPending || preview.some((coupon) => coupon.length !== couponSize)} onClick={() => saveBatch.mutate(preview)}>
-              <Ticket /> {saveBatch.isPending ? "Zapisywanie…" : `Zapisz ${preview.length} kuponów`}
+            <Button className="mt-4" disabled={!!stakeError || saveBatch.isPending || preview.some((coupon) => coupon.length !== couponSize) || (couponType !== "TEST" && previewMissingOdds)} onClick={() => saveBatch.mutate(preview)}>
+              <Ticket /> {saveBatch.isPending ? "Zapisywanie…" : couponType !== "TEST" && previewMissingOdds ? "Brak kursów — wybierz TEST" : `Zapisz ${preview.length} kuponów`}
             </Button>
           </>
         )}
@@ -288,6 +294,9 @@ function Kupony() {
                     );
                   })}
                   {couponLegs.length !== coupon.target_legs && <p className="text-xs text-destructive">Kupon ma {couponLegs.length} zdarzeń zamiast {coupon.target_legs}.</p>}
+                  {couponLegs.some((leg) => leg.odds == null || Number(leg.odds) <= 1) && (
+                    <p className="text-xs text-amber-300">Brak potwierdzonych kursów — kupon służy do testowania skuteczności, nie jest potwierdzonym kuponem bukmacherskim.</p>
+                  )}
                 </div>
                 <div className="num mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3 text-sm">
                   <div><div className="eyebrow">Stawka</div>{fmtMoney(coupon.stake)}</div>
