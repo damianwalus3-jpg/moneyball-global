@@ -65,7 +65,7 @@ export const TX_LABELS: Record<TransactionType, string> = {
 export function isValidPick(market: Market | null | undefined, selection: string | null | undefined): selection is Selection {
   if (typeof market !== "string" || typeof selection !== "string") return false;
   const allowed = PICKS[market as Market];
-  return Array.isArray(allowed) && allowed.includes(selection);
+  return Array.isArray(allowed) && (allowed as string[]).includes(selection);
 }
 
 export function outcomeFromScore(home: number, away: number): Outcome {
