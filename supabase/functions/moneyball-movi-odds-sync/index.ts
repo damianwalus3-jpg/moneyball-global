@@ -32,8 +32,12 @@ function selectionFor(q:any,home:string,away:string):{market:string;selection:st
   return s?{market:"1X2",selection:s}:null;
  }
  if(group==="double chance"){
-  const l=norm(label).replace(/\s/g,"");
-  const s=["1x","x2","12"].includes(l)?l.toUpperCase():null;
+  const l=norm(label),compact=l.replace(/\s/g,"");
+  let s=["1x","x2","12"].includes(compact)?compact.toUpperCase():null;
+  const h=norm(home),a=norm(away),hasHome=!!h&&l.includes(h),hasAway=!!a&&l.includes(a),hasDraw=l.includes("draw");
+  if(!s&&hasDraw&&hasHome)s="1X";
+  else if(!s&&hasDraw&&hasAway)s="X2";
+  else if(!s&&hasHome&&hasAway)s="12";
   return s?{market:"DOUBLE_CHANCE",selection:s}:null;
  }
  if(group==="both teams to score"){
