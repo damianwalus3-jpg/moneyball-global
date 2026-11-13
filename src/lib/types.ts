@@ -45,6 +45,9 @@ export interface Match {
   kickoff_at: string | null;
   kickoff_date?: string | null;
   status: MatchStatus;
+  live_home_score?: number | null;
+  live_away_score?: number | null;
+  live_updated_at?: string | null;
   created_at: string;
   updated_at: string;
   league?: string | null;
