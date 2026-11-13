@@ -520,7 +520,7 @@ function Mecze() {
                                         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
                                           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{rejected ? "Dlaczego typ odrzucono" : "Dlaczego model wybrał ten typ"}</div>
                                           <p className="text-sm leading-relaxed">{rejected && p.rationale?.toLowerCase().includes("brak wymaganych danych") ? reason : reason}</p>
-                                          {Number.isFinite(Number(coverage.expected_total_goals)) && (
+                                          {Number.isFinite(Number(coverage.expected_total_goals)) && coverage.expected_home_goals != null && coverage.expected_away_goals != null && (
                                             <div className="mt-2 flex flex-wrap gap-2 text-xs">
                                               <Badge variant="outline">Oczekiwane gole: {Number(coverage.expected_total_goals).toFixed(2)}</Badge>
                                               <Badge variant="outline">Gospodarze: {Number(coverage.expected_home_goals).toFixed(2)}</Badge>
@@ -530,7 +530,7 @@ function Mecze() {
                                           {coverage.xg_used === false && <p className="mt-2 text-[11px] text-muted-foreground">W tej prognozie nie było dostępnych danych xG — uzasadnienie opiera się na wynikach i formie.</p>}
                                         </div>
                                         <div>
-                                          <div className="mb-2 text-sm font-semibold">Ostatnie mecze drużyn</div>
+                                          <div className="mb-2 text-sm font-semibold">Ostatnie 5 meczów każdej drużyny</div>
                                           <div className="grid gap-2 md:grid-cols-2">
                                             <RecentFormCard title={m.home_team} form={homeForm} />
                                             <RecentFormCard title={m.away_team} form={awayForm} />
