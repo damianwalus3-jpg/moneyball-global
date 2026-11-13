@@ -130,6 +130,7 @@ export interface FileRoutesByTo {
   '/mecze': typeof AuthenticatedMeczeRoute
   '/panel': typeof AuthenticatedPanelRoute
   '/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
+  '/prognozy-gole': typeof AuthenticatedPrognozyGoleRoute
   '/statystyki': typeof AuthenticatedStatystykiRoute
   '/ustawienia': typeof AuthenticatedUstawieniaRoute
 }
@@ -181,6 +182,7 @@ export interface FileRouteTypes {
     | '/mecze'
     | '/panel'
     | '/prognozy-1x2'
+    | '/prognozy-gole'
     | '/statystyki'
     | '/ustawienia'
   id:
@@ -197,6 +199,7 @@ export interface FileRouteTypes {
     | '/_authenticated/mecze'
     | '/_authenticated/panel'
     | '/_authenticated/prognozy-1x2'
+    | '/_authenticated/prognozy-gole'
     | '/_authenticated/statystyki'
     | '/_authenticated/ustawienia'
   fileRoutesById: FileRoutesById
