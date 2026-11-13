@@ -35,6 +35,8 @@ jobs:
           bunx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
           bunx vercel build --prod --token="$VERCEL_TOKEN"
           bunx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
-      - name: Explain skipped deployment
+      - name: Fail clearly when deployment credentials are missing
         if: ${{ env.VERCEL_TOKEN == '' || env.VERCEL_ORG_ID == '' || env.VERCEL_PROJECT_ID == '' }}
-        run: echo "Deployment skipped. Add VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID as repository Actions secrets."
+        run: |
+          echo "::error::Vercel deployment was NOT performed. Add VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID under Repository Settings > Secrets and variables > Actions."
+          exit 1
