@@ -47,6 +47,7 @@ export interface Match {
   status: MatchStatus;
   live_home_score?: number | null;
   live_away_score?: number | null;
+  live_minute?: string | null;
   live_updated_at?: string | null;
   created_at: string;
   updated_at: string;
