@@ -479,7 +479,7 @@ function Mecze() {
                             {m.live_home_score == null || m.live_away_score == null ? "LIVE" : String(m.live_home_score) + ":" + String(m.live_away_score)}
                           </div>
                           <div className="text-[10px] font-semibold text-danger">
-                            NA ŻYWO{m.live_updated_at ? " · " + fmtTime(m.live_updated_at) : ""}
+                            NA ŻYWO{m.live_minute ? " · " + m.live_minute + "'" : ""}{m.live_updated_at ? " · " + fmtTime(m.live_updated_at) : ""}
                           </div>
                         </div>
                       ) : r ? (
