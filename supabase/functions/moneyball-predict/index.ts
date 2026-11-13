@@ -507,6 +507,11 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   }
   const hasModel=!!model;
   if(!model){coverage={market_odds:false,elo:false,reason:"BRAK POTWIERDZONYCH DANYCH — nie generujemy sztucznego prawdopodobieństwa."};}
+  // Show verified recent form even when the probability model is market-based.
+  const fotbalInfoContext=fotbalForms.get(m.id);
+  if(fotbalInfoContext?.home&&fotbalInfoContext?.away){
+   coverage={...coverage,home_form:fotbalInfoContext.home,away_form:fotbalInfoContext.away,history_source:"FOTBALINFO_PREMATCH",home_history_matches:fotbalInfoContext.home.matches,away_history_matches:fotbalInfoContext.away.matches,fotbalinfo_form:true};
+  }
   const bothTeamsCovered=!!(model.market||(model.history&&model.home_matches>=3&&model.away_matches>=3));const dataCovered=bothTeamsCovered;if(dataCovered)covered++;else missing++;
   const preds:any[]=[];
   if(hasModel){const opts=[["1",model.p1],["X",model.px],["2",model.p2]];const best=opts.sort((x:any,y:any)=>y[1]-x[1])[0];preds.push({market:"1X2",selection:best[0],probability:best[1]});for(const [sel,val] of [["1X",model.p1+model.px],["X2",model.px+model.p2],["12",model.p1+model.p2]])preds.push({market:"DOUBLE_CHANCE",selection:sel,probability:+val.toFixed(1)});}
