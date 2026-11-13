@@ -2,7 +2,7 @@ name: Moneyball CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, migration/cloudflare-workers-setup]
   pull_request:
     branches: [main]
 
