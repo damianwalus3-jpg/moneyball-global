@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const SUPABASE_URL=Deno.env.get("SUPABASE_URL")||"https://xwrgfaarmwnguymresjy.supabase.co";
 const KEY=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||"sb_publishable_E27tyjResjElwC4AWbmILw_wbtibXhX";
 const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
+let ACTIVE_CRON_TOKEN="";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-requested-with, prefer, cache-control, pragma","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Max-Age":"86400","Vary":"Origin"};
 
 
@@ -42,7 +43,7 @@ async function readFixtures(date:string){
  return {date,total_found:total,fixtures_count:fixtures.length,fixtures};
 }
 async function db(path:string,token:string,method="GET",body?:unknown,prefer="return=representation"){
- const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{method,headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json",Prefer:prefer},body:body===undefined?undefined:JSON.stringify(body)});
+ const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{method,headers:{apikey:KEY,Authorization:"Bearer "+token,...(ACTIVE_CRON_TOKEN?{"x-cron-token":ACTIVE_CRON_TOKEN}:{}),"Content-Type":"application/json",Prefer:prefer},body:body===undefined?undefined:JSON.stringify(body)});
  const txt=await r.text();let data:any;try{data=txt?JSON.parse(txt):null}catch{data=txt}
  if(!r.ok)throw new Error((data?.message||data?.hint||data?.details||txt||"Supabase request failed")+" ["+r.status+"]");
  return data;
@@ -94,7 +95,6 @@ Deno.serve(async(req)=>{
   const cronToken=req.headers.get("x-cron-token")||"";
   let ownerId="";
   if(cronToken){
-   if(!SERVICE_KEY)throw new Error("Brak konfiguracji klucza serwisowego dla harmonogramu.");
    const authResponse=await fetch(SUPABASE_URL+"/rest/v1/rpc/moneyball_cron_token_valid",{
     method:"POST",
     headers:{apikey:KEY,Authorization:"Bearer "+(token||KEY),"Content-Type":"application/json"},
@@ -103,7 +103,7 @@ Deno.serve(async(req)=>{
    if(!authResponse.ok||(await authResponse.json())!==true)throw new Error("Nieprawidłowy token harmonogramu.");
    ownerId=String(requestBody.owner_id||"");
    if(!ownerId)throw new Error("Brak właściciela dla automatycznego skanu.");
-   token=SERVICE_KEY;
+   ACTIVE_CRON_TOKEN=cronToken;
   }else{
    if(!token)throw new Error("Brak sesji logowania. Zaloguj się ponownie.");
    const jwtParts=token.split(".");
