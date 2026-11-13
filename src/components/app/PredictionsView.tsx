@@ -14,6 +14,7 @@ import type { Market, Prediction } from "@/lib/types";
 function sourceLabel(source?: string | null) {
   if (!source) return "brak źródła";
   if (source === "NO_VERIFIED_SOURCE") return "brak potwierdzonych danych";
+  if (source === "TIPSAUDIT_FAIR_MARKET") return "rynek fair TipsAudit";
   return source.replace(/_/g, " ");
 }
 
@@ -105,6 +106,9 @@ export function PredictionsView({ market }: { market: Market }) {
           {list.map((prediction) => {
             const match = byId.get(prediction.match_id);
             const implied = impliedProbability(prediction.odds);
+            const fairOdds = prediction.data_coverage?.["market_source"] === "TIPSAUDIT_FAIR_MARKET"
+              ? prediction.data_coverage["fair_odds"] as { home?: number; draw?: number; away?: number } | null
+              : null;
             return (
               <div key={prediction.id} className="surface-card flex flex-wrap items-center gap-3 p-3">
                 <div className="num flex size-12 items-center justify-center rounded-lg bg-primary/10 text-lg font-semibold text-primary">
@@ -116,6 +120,7 @@ export function PredictionsView({ market }: { market: Market }) {
                     {match?.competition ?? match?.league ?? "—"} · {match?.kickoff_at ? fmtDateTime(match.kickoff_at) : match?.kickoff_date ? match.kickoff_date + " · godzina nieznana" : "brak daty"}
                   </div>
                   <div className="text-xs text-muted-foreground">Źródło: {sourceLabel(prediction.data_source)} · {coverageLabel(prediction.data_coverage)}</div>
+                  {fairOdds && <div className="text-xs text-muted-foreground">Kursy fair bez marży 1/X/2: {fmtOdds(fairOdds.home)} / {fmtOdds(fairOdds.draw)} / {fmtOdds(fairOdds.away)} · <a href="https://tipsaudit.com" target="_blank" rel="noreferrer" className="underline">Data: TipsAudit</a> (nie są ofertą bukmachera)</div>}
                   {prediction.probability == null && <div className="text-xs text-warning">Brak wystarczających potwierdzonych danych — prawdopodobieństwo nie zostało wygenerowane.</div>}
                   {prediction.rationale && <div className="text-xs text-muted-foreground">Uzasadnienie: {prediction.rationale}</div>}
                   {prediction.note && !prediction.note.trim().startsWith("{") && <div className="text-xs text-muted-foreground">{prediction.note}</div>}
