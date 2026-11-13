@@ -8,10 +8,11 @@ on:
     paths:
       - "src/**"
       - "public/**"
+      - "supabase/functions/**"
       - "package.json"
       - "bun.lock"
       - "vite.config.ts"
-      - "wrangler.jsonc"\n      - "supabase/functions/**"
+      - "wrangler.jsonc"
       - ".github/workflows/deploy-cloudflare-test.yml"
 
 permissions:
@@ -37,6 +38,9 @@ jobs:
 
       - name: Run tests
         run: bun run test
+
+      - name: Type-check
+        run: bunx tsc --noEmit
 
       - name: Build for Cloudflare
         run: bun run build
