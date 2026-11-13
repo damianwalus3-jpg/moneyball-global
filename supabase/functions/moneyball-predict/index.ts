@@ -416,7 +416,6 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  CRON_FALLBACK_TOKEN=cronToken;
  CRON_JWT_TOKEN=requestToken;
  if(cronToken){
-  if(!SERVICE_KEY)throw Error("Brak konfiguracji bezpiecznego klucza serwisowego.");
   const check=await fetch(S+"/rest/v1/rpc/moneyball_cron_token_valid",{method:"POST",headers:{apikey:K,Authorization:"Bearer "+requestToken,"Content-Type":"application/json"},body:JSON.stringify({p_token:cronToken})});
   if(!check.ok||(await check.json())!==true)throw Error("Nieprawidłowy token harmonogramu.");
   ownerId=String(body.owner_id||"");
