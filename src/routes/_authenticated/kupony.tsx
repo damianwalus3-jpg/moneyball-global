@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState, Field, NoGuarantee, PageHeader, PageLoader, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { saveCouponBatch } from "@/lib/coupons";
-import { deleteRow, updateRow } from "@/lib/db";
+import { deleteRow } from "@/lib/db";
 import { buildCouponBatch, buildSingleCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, MARKET_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel, parseDecimal } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
@@ -98,14 +98,6 @@ function Kupony() {
   );
 
   const removeCoupon = useAction(async (coupon: Coupon) => {
-    const relatedTransactions = transactions.filter((transaction) => transaction.coupon_id === coupon.id);
-    if (relatedTransactions.length) {
-      await updateRow("coupons", coupon.id, {
-        status: "cancelled",
-        notes: [coupon.notes, "Anulowano w aplikacji; transakcje bankrolla zachowano."].filter(Boolean).join(" "),
-      });
-      return;
-    }
     for (const leg of legs.filter((item) => item.coupon_id === coupon.id)) await deleteRow("coupon_legs", leg.id);
     await deleteRow("coupons", coupon.id);
   }, { success: "Kupon usunięty lub bezpiecznie anulowany" });
