@@ -17,6 +17,7 @@ import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AuthenticatedBankrollRouteImport } from './routes/_authenticated/bankroll'
 import { Route as AuthenticatedDoubleChanceRouteImport } from './routes/_authenticated/double-chance'
 import { Route as AuthenticatedHistoriaRouteImport } from './routes/_authenticated/historia'
+import { Route as AuthenticatedPrognozyGoleRouteImport } from './routes/_authenticated/prognozy-gole'
 import { Route as AuthenticatedKuponyRouteImport } from './routes/_authenticated/kupony'
 import { Route as AuthenticatedMeczeRouteImport } from './routes/_authenticated/mecze'
 import { Route as AuthenticatedPanelRouteImport } from './routes/_authenticated/panel'
@@ -59,6 +60,11 @@ const AuthenticatedDoubleChanceRoute =
     path: '/double-chance',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPrognozyGoleRoute = AuthenticatedPrognozyGoleRouteImport.update({
+  id: '/prognozy-gole',
+  path: '/prognozy-gole',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedHistoriaRoute = AuthenticatedHistoriaRouteImport.update({
   id: '/historia',
   path: '/historia',
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/mecze': typeof AuthenticatedMeczeRoute
   '/panel': typeof AuthenticatedPanelRoute
   '/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
+  '/prognozy-gole': typeof AuthenticatedPrognozyGoleRoute
   '/statystyki': typeof AuthenticatedStatystykiRoute
   '/ustawienia': typeof AuthenticatedUstawieniaRoute
 }
@@ -140,6 +147,7 @@ export interface FileRoutesById {
   '/_authenticated/mecze': typeof AuthenticatedMeczeRoute
   '/_authenticated/panel': typeof AuthenticatedPanelRoute
   '/_authenticated/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
+  '/_authenticated/prognozy-gole': typeof AuthenticatedPrognozyGoleRoute
   '/_authenticated/statystyki': typeof AuthenticatedStatystykiRoute
   '/_authenticated/ustawienia': typeof AuthenticatedUstawieniaRoute
 }
@@ -157,6 +165,7 @@ export interface FileRouteTypes {
     | '/mecze'
     | '/panel'
     | '/prognozy-1x2'
+    | '/prognozy-gole'
     | '/statystyki'
     | '/ustawienia'
   fileRoutesByTo: FileRoutesByTo
@@ -279,6 +288,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPanelRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/prognozy-gole': {
+      id: '/_authenticated/prognozy-gole'
+      path: '/prognozy-gole'
+      fullPath: '/prognozy-gole'
+      preLoaderRoute: typeof AuthenticatedPrognozyGoleRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/prognozy-1x2': {
       id: '/_authenticated/prognozy-1x2'
       path: '/prognozy-1x2'
@@ -311,6 +327,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMeczeRoute: typeof AuthenticatedMeczeRoute
   AuthenticatedPanelRoute: typeof AuthenticatedPanelRoute
   AuthenticatedPrognozy1x2Route: typeof AuthenticatedPrognozy1x2Route
+  AuthenticatedPrognozyGoleRoute: typeof AuthenticatedPrognozyGoleRoute
   AuthenticatedStatystykiRoute: typeof AuthenticatedStatystykiRoute
   AuthenticatedUstawieniaRoute: typeof AuthenticatedUstawieniaRoute
 }
@@ -323,6 +340,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMeczeRoute: AuthenticatedMeczeRoute,
   AuthenticatedPanelRoute: AuthenticatedPanelRoute,
   AuthenticatedPrognozy1x2Route: AuthenticatedPrognozy1x2Route,
+  AuthenticatedPrognozyGoleRoute: AuthenticatedPrognozyGoleRoute,
   AuthenticatedStatystykiRoute: AuthenticatedStatystykiRoute,
   AuthenticatedUstawieniaRoute: AuthenticatedUstawieniaRoute,
 }
