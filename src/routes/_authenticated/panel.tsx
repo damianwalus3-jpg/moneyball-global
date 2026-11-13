@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { CalendarDays, Ticket, Trophy, Wallet } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CalendarDays, ChevronRight, Ticket, Trophy, Wallet } from "lucide-react";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { dashboardSummaryQuery } from "@/lib/queries";
@@ -14,6 +13,28 @@ export const Route = createFileRoute("/_authenticated/panel")({
   component: Panel,
 });
 
+function DashboardTile({ to, label, value, hint, icon, tone = "default" }: {
+  to: "/bankroll" | "/mecze" | "/statystyki" | "/kupony" | "/historia";
+  label: string;
+  value: string | number;
+  hint?: string;
+  icon: typeof Wallet;
+  tone?: "default" | "primary" | "warning";
+}) {
+  return (
+    <Link
+      to={to}
+      aria-label={`${label}: ${value}. Zobacz szczegóły`}
+      className="group block min-w-0 rounded-xl outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+    >
+      <StatCard label={label} value={value} hint={hint} icon={icon} tone={tone} className="h-full transition-colors group-hover:border-primary/50" />
+      <span className="mt-1 flex items-center justify-end gap-1 px-1 text-xs font-semibold text-primary">
+        Zobacz szczegóły <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+      </span>
+    </Link>
+  );
+}
+
 function Panel() {
   const { data: summary } = useSuspenseQuery(dashboardSummaryQuery());
   const hr1 = summary.hit_rates["1X2"];
@@ -23,19 +44,20 @@ function Panel() {
   return (
     <div>
       <PageHeader eyebrow="Europe/Brussels" title="Panel" />
+      <p className="mb-3 text-sm text-muted-foreground">Każdy kafelek jest teraz przyciskiem — otwiera odpowiedni widok ze szczegółami.</p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Bankroll" value={summary.bankroll == null ? "brak danych" : fmtMoney(summary.bankroll)} icon={Wallet} tone="primary" />
-        <StatCard label="Mecze dziś" value={summary.matches_today} icon={CalendarDays} />
-        <StatCard label="Skuteczność 1X2" value={fmtPct(hr1?.rate ?? null)} hint={`${hr1?.won ?? 0}/${hr1?.settled ?? 0}`} icon={Trophy} />
-        <StatCard label="Skuteczność DC" value={fmtPct(hrDc?.rate ?? null)} hint={`${hrDc?.won ?? 0}/${hrDc?.settled ?? 0}`} icon={Trophy} />
-        <StatCard label="Skuteczność goli" value={fmtPct(hrGoals?.rate ?? null)} hint={`${hrGoals?.won ?? 0}/${hrGoals?.settled ?? 0}`} icon={Trophy} />
-        <StatCard label="Kupony w grze" value={summary.coupons_in_play} icon={Ticket} />
-        <StatCard label="Kandydaci >75%" value={summary.candidates} hint="mecze do kuponów" />
-        <StatCard label="Do rozliczenia" value={summary.to_settle} tone={summary.to_settle ? "warning" : "default"} />
+        <DashboardTile to="/bankroll" label="Bankroll" value={summary.bankroll == null ? "brak danych" : fmtMoney(summary.bankroll)} icon={Wallet} tone="primary" />
+        <DashboardTile to="/mecze" label="Mecze dziś" value={summary.matches_today} icon={CalendarDays} />
+        <DashboardTile to="/statystyki" label="Skuteczność 1X2" value={fmtPct(hr1?.rate ?? null)} hint={`${hr1?.won ?? 0}/${hr1?.settled ?? 0} rozliczonych`} icon={Trophy} />
+        <DashboardTile to="/statystyki" label="Skuteczność DC" value={fmtPct(hrDc?.rate ?? null)} hint={`${hrDc?.won ?? 0}/${hrDc?.settled ?? 0} rozliczonych`} icon={Trophy} />
+        <DashboardTile to="/statystyki" label="Skuteczność goli" value={fmtPct(hrGoals?.rate ?? null)} hint={`${hrGoals?.won ?? 0}/${hrGoals?.settled ?? 0} rozliczonych`} icon={Trophy} />
+        <DashboardTile to="/kupony" label="Kupony w grze" value={summary.coupons_in_play} icon={Ticket} />
+        <DashboardTile to="/kupony" label="Kandydaci >75%" value={summary.candidates} hint="mecze do kuponów" icon={Trophy} />
+        <DashboardTile to="/historia" label="Do rozliczenia" value={summary.to_settle} hint="wyniki i rozliczenia" icon={CalendarDays} tone={summary.to_settle ? "warning" : "default"} />
       </div>
       {summary.matches_today === 0 && (
         <div className="mt-6">
-          <EmptyState icon={CalendarDays} title="Brak meczów" description="Zaimportuj skan CSV lub dodaj pierwszy mecz w Terminarzu." action={<Button asChild><Link to="/mecze">Przejdź do Terminarza</Link></Button>} />
+          <EmptyState icon={CalendarDays} title="Brak meczów" description="Zaimportuj skan CSV lub dodaj pierwszy mecz w Terminarzu." />
         </div>
       )}
       <NoGuarantee className="mt-6" />
