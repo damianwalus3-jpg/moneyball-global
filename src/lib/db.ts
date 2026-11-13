@@ -122,6 +122,9 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
       const prediction = byId.get(leg.prediction_id);
       return {
         ...leg,
+        // Use the latest prediction price when the leg was saved before odds arrived.
+        // This is a read-time fallback; it never fabricates or overwrites stored prices.
+        odds: leg.odds ?? prediction?.odds ?? null,
         match_id: prediction?.match_id ?? null,
         prediction_type: prediction?.market === "DOUBLE_CHANCE" ? "DC" : prediction?.market === "GOALS" ? "GOALS" : "1X2",
         pick: prediction?.selection ?? "—",
@@ -138,14 +141,23 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
     ]);
     const byId = new Map(predictions.map((prediction) => [prediction.id, prediction]));
     return coupons.map((coupon) => {
-      const probabilities = legs
-        .filter((leg) => leg.coupon_id === coupon.id)
-        .map((leg) => byId.get(leg.prediction_id)?.probability ?? null);
-      const valid = probabilities.length === coupon.target_legs && probabilities.every((p) => p != null);
-      const combined = valid
+      const couponLegs = legs.filter((leg) => leg.coupon_id === coupon.id);
+      const probabilities = couponLegs.map((leg) => byId.get(leg.prediction_id)?.probability ?? null);
+      const prices = couponLegs.map((leg) => leg.odds ?? byId.get(leg.prediction_id)?.odds ?? null);
+      const validProbability = probabilities.length === coupon.target_legs && probabilities.every((p) => p != null);
+      const combinedProbability = validProbability
         ? Math.round(probabilities.reduce((acc, p) => acc * (Number(p) / 100), 1) * 10000) / 100
         : null;
-      return { ...coupon, total_odds: coupon.combined_odds, combined_probability: combined };
+      const validOdds = prices.length === coupon.target_legs && prices.every((price) => price != null && Number(price) > 1);
+      const combinedOdds = validOdds
+        ? Math.round(prices.reduce((acc, price) => acc * Number(price), 1) * 100) / 100
+        : null;
+      return {
+        ...coupon,
+        total_odds: combinedOdds ?? coupon.combined_odds,
+        combined_odds: combinedOdds ?? coupon.combined_odds,
+        combined_probability: combinedProbability,
+      };
     }) as TableRows[K][];
   }
   if (table === "odds_snapshots") {
