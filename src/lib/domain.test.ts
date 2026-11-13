@@ -99,6 +99,7 @@ describe("coupon builder", () => {
     expect(new Set(matchIds).size).toBe(matchIds.length);
     expect(matchIds).not.toContain("m8");
     expect(validateBatch(batch)).toEqual([]);
+    expect(validateBatch(batch, 3, true)).toEqual([]);
   });
   it("builds single-pick coupons without repeating a match and keeps the best pick", () => {
     const candidates = [
@@ -114,6 +115,12 @@ describe("coupon builder", () => {
     expect(batch.map((coupon) => coupon[0]?.id)).toEqual(["a2", "b", "c"]);
     expect(batch.every((coupon) => coupon.length === 1)).toBe(true);
     expect(validateBatch(batch, 1)).toEqual([]);
+  });
+  it("rejects missing or invalid odds for non-test coupon batches", () => {
+    const noOdds = [prediction("a", "m1", 90, { odds: null }), prediction("b", "m2", 90), prediction("c", "m3", 90)];
+    expect(validateBatch([noOdds], 3, true)).toContain("Kupon 1: Kupon MAIN/MEGA/EXTRA wymaga potwierdzonego kursu większego niż 1,00 dla każdego zdarzenia.");
+    expect(validateBatch([noOdds], 3, false)).toEqual([]);
+    expect(validateBatch([[prediction("a", "m1", 90, { odds: 1 }), prediction("b", "m2", 90), prediction("c", "m3", 90)]], 3, true).length).toBe(1);
   });
   it("rejects incomplete coupons, duplicate matches, low probability and batch reuse", () => {
     expect(validateCoupon([prediction("a", "m1", 90), prediction("b", "m2", 90)])).toContain("Kupon musi mieć dokładnie 3 zdarzenia.");
