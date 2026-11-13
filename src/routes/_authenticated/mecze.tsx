@@ -88,6 +88,13 @@ function readableReason(p: Prediction, home: TeamForm | null, away: TeamForm | n
   const homeExpected = Number(coverage.expected_home_goals);
   const awayExpected = Number(coverage.expected_away_goals);
   const parts: string[] = [];
+  if (p.market === "1X2") {
+    const outcomes: Record<string, string> = { "1": "zwycięstwo gospodarzy", X: "remis", "2": "zwycięstwo gości" };
+    parts.push(`Model wskazuje ${outcomes[selection] ?? selection} jako najbardziej prawdopodobny wynik. Szacowane prawdopodobieństwo tego scenariusza wynosi ${p.probability == null ? "brak danych" : Number(p.probability).toFixed(1).replace(".", ",") + "%"}.`);
+  } else if (p.market === "DOUBLE_CHANCE") {
+    const outcomes: Record<string, string> = { "1X": "wygrana gospodarzy lub remis", X2: "remis lub wygrana gości", "12": "zwycięstwo którejkolwiek drużyny, bez remisu" };
+    parts.push(`Wybrany wariant oznacza ${outcomes[selection] ?? selection}. Model łączy prawdopodobieństwa składających się na niego wyników.`);
+  }
   if (p.market === "GOALS" && coverage.expected_total_goals != null && coverage.expected_home_goals != null && coverage.expected_away_goals != null && Number.isFinite(total) && Number.isFinite(homeExpected) && Number.isFinite(awayExpected)) {
     parts.push(`Model przewiduje średnio około ${total.toFixed(2).replace(".", ",")} gola łącznie: ${homeExpected.toFixed(2).replace(".", ",")} dla gospodarzy i ${awayExpected.toFixed(2).replace(".", ",")} dla gości.`);
   }
@@ -594,7 +601,9 @@ function Mecze() {
                                               <Badge variant="outline">Goście: {Number(coverage.expected_away_goals).toFixed(2)}</Badge>
                                             </div>
                                           )}
-                                          {coverage.xg_used === false && <p className="mt-2 text-[11px] text-muted-foreground">W tej prognozie nie było dostępnych danych xG — uzasadnienie opiera się na wynikach i formie.</p>}
+                                          {coverage.xg_used === true
+                                            ? <p className="mt-2 text-[11px] text-muted-foreground">Analiza uwzględnia również jakość sytuacji bramkowych (xG), jeśli dane były dostępne.</p>
+                                            : <p className="mt-2 text-[11px] text-muted-foreground">Dla tego meczu nie było wiarygodnych danych xG — prognoza opiera się na wynikach, skuteczności i formie obu drużyn.</p>}
                                         </div>
                                         <div>
                                           <div className="mb-2 text-sm font-semibold">Ostatnie 5 meczów każdej drużyny</div>
