@@ -199,7 +199,7 @@ Deno.serve(async(req)=>{
     const predictionResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-predict",{
      method:"POST",
      headers:{apikey:KEY,Authorization:"Bearer "+token,...(cronToken?{"x-cron-token":cronToken}:{}),"Content-Type":"application/json",Accept:"application/json"},
-     body:JSON.stringify({date,offset}),
+     body:JSON.stringify({date,offset,owner_id:ownerId}),
     });
     const predictionText=await predictionResponse.text();
     let predictionResult:any;
