@@ -684,7 +684,7 @@ function Mecze() {
                     <div className="mt-1 flex justify-between"><span>Możliwa strata</span><strong className="num text-destructive">−{fmtMoney(stake!)}</strong></div>
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">Zapis utworzy kupon pojedynczy, zapisze dokładny kurs i odejmie stawkę od bankrolla. Wynik i zysk/strata zostaną rozliczone po potwierdzeniu wyniku meczu.</p>
+                <p className="text-xs text-muted-foreground">Zapis utworzy pojedynczy typ ze stałą stawką analityczną 5 €, zapisze kurs oraz rozliczy wynik i zysk/stratę po potwierdzeniu rezultatu meczu.</p>
               </div>
             );
           })()}
