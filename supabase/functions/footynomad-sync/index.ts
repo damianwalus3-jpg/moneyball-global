@@ -136,10 +136,10 @@ Deno.serve(async(req)=>{
     if(!exact&&byFixture)matchedByFixture++;
     const noteData={integration:"MONEYBALL_PUBLIC_AGGREGATOR",sources:(f as any).public_data?.sources||[source],home_form:(f as any).home_form||(f as any).public_data?.home_form||null,away_form:(f as any).away_form||(f as any).public_data?.away_form||null,public_data:(f as any).public_data||null};
     publicDataByKey.set(key,noteData);
-    const row={owner_id:ownerId,scan_run_id:run.id,external_id:sourceId,source,competition:f.competition||f.league||null,country:f.country||null,gender:f.gender||"unknown",home_team:f.home_team,away_team:f.away_team,kickoff_at:f.kickoff_at||null,status:f.status||"scheduled"};
+    const row={owner_id:ownerId,scan_run_id:run.id,external_id:sourceId,source,competition:f.competition||f.league||null,country:f.country||null,gender:f.gender||"unknown",home_team:f.home_team,away_team:f.away_team,kickoff_at:f.kickoff_at||null,kickoff_date:String(f.date||date).slice(0,10),status:f.status||"scheduled"};
     if(existing){
      if(source==="FootyNomad"||String(existing.source)===source){
-      const patch:any={scan_run_id:run.id,kickoff_at:row.kickoff_at,status:row.status,competition:row.competition,gender:row.gender,country:row.country};
+      const patch:any={scan_run_id:run.id,kickoff_at:row.kickoff_at,kickoff_date:row.kickoff_date,status:row.status,competition:row.competition,gender:row.gender,country:row.country};
       if(source==="FootyNomad"&&String(existing.source)!=="FootyNomad"){patch.source=source;patch.external_id=sourceId;promotedToPrimary++;}
       await db("matches?id=eq."+existing.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",patch);
       updated++;
