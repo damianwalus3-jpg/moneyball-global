@@ -3,6 +3,7 @@ import { CalendarDays, ChevronDown, ChevronUp, CircleDollarSign, FileUp, Flag, P
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ConfirmDelete, DataError, EmptyState, PageHeader, PageLoader } from "@/components/app/ui-bits";
 import { ScanImportDialog } from "@/components/app/ScanImportDialog";
@@ -10,8 +11,9 @@ import { SettleMatchDialog } from "@/components/app/SettleMatchDialog";
 import { MatchForm } from "@/components/forms/MatchForm";
 import { OddsForm, ScanRunForm } from "@/components/forms/SimpleForms";
 import { deleteRow } from "@/lib/db";
+import { saveCouponBatch } from "@/lib/coupons";
 import { isActivePredictionVersion, MATCH_STATUS_LABELS } from "@/lib/domain";
-import { fmtOdds } from "@/lib/format";
+import { fmtMoney, fmtOdds, matchLabel, parseDecimal } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { brusselsDayKey, fmtDateTime, fmtDayLong, fmtTime } from "@/lib/time";
 import { getSupabase } from "@/lib/supabase";
@@ -86,6 +88,13 @@ function readableReason(p: Prediction, home: TeamForm | null, away: TeamForm | n
   const homeExpected = Number(coverage.expected_home_goals);
   const awayExpected = Number(coverage.expected_away_goals);
   const parts: string[] = [];
+  if (p.market === "1X2") {
+    const outcomes: Record<string, string> = { "1": "zwycięstwo gospodarzy", X: "remis", "2": "zwycięstwo gości" };
+    parts.push(`Model wskazuje ${outcomes[selection] ?? selection} jako najbardziej prawdopodobny wynik. Szacowane prawdopodobieństwo tego scenariusza wynosi ${p.probability == null ? "brak danych" : Number(p.probability).toFixed(1).replace(".", ",") + "%"}.`);
+  } else if (p.market === "DOUBLE_CHANCE") {
+    const outcomes: Record<string, string> = { "1X": "wygrana gospodarzy lub remis", X2: "remis lub wygrana gości", "12": "zwycięstwo którejkolwiek drużyny, bez remisu" };
+    parts.push(`Wybrany wariant oznacza ${outcomes[selection] ?? selection}. Model łączy prawdopodobieństwa składających się na niego wyników.`);
+  }
   if (p.market === "GOALS" && coverage.expected_total_goals != null && coverage.expected_home_goals != null && coverage.expected_away_goals != null && Number.isFinite(total) && Number.isFinite(homeExpected) && Number.isFinite(awayExpected)) {
     parts.push(`Model przewiduje średnio około ${total.toFixed(2).replace(".", ",")} gola łącznie: ${homeExpected.toFixed(2).replace(".", ",")} dla gospodarzy i ${awayExpected.toFixed(2).replace(".", ",")} dla gości.`);
   }
@@ -144,6 +153,7 @@ function Mecze() {
   const results = useTable("match_results");
   const odds = useTable("odds_snapshots");
   const couponLegs = useTable("coupon_legs");
+  const coupons = useTable("coupons");
   const [view, setView] = useState<View>("upcoming");
   const [q, setQ] = useState("");
   const [editMatch, setEditMatch] = useState<Match | null>(null);
@@ -155,6 +165,26 @@ function Mecze() {
   const [scanOpen, setScanOpen] = useState(false);
   const [predictionProgress, setPredictionProgress] = useState("");
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [singleBetPrediction, setSingleBetPrediction] = useState<Prediction | null>(null);
+  const [singleBetStake, setSingleBetStake] = useState("2");
+
+  const saveSingleBet = useAction(async () => {
+    const prediction = singleBetPrediction;
+    const stake = parseDecimal(singleBetStake);
+    if (!prediction || prediction.verdict !== "WYBRANY") throw new Error("Wybierz zatwierdzony typ.");
+    if (prediction.odds == null || Number(prediction.odds) <= 1) throw new Error("Brak potwierdzonego kursu — nie zapisuję zakładu bez kursu.");
+    if (stake == null || stake <= 0) throw new Error("Podaj stawkę większą od zera.");
+    const match = matches.find((item) => item.id === prediction.match_id);
+    if (!match) throw new Error("Nie znaleziono meczu.");
+    await saveCouponBatch([[prediction]], {
+      namePrefix: `SINGIEL · ${match.home_team} – ${match.away_team} · ${prediction.selection}`,
+      couponType: "MAIN",
+      scanRunId: match.scan_run_id,
+      stake,
+      recordStake: true,
+      targetLegs: 1,
+    });
+  }, { success: "Zapisano pojedynczy zakład i pobrano stawkę z bankrolla", onDone: () => setSingleBetPrediction(null) });
 
   const delScan = useAction((id: string) => deleteRow("scan_runs", id), {
     success: "Usunięto skan",
@@ -505,10 +535,61 @@ function Mecze() {
                                   </div>
                                   <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                                     <div><div className="text-xs text-muted-foreground">Prawdopodobieństwo</div><strong>{p.probability == null ? "Brak" : Number(p.probability).toFixed(1) + "%"}</strong></div>
-                                    <div><div className="text-xs text-muted-foreground">Kurs bukmachera</div><strong>{fmtOdds(p.odds)}</strong></div>
+                                    <div><div className="text-xs text-muted-foreground">Kurs wybranego typu</div><strong>{fmtOdds(p.odds)}{p.odds != null && asObject(p.data_coverage).odds_bookmaker ? ` · ${String(asObject(p.data_coverage).odds_bookmaker)}` : ""}</strong></div>
                                     <div><div className="text-xs text-muted-foreground">Pewność</div><strong>{p.confidence ?? "—"}</strong></div>
                                     <div><div className="text-xs text-muted-foreground">Rozliczenie</div><strong>{p.settlement_status}</strong></div>
                                   </div>
+                                  {(() => {
+                                    const linked = couponLegs.filter((leg) => leg.prediction_id === p.id)
+                                      .map((leg) => ({ leg, coupon: coupons.find((item) => item.id === leg.coupon_id) }))
+                                      .filter((item) => item.coupon);
+                                    return linked.length ? (
+                                      <div className="mt-3 grid gap-2">
+                                        {linked.map(({ leg, coupon }) => {
+                                          if (!coupon) return null;
+                                          const stake = coupon.stake == null ? null : Number(coupon.stake);
+                                          const single = coupon.target_legs === 1;
+                                          const realized = coupon.status === "won" && stake != null && coupon.potential_return != null
+                                            ? Number(coupon.potential_return) - stake
+                                            : coupon.status === "lost" && stake != null ? -stake
+                                            : coupon.status === "void" ? 0 : null;
+                                          const possible = single && coupon.status === "pending" && stake != null && leg.odds != null
+                                            ? stake * (Number(leg.odds) - 1) : null;
+                                          return (
+                                            <div key={leg.id} className="rounded-md border border-border bg-secondary/30 p-2 text-xs">
+                                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <span className="font-semibold">{single ? "Twój singiel" : "Zakład w kuponie AKO"}</span>
+                                                <Badge variant={coupon.status === "won" ? "success" : coupon.status === "lost" ? "danger" : coupon.status === "pending" ? "warning" : "muted"}>{coupon.status === "won" ? "Wygrany" : coupon.status === "lost" ? "Przegrany" : coupon.status === "void" ? "Zwrot" : "W grze"}</Badge>
+                                              </div>
+                                              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+                                                <span>Kurs: <strong className="text-foreground">{fmtOdds(leg.odds ?? p.odds)}</strong></span>
+                                                <span>Stawka: <strong className="text-foreground">{stake == null ? "—" : fmtMoney(stake)}</strong></span>
+                                                {realized != null && <span>Wynik: <strong className={realized > 0 ? "text-success" : realized < 0 ? "text-destructive" : "text-foreground"}>{realized > 0 ? "+" : ""}{fmtMoney(realized)}</strong></span>}
+                                                {possible != null && <span>Możliwy zysk: <strong className="text-success">+{fmtMoney(possible)}</strong></span>}
+                                                {single && coupon.status === "pending" && stake != null && <span>Możliwa strata: <strong className="text-destructive">−{fmtMoney(stake)}</strong></span>}
+                                                {!single && <span>Wynik finansowy po rozliczeniu całego kuponu</span>}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : null;
+                                  })()}
+                                  {p.verdict === "WYBRANY" && (
+                                    <div className="mt-3">
+                                      <Button size="sm" className="w-full" disabled={p.odds == null || Number(p.odds) <= 1} onClick={() => { setSingleBetStake("2"); setSingleBetPrediction(p); }}>
+                                        {p.odds == null ? "Brak kursu — zakład niedostępny" : "Zapisz jako pojedynczy zakład"}
+                                      </Button>
+                                      {p.odds == null && (
+                                        <div className="mt-2 grid gap-2">
+                                          <p className="text-[11px] text-muted-foreground">Nie zapisujemy zakładu bez potwierdzonego kursu bukmachera.</p>
+                                          {(p.verdict === "WYBRANY" || (p.rejection_reason ?? "").includes("Brak potwierdzonego kursu")) && (
+                                            <Button size="sm" variant="outline" onClick={() => setOddsFor(m.id)}>Wprowadź kurs z Bwin / innego bukmachera</Button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                   {(() => {
                                     const coverage = asObject(p.data_coverage);
                                     const homeForm = asTeamForm(coverage.home_form);
@@ -527,7 +608,9 @@ function Mecze() {
                                               <Badge variant="outline">Goście: {Number(coverage.expected_away_goals).toFixed(2)}</Badge>
                                             </div>
                                           )}
-                                          {coverage.xg_used === false && <p className="mt-2 text-[11px] text-muted-foreground">W tej prognozie nie było dostępnych danych xG — uzasadnienie opiera się na wynikach i formie.</p>}
+                                          {coverage.xg_used === true
+                                            ? <p className="mt-2 text-[11px] text-muted-foreground">Analiza uwzględnia również jakość sytuacji bramkowych (xG), jeśli dane były dostępne.</p>
+                                            : <p className="mt-2 text-[11px] text-muted-foreground">Dla tego meczu nie było wiarygodnych danych xG — prognoza opiera się na wynikach, skuteczności i formie obu drużyn.</p>}
                                         </div>
                                         <div>
                                           <div className="mb-2 text-sm font-semibold">Ostatnie 5 meczów każdej drużyny</div>
@@ -565,6 +648,42 @@ function Mecze() {
         matches={matches}
         defaultPredictionId={preds.find((prediction) => prediction.match_id === oddsFor && isActivePredictionVersion(prediction.model_version))?.id}
       />
+      <Dialog open={singleBetPrediction != null} onOpenChange={(open) => { if (!open) setSingleBetPrediction(null); }}>
+        <DialogContent className="bg-card">
+          <DialogHeader><DialogTitle className="font-display text-xl uppercase">Zapisz pojedynczy zakład</DialogTitle></DialogHeader>
+          {singleBetPrediction && (() => {
+            const match = matches.find((item) => item.id === singleBetPrediction.match_id);
+            const stake = parseDecimal(singleBetStake);
+            const oddsValue = Number(singleBetPrediction.odds);
+            const potentialReturn = stake != null && stake > 0 ? stake * oddsValue : null;
+            return (
+              <div className="grid gap-3">
+                <div className="rounded-md border border-border bg-secondary/30 p-3">
+                  <div className="font-semibold">{match ? matchLabel(match) : "Mecz"}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">{singleBetPrediction.market} · {singleBetPrediction.selection}</div>
+                  <div className="mt-2 text-sm">Kurs zapisany: <strong className="num">{fmtOdds(singleBetPrediction.odds)}</strong></div>
+                </div>
+                <label className="grid gap-1 text-sm">
+                  <span className="font-medium">Stawka (€)</span>
+                  <Input inputMode="decimal" className="num" value={singleBetStake} onChange={(event) => setSingleBetStake(event.target.value)} placeholder="np. 2,00" />
+                </label>
+                {potentialReturn != null && (
+                  <div className="rounded-md bg-secondary/40 p-3 text-sm">
+                    <div className="flex justify-between"><span>Potencjalny zwrot</span><strong className="num">{fmtMoney(potentialReturn)}</strong></div>
+                    <div className="mt-1 flex justify-between"><span>Potencjalny zysk</span><strong className="num text-success">+{fmtMoney(potentialReturn - stake!)}</strong></div>
+                    <div className="mt-1 flex justify-between"><span>Możliwa strata</span><strong className="num text-destructive">−{fmtMoney(stake!)}</strong></div>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">Zapis utworzy kupon pojedynczy, zapisze dokładny kurs i odejmie stawkę od bankrolla. Wynik i zysk/strata zostaną rozliczone po potwierdzeniu wyniku meczu.</p>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setSingleBetPrediction(null)}>Anuluj</Button>
+            <Button type="button" disabled={saveSingleBet.isPending || parseDecimal(singleBetStake) == null || Number(parseDecimal(singleBetStake)) <= 0} onClick={() => saveSingleBet.mutate(undefined)}>{saveSingleBet.isPending ? "Zapisywanie…" : "Zapisz zakład"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <SettleMatchDialog match={settle} onClose={() => setSettle(null)} />
     </div>
   );

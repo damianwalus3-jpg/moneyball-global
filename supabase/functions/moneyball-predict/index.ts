@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-const S="https://gzgeklcukrclgwbsmbsp.supabase.co",K=Deno.env.get("SUPABASE_ANON_KEY")||"",V="MONEYBALL GLOBAL 3.8";
+const S="https://gzgeklcukrclgwbsmbsp.supabase.co",K=Deno.env.get("SUPABASE_ANON_KEY")||"",SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"",V="MONEYBALL GLOBAL 3.8";
+let CRON_FALLBACK_TOKEN="",CRON_JWT_TOKEN="";
 const C={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-requested-with, prefer, cache-control, pragma","Access-Control-Allow-Methods":"POST, GET, OPTIONS","Access-Control-Max-Age":"86400","Vary":"Origin"};
 const out=(x:any,n=200)=>new Response(JSON.stringify(x),{status:n,headers:{...C,"Content-Type":"application/json"}});
 
@@ -15,7 +16,7 @@ function isEuropeanFixture(country: unknown, competition: unknown, home?: unknow
  return false;
 }
 
-async function db(p:string,t:string,m="GET",b?:any,prefer="return=representation"){const r=await fetch(S+"/rest/v1/"+p,{method:m,headers:{apikey:K,Authorization:"Bearer "+t,"Content-Type":"application/json",Prefer:prefer},body:b===undefined?undefined:JSON.stringify(b)});const s=await r.text();let j:any;try{j=s?JSON.parse(s):null}catch{j=s}if(!r.ok)throw Error(j?.message||j?.details||"DB HTTP "+r.status);return j;}
+async function db(p:string,t:string,m="GET",b?:any,prefer="return=representation"){const r=await fetch(S+"/rest/v1/"+p,{method:m,headers:{apikey:K,Authorization:"Bearer "+(t===SERVICE_KEY?CRON_JWT_TOKEN:t),...(t===SERVICE_KEY?{"x-cron-token":CRON_FALLBACK_TOKEN}:{}),"Content-Type":"application/json",Prefer:prefer},body:b===undefined?undefined:JSON.stringify(b)});const s=await r.text();let j:any;try{j=s?JSON.parse(s):null}catch{j=s}if(!r.ok)throw Error(j?.message||j?.details||"DB HTTP "+r.status);return j;}
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
 function normTeam(v:any){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\b(fc|cf|sc|ac|afc|club)\b/g," ").replace(/\b(wfc|women|w)\b/g," women ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");}
 function fixtureTeamKey(v:any){const key=normTeam(v);const aliases:Record<string,string>={"turkiye":"turkey"};return aliases[key]||key;}
@@ -95,6 +96,63 @@ async function readFootyNomadForm(id:string,expectedHome:string,expectedAway:str
   return {home:h,away:a,source:"FOOTYNOMAD_LAST5"};
  }catch(_){return null;}
 }
+
+function fotbalSlug(value:string){
+ return String(value||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase()
+  .replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
+}
+const FOTBAL_COUNTRY_SLUGS:Record<string,string>={SVN:"slovenia",SLO:"slovenia",SVK:"slovakia",CZE:"czechia",ROU:"romania",GER:"germany",DEU:"germany",ENG:"england",SCO:"scotland",NIR:"northern-ireland",WAL:"wales",IRL:"ireland",BEL:"belgium",NED:"netherlands",NLD:"netherlands",ESP:"spain",FRA:"france",ITA:"italy",POR:"portugal",PRT:"portugal",AUT:"austria",SUI:"switzerland",CHE:"switzerland",POL:"poland",CRO:"croatia",SRB:"serbia",HUN:"hungary",TUR:"turkey",UKR:"ukraine",NOR:"norway",SWE:"sweden",DEN:"denmark",DNK:"denmark",FIN:"finland",GRE:"greece",GRC:"greece",BUL:"bulgaria"};
+function fotbalTeamSlug(team:string){
+ let s=fotbalSlug(team).replace(/^(nk|fc|fk|ac|afc|sc|sv|club)-/,"");
+ const aliases:Record<string,string>={"primorje-ajdovscina":"primorje","nk-jesenice":"jesenice","nk-primorje":"primorje"};
+ return aliases[s]||s;
+}
+function parseFotbalFormSection(markdown:string,kickoff:string){
+ const heading="Meciuri recente, de la cel mai vechi la cel mai recent, în ultimele 5 meciuri.";
+ const sections=String(markdown||"").split(heading).slice(1,3);
+ const cutoff=String(kickoff||"").slice(0,10),target=new Date(cutoff+"T12:00:00Z");
+ if(!Number.isFinite(target.getTime()))return [];
+ return sections.map((section:string)=>{
+  const body=section.split("Victorii–egaluri–înfrângeri")[0];
+  const games:any[]=[];
+  for(const line of body.split(/\\r?\\n/)){
+   if(!/^\\s*\\*/.test(line))continue;
+   const plain=line.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g," $1 ").replace(/\\*\\*/g," ").replace(/\\*/g," ").replace(/\\s+/g," ").trim();
+   const match=plain.match(/^(\\d{1,2})\\.(\\d{1,2})\\s+([DA])\\s+(.+?)\\s+(\\d{1,2})\\s*[–−-]\\s*(\\d{1,2})\\s+([VEÎ])$/i);
+   if(!match)continue;
+   const day=Number(match[1]),month=Number(match[2]),location=match[3],opponent=match[4].trim(),first=Number(match[5]),second=Number(match[6]);
+   let year=target.getUTCFullYear();if(month>target.getUTCMonth()+1||(month===target.getUTCMonth()+1&&day>target.getUTCDate()))year--;
+   const date=new Date(Date.UTC(year,month-1,day)).toISOString().slice(0,10);
+   if(date>=cutoff)continue;
+   const isHome=location==="A",gf=isHome?first:second,ga=isHome?second:first;
+   games.push({date,opponent,goals_for:gf,goals_against:ga,result:gf>ga?"W":gf<ga?"L":"D"});
+  }
+  const last10=games.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
+  if(last10.length<3)return null;
+  const w=last10.filter(x=>x.result==="W").length,d=last10.filter(x=>x.result==="D").length,l=last10.filter(x=>x.result==="L").length;
+  return {matches:last10.length,w,d,l,points:w*3+d,goals_for:last10.reduce((s,x)=>s+x.goals_for,0),goals_against:last10.reduce((s,x)=>s+x.goals_against,0),last10,source:"FOTBALINFO_PREMATCH"};
+ }).filter(Boolean);
+}
+async function readFotbalInfoForm(m:any){
+ try{
+  const countryRaw=String(m.country||"").trim(),country=FOTBAL_COUNTRY_SLUGS[countryRaw.toUpperCase()]||fotbalSlug(countryRaw);
+  const competition=String(m.competition||m.league||"").trim();
+  if(!country||!competition||!m.kickoff_at)return null;
+  const league=fotbalSlug(competition),date=String(m.kickoff_date||m.kickoff_at).slice(0,10);
+  const home=fotbalTeamSlug(String(m.home_team)),away=fotbalTeamSlug(String(m.away_team));
+  if(!home||!away||!/^\d{4}-\d{2}-\d{2}$/.test(date))return null;
+  const url="https://www.fotbalinfo.ro/"+country+"-"+league+"/"+date+"/"+home+"-"+away;
+  // Direct requests from the edge region time out on FotbalInfo; use its public text-reader endpoint.
+  const response=await fetch("https://r.jina.ai/"+url,{headers:{"User-Agent":"Mozilla/5.0 MoneyballGlobal/3.8","Accept":"text/plain"},signal:AbortSignal.timeout(14000)});
+  if(!response.ok)return null;
+  const markdown=await response.text();
+  if(!markdown.toLowerCase().includes(String(m.home_team).toLowerCase())||!markdown.toLowerCase().includes(String(m.away_team).toLowerCase()))return null;
+  const forms=parseFotbalFormSection(markdown,date);
+  if(forms.length!==2)return null;
+  return {home:forms[0],away:forms[1],source:"FOTBALINFO_PREMATCH",fixture_url:url,fetched_at:new Date().toISOString()};
+ }catch(_){return null;}
+}
+
 function xgoalsSlug(value:string){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");}
 async function readXgoalsTeamForm(team:string,country:string,kickoff:string){
  try{
@@ -258,6 +316,7 @@ function historyModel(home:string,away:string,kickoff:string,history:any[],footy
   else if(hs.source==="ESPN_WOMEN_LAST10"||as.source==="ESPN_WOMEN_LAST10")source="ESPN_WOMEN_LAST10";
   else if(hs.source==="ESPN_FORM_LAST5"||as.source==="ESPN_FORM_LAST5")source="ESPN_FORM_LAST5";
    else if(hs.source==="OPENMATCHDAY_LAST10"||as.source==="OPENMATCHDAY_LAST10")source="OPENMATCHDAY_LAST10";
+  else if(hs.source==="FOTBALINFO_PREMATCH"||as.source==="FOTBALINFO_PREMATCH")source="FOTBALINFO_PREMATCH";
   else if(hs.source==="VERIFIED_MATCH_HISTORY"&&as.source==="VERIFIED_MATCH_HISTORY")source="VERIFIED_MATCH_HISTORY";
   else if(footyForm)source="FOOTYNOMAD_LAST5";
   else if(hn>0||an>0)source="PARTIAL_VERIFIED_HISTORY";
@@ -349,12 +408,28 @@ function githubTeamForm(team:string,kickoff:string,data:any,xgData:any=null,gend
 Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{headers:C});try{
  if(req.method==="GET")return out({ok:true,model:V,provider:"Keyless OpenMatchday/OpenFootball + OpenPlay xG + StatsBomb Open Data xG + American Soccer Analysis xG + BeyondELO + verified results + FootyNomad + fresh market probabilities",apiFootballDisabled:true});
  if(req.method!=="POST")return out({error:"POST required"},405);
- const token=req.headers.get("Authorization")?.replace("Bearer ","");if(!token)throw Error("Zaloguj się ponownie.");
- const jwtParts=token.split(".");
- const jwtPayload=jwtParts.length>1?JSON.parse(atob(jwtParts[1].replace(/-/g,"+").replace(/_/g,"/"))):{};
- const ownerId=String(jwtPayload.sub||"");
- if(!ownerId)throw Error("Nie można odczytać właściciela sesji.");
- const body=await req.json().catch(()=>({})),date=String(body.date||new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())),analysisOffset=Math.max(0,Math.floor(Number(body.offset)||0));
+ const body=await req.json().catch(()=>({}));
+ let token=req.headers.get("Authorization")?.replace("Bearer ","")||"";
+ const requestToken=token;
+ let ownerId="";
+ const cronToken=req.headers.get("x-cron-token")||"";
+ CRON_FALLBACK_TOKEN=cronToken;
+ CRON_JWT_TOKEN=requestToken;
+ if(cronToken){
+  if(!SERVICE_KEY)throw Error("Brak konfiguracji bezpiecznego klucza serwisowego.");
+  const check=await fetch(S+"/rest/v1/rpc/moneyball_cron_token_valid",{method:"POST",headers:{apikey:K,Authorization:"Bearer "+requestToken,"Content-Type":"application/json"},body:JSON.stringify({p_token:cronToken})});
+  if(!check.ok||(await check.json())!==true)throw Error("Nieprawidłowy token harmonogramu.");
+  ownerId=String(body.owner_id||"");
+  if(!ownerId)throw Error("Brak właściciela dla automatycznego skanu.");
+  token=SERVICE_KEY;
+ }else{
+  if(!token)throw Error("Zaloguj się ponownie.");
+  const jwtParts=token.split(".");
+  const jwtPayload=jwtParts.length>1?JSON.parse(atob(jwtParts[1].replace(/-/g,"+").replace(/_/g,"/"))):{};
+  ownerId=String(jwtPayload.sub||"");
+  if(!ownerId)throw Error("Nie można odczytać właściciela sesji.");
+ }
+ const date=String(body.date||new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date())),analysisOffset=Math.max(0,Math.floor(Number(body.offset)||0));
  const horizonDate=new Date(date+"T12:00:00Z");horizonDate.setUTCDate(horizonDate.getUTCDate()+6);const endDate=horizonDate.toISOString().slice(0,10);const afterEnd=new Date(endDate+"T12:00:00Z");afterEnd.setUTCDate(afterEnd.getUTCDate()+1);const afterEndDate=afterEnd.toISOString().slice(0,10);const all=await db("matches?select=id,owner_id,scan_run_id,external_id,source,competition,league,country,gender,home_team,away_team,kickoff_at,kickoff_date,status&owner_id=eq."+encodeURIComponent(ownerId)+"&or=(and(kickoff_at.gte."+encodeURIComponent(date+"T00:00:00Z")+",kickoff_at.lt."+encodeURIComponent(afterEndDate+"T00:00:00Z")+"),and(kickoff_at.is.null,kickoff_date.gte."+date+",kickoff_date.lte."+endDate+"))&order=kickoff_at.asc&limit=30&offset="+analysisOffset,token);
  const dateFromExternalId=(m:any)=>/:(\d{4}-\d{2}-\d{2}):/.exec(String(m.external_id||""))?.[1]||null;
   const matchDate=(m:any)=>m.kickoff_at?new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(m.kickoff_at)):(String(m.kickoff_date||"").slice(0,10)||dateFromExternalId(m));
@@ -365,6 +440,8 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  const history=historyTimed||[];
  const footyCacheRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FootyNomad",token).catch(()=>[]);
  const footyCacheMap=new Map((footyCacheRows||[]).map((row:any)=>[row.match_id,row.provider_data]));
+ const fotbalCacheRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FotbalInfo",token).catch(()=>[]);
+ const fotbalCacheMap=new Map((fotbalCacheRows||[]).map((row:any)=>[row.match_id,row.provider_data]));
  const footyForms=new Map<string,any>(),formCandidates:any[]=[];
  for(const m of matches){
   if(!["scheduled","unknown"].includes(m.status)||!m.kickoff_at||new Date(m.kickoff_at).getTime()<=Date.now()||m.source!=="FootyNomad"||!/^\d+$/.test(String(m.external_id||"")))continue;
@@ -380,10 +457,15 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   }
   return {id:m.id,form};
  });
- const publicForms=await readPublicSourceForms(date,token);
+ const publicForms=await readPublicSourceForms(date,requestToken);
  const githubPublic=await readGitHubPublicTeamHistory();
  const openPlayXg=await readOpenPlayXgData();
  const marketRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI",token);const marketMap=new Map((marketRows||[]).map((x:any)=>[x.match_id,x.provider_data]));
+ const providerOddsRows=matches.length?await db("provider_odds?select=match_id,mapped_market,mapped_selection,odds,bookmaker,provider,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&suspended=eq.false&phase=eq.prematch&captured_at=gte."+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+"&mapped_market=not.is.null&mapped_selection=not.is.null&match_id=in.("+matches.map((x:any)=>x.id).join(",")+")&order=captured_at.desc",token).catch(()=>[]):[];
+ const providerOddsMap=new Map<string,any>();
+ for(const quote of providerOddsRows||[]){const key=String(quote.match_id)+"|"+String(quote.mapped_market)+"|"+String(quote.mapped_selection);if(!providerOddsMap.has(key)&&Number(quote.odds)>1)providerOddsMap.set(key,quote);}
+ const americanToDecimal=(value:any)=>{const n=Number(value);if(!Number.isFinite(n)||n===0)return null;return +(n>0?1+n/100:1+100/Math.abs(n)).toFixed(3);};
+
  if(!matches.length)return out({ok:true,date,total:0,created:0,updated:0,selected:0,message:"Brak zaplanowanych meczów w bazie."});
  // Add a no-key public score-history fallback for teams missing recent verified results.
  const xgoalsTeamForms=new Map<string,any>(),xgoalsCandidates=new Map<string,{team:string,country:string,kickoff:string}>();
@@ -396,13 +478,29 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  }
  const xgoalsResults=await limitedSettled([...xgoalsCandidates.values()].slice(0,8),2,async(item)=>({key:normTeam(item.team),form:await readXgoalsTeamForm(item.team,item.country,item.kickoff)}));
  for(const item of xgoalsResults)if(item.status==="fulfilled"&&item.value.form)xgoalsTeamForms.set(item.value.key,item.value.form);
+ const fotbalForms=new Map<string,any>(),fotbalCandidates:any[]=[];
+ for(const m of matches){
+  if(!["scheduled","unknown"].includes(String(m.status||""))||!m.kickoff_at||new Date(m.kickoff_at).getTime()<=Date.now())continue;
+  const cached=fotbalCacheMap.get(m.id),age=cached?.fetched_at?Date.now()-Date.parse(cached.fetched_at):Infinity;
+  if(cached?.source==="FOTBALINFO_PREMATCH"&&age>=0&&age<6*60*60*1000&&cached.home&&cached.away)fotbalForms.set(m.id,cached);
+  else fotbalCandidates.push(m);
+ }
+ const fotbalResults=await limitedSettled(fotbalCandidates.slice(0,24),6,async(m:any)=>{
+  const form=await readFotbalInfoForm(m);
+  if(form)await db("match_market_data?on_conflict=owner_id,match_id,source",token,"POST",{owner_id:ownerId,match_id:m.id,source:"FotbalInfo",provider_data:form,captured_at:form.fetched_at},"resolution=merge-duplicates,return=minimal").catch((e:any)=>console.error("FotbalInfo cache write failed:",String(e)));
+  return {id:m.id,form};
+ });
+ for(const item of fotbalResults)if(item.status==="fulfilled"&&item.value.form)fotbalForms.set(item.value.id,item.value.form);
  const tipsAudit=await readTipsAuditFairMarket(date,matches);
  const rows:any[]=[];let covered=0,missing=0;
  for(const m of matches){
   const market:any=marketMap.get(m.id)||tipsAudit.byMatch.get(m.id);let model:any=null,coverage:any={market_odds:false,elo:false,verified_history:false};
   if(market?.market_probabilities){const mp=market.market_probabilities,stamp=Date.parse(String(market.captured_at||market.provider_data?.captured_at||"")),fresh=Number.isFinite(stamp)&&Date.now()-stamp>=0&&Date.now()-stamp<=48*60*60*1000,vals=[Number(mp.home),Number(mp.draw),Number(mp.away)],sum=vals.reduce((a,b)=>a+b,0);if(fresh&&vals.every(x=>Number.isFinite(x)&&x>0)&&sum>0){model={p1:+(vals[0]/sum*100).toFixed(1),px:+(vals[1]/sum*100).toFixed(1),p2:+(vals[2]/sum*100).toFixed(1),coverage:market.market_source==="TIPSAUDIT_FAIR_MARKET"?75:80,market:true,source:market.market_source||"VERIFIED_MARKET_DATA"};coverage={market_odds:true,market_source:market.market_source||"VERIFIED_MARKET_DATA",books:market.books||null,league:market.league||null,market_captured_at:market.captured_at||market.provider_data?.captured_at,fair_odds:market.fair_odds||null,fair_source_url:market.fair_source_url||null,market_reference_best_soft_odds:market.market_reference_best_soft_odds||null,market_reference_bookmaker:market.market_reference_bookmaker||null,market_reference_selection:market.market_reference_selection||null,market_feed_generated_at:market.generated_at||null};}}
   if(!model){
-   const modelKickoff=String(m.kickoff_at||`${matchDate(m)}T00:00:00.000Z`);const isWomen=String(m.gender||"").toLowerCase()==="women";const githubHome=githubTeamForm(String(m.home_team),modelKickoff,githubPublic,openPlayXg,String(m.gender||"unknown")),githubAway=githubTeamForm(String(m.away_team),modelKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));const githubForm={home:githubHome,away:githubAway,source:"KEYLESS_GITHUB_LAST10"};const publicMatchForm=publicFormForMatch(m,publicForms);const knownGender=["men","women"].includes(String(m.gender||"").toLowerCase());const homeElo=knownGender&&!isWomen?findEloRating(String(m.home_team),publicForms.eloByTeam||new Map()):null,awayElo=knownGender&&!isWomen?findEloRating(String(m.away_team),publicForms.eloByTeam||new Map()):null;const xgoalsHome=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.home_team)):null,xgoalsAway=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.away_team)):null;const homeSupplement={...(publicMatchForm?.home||{}),...(githubForm.home||{}),...(xgoalsHome||{})},awaySupplement={...(publicMatchForm?.away||{}),...(githubForm.away||{}),...(xgoalsAway||{})};if(homeElo)Object.assign(homeSupplement,{elo:Number(homeElo.elo),rd:Number(homeElo.rd),hfa:Number(homeElo.hfa),elo_as_of:homeElo.as_of});if(awayElo)Object.assign(awaySupplement,{elo:Number(awayElo.elo),rd:Number(awayElo.rd),hfa:Number(awayElo.hfa),elo_as_of:awayElo.as_of});const supplemental={home:Object.keys(homeSupplement).length?homeSupplement:null,away:Object.keys(awaySupplement).length?awaySupplement:null,source:xgoalsHome||xgoalsAway?"XGOALSPRO_PUBLIC_RESULTS":githubForm.home||githubForm.away?githubForm.source:publicMatchForm?.source||"OPENMATCHDAY_LAST10"};
+   const modelKickoff=String(m.kickoff_at||`${matchDate(m)}T00:00:00.000Z`);const isWomen=String(m.gender||"").toLowerCase()==="women";const githubHome=githubTeamForm(String(m.home_team),modelKickoff,githubPublic,openPlayXg,String(m.gender||"unknown")),githubAway=githubTeamForm(String(m.away_team),modelKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));const githubForm={home:githubHome,away:githubAway,source:"KEYLESS_GITHUB_LAST10"};const publicMatchForm=publicFormForMatch(m,publicForms);const knownGender=["men","women"].includes(String(m.gender||"").toLowerCase());const homeElo=knownGender&&!isWomen?findEloRating(String(m.home_team),publicForms.eloByTeam||new Map()):null,awayElo=knownGender&&!isWomen?findEloRating(String(m.away_team),publicForms.eloByTeam||new Map()):null;const xgoalsHome=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.home_team)):null,xgoalsAway=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.away_team)):null;const homeSupplement={...(publicMatchForm?.home||{}),...(githubForm.home||{}),...(xgoalsHome||{})},awaySupplement={...(publicMatchForm?.away||{}),...(githubForm.away||{}),...(xgoalsAway||{})};if(homeElo)Object.assign(homeSupplement,{elo:Number(homeElo.elo),rd:Number(homeElo.rd),hfa:Number(homeElo.hfa),elo_as_of:homeElo.as_of});if(awayElo)Object.assign(awaySupplement,{elo:Number(awayElo.elo),rd:Number(awayElo.rd),hfa:Number(awayElo.hfa),elo_as_of:awayElo.as_of});const fotbalInfoForm=fotbalForms.get(m.id);
+   if(fotbalInfoForm?.home)Object.assign(homeSupplement,fotbalInfoForm.home);
+   if(fotbalInfoForm?.away)Object.assign(awaySupplement,fotbalInfoForm.away);
+   const supplemental={home:Object.keys(homeSupplement).length?homeSupplement:null,away:Object.keys(awaySupplement).length?awaySupplement:null,source:fotbalInfoForm?"FOTBALINFO_PREMATCH":xgoalsHome||xgoalsAway?"XGOALSPRO_PUBLIC_RESULTS":githubForm.home||githubForm.away?githubForm.source:publicMatchForm?.source||"OPENMATCHDAY_LAST10"};
    model=historyModel(m.home_team,m.away_team,modelKickoff,history||[],footyForms.get(m.id)||null,supplemental,String(m.gender||"unknown"));
    coverage={verified_history:model.source==="VERIFIED_MATCH_HISTORY",partial_verified_history:model.source==="PARTIAL_VERIFIED_HISTORY",baseline_only:model.source==="BASELINE_ONLY",footynomad_last5:model.footyForm,openmatchday_last10:model.source==="OPENMATCHDAY_LAST10",espn_women_last10:model.espnWomenForm,keyless_github_last10:githubForm.source==="KEYLESS_GITHUB_LAST10"&&!!(githubForm.home||githubForm.away),xgoals_public_results:!!(xgoalsHome||xgoalsAway),xgoals_home_matches:xgoalsHome?.matches||0,xgoals_away_matches:xgoalsAway?.matches||0,statsbomb_open_data:(model.xg_sources||[]).some((x:string)=>String(x).toLowerCase().includes("statsbomb")),statsbomb_xg_used:!!model.xg_used&&(model.xg_sources||[]).some((x:string)=>String(x).toLowerCase().includes("statsbomb")),openplay_xg_used:!!model.xg_used&&(model.xg_sources||[]).some((x:string)=>String(x).toLowerCase().includes("openplay")),asa_xg_used:!!model.xg_used&&(model.xg_sources||[]).some((x:string)=>String(x).toLowerCase().includes("american_soccer_analysis")),historical_xg_used:!!model.xg_used,historical_xg_sources:model.xg_sources||[],calibration_temperature:model.calibration_temperature||1,calibration_method:model.calibration_method||"none",elo_used:model.elo_used,home_elo:model.elo_home,away_elo:model.elo_away,elo_diff:model.elo_diff,elo_weight:model.elo_weight,elo_as_of:model.elo_as_of,elo_ratings_count:publicForms.eloMeta?.ratings_count||0,github_data_generated_at:githubPublic.generated_at||null,github_data_coverage:githubPublic.coverage||null,openplay_xg_generated_at:openPlayXg.openplay_generated_at||null,statsbomb_xg_generated_at:openPlayXg.statsbomb_generated_at||null,asa_xg_generated_at:openPlayXg.asa_generated_at||null,xg_data_coverage:openPlayXg.coverage||null,historical_xg_home_matches:model.xg_home_matches||0,historical_xg_away_matches:model.xg_away_matches||0,openplay_xg_home_matches:model.xg_home_source_counts?.openplay||0,openplay_xg_away_matches:model.xg_away_source_counts?.openplay||0,statsbomb_xg_home_matches:model.xg_home_source_counts?.statsbomb_open_data||0,statsbomb_xg_away_matches:model.xg_away_source_counts?.statsbomb_open_data||0,asa_xg_home_matches:model.xg_home_source_counts?.american_soccer_analysis||0,asa_xg_away_matches:model.xg_away_source_counts?.american_soccer_analysis||0,home_form:model.home_form,away_form:model.away_form,method:model.method};
    model.history=model.source!=="BASELINE_ONLY";
@@ -416,11 +514,21 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    const reasonBase=model.market?(model.source==="TIPSAUDIT_FAIR_MARKET"?"Prawdopodobieństwa fair bez marży z aktualnego rynku TipsAudit; kursy fair nie są ofertą bukmachera. Źródło: https://tipsaudit.com":"Rzeczywiste prawdopodobieństwa rynkowe dostawcy."):model.source==="BEYONDELO_ONLY"?"Prognoza oparta na ratingach Elo obu klubów z publicznego źródła BeyondELO; brak wystarczającej historii formy, więc typ jest odrzucony.":model.source==="STATSBOMB_OPEN_DATA"?"Forma z publicznych danych StatsBomb Open Data; zakres rozgrywek jest selektywny i historyczny.":model.source==="AMERICAN_SOCCER_ANALYSIS"?"Forma i historyczne xG z publicznego American Soccer Analysis; dane obejmują wybrane ligi Ameryki Północnej.":model.source==="KEYLESS_GITHUB_LAST10"?"Model Poissona na podstawie ostatnich maksymalnie 10 wyników z publicznych baz GitHub: OpenMatchday i OpenFootball.":model.source==="ESPN_WOMEN_LAST10"?"Model Poissona na podstawie ostatnich dostępnych wyników ligi kobiecej z publicznych scoreboardów ESPN.":model.source==="ESPN_FORM_LAST5"?"Model formy W/D/L na podstawie ostatnich pięciu wyników widocznych w publicznym scoreboardzie ESPN; bez dopisywania nieudostępnionych goli ani xG.":model.history?"Szacunek Moneyball na podstawie zweryfikowanej historii i formy z publicznych baz. Nie jest to kurs bukmachera ani gwarancja.":"Neutralny prior techniczny bez danych o formie; zapisany wyłącznie jako ODRZUCONY.";const xgNote=model.market?"":model.xg_used?` Uwzględniono świeże historyczne xG ze źródeł: ${(model.xg_sources||[]).join(", ")}.`:" Nie wykorzystano xG: brak co najmniej 3 świeżych meczów z xG dla obu drużyn.";const calibrationNote=model.calibration_temperature&&model.calibration_temperature!==1?` Prawdopodobieństwa skalowano temperaturą ${model.calibration_temperature.toFixed(2)}.`:"";const reason=reasonBase+xgNote+calibrationNote+(model.elo_used&&model.source!=="BEYONDELO_ONLY"?` Rating Elo: ${model.elo_home}–${model.elo_away} (różnica ${model.elo_diff}), snapshot ${model.elo_as_of}.`:"");
   for(const p of preds){
    const futureEligible=!!m.kickoff_at&&["scheduled","unknown"].includes(m.status)&&new Date(m.kickoff_at).getTime()>Date.now();
-   const verdict=futureEligible&&bothTeamsCovered&&model.source!=="BASELINE_ONLY"&&p.probability>75&&model.coverage>=55?"WYBRANY":"ODRZUCONY";
-   const rejectionReason=verdict==="WYBRANY"?null:!m.kickoff_at?"Brak potwierdzonej godziny rozpoczęcia meczu.":!["scheduled","unknown"].includes(String(m.status||""))?"Mecz jest w trakcie, zakończony lub ma nieaktywny status.":new Date(m.kickoff_at).getTime()<=Date.now()?"Mecz już się rozpoczął.":!bothTeamsCovered?"Brak minimum 3 zweryfikowanych ostatnich meczów dla obu drużyn.":model.source==="BASELINE_ONLY"?"Dostępny jest wyłącznie model bazowy bez potwierdzonej formy.":p.probability==null||p.probability<75?"Prawdopodobieństwo poniżej wymaganego progu 75%.":Number(model.coverage||0)<55?"Pokrycie danych modelu poniżej 55%.":"Nie spełniono warunków zatwierdzenia.";
+   const providerQuote=providerOddsMap.get(m.id+"|"+p.market+"|"+p.selection);
+   const tipsOdds=coverage.market_source==="TIPSAUDIT_FAIR_MARKET"&&coverage.market_reference_selection===p.selection&&Number(coverage.market_reference_best_soft_odds)>1?Number(coverage.market_reference_best_soft_odds):null;
+   const marketPriceStamp=Date.parse(String(market?.captured_at||market?.generated_at||""));
+   const marketPriceFresh=Number.isFinite(marketPriceStamp)&&Date.now()-marketPriceStamp>=0&&Date.now()-marketPriceStamp<=48*60*60*1000;
+   const strikerAmerican=marketPriceFresh&&market?.odds?(p.selection==="1"?market.odds.home:p.selection==="X"?market.odds.draw:p.selection==="2"?market.odds.away:null):null;
+   const strikerOdds=p.market==="1X2"?americanToDecimal(strikerAmerican):null;
+   const referenceOdds=providerQuote?Number(providerQuote.odds):tipsOdds??strikerOdds;
+   const oddsSource=providerQuote?String(providerQuote.provider||"MoviOdds")+"/"+String(providerQuote.bookmaker||"bookmaker"):tipsOdds?String(coverage.market_reference_bookmaker||"TipsAudit best soft"):strikerOdds?("StrikerAPI median · "+String(market?.books||"multi")+" books"):null;
+   const verdictBase=futureEligible&&bothTeamsCovered&&model.source!=="BASELINE_ONLY"&&p.probability>75&&model.coverage>=55;
+   const verdict=verdictBase&&referenceOdds!=null&&referenceOdds>1?"WYBRANY":"ODRZUCONY";
+   const rejectionReason=verdict==="WYBRANY"?null:!m.kickoff_at?"Brak potwierdzonej godziny rozpoczęcia meczu.":!["scheduled","unknown"].includes(String(m.status||""))?"Mecz jest w trakcie, zakończony lub ma nieaktywny status.":new Date(m.kickoff_at).getTime()<=Date.now()?"Mecz już się rozpoczął.":!bothTeamsCovered?"Brak minimum 3 zweryfikowanych ostatnich meczów dla obu drużyn.":model.source==="BASELINE_ONLY"?"Dostępny jest wyłącznie model bazowy bez potwierdzonej formy.":p.probability==null||p.probability<75?"Prawdopodobieństwo poniżej wymaganego progu 75%.":Number(model.coverage||0)<55?"Pokrycie danych modelu poniżej 55%.":referenceOdds==null?"Brak potwierdzonego kursu dla tego rynku i typu — nie można zatwierdzić zakładu.":"Nie spełniono warunków zatwierdzenia.";
+   if(referenceOdds!=null){coverage.odds_source=providerQuote?.provider|| (tipsOdds?"TipsAudit":"StrikerAPI");coverage.odds_bookmaker=providerQuote?.bookmaker|| (tipsOdds?coverage.market_reference_bookmaker:"Mediana z "+String(market?.books||"wielu")+" bukmacherów");coverage.odds_captured_at=providerQuote?.captured_at||coverage.market_captured_at||market?.captured_at||null;}
    const type=p.market==="DOUBLE_CHANCE"?"DC":"1X2";
     const baseSource=model.market?(model.source==="TIPSAUDIT_FAIR_MARKET"?"TIPSAUDIT_FAIR_MARKET":"VERIFIED_MARKET_DATA"):model.source==="BASELINE_ONLY"?"NO_VERIFIED_SOURCE":model.source==="BEYONDELO_ONLY"?"BEYONDELO_ELO_ONLY":model.source==="KEYLESS_GITHUB_LAST10"?"KEYLESS_GITHUB_LAST10_FORM":model.source==="STATSBOMB_OPEN_DATA"?"STATSBOMB_OPEN_DATA_FORM":model.source==="AMERICAN_SOCCER_ANALYSIS"?"AMERICAN_SOCCER_ANALYSIS_FORM":model.source==="ESPN_WOMEN_LAST10"?"ESPN_WOMEN_LAST10_FORM":model.publicForm?"OPENMATCHDAY_LAST10_FORM":model.footyForm?"FOOTYNOMAD_LAST5_FORM":"MONEYBALL_VERIFIED_HISTORY";const xgSources=model.xg_sources||[];const xgSuffix=model.xg_used?"+HISTORICAL_XG"+(xgSources.some((x:string)=>x.toLowerCase().includes("openplay"))?"+OPENPLAY_XG":"")+(xgSources.some((x:string)=>x.toLowerCase().includes("statsbomb"))?"+STATSBOMB_XG":"")+(xgSources.some((x:string)=>x.toLowerCase().includes("american_soccer_analysis"))?"+ASA_XG":""):"";const dataSource=(model.elo_used&&model.source!=="BEYONDELO_ONLY"?baseSource+"+BEYONDELO_ELO":baseSource)+xgSuffix;
-    rows.push({owner_id:ownerId,match_id:m.id,scan_run_id:m.scan_run_id||null,model_version:V,market:p.market,selection:p.selection,pick:p.selection,prediction_type:type,selection_status:verdict,rejection_reason:rejectionReason,probability:p.probability,odds:null,confidence:hasModel&&model.source!=="BASELINE_ONLY"?String(model.coverage):null,verdict,rationale:reason,group_name:p.market==="1X2"?"MAIN":"MEGA",data_source:dataSource,data_coverage:coverage,note:JSON.stringify({source:dataSource,coverage}),settlement_status:"pending",result_status:"pending",verified:false});
+    rows.push({owner_id:ownerId,match_id:m.id,scan_run_id:m.scan_run_id||null,model_version:V,market:p.market,selection:p.selection,pick:p.selection,prediction_type:type,selection_status:verdict,rejection_reason:rejectionReason,probability:p.probability,odds:referenceOdds,confidence:hasModel&&model.source!=="BASELINE_ONLY"?String(model.coverage):null,verdict,rationale:reason,group_name:p.market==="1X2"?"MAIN":"MEGA",data_source:oddsSource||dataSource,data_coverage:{...coverage,model_source:dataSource},note:JSON.stringify({source:dataSource,odds_source:oddsSource,coverage}),settlement_status:"pending",result_status:"pending",verified:false});
   }
   // Goals are modelled independently from 1X2 market odds. Market-only records do not contain expected goals.
   const goalKickoff=String(m.kickoff_at||`${matchDate(m)}T00:00:00.000Z`);
@@ -440,9 +548,12 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    for(const [selection,prob] of goalMarkets){
     const probability=+(Number(prob)*100).toFixed(1),futureEligible=!!m.kickoff_at&&["scheduled","unknown"].includes(m.status)&&new Date(m.kickoff_at).getTime()>Date.now();
     const goalCoverage={...coverage,expected_home_goals:lh,expected_away_goals:la,expected_total_goals:+(lh+la).toFixed(2),goals_model:"INDEPENDENT_POISSON",history_source:goalsModel.source,xgoals_public_results:goalsModel.source==="XGOALSPRO_PUBLIC_RESULTS",xg_used:!!goalsModel.xg_used,xg_sources:goalsModel.xg_sources||[],home_history_matches:goalsModel.home_matches,away_history_matches:goalsModel.away_matches};
-    const verdict=futureEligible&&(goalsModel.home_matches>=3&&goalsModel.away_matches>=3)&&goalsModel.source!=="BASELINE_ONLY"&&probability>75&&goalsModel.coverage>=55?"WYBRANY":"ODRZUCONY";
-     const rejectionReason=verdict==="WYBRANY"?null:!m.kickoff_at?"Brak potwierdzonej godziny rozpoczęcia meczu.":!["scheduled","unknown"].includes(String(m.status||""))?"Mecz jest w trakcie, zakończony lub ma nieaktywny status.":new Date(m.kickoff_at).getTime()<=Date.now()?"Mecz już się rozpoczął.":!(goalsModel.home_matches>=3&&goalsModel.away_matches>=3)?"Brak minimum 3 zweryfikowanych ostatnich meczów dla obu drużyn.":goalsModel.source==="BASELINE_ONLY"?"Dostępny jest wyłącznie model bazowy bez potwierdzonej formy.":probability<75?"Prawdopodobieństwo poniżej wymaganego progu 75%.":Number(goalsModel.coverage||0)<55?"Pokrycie danych modelu poniżej 55%.":"Nie spełniono warunków zatwierdzenia.";
-    rows.push({owner_id:ownerId,match_id:m.id,scan_run_id:m.scan_run_id||null,model_version:V,market:"GOALS",selection,prediction_type:null,pick:selection,probability,odds:null,confidence:String(goalsModel.coverage),verdict,selection_status:verdict,rejection_reason:rejectionReason,rationale:"Niezależny model Poissona na podstawie ostatnich maksymalnie 10 wyników z oznaczonym źródłem publicznym lub zweryfikowanej historii bazy; xG uwzględniane, gdy dostępne.",data_source:goalsModel.xg_used?"GOALS_POISSON+HISTORICAL_XG":goalsModel.source==="XGOALSPRO_PUBLIC_RESULTS"?"GOALS_POISSON+XGOALSPRO_PUBLIC_RESULTS":"GOALS_POISSON+VERIFIED_GOALS",data_coverage:goalCoverage,note:JSON.stringify({source:"GOALS_POISSON",coverage:goalCoverage}),settlement_status:"pending",result_status:"pending",verified:false});
+    const providerQuote=providerOddsMap.get(m.id+"|GOALS|"+selection);
+    const referenceOdds=providerQuote&&Number(providerQuote.odds)>1?Number(providerQuote.odds):null;
+    const oddsSource=providerQuote?String(providerQuote.provider||"MoviOdds")+"/"+String(providerQuote.bookmaker||"bookmaker"):null;
+    const verdict=futureEligible&&(goalsModel.home_matches>=3&&goalsModel.away_matches>=3)&&goalsModel.source!=="BASELINE_ONLY"&&probability>75&&goalsModel.coverage>=55&&referenceOdds!=null?"WYBRANY":"ODRZUCONY";
+     const rejectionReason=verdict==="WYBRANY"?null:!m.kickoff_at?"Brak potwierdzonej godziny rozpoczęcia meczu.":!["scheduled","unknown"].includes(String(m.status||""))?"Mecz jest w trakcie, zakończony lub ma nieaktywny status.":new Date(m.kickoff_at).getTime()<=Date.now()?"Mecz już się rozpoczął.":!(goalsModel.home_matches>=3&&goalsModel.away_matches>=3)?"Brak minimum 3 zweryfikowanych ostatnich meczów dla obu drużyn.":goalsModel.source==="BASELINE_ONLY"?"Dostępny jest wyłącznie model bazowy bez potwierdzonej formy.":probability<75?"Prawdopodobieństwo poniżej wymaganego progu 75%.":Number(goalsModel.coverage||0)<55?"Pokrycie danych modelu poniżej 55%.":referenceOdds==null?"Brak potwierdzonego kursu dla tego rynku i typu — nie można zatwierdzić zakładu.":"Nie spełniono warunków zatwierdzenia.";
+    rows.push({owner_id:ownerId,match_id:m.id,scan_run_id:m.scan_run_id||null,model_version:V,market:"GOALS",selection,prediction_type:null,pick:selection,probability,odds:referenceOdds,confidence:String(goalsModel.coverage),verdict,selection_status:verdict,rejection_reason:rejectionReason,rationale:"Niezależny model Poissona na podstawie ostatnich maksymalnie 10 wyników z oznaczonym źródłem publicznym lub zweryfikowanej historii bazy; xG uwzględniane, gdy dostępne.",data_source:oddsSource||"GOALS_POISSON+VERIFIED_GOALS",data_coverage:{...goalCoverage,odds_source:providerQuote?.provider||null,odds_bookmaker:providerQuote?.bookmaker||null,odds_captured_at:providerQuote?.captured_at||null},note:JSON.stringify({source:"GOALS_POISSON",odds_source:oddsSource,coverage:goalCoverage}),settlement_status:"pending",result_status:"pending",verified:false});
    }
   } else {
    const reason=!goalsModel?"Nie udało się zbudować niezależnego modelu goli.":goalsModel.home_matches<3||goalsModel.away_matches<3?"Za mało zweryfikowanych ostatnich meczów: wymagane minimum 3 dla każdej drużyny.":goalsModel.source==="BASELINE_ONLY"?"Dostępny wyłącznie model bazowy — brak podstaw do prognozy goli.":goalsModel.expected_home_goals==null||goalsModel.expected_away_goals==null?"Brak wiarygodnych oczekiwanych goli w modelu Poissona.":"Model goli nie spełnia warunków publikacji.";
