@@ -536,8 +536,9 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   const goalGithubHome=githubTeamForm(String(m.home_team),goalKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));
   const goalGithubAway=githubTeamForm(String(m.away_team),goalKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));
   const goalXgoalsHome=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.home_team)):null,goalXgoalsAway=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.away_team)):null;
-  const goalHomeSupplement={...(goalPublicForm?.home||{}),...(goalGithubHome||{}),...(goalXgoalsHome||{})};
-  const goalAwaySupplement={...(goalPublicForm?.away||{}),...(goalGithubAway||{}),...(goalXgoalsAway||{})};
+  const goalFotbalInfoForm=fotbalForms.get(m.id);
+  const goalHomeSupplement={...(goalPublicForm?.home||{}),...(goalGithubHome||{}),...(goalXgoalsHome||{}),...(goalFotbalInfoForm?.home||{})};
+  const goalAwaySupplement={...(goalPublicForm?.away||{}),...(goalGithubAway||{}),...(goalXgoalsAway||{}),...(goalFotbalInfoForm?.away||{})};
   const goalSupplement={home:Object.keys(goalHomeSupplement).length?goalHomeSupplement:null,away:Object.keys(goalAwaySupplement).length?goalAwaySupplement:null,source:goalXgoalsHome||goalXgoalsAway?"XGOALSPRO_PUBLIC_RESULTS":goalGithubHome||goalGithubAway?"KEYLESS_GITHUB_LAST10":goalPublicForm?.source||"OPENMATCHDAY_LAST10"};
   const goalsModel=model?.expected_home_goals!=null&&model?.expected_away_goals!=null?model:historyModel(m.home_team,m.away_team,goalKickoff,history||[],footyForms.get(m.id)||null,goalSupplement,String(m.gender||"unknown"));
   if(goalsModel&&goalsModel.expected_home_goals!=null&&goalsModel.expected_away_goals!=null&&goalsModel.home_matches>=3&&goalsModel.away_matches>=3){
