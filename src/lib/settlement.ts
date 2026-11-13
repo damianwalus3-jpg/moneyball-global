@@ -136,7 +136,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
       const affected = input.predictions.filter((prediction) => prediction.match_id === match.id && prediction.verdict === "WYBRANY");
       for (const prediction of affected) {
         if (prediction.settlement_status !== "pending" || prediction.verified) {
-          await updateRow("predictions", prediction.id, { settlement_status: "pending", verified: false });
+          await updateRow("predictions", prediction.id, { settlement_status: "pending", verified: false, profit_loss: null });
           prediction.settlement_status = "pending";
           prediction.verified = false;
         }
@@ -177,6 +177,15 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
       await updateRow("predictions", prediction.id, {
         settlement_status: status,
         verified: true,
+        stake: Number(prediction.stake ?? 5),
+        potential_return: prediction.odds != null && Number(prediction.odds) > 1
+          ? Math.round(Number(prediction.stake ?? 5) * Number(prediction.odds) * 100) / 100
+          : null,
+        profit_loss: status === "won" && prediction.odds != null && Number(prediction.odds) > 1
+          ? Math.round(Number(prediction.stake ?? 5) * (Number(prediction.odds) - 1) * 100) / 100
+          : status === "lost" ? -Number(prediction.stake ?? 5)
+          : status === "void" ? 0
+          : null,
       });
       prediction.settlement_status = status;
       prediction.verified = true;
