@@ -37,7 +37,15 @@ function Panel() {
   const hrDc = hitRate(sel.filter((prediction) => prediction.market === "DOUBLE_CHANCE").map((prediction) => prediction.settlement_status));
   const candidates = new Set(activePreds.filter((p) => isCouponCandidate(p, byId.get(p.match_id), now)).map((p) => p.match_id)).size;
   const verifiedResultIds = new Set(results.filter((result) => result.verified).map((result) => result.match_id));
-  const toSettle = matches.filter((m) => m.kickoff_at && new Date(m.kickoff_at).getTime() < now && !verifiedResultIds.has(m.id)).length;
+  const toSettle = matches.filter(
+    (m) =>
+      m.kickoff_at &&
+      new Date(m.kickoff_at).getTime() < now &&
+      m.status !== "finished" &&
+      m.status !== "postponed" &&
+      m.status !== "cancelled" &&
+      !verifiedResultIds.has(m.id),
+  ).length;
 
   return (
     <div>
