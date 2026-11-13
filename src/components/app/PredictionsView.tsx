@@ -1,4 +1,4 @@
-import { Pencil, Plus, Target } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Target } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ export function PredictionsView({ market }: { market: Market }) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Prediction | null>(null);
   const [open, setOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const byId = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
   const visible = modelScope === "all"
     ? all
@@ -120,7 +121,7 @@ export function PredictionsView({ market }: { market: Market }) {
               : null;
             const fairSelectionOdds = fairSelectionProbability != null && fairSelectionProbability > 0 ? 1 / fairSelectionProbability : null;
             return (
-              <div key={prediction.id} className="surface-card flex flex-wrap items-center gap-3 p-3">
+              <div key={prediction.id} className="surface-card grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 p-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
                 <div className="num flex size-12 items-center justify-center rounded-lg bg-primary/10 text-lg font-semibold text-primary">
                   {prediction.selection}
                 </div>
@@ -135,15 +136,38 @@ export function PredictionsView({ market }: { market: Market }) {
                   {prediction.rationale && <div className="text-xs text-muted-foreground">Uzasadnienie: {prediction.rationale}</div>}
                   {prediction.note && !prediction.note.trim().startsWith("{") && <div className="text-xs text-muted-foreground">{prediction.note}</div>}
                 </div>
-                <div className="num text-right text-sm">
-                  <div>{fmtPct(prediction.probability)}</div>
-                  <div className="text-xs text-muted-foreground">kurs {fmtOdds(prediction.odds)}{referenceBookmaker && ` · ${referenceBookmaker}`}{implied != null && ` · imp. ${fmtPct(implied)}`}</div>
+                <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2 sm:col-span-1 sm:justify-end sm:border-0 sm:pt-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="num text-sm font-semibold">{fmtPct(prediction.probability)}</span>
+                    <span className="num text-xs text-muted-foreground">kurs {fmtOdds(prediction.odds)}{referenceBookmaker && ` · ${referenceBookmaker}`}{implied != null && ` · imp. ${fmtPct(implied)}`}</span>
+                    <button onClick={() => toggle.mutate(prediction)} title="Przełącz werdykt"><SelectionBadge status={prediction.verdict} /></button>
+                    <SettlementBadge status={prediction.settlement_status} />
+                    {prediction.verified && <span className="text-xs text-success">zweryfikowano</span>}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="outline" size="sm" onClick={() => setExpandedId(expandedId === prediction.id ? null : prediction.id)}>
+                      {expandedId === prediction.id ? <ChevronUp /> : <ChevronDown />} Szczegóły
+                    </Button>
+                    <Button variant="ghost" size="icon" aria-label="Edytuj" title={couponLegs.some((leg) => leg.prediction_id === prediction.id) ? "Prognoza jest użyta w kuponie" : "Edytuj"} disabled={couponLegs.some((leg) => leg.prediction_id === prediction.id)} onClick={() => { setEditing(prediction); setOpen(true); }}><Pencil /></Button>
+                    {!couponLegs.some((leg) => leg.prediction_id === prediction.id) && <ConfirmDelete onConfirm={() => remove.mutate(prediction.id)} />}
+                  </div>
                 </div>
-                <button onClick={() => toggle.mutate(prediction)} title="Przełącz werdykt"><SelectionBadge status={prediction.verdict} /></button>
-                <SettlementBadge status={prediction.settlement_status} />
-                {prediction.verified && <span className="text-xs text-success">zweryfikowano</span>}
-                <Button variant="ghost" size="icon" aria-label="Edytuj" title={couponLegs.some((leg) => leg.prediction_id === prediction.id) ? "Prognoza jest użyta w kuponie" : "Edytuj"} disabled={couponLegs.some((leg) => leg.prediction_id === prediction.id)} onClick={() => { setEditing(prediction); setOpen(true); }}><Pencil /></Button>
-                {!couponLegs.some((leg) => leg.prediction_id === prediction.id) && <ConfirmDelete onConfirm={() => remove.mutate(prediction.id)} />}
+                {expandedId === prediction.id && (
+                  <div className="col-span-2 grid gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm sm:grid-cols-2">
+                    <div className="min-w-0">
+                      <div className="eyebrow mb-1">Dlaczego taki typ?</div>
+                      <p className="whitespace-pre-wrap break-words">{prediction.rationale || "Silnik nie zapisał szczegółowego uzasadnienia dla tej prognozy."}</p>
+                      {prediction.note && !prediction.note.trim().startsWith("{") && <p className="mt-2 whitespace-pre-wrap break-words text-muted-foreground">{prediction.note}</p>}
+                    </div>
+                    <div className="grid content-start gap-2">
+                      <div><span className="eyebrow">Model</span><p className="break-words">{prediction.model_version}</p></div>
+                      <div><span className="eyebrow">Poziom pewności</span><p>{prediction.confidence || "nie podano"}</p></div>
+                      <div><span className="eyebrow">Źródła i pokrycie</span><p className="break-words">{sourceLabel(prediction.data_source)} · {coverageLabel(prediction.data_coverage)}</p></div>
+                      <div><span className="eyebrow">Rynek / kurs</span><p>{MARKET_LABELS[prediction.market]} · {prediction.selection} · {fmtOdds(prediction.odds)}{referenceBookmaker ? ` · ${referenceBookmaker}` : ""}</p></div>
+                      <div><span className="eyebrow">Mecz / termin</span><p>{match?.competition ?? match?.league ?? "Rozgrywki niepodane"} · {match?.kickoff_at ? fmtDateTime(match.kickoff_at) : match?.kickoff_date ?? "Termin nieznany"}</p></div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
