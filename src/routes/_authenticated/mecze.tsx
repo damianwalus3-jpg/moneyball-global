@@ -45,6 +45,98 @@ export const Route = createFileRoute("/_authenticated/mecze")({
 
 type View = "upcoming" | "past" | "all" | "scans";
 
+type RecentGame = { date?: string; result?: string; opponent?: string; goals_for?: number; goals_against?: number };
+type TeamForm = { w?: number; d?: number; l?: number; matches?: number; goals_for?: number; goals_against?: number; last5?: RecentGame[]; last10?: RecentGame[] };
+
+function asObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+function asTeamForm(value: unknown): TeamForm | null {
+  const form = asObject(value);
+  if (!Object.keys(form).length) return null;
+  return form as TeamForm;
+}
+function recentGames(form: TeamForm | null): RecentGame[] {
+  const games = Array.isArray(form?.last5) ? form.last5 : Array.isArray(form?.last10) ? form.last10 : [];
+  return games.slice(0, 5);
+}
+function averageGoals(form: TeamForm | null, key: "goals_for" | "goals_against"): string | null {
+  const games = recentGames(form);
+  const values = games.map((game) => Number(game[key])).filter(Number.isFinite);
+  if (!values.length) return null;
+  return (values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1);
+}
+function formSummary(form: TeamForm | null): string | null {
+  if (!form) return null;
+  const w = Number(form.w ?? 0), d = Number(form.d ?? 0), l = Number(form.l ?? 0);
+  if (![w, d, l].every(Number.isFinite) || w + d + l === 0) return null;
+  return `${w} zwycięstw · ${d} remisów · ${l} porażek`;
+}
+function friendlyDate(value?: string): string {
+  if (!value) return "—";
+  const date = new Date(value + (value.length === 10 ? "T12:00:00" : ""));
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("pl-BE", { day: "2-digit", month: "2-digit" });
+}
+function resultLabel(value?: string): string {
+  return value === "W" ? "W" : value === "D" ? "R" : value === "L" ? "P" : "—";
+}
+function readableReason(p: Prediction, home: TeamForm | null, away: TeamForm | null, coverage: Record<string, unknown>): string {
+  const selection = String(p.selection);
+  const total = Number(coverage.expected_total_goals);
+  const homeExpected = Number(coverage.expected_home_goals);
+  const awayExpected = Number(coverage.expected_away_goals);
+  const parts: string[] = [];
+  if (Number.isFinite(total) && Number.isFinite(homeExpected) && Number.isFinite(awayExpected)) {
+    parts.push(`Model przewiduje średnio około ${total.toFixed(2).replace(".", ",")} gola łącznie: ${homeExpected.toFixed(2).replace(".", ",")} dla gospodarzy i ${awayExpected.toFixed(2).replace(".", ",")} dla gości.`);
+  }
+  const homeScored = averageGoals(home, "goals_for"), homeConceded = averageGoals(home, "goals_against");
+  const awayScored = averageGoals(away, "goals_for"), awayConceded = averageGoals(away, "goals_against");
+  if (selection.startsWith("OVER") && Number.isFinite(total)) {
+    const line = Number(selection.replace("OVER_", "").replace("_", "."));
+    parts.push(`Przewidywana liczba goli jest ${total > line ? "powyżej" : "poniżej"} granicy ${line.toFixed(1).replace(".", ",")}.`);
+  } else if (selection.startsWith("UNDER") && Number.isFinite(total)) {
+    const line = Number(selection.replace("UNDER_", "").replace("_", "."));
+    parts.push(`Przewidywana liczba goli jest ${total < line ? "poniżej" : "powyżej"} granicy ${line.toFixed(1).replace(".", ",")}.`);
+  } else if (selection === "BTTS_YES" && homeScored && awayScored) {
+    parts.push(`Obie drużyny regularnie zdobywają bramki: gospodarze średnio ${homeScored}, goście ${awayScored} gola na mecz w pokazanej serii.`);
+  } else if (selection === "BTTS_NO" && (homeConceded || awayConceded)) {
+    parts.push("Model ocenia, że co najmniej jedna z drużyn może mieć problem ze zdobyciem bramki; sprawdź jej ostatnie wyniki poniżej.");
+  }
+  const hs = formSummary(home), as = formSummary(away);
+  if (hs) parts.push(`Forma gospodarzy: ${hs}.`);
+  if (as) parts.push(`Forma gości: ${as}.`);
+  if (parts.length) return parts.join(" ");
+  const rationale = (p.rationale ?? "").toLowerCase();
+  if (rationale.includes("brak wymaganych danych") || rationale.includes("nie została wyliczona"))
+    return "Model nie miał wystarczających danych, aby wiarygodnie obliczyć tę prognozę. Dlatego typ został odrzucony.";
+  if (rationale.includes("poiss")) return "Typ opiera się na przewidywanej liczbie bramek i wynikach ostatnich spotkań obu drużyn.";
+  return p.rationale || "Brak wystarczających danych, aby wyjaśnić tę prognozę.";
+}
+function RecentFormCard({ title, form }: { title: string; form: TeamForm | null }) {
+  const games = recentGames(form);
+  return (
+    <div className="rounded-lg border border-border bg-secondary/30 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold">{title}</span>
+        {formSummary(form) && <span className="text-[11px] text-muted-foreground">{formSummary(form)}</span>}
+      </div>
+      {games.length ? (
+        <div className="grid gap-1.5">
+          {games.map((game, index) => (
+            <div key={`${game.date ?? "date"}-${game.opponent ?? "team"}-${index}`} className="flex items-center gap-2 text-xs">
+              <span className="w-10 shrink-0 text-muted-foreground">{friendlyDate(game.date)}</span>
+              <Badge variant={game.result === "W" ? "success" : game.result === "L" ? "danger" : "muted"}>{resultLabel(game.result)}</Badge>
+              <span className="min-w-0 flex-1 truncate">{game.opponent ?? "Rywal nieznany"}</span>
+              <strong className="num shrink-0">{Number.isFinite(Number(game.goals_for)) && Number.isFinite(Number(game.goals_against)) ? `${game.goals_for}:${game.goals_against}` : "—"}</strong>
+            </div>
+          ))}
+        </div>
+      ) : <p className="text-xs text-muted-foreground">Brak potwierdzonych ostatnich wyników.</p>}
+      {form && <p className="mt-2 text-[11px] text-muted-foreground">Średnio zdobyte / stracone w pokazanej serii: {averageGoals(form, "goals_for") ?? "—"} / {averageGoals(form, "goals_against") ?? "—"}</p>}
+    </div>
+  );
+}
+
 function Mecze() {
   const matches = useTable("matches");
   const scans = useTable("scan_runs");
@@ -417,10 +509,36 @@ function Mecze() {
                                     <div><div className="text-xs text-muted-foreground">Pewność</div><strong>{p.confidence ?? "—"}</strong></div>
                                     <div><div className="text-xs text-muted-foreground">Rozliczenie</div><strong>{p.settlement_status}</strong></div>
                                   </div>
-                                  {p.rationale && <p className="mt-3 text-sm leading-relaxed"><span className="font-medium">Dlaczego model tak typuje:</span> {p.rationale}</p>}
-                                  {p.rejection_reason && <p className="mt-2 text-sm text-amber-300"><span className="font-medium">Powód odrzucenia:</span> {p.rejection_reason}</p>}
-                                  <p className="mt-2 break-words text-xs text-muted-foreground">Źródło: {p.data_source ?? "niepodane"} · Model: {p.model_version}</p>
-                                  {p.data_coverage && <p className="mt-1 break-words text-xs text-muted-foreground">Pokrycie danych: {Object.entries(p.data_coverage).filter(([,v]) => v != null && v !== false && v !== "").map(([k,v]) => k + ": " + (typeof v === "object" ? JSON.stringify(v) : String(v))).join(" · ") || "brak szczegółów"}</p>}
+                                  {(() => {
+                                    const coverage = asObject(p.data_coverage);
+                                    const homeForm = asTeamForm(coverage.home_form);
+                                    const awayForm = asTeamForm(coverage.away_form);
+                                    const reason = readableReason(p, homeForm, awayForm, coverage);
+                                    const rejected = p.verdict === "ODRZUCONY";
+                                    return (
+                                      <div className="mt-3 grid gap-3">
+                                        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                                          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{rejected ? "Dlaczego typ odrzucono" : "Dlaczego model wybrał ten typ"}</div>
+                                          <p className="text-sm leading-relaxed">{rejected && p.rationale?.toLowerCase().includes("brak wymaganych danych") ? reason : reason}</p>
+                                          {Number.isFinite(Number(coverage.expected_total_goals)) && (
+                                            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                                              <Badge variant="outline">Oczekiwane gole: {Number(coverage.expected_total_goals).toFixed(2)}</Badge>
+                                              <Badge variant="outline">Gospodarze: {Number(coverage.expected_home_goals).toFixed(2)}</Badge>
+                                              <Badge variant="outline">Goście: {Number(coverage.expected_away_goals).toFixed(2)}</Badge>
+                                            </div>
+                                          )}
+                                          {coverage.xg_used === false && <p className="mt-2 text-[11px] text-muted-foreground">W tej prognozie nie było dostępnych danych xG — uzasadnienie opiera się na wynikach i formie.</p>}
+                                        </div>
+                                        <div>
+                                          <div className="mb-2 text-sm font-semibold">Ostatnie mecze drużyn</div>
+                                          <div className="grid gap-2 md:grid-cols-2">
+                                            <RecentFormCard title={m.home_team} form={homeForm} />
+                                            <RecentFormCard title={m.away_team} form={awayForm} />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               ))}
                             </div>
