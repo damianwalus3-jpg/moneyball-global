@@ -52,11 +52,14 @@ function Historia() {
     .filter((m) => {
       const result = resultBy.get(m.id);
       const started = m.kickoff_at && new Date(m.kickoff_at).getTime() < now;
-      return !!started && (!result || !result.verified);
+      // Postponed/cancelled fixtures are already settled as void; they must not
+      // remain in the pending queue just because no numeric score exists.
+      return !!started && !isVoided(m) && (!result || !result.verified);
     })
     .sort((a, b) => (a.kickoff_at ?? "").localeCompare(b.kickoff_at ?? ""));
   const done = matches
-    .filter((m) => resultBy.get(m.id)?.verified === true)
+    // Verified score results and confirmed void fixtures both belong in history.
+    .filter((m) => resultBy.get(m.id)?.verified === true || isVoided(m))
     .sort((a, b) => (b.kickoff_at ?? "").localeCompare(a.kickoff_at ?? ""));
   const list = (tab === "todo" ? todo : done).filter(
     (m) => !q || `${matchLabel(m)} ${m.competition ?? ""}`.toLowerCase().includes(q.toLowerCase()),
@@ -67,7 +70,7 @@ function Historia() {
       <PageHeader
         eyebrow="Wyniki · rozliczenia"
         title="Historia / Rozliczenia"
-        description="Wpisz wynik, a aplikacja rozliczy wszystkie prognozy 1X2 i DC tego meczu oraz powiązane kupony. Poprawienie wyniku rozlicza wszystko ponownie."
+        description="Wyniki meczów, zwroty za przełożone/odwołane spotkania oraz rozliczenia prognoz i kuponów. Poprawienie wyniku przelicza rozliczenie ponownie."
       />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Button size="sm" variant={tab === "todo" ? "default" : "outline"} onClick={() => setTab("todo")}>
@@ -85,8 +88,8 @@ function Historia() {
           title={tab === "todo" ? "Nic do rozliczenia" : "Brak zweryfikowanych wyników"}
           description={
             tab === "todo"
-              ? "Mecze pojawią się tutaj po rozpoczęciu. Wynik bez weryfikacji pozostaje do rozliczenia."
-              : "Dopiero zweryfikowane wyniki trafiają do rozliczonej historii."
+              ? "Tutaj trafiają rozpoczęte mecze bez zweryfikowanego wyniku. Przełożone i odwołane spotkania ze zwrotem są w historii."
+              : "Tutaj są zweryfikowane wyniki oraz przełożone/odwołane mecze rozliczone jako zwrot."
           }
         />
       ) : (
