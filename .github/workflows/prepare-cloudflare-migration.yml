@@ -1,4 +1,5 @@
 name: Prepare Cloudflare Workers migration
+# Triggered explicitly by updates on the isolated migration branch.
 
 on:
   push:
