@@ -171,6 +171,7 @@ export function validateCoupon(
   legs: { match_id: string; probability: number | null }[],
   usedMatchIds: Set<string> = new Set(),
   targetLegs: 1 | 3 = COUPON_SIZE,
+  requireOdds = false,
 ): string[] {
   const errors: string[] = [];
   if (legs.length !== targetLegs)
@@ -181,14 +182,16 @@ export function validateCoupon(
     errors.push("Wszystkie zdarzenia muszą mieć prawdopodobieństwo powyżej 75%.");
   if (legs.some((leg) => usedMatchIds.has(leg.match_id)))
     errors.push("Mecz jest już użyty w innym kuponie tej partii.");
+  if (requireOdds && legs.some((leg) => leg.odds == null || !Number.isFinite(Number(leg.odds)) || Number(leg.odds) <= 1))
+    errors.push("Kupon MAIN/MEGA/EXTRA wymaga potwierdzonego kursu większego niż 1,00 dla każdego zdarzenia.");
   return errors;
 }
 
-export function validateBatch(coupons: { match_id: string; probability: number | null }[][], targetLegs: 1 | 3 = COUPON_SIZE): string[] {
+export function validateBatch(coupons: { match_id: string; probability: number | null; odds?: number | null }[][], targetLegs: 1 | 3 = COUPON_SIZE, requireOdds = false): string[] {
   const used = new Set<string>();
   const errors: string[] = [];
   coupons.forEach((legs, index) => {
-    for (const error of validateCoupon(legs, used, targetLegs)) errors.push(`Kupon ${index + 1}: ${error}`);
+    for (const error of validateCoupon(legs, used, targetLegs, requireOdds)) errors.push(`Kupon ${index + 1}: ${error}`);
     legs.forEach((leg) => used.add(leg.match_id));
   });
   return errors;
