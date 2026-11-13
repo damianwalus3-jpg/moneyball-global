@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronRight, Ticket, Trophy } from "lucide-react";
+import { CalendarDays, ChevronRight, Ticket, Trophy, Wallet } from "lucide-react";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
 import { fmtPct } from "@/lib/format";
 import { dashboardSummaryQuery } from "@/lib/queries";
