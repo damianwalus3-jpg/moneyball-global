@@ -112,7 +112,7 @@ function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Predictio
         <StatCard label="Skuteczność WYBRANE" value={fmtPct(hrSel.rate)} hint={`${hrSel.won}/${hrSel.settled}`} tone="primary" />
         <StatCard label="Prognozy" value={preds.length} hint={`${sel.length} wybranych · ${rej.length} odrzuconych`} />
         <StatCard label="Zweryfikowane rozliczenia" value={hrSel.settled} />
-        <StatCard label="Oczekujące" value={preds.filter((prediction) => prediction.settlement_status === "pending").length} />
+        <StatCard label="Oczekujące" value={sel.filter((prediction) => prediction.settlement_status === "pending").length} />
       </div>
       {hrSel.settled > 0 && (
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
