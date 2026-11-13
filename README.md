@@ -1,63 +1,50 @@
-# MONEYBALL GLOBAL 2.0
+# MONEYBALL GLOBAL 2.0 — Cloudflare Test
 
-Polish-language football data and prediction tracking application. The app uses the existing Supabase project as its source of truth and keeps 1X2 and Double Chance predictions separate.
+Polish-language football data and prediction tracking application. This branch is an isolated test environment and does not deploy to Vercel or write to the production Supabase project.
+
+## Test environment
+
+- Cloudflare Worker: https://moneyball-global-test.damianwalus3.workers.dev
+- Supabase test project: `xwrgfaarmwnguymresjy` (EU West)
+- Git branch: `migration/cloudflare-workers-setup`
+- Production Supabase project and the `main` branch are not modified by this test deployment.
 
 ## Stack
 
 - React 19, TanStack Start and Vite
-- Nitro production output for Cloudflare Workers
+- Cloudflare Workers via `@cloudflare/vite-plugin` and Wrangler
 - Supabase Auth and Postgres with owner-scoped RLS
 - Bun for dependency management and tests
 
-## Main workflows
+## Features under test
 
 - European fixtures from FootyNomad, enriched with public no-key sources
-- Prediction engine MONEYBALL GLOBAL 3.8 with explicit data coverage and missing-data reporting
-- Separate 1X2 and Double Chance predictions
-- Three-leg coupon generation using only active-model or manual candidates above 75%
+- MONEYBALL GLOBAL 3.8 prediction engine with explicit data coverage and missing-data reporting
+- Separate 1X2 and Double Chance predictions, plus goals / BTTS markets
+- Single picks and three-leg coupon generation
+- Match details with model rationale and source coverage
 - Result settlement and coupon settlement
-- Fixed €5 analytical stake for every selected single pick and generated coupon; the app does not place cash bets or use a bankroll ledger
-- Tracking of bookmaker odds, gross potential return and settled net profit/loss when the required data is available
-- CSV/JSON import, export and backup
+- Fixed €5 analytical stake; no cash bets are placed by the app
+- Odds tracking when a fresh, verified quote is available
 
-The application must not fabricate missing xG, odds, lineups, injuries or match results. Missing data remains explicitly marked as unavailable.
-
-## Supabase
-
-Existing project: `gzgeklcukrclgwbsmbsp`
-
-The browser app uses only the public/publishable key. Never place a Supabase service-role or secret key in browser code, Vite variables, or committed files. Owner isolation is enforced by RLS.
+Missing xG, odds, lineups, injuries or match results must remain explicitly unavailable. The model must not fabricate inputs or probabilities.
 
 ## Local development
 
 ```sh
 bun install
 bun run dev
-```
-
-## Current audit
-
-- Active model: `MONEYBALL GLOBAL 3.8`.
-- Canonical Supabase fields are mapped to legacy read-only view aliases in `src/lib/db.ts`.
-- Compatibility triggers prefer the field changed by the current write, so stale legacy aliases cannot overwrite canonical updates.
-- Active Edge Function source is tracked under `supabase/functions/`; database changes are tracked under `supabase/migrations/`.
-- Fixture scan and prediction are separate authenticated Edge Function calls; result sync is chained by the fixture sync.
-- The `main` branch CI checks tests, TypeScript and production build.
-
-## Validation
-
-```sh
 bun run test
 bunx tsc --noEmit
 bun run build
 ```
 
-The `.github/workflows/ci.yml` workflow is configured to run the tests, TypeScript check and production build on pushes and pull requests to `main`. A successful CI run must be confirmed in GitHub Actions before release.
+## Deploy
 
-## Production build and deployment
+GitHub Actions deploys only this branch to the isolated Cloudflare Worker. The workflow runs tests, TypeScript validation and the Cloudflare build before deployment. Required GitHub environment values are `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 
-The application is deployed through the native Vercel GitHub integration. The Vercel project must be connected to this repository's `main` branch, with the TanStack Start framework preset and the repository root as the Root Directory. Vercel runs the Bun install/build based on `bun.lock` and `package.json`; Nitro detects the Vercel production host automatically.
+The application uses the test Supabase project by default. Only its public publishable key is embedded in browser configuration. Never put a service-role or secret key in browser code or committed files. Supabase Edge Functions use their own runtime-provided service-role environment variable.
 
-The GitHub Actions deployment workflow is optional and requires Vercel credentials. It is not required when the native Vercel Git integration is enabled. Do not add paid services or API keys for deployment.
+## Important
 
-No production URL is considered verified until Vercel reports a successful Production deployment and the public URL responds successfully.
+This branch is a test environment. Do not merge it into `main` or change the production Vercel deployment until the full scan, prediction, odds, coupons, authentication and settlement flows have passed end-to-end testing.
