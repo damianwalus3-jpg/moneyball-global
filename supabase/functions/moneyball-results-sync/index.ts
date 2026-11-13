@@ -43,10 +43,12 @@ async function readDay(date:string){
   const gender=/\bW\b|Women|female|girls/i.test(home+" "+away+" "+league)?"women":"men";
   const kickoff=(body.match(/<time[^>]*datetime=["']([^"']+)/i)||[])[1]||null;
   const cls=(attrs.match(/class=["']([^"']+)/i)||[])[1]||"";
-  const hs=(body.match(/class=["'][^"']*ticket-hs[^"']*["'][^>]*>(\d+)</i)||[])[1];
-  const as=(body.match(/class=["'][^"']*ticket-as[^"']*["'][^>]*>(\d+)</i)||[])[1];
+  const bodyText=clean(body),homeAt=bodyText.toLowerCase().indexOf(home.toLowerCase()),awayAt=bodyText.toLowerCase().lastIndexOf(away.toLowerCase()),scoreBetween=homeAt>=0&&awayAt>homeAt?bodyText.slice(homeAt+home.length,awayAt):"",scoreParts=scoreBetween.match(/[0-9]+/g)||[];
+  const hs=(body.match(/class=["'][^"']*ticket-hs[^"']*["'][^>]*>(\d+)</i)||[])[1]||scoreParts[0];
+  const as=(body.match(/class=["'][^"']*ticket-as[^"']*["'][^>]*>(\d+)</i)||[])[1]||scoreParts[1];
+  const liveMinute=(bodyText.match(/([0-9]{1,3}(?:\+[0-9]{1,2})?)\s*['’]\s*live/i)||[])[1]||null;
   const status=cls.includes("ticket-ft")?"finished":cls.includes("ticket-live")?"live":cls.includes("ticket-pst")?"postponed":cls.includes("ticket-canc")?"cancelled":"scheduled";
-  if(home&&away)out.push({external_id:id,home_team:home,away_team:away,gender,kickoff_at:kickoff?new Date(kickoff).toISOString():null,status,home_score:hs==null?null:Number(hs),away_score:as==null?null:Number(as)});
+  if(home&&away)out.push({external_id:id,home_team:home,away_team:away,gender,kickoff_at:kickoff?new Date(kickoff).toISOString():null,status,home_score:hs==null?null:Number(hs),away_score:as==null?null:Number(as),live_minute:status==="live"?liveMinute:null});
  }
  return out;
 }
@@ -192,7 +194,7 @@ function outcome(h:number,a:number){return h>a?"1":h<a?"2":"X";}
 function won(selection:string,result:string):boolean|null{if(selection==="1X")return result!=="2";if(selection==="X2")return result!=="1";if(selection==="12")return result!=="X";if(["1","X","2"].includes(selection))return selection===result;return null;}
 async function markVoid(m:any,reason:string){
  const now=new Date().toISOString();
- await db("matches?id=eq."+m.id,"PATCH",{status:reason,live_home_score:null,live_away_score:null,live_updated_at:null,updated_at:now});
+ await db("matches?id=eq."+m.id,"PATCH",{status:reason,live_home_score:null,live_away_score:null,live_minute:null,live_updated_at:null,updated_at:now});
  const preds=await db("predictions?select=id,selection,pick&match_id=eq."+m.id);
  for(const p of preds||[]){
   const pick=String(p.selection||p.pick||"").trim();if(!pick||pick==="—"){await db("predictions?id=eq."+p.id,"PATCH",{settlement_status:"void",result_status:"void",verified:true,settled_at:now,note:"Brak poprawnego typu — wyłączono z rozliczenia skuteczności."});continue;}
@@ -336,7 +338,7 @@ Deno.serve(async(req:Request)=>{
     for(const f of fixtures){
      if(f.status!=="live")continue;
      const m=map.get(String(f.external_id));
-     if(m){const livePatch={status:"live",live_home_score:Number.isInteger(f.home_score)?f.home_score:null,live_away_score:Number.isInteger(f.away_score)?f.away_score:null,live_updated_at:new Date().toISOString(),updated_at:new Date().toISOString()};if(m.status!=="live"||m.live_home_score!==livePatch.live_home_score||m.live_away_score!==livePatch.live_away_score)await db("matches?id=eq."+m.id,"PATCH",livePatch);}
+     if(m){const livePatch={status:"live",live_home_score:Number.isInteger(f.home_score)?f.home_score:null,live_away_score:Number.isInteger(f.away_score)?f.away_score:null,live_minute:f.live_minute||null,live_updated_at:new Date().toISOString(),updated_at:new Date().toISOString()};if(m.status!=="live"||m.live_home_score!==livePatch.live_home_score||m.live_away_score!==livePatch.live_away_score)await db("matches?id=eq."+m.id,"PATCH",livePatch);}
     }
     const eligible:any[]=[];
     for(const f of fixtures){
