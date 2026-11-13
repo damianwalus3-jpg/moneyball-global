@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchAll } from "./db";
+import { fetchAll, fetchDashboardSummary } from "./db";
 import type { TableName } from "./types";
 
 export function tableQuery<K extends TableName>(table: K) {
@@ -8,6 +8,17 @@ export function tableQuery<K extends TableName>(table: K) {
     queryKey: ["table", table] as const,
     queryFn: () => fetchAll(table),
     staleTime: 120_000,
+    gcTime: 600_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+
+export function dashboardSummaryQuery() {
+  return queryOptions({
+    queryKey: ["dashboard-summary"] as const,
+    queryFn: fetchDashboardSummary,
+    staleTime: 30_000,
     gcTime: 600_000,
     refetchOnWindowFocus: false,
   });
@@ -30,7 +41,7 @@ export function useAction<TArgs, TResult = unknown>(
   return useMutation({
     mutationFn: fn,
     onSuccess: async (r) => {
-      await qc.invalidateQueries({ queryKey: ["table"] });
+      await Promise.all([qc.invalidateQueries({ queryKey: ["table"] }), qc.invalidateQueries({ queryKey: ["dashboard-summary"] })]);
       const msg = typeof opts.success === "function" ? opts.success(r) : opts.success;
       if (msg) toast.success(msg);
       opts.onDone?.(r);
