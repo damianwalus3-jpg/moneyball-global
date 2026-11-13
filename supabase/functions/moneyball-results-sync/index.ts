@@ -192,7 +192,7 @@ function outcome(h:number,a:number){return h>a?"1":h<a?"2":"X";}
 function won(selection:string,result:string):boolean|null{if(selection==="1X")return result!=="2";if(selection==="X2")return result!=="1";if(selection==="12")return result!=="X";if(["1","X","2"].includes(selection))return selection===result;return null;}
 async function markVoid(m:any,reason:string){
  const now=new Date().toISOString();
- await db("matches?id=eq."+m.id,"PATCH",{status:reason,updated_at:now});
+ await db("matches?id=eq."+m.id,"PATCH",{status:reason,live_home_score:null,live_away_score:null,live_updated_at:null,updated_at:now});
  const preds=await db("predictions?select=id,selection,pick&match_id=eq."+m.id);
  for(const p of preds||[]){
   const pick=String(p.selection||p.pick||"").trim();if(!pick||pick==="—"){await db("predictions?id=eq."+p.id,"PATCH",{settlement_status:"void",result_status:"void",verified:true,settled_at:now,note:"Brak poprawnego typu — wyłączono z rozliczenia skuteczności."});continue;}
@@ -222,7 +222,7 @@ async function processFixture(f:any,m:any,source="FootyNomad",externalId?:string
  const row={owner_id:m.owner_id,home_score:f.home_score,away_score:f.away_score,home_goals:f.home_score,away_goals:f.away_score,outcome_1x2:result,verified:true,source,finished_at:m.kickoff_at||now,verified_at:now,settled_at:now};
  if(old?.length)await db("match_results?id=eq."+old[0].id,"PATCH",row);else await db("match_results","POST",{match_id:m.id,...row});
  await saveSourceObservation(m,{source,external_id:String(externalId||f.external_id||""),home:m.home_team,away:m.away_team,home_score:f.home_score,away_score:f.away_score,status:"finished",date:m.kickoff_at||now,url:f.url||f.source_url||(source==="FootyNomad"?"https://footynomad.com/fixture/"+String(externalId||f.external_id||""):""),raw:f});
- await db("matches?id=eq."+m.id,"PATCH",{status:"finished",updated_at:now});
+ await db("matches?id=eq."+m.id,"PATCH",{status:"finished",live_home_score:null,live_away_score:null,live_updated_at:null,updated_at:now});
  const preds=await db("predictions?select=id,market,selection,prediction_type,pick&match_id=eq."+m.id);
  let settled=0,legsSettled=0;
  for(const p of preds||[]){
@@ -336,7 +336,7 @@ Deno.serve(async(req:Request)=>{
     for(const f of fixtures){
      if(f.status!=="live")continue;
      const m=map.get(String(f.external_id));
-     if(m&&m.status!=="live")await db("matches?id=eq."+m.id,"PATCH",{status:"live",updated_at:new Date().toISOString()});
+     if(m){const livePatch={status:"live",live_home_score:Number.isInteger(f.home_score)?f.home_score:null,live_away_score:Number.isInteger(f.away_score)?f.away_score:null,live_updated_at:new Date().toISOString(),updated_at:new Date().toISOString()};if(m.status!=="live"||m.live_home_score!==livePatch.live_home_score||m.live_away_score!==livePatch.live_away_score)await db("matches?id=eq."+m.id,"PATCH",livePatch);}
     }
     const eligible:any[]=[];
     for(const f of fixtures){
