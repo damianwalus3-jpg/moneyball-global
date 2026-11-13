@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { CalendarDays, Ticket, Trophy, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_authenticated/panel")({
 });
 
 function Panel() {
-  const { data: summary } = useQuery(dashboardSummaryQuery());
+  const { data: summary } = useSuspenseQuery(dashboardSummaryQuery());
   const hr1 = summary.hit_rates["1X2"];
   const hrDc = summary.hit_rates.DOUBLE_CHANCE;
   const hrGoals = summary.hit_rates.GOALS;
