@@ -1,6 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const SUPABASE_URL=Deno.env.get("SUPABASE_URL")||"https://xwrgfaarmwnguymresjy.supabase.co";
-const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
+const ANON_KEY=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||"";
+let REQUEST_BEARER="";
+let REQUEST_CRON_TOKEN="";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type, x-cron-token","Access-Control-Allow-Methods":"GET, POST, OPTIONS"};
 
 
@@ -19,8 +22,10 @@ function isEuropeanFixture(country: unknown, competition: unknown, home?: unknow
 function clean(s:string){return s.replace(/<[^>]*>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&nbsp;/g," ").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/\s+/g," ").trim();}
 function day(d:Date){return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);}
 async function db(path:string,method="GET",body?:unknown){
- if(!SERVICE_KEY)throw new Error("SUPABASE_SERVICE_ROLE_KEY missing");
- const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{method,headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+SERVICE_KEY,"Content-Type":"application/json",Prefer:"return=representation"},body:body===undefined?undefined:JSON.stringify(body)});
+ const apiKey=SERVICE_KEY||ANON_KEY;
+ const bearer=SERVICE_KEY||REQUEST_BEARER;
+ if(!apiKey||!bearer)throw new Error("Supabase database authorization missing");
+ const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{method,headers:{apikey:apiKey,Authorization:"Bearer "+bearer,...(REQUEST_CRON_TOKEN?{"x-cron-token":REQUEST_CRON_TOKEN}:{}),"Content-Type":"application/json",Prefer:"return=representation"},body:body===undefined?undefined:JSON.stringify(body)});
  const raw=await r.text();let data:any;try{data=raw?JSON.parse(raw):null;}catch{data=raw;}
  if(!r.ok)throw new Error("Supabase "+r.status+": "+(data?.message||raw));return data;
 }
@@ -277,18 +282,19 @@ Deno.serve(async(req:Request)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
  const cronToken=req.headers.get("x-cron-token")||"";
  const bearer=(req.headers.get("Authorization")||"").replace(/^Bearer\s+/i,"");
- if(!SERVICE_KEY)return new Response(JSON.stringify({ok:false,error:"Server configuration error"}),{status:500,headers:{...cors,"Content-Type":"application/json"}});
  let ownerId:string|null=null,authorizedCron=false;
  if(cronToken){
   try{
-   const authResponse=await fetch(SUPABASE_URL+"/rest/v1/rpc/moneyball_cron_token_valid",{method:"POST",headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+SERVICE_KEY,"Content-Type":"application/json"},body:JSON.stringify({p_token:cronToken})});
+   const authResponse=await fetch(SUPABASE_URL+"/rest/v1/rpc/moneyball_cron_token_valid",{method:"POST",headers:{apikey:ANON_KEY||SERVICE_KEY,Authorization:"Bearer "+(bearer||ANON_KEY||SERVICE_KEY),"Content-Type":"application/json"},body:JSON.stringify({p_token:cronToken})});
    authorizedCron=authResponse.ok&&(await authResponse.json())===true;
   }catch(_){authorizedCron=false;}
  }
+ REQUEST_BEARER=SERVICE_KEY||bearer;
+ REQUEST_CRON_TOKEN=authorizedCron?cronToken:"";
  if(!authorizedCron){
   if(!bearer)return new Response(JSON.stringify({ok:false,error:"Unauthorized"}),{status:401,headers:{...cors,"Content-Type":"application/json"}});
   try{
-   const userResponse=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+bearer}});
+   const userResponse=await fetch(SUPABASE_URL+"/auth/v1/user",{headers:{apikey:ANON_KEY||SERVICE_KEY,Authorization:"Bearer "+bearer}});
    if(!userResponse.ok)return new Response(JSON.stringify({ok:false,error:"Unauthorized"}),{status:401,headers:{...cors,"Content-Type":"application/json"}});
    const user=await userResponse.json();ownerId=typeof user.id==="string"?user.id:null;
    if(!ownerId)return new Response(JSON.stringify({ok:false,error:"Unauthorized"}),{status:401,headers:{...cors,"Content-Type":"application/json"}});
