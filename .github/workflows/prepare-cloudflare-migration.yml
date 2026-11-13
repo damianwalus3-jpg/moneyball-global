@@ -1,0 +1,94 @@
+name: Prepare Cloudflare Workers migration
+
+on:
+  push:
+    branches:
+      - migration/cloudflare-workers-setup
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: "!contains(github.event.head_commit.message, 'Prepare Cloudflare Workers migration')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout migration branch
+        uses: actions/checkout@v4
+        with:
+          ref: migration/cloudflare-workers-setup
+          fetch-depth: 0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Refresh dependencies and switch adapter
+        run: |
+          bun install
+          bun remove nitro
+          bun add --dev @cloudflare/vite-plugin wrangler
+
+      - name: Configure Vite for Cloudflare Workers
+        run: |
+          cat > vite.config.ts <<'EOF'
+          import { cloudflare } from "@cloudflare/vite-plugin";
+          import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+          import tailwindcss from "@tailwindcss/vite";
+          import { defineConfig } from "vite";
+          import viteReact from "@vitejs/plugin-react";
+          import tsconfigPaths from "vite-tsconfig-paths";
+
+          export default defineConfig({
+            plugins: [
+              cloudflare({ viteEnvironment: { name: "ssr" } }),
+              tanstackStart({ server: { entry: "server" } }),
+              viteReact(),
+              tailwindcss(),
+              tsconfigPaths(),
+            ],
+            resolve: {
+              dedupe: ["react", "react-dom"],
+            },
+          });
+          EOF
+
+      - name: Add Wrangler configuration and scripts
+        run: |
+          cat > wrangler.jsonc <<'EOF'
+          {
+            "$schema": "node_modules/wrangler/config-schema.json",
+            "name": "moneyball-global-test",
+            "main": "src/server.ts",
+            "compatibility_date": "2026-11-13",
+            "observability": {
+              "enabled": true
+            }
+          }
+          EOF
+          node --input-type=module <<'EOF'
+          import fs from "node:fs";
+          const path = "package.json";
+          const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+          pkg.scripts = {
+            ...pkg.scripts,
+            deploy: "bun run build && wrangler deploy",
+            "cf-typegen": "wrangler types"
+          };
+          fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + "\n");
+          EOF
+
+      - name: Verify tests, types, and Cloudflare build
+        run: |
+          bun run test
+          bunx tsc --noEmit
+          bun run build
+
+      - name: Commit verified migration files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json bun.lock vite.config.ts wrangler.jsonc
+          git commit -m "Prepare Cloudflare Workers migration"
+          git push origin migration/cloudflare-workers-setup
