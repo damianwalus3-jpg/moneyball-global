@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ConfirmDelete, EmptyState, PageHeader, SelectionBadge, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { PredictionForm } from "@/components/forms/PredictionForm";
 import { deleteRow, updateRow } from "@/lib/db";
-import { hitRate, impliedProbability, isActivePredictionVersion, MARKET_LABELS } from "@/lib/domain";
+import { hitRate, impliedProbability, isActivePredictionVersion, MARKET_LABELS, PICK_LABELS } from "@/lib/domain";
 import { fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -127,6 +127,10 @@ export function PredictionsView({ market }: { market: Market }) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{matchLabel(match)}</div>
+                  <div className="mt-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Wybrany typ · {MARKET_LABELS[prediction.market]}</div>
+                    <div className="mt-0.5 text-base font-extrabold leading-snug text-foreground sm:text-lg">{PICK_LABELS[prediction.selection] ?? prediction.selection}</div>
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {match?.competition ?? match?.league ?? "—"} · {match?.kickoff_at ? fmtDateTime(match.kickoff_at) : match?.kickoff_date ? match.kickoff_date + " · godzina nieznana" : "brak daty"}
                   </div>
