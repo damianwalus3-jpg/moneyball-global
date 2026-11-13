@@ -166,11 +166,11 @@ function Mecze() {
   const [predictionProgress, setPredictionProgress] = useState("");
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [singleBetPrediction, setSingleBetPrediction] = useState<Prediction | null>(null);
-  const [singleBetStake, setSingleBetStake] = useState("2");
+  const singleBetStake = "5";
 
   const saveSingleBet = useAction(async () => {
     const prediction = singleBetPrediction;
-    const stake = parseDecimal(singleBetStake);
+    const stake = 5;
     if (!prediction || prediction.verdict !== "WYBRANY") throw new Error("Wybierz zatwierdzony typ.");
     if (prediction.odds == null || Number(prediction.odds) <= 1) throw new Error("Brak potwierdzonego kursu — nie zapisuję zakładu bez kursu.");
     if (stake == null || stake <= 0) throw new Error("Podaj stawkę większą od zera.");
@@ -181,10 +181,9 @@ function Mecze() {
       couponType: "MAIN",
       scanRunId: match.scan_run_id,
       stake,
-      recordStake: true,
       targetLegs: 1,
     });
-  }, { success: "Zapisano pojedynczy zakład i pobrano stawkę z bankrolla", onDone: () => setSingleBetPrediction(null) });
+  }, { success: "Zapisano pojedynczy typ ze stałą stawką 5 €", onDone: () => setSingleBetPrediction(null) });
 
   const delScan = useAction((id: string) => deleteRow("scan_runs", id), {
     success: "Usunięto skan",
@@ -675,8 +674,8 @@ function Mecze() {
                   <div className="mt-2 text-sm">Kurs zapisany: <strong className="num">{fmtOdds(singleBetPrediction.odds)}</strong></div>
                 </div>
                 <label className="grid gap-1 text-sm">
-                  <span className="font-medium">Stawka (€)</span>
-                  <Input inputMode="decimal" className="num" value={singleBetStake} onChange={(event) => setSingleBetStake(event.target.value)} placeholder="np. 2,00" />
+                  <span className="font-medium">Stała stawka analityczna</span>
+                  <div className="num rounded-md border border-border bg-secondary/30 px-3 py-2">5,00 €</div>
                 </label>
                 {potentialReturn != null && (
                   <div className="rounded-md bg-secondary/40 p-3 text-sm">
@@ -691,7 +690,7 @@ function Mecze() {
           })()}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => setSingleBetPrediction(null)}>Anuluj</Button>
-            <Button type="button" disabled={saveSingleBet.isPending || parseDecimal(singleBetStake) == null || Number(parseDecimal(singleBetStake)) <= 0} onClick={() => saveSingleBet.mutate(undefined)}>{saveSingleBet.isPending ? "Zapisywanie…" : "Zapisz zakład"}</Button>
+            <Button type="button" disabled={saveSingleBet.isPending} onClick={() => saveSingleBet.mutate(undefined)}>{saveSingleBet.isPending ? "Zapisywanie…" : "Zapisz zakład"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
