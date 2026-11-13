@@ -107,8 +107,10 @@ export function PredictionsView({ market }: { market: Market }) {
           {list.map((prediction) => {
             const match = byId.get(prediction.match_id);
             const implied = impliedProbability(prediction.odds);
-            const referenceBookmaker = prediction.odds != null && prediction.data_coverage?.["market_reference_selection"] === prediction.selection
-              ? String(prediction.data_coverage?.["market_reference_bookmaker"] ?? "")
+            // The displayed odds may come from a provider quote, while market_reference_bookmaker
+            // belongs to the separate fair-market probability feed. Never mix those sources.
+            const referenceBookmaker = prediction.odds != null
+              ? String(prediction.data_coverage?.["odds_bookmaker"] ?? "")
               : "";
             const fairOdds = prediction.data_coverage?.["market_source"] === "TIPSAUDIT_FAIR_MARKET"
               ? prediction.data_coverage["fair_odds"] as { home?: number; draw?: number; away?: number } | null
