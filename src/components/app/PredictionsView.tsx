@@ -106,8 +106,8 @@ export function PredictionsView({ market }: { market: Market }) {
           {list.map((prediction) => {
             const match = byId.get(prediction.match_id);
             const implied = impliedProbability(prediction.odds);
-            const fairOdds = prediction.data_coverage?.market_source === "TIPSAUDIT_FAIR_MARKET"
-              ? prediction.data_coverage.fair_odds as { home?: number; draw?: number; away?: number } | null
+            const fairOdds = prediction.data_coverage?.["market_source"] === "TIPSAUDIT_FAIR_MARKET"
+              ? prediction.data_coverage["fair_odds"] as { home?: number; draw?: number; away?: number } | null
               : null;
             return (
               <div key={prediction.id} className="surface-card flex flex-wrap items-center gap-3 p-3">
