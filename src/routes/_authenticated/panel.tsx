@@ -27,9 +27,10 @@ function Panel() {
   const balance = bankrollBalance(txs);
   const today = brusselsDayKey(new Date());
   const todayCount = matches.filter((m) => m.kickoff_at && brusselsDayKey(m.kickoff_at) === today).length;
+  // Hit rate tracks every verified prediction from the active model version,
+  // including ODRZUCONY picks, so the dashboard audits the full prediction record.
   const sel = activePreds.filter(
     (prediction) =>
-      prediction.verdict === "WYBRANY" &&
       prediction.verified &&
       (prediction.settlement_status === "won" || prediction.settlement_status === "lost"),
   );
