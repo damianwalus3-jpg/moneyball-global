@@ -6,7 +6,7 @@ import { ConfirmDelete, EmptyState, PageHeader, SelectionBadge, SettlementBadge,
 import { PredictionForm } from "@/components/forms/PredictionForm";
 import { deleteRow, updateRow } from "@/lib/db";
 import { hitRate, impliedProbability, isActivePredictionVersion, MARKET_LABELS, PICK_LABELS } from "@/lib/domain";
-import { fmtOdds, fmtPct, matchLabel } from "@/lib/format";
+import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
 import type { Market, Prediction } from "@/lib/types";
@@ -168,6 +168,27 @@ export function PredictionsView({ market }: { market: Market }) {
                       <div><span className="eyebrow">Poziom pewności</span><p>{prediction.confidence || "nie podano"}</p></div>
                       <div><span className="eyebrow">Źródła i pokrycie</span><p className="break-words">{sourceLabel(prediction.data_source)} · {coverageLabel(prediction.data_coverage)}</p></div>
                       <div><span className="eyebrow">Rynek / kurs</span><p>{MARKET_LABELS[prediction.market]} · {prediction.selection} · {fmtOdds(prediction.odds)}{referenceBookmaker ? ` · ${referenceBookmaker}` : ""}</p></div>
+                      {prediction.verdict === "WYBRANY" && (() => {
+                        const stake = Number(prediction.stake ?? 5);
+                        const potentialReturn = prediction.potential_return != null
+                          ? Number(prediction.potential_return)
+                          : prediction.odds != null && Number(prediction.odds) > 1
+                            ? Math.round(stake * Number(prediction.odds) * 100) / 100
+                            : null;
+                        const potentialProfit = potentialReturn == null ? null : Math.round((potentialReturn - stake) * 100) / 100;
+                        return (
+                          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 sm:col-span-2">
+                            <div className="eyebrow mb-2">Rozliczenie pojedynczego typu · stała stawka</div>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div><span className="text-xs text-muted-foreground">Stawka</span><p className="num font-semibold">{fmtMoney(stake)}</p></div>
+                              <div><span className="text-xs text-muted-foreground">Możliwy zwrot</span><p className="num font-semibold">{fmtMoney(potentialReturn)}</p></div>
+                              <div><span className="text-xs text-muted-foreground">Możliwy zysk netto</span><p className="num font-semibold text-success">{fmtMoney(potentialProfit)}</p></div>
+                              <div><span className="text-xs text-muted-foreground">Wynik rozliczenia</span><p className={prediction.profit_loss != null && prediction.profit_loss > 0 ? "num font-semibold text-success" : prediction.profit_loss != null && prediction.profit_loss < 0 ? "num font-semibold text-destructive" : "num font-semibold"}>{prediction.verified ? fmtMoney(prediction.profit_loss) : "Oczekuje na wynik"}</p></div>
+                            </div>
+                            {prediction.odds == null && <p className="mt-2 text-xs text-warning">Brak zapisanego kursu — potencjalna wypłata i zysk nie są wyliczane.</p>}
+                          </div>
+                        );
+                      })()}
                       <div><span className="eyebrow">Mecz / termin</span><p>{match?.competition ?? match?.league ?? "Rozgrywki niepodane"} · {match?.kickoff_at ? fmtDateTime(match.kickoff_at) : match?.kickoff_date ?? "Termin nieznany"}</p></div>
                     </div>
                   </div>
