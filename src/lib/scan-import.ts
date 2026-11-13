@@ -146,7 +146,7 @@ export function parseScanRows(
     const selection = normalizeSelection(rawSelection);
     const market = parseMarket(rawMarket, selection);
     if (!market || !isValidPick(market, selection)) {
-      errors.push({ row: rowNumber, message: "market/selection nie pasują. Użyj 1X2 z 1/X/2 albo DOUBLE_CHANCE z 1X/X2/12." });
+      errors.push({ row: rowNumber, message: "market/selection nie pasują. Użyj 1X2 z 1/X/2, DOUBLE_CHANCE z 1X/X2/12 albo GOALS z BTTS/Over/Under." });
       return;
     }
 
