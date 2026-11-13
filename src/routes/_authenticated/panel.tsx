@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronRight, Ticket, Trophy, Wallet } from "lucide-react";
+import { CalendarDays, ChevronRight, Ticket, Trophy } from "lucide-react";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
-import { fmtMoney, fmtPct } from "@/lib/format";
+import { fmtPct } from "@/lib/format";
 import { dashboardSummaryQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_authenticated/panel")({
@@ -46,7 +46,6 @@ function Panel() {
       <PageHeader eyebrow="Europe/Brussels" title="Panel" />
       <p className="mb-3 text-sm text-muted-foreground">Każdy kafelek jest teraz przyciskiem — otwiera odpowiedni widok ze szczegółami.</p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <DashboardTile to="/bankroll" label="Bankroll" value={summary.bankroll == null ? "brak danych" : fmtMoney(summary.bankroll)} icon={Wallet} tone="primary" />
         <DashboardTile to="/mecze" label="Mecze dziś" value={summary.matches_today} icon={CalendarDays} />
         <DashboardTile to="/statystyki" label="Skuteczność 1X2" value={fmtPct(hr1?.rate ?? null)} hint={`${hr1?.won ?? 0}/${hr1?.settled ?? 0} rozliczonych`} icon={Trophy} />
         <DashboardTile to="/statystyki" label="Skuteczność DC" value={fmtPct(hrDc?.rate ?? null)} hint={`${hrDc?.won ?? 0}/${hrDc?.settled ?? 0} rozliczonych`} icon={Trophy} />

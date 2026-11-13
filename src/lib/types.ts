@@ -64,6 +64,9 @@ export interface Prediction {
   created_at: string;
   group_name: string;
   odds: number | null;
+  stake?: number;
+  potential_return?: number | null;
+  profit_loss?: number | null;
   settlement_status: Settlement;
   verified: boolean;
   note: string | null;

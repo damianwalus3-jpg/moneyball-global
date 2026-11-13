@@ -11,7 +11,6 @@ import {
   ShieldHalf,
   Target,
   Ticket,
-  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -30,7 +29,6 @@ type NavTo =
   | "/kupony"
   | "/historia"
   | "/statystyki"
-  | "/bankroll"
   | "/ustawienia";
 
 const NAV: { to: NavTo; label: string; short: string; icon: LucideIcon }[] = [
@@ -42,7 +40,6 @@ const NAV: { to: NavTo; label: string; short: string; icon: LucideIcon }[] = [
   { to: "/kupony", label: "Kupony", short: "Kupony", icon: Ticket },
   { to: "/historia", label: "Historia / Rozliczenia", short: "Historia", icon: History },
   { to: "/statystyki", label: "Statystyki", short: "Statystyki", icon: BarChart3 },
-  { to: "/bankroll", label: "Bankroll", short: "Bankroll", icon: Wallet },
   { to: "/ustawienia", label: "Ustawienia", short: "Ustawienia", icon: Settings },
 ];
 const MOBILE_MAIN: NavTo[] = ["/panel", "/mecze", "/prognozy-1x2", "/double-chance", "/kupony"];

@@ -539,6 +539,17 @@ function Mecze() {
                                     <div><div className="text-xs text-muted-foreground">Pewność</div><strong>{p.confidence ?? "—"}</strong></div>
                                     <div><div className="text-xs text-muted-foreground">Rozliczenie</div><strong>{p.settlement_status}</strong></div>
                                   </div>
+                                  {p.verdict === "WYBRANY" && (
+                                    <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 p-2 text-xs">
+                                      <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                        <span>Stawka pojedyncza: <strong>5,00 €</strong></span>
+                                        <span>Kurs: <strong>{fmtOdds(p.odds)}</strong></span>
+                                        <span>Możliwy zwrot: <strong>{p.odds != null ? fmtMoney(5 * Number(p.odds)) : "brak kursu"}</strong></span>
+                                        <span>Możliwy zysk: <strong>{p.odds != null ? fmtMoney(5 * (Number(p.odds) - 1)) : "—"}</strong></span>
+                                        {p.verified && <span>Wynik: <strong>{fmtMoney(p.profit_loss)}</strong></span>}
+                                      </div>
+                                    </div>
+                                  )}
                                   {(() => {
                                     const linked = couponLegs.filter((leg) => leg.prediction_id === p.id)
                                       .map((leg) => ({ leg, coupon: coupons.find((item) => item.id === leg.coupon_id) }))

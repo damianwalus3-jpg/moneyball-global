@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Banknote, Sparkles, Ticket } from "lucide-react";
+import { Sparkles, Ticket } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState, Field, NoGuarantee, PageHeader, PageLoader, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { saveCouponBatch } from "@/lib/coupons";
-import { deleteRow, fetchAll, insertRow, updateRow } from "@/lib/db";
-import { bankrollBalance, buildCouponBatch, buildSingleCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, MARKET_LABELS, signedAmount } from "@/lib/domain";
+import { deleteRow } from "@/lib/db";
+import { buildCouponBatch, buildSingleCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, MARKET_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel, parseDecimal } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -18,7 +18,7 @@ import type { Coupon, CouponStatus, CouponType, Prediction } from "@/lib/types";
 export const Route = createFileRoute("/_authenticated/kupony")({
   head: () => ({ meta: [{ title: "Kupony — MONEYBALL GLOBAL 2.0" }] }),
   loader: ({ context }) =>
-    ensureTables(context.queryClient, ["matches", "predictions", "coupons", "coupon_legs", "bankroll_transactions", "scan_runs"]),
+    ensureTables(context.queryClient, ["matches", "predictions", "coupons", "coupon_legs", "scan_runs"]),
   pendingComponent: PageLoader,
   component: Kupony,
 });
@@ -40,15 +40,14 @@ function Kupony() {
   const predictions = useTable("predictions");
   const coupons = useTable("coupons");
   const legs = useTable("coupon_legs");
-  const transactions = useTable("bankroll_transactions");
   const scans = useTable("scan_runs");
   const matchById = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
   const predictionById = useMemo(() => new Map(predictions.map((prediction) => [prediction.id, prediction])), [predictions]);
 
   const [couponCount, setCouponCount] = useState("2");
   const [couponSize, setCouponSize] = useState<1 | 3>(3);
-  const [stake, setStake] = useState("");
-  const [recordStake, setRecordStake] = useState(true);
+  const stake = "5";
+  const recordStake = false;
   const [couponType, setCouponType] = useState<CouponType>("TEST");
   const [namePrefix, setNamePrefix] = useState("MONEYBALL");
   const [excludeActive, setExcludeActive] = useState(true);
@@ -99,32 +98,11 @@ function Kupony() {
   );
 
   const removeCoupon = useAction(async (coupon: Coupon) => {
-    const relatedTransactions = transactions.filter((transaction) => transaction.coupon_id === coupon.id);
-    if (relatedTransactions.length) {
-      await updateRow("coupons", coupon.id, {
-        status: "cancelled",
-        notes: [coupon.notes, "Anulowano w aplikacji; transakcje bankrolla zachowano."].filter(Boolean).join(" "),
-      });
-      return;
-    }
     for (const leg of legs.filter((item) => item.coupon_id === coupon.id)) await deleteRow("coupon_legs", leg.id);
     await deleteRow("coupons", coupon.id);
   }, { success: "Kupon usunięty lub bezpiecznie anulowany" });
 
-  const bookPayout = useAction(async ({ coupon, amount }: { coupon: Coupon; amount: number }) => {
-    const currentTransactions = await fetchAll("bankroll_transactions");
-    if (currentTransactions.some((transaction) => transaction.coupon_id === coupon.id && transaction.transaction_type === "return"))
-      throw new Error("Zwrot lub wygrana dla tego kuponu jest już zaksięgowana.");
-    const knownBalance = bankrollBalance(currentTransactions);
-    await insertRow("bankroll_transactions", {
-      transaction_type: "return",
-      amount,
-      balance_after: knownBalance == null ? null : Math.round((knownBalance + signedAmount({ transaction_type: "return", amount })) * 100) / 100,
-      coupon_id: coupon.id,
-      occurred_at: new Date().toISOString(),
-      note: `Rozliczenie kuponu: ${coupon.name}`,
-    });
-  }, { success: "Zaksięgowano zwrot / wygraną" });
+
 
   const list = coupons
     .filter((coupon) => statusFilter === "all" || coupon.status === statusFilter)
@@ -186,19 +164,17 @@ function Kupony() {
           <Field label="Nazwa partii">
             <Input value={namePrefix} onChange={(event) => setNamePrefix(event.target.value)} />
           </Field>
-          <Field label="Stawka na kupon" error={stakeError} hint="Opcjonalna; bez stawki nie zapisuje transakcji bankrolla">
-            <Input inputMode="decimal" className="num" value={stake} onChange={(event) => setStake(event.target.value)} placeholder="np. 2,00" />
-          </Field>
+          <div className="rounded-lg border border-border px-3 py-2">
+            <div className="text-xs text-muted-foreground">Stała stawka na każdy kupon</div>
+            <div className="num text-lg font-semibold">5,00 €</div>
+          </div>
         </div>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2">
             <Checkbox checked={excludeActive} onCheckedChange={(value) => { setExcludeActive(value === true); setGenerated([]); }} />
             Pomiń mecze z aktywnych kuponów
           </label>
-          <label className="flex items-center gap-2">
-            <Checkbox checked={recordStake} onCheckedChange={(value) => setRecordStake(value === true)} />
-            Zapisz stawkę w bankrollu
-          </label>
+
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={generate} disabled={candidates.length < couponSize}>
@@ -267,7 +243,6 @@ function Kupony() {
           {list.map((coupon) => {
             const couponLegs = legs.filter((leg) => leg.coupon_id === coupon.id);
             const payout = couponPayout(coupon.stake, couponLegs);
-            const hasReturn = transactions.some((transaction) => transaction.coupon_id === coupon.id && transaction.transaction_type === "return");
             return (
               <div key={coupon.id} className="surface-card p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -304,12 +279,6 @@ function Kupony() {
                   <div><div className="eyebrow">Zwrot</div>{fmtMoney(payout)}</div>
                 </div>
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
-                  {(coupon.status === "won" || coupon.status === "void") && payout != null && payout > 0 && !hasReturn && (
-                    <Button size="sm" variant="outline" disabled={bookPayout.isPending} onClick={() => bookPayout.mutate({ coupon, amount: payout })}>
-                      <Banknote /> Zaksięguj {fmtMoney(payout)}
-                    </Button>
-                  )}
-                  {hasReturn && <span className="self-center text-xs text-muted-foreground">Rozliczenie ujęte w ledgerze</span>}
                   {coupon.status === "pending" && (
                     <Button size="sm" variant="ghost" onClick={() => removeCoupon.mutate(coupon)} disabled={removeCoupon.isPending}>Anuluj / usuń</Button>
                   )}
