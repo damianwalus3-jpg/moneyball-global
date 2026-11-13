@@ -213,6 +213,12 @@ Deno.serve(async(req)=>{
    try{resultSync=syncText?JSON.parse(syncText):{ok:false,error:"Empty result-sync response"};}catch(_){resultSync={ok:false,error:syncText.slice(0,500)};}
    if(!syncResponse.ok)resultSync={...resultSync,ok:false,http_status:syncResponse.status};
   }catch(e){resultSync={ok:false,error:String(e)};}
-  return new Response(JSON.stringify({ok:predictionSync.ok&&resultSync.ok!==false,date,total_found:result.total_found,fixtures_count:result.fixtures.length,combined_count:combined.length,public_fixtures:publicFixtures.length,enriched,public_only:publicOnly,public_source_status:publicSourceStatus,inserted,updated,settled,matched_by_fixture:matchedByFixture,promoted_to_primary:promotedToPrimary,scan_run_id:run.id,prediction_sync:predictionSync,result_sync:resultSync}),{status:predictionSync.ok&&resultSync.ok!==false?200:502,headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
+  const pipelineOk=predictionSync.ok&&resultSync.ok!==false;
+  await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{
+   status:pipelineOk?"completed":"partial",
+   completed_at:new Date().toISOString(),
+   notes:"FootyNomad "+result.fixtures.length+"; inserted "+inserted+"; updated "+updated+"; predictions "+JSON.stringify({ok:predictionSync.ok,batches:predictionSync.batches,total:predictionSync.total_predictions,selected:predictionSync.selected,error:predictionSync.error||null}).slice(0,900)+"; results "+JSON.stringify({ok:resultSync.ok,results_saved:resultSync.results_saved,predictions_settled:resultSync.predictions_settled,coupon_legs_settled:resultSync.coupon_legs_settled,error:resultSync.error||null}).slice(0,900)
+  }).catch((e:any)=>console.error("Final scan status update failed:",String(e)));
+  return new Response(JSON.stringify({ok:pipelineOk,date,total_found:result.total_found,fixtures_count:result.fixtures.length,combined_count:combined.length,public_fixtures:publicFixtures.length,enriched,public_only:publicOnly,public_source_status:publicSourceStatus,inserted,updated,settled,matched_by_fixture:matchedByFixture,promoted_to_primary:promotedToPrimary,scan_run_id:run.id,prediction_sync:predictionSync,result_sync:resultSync}),{status:pipelineOk?200:502,headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
  }catch(e){return new Response(JSON.stringify({error:String(e)}),{status:400,headers:{...cors,"Content-Type":"application/json"}});}
 });
