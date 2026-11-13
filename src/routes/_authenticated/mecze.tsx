@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CalendarDays, CircleDollarSign, FileUp, Flag, Pencil, Plus, ScanLine } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronUp, CircleDollarSign, FileUp, Flag, Pencil, Plus, ScanLine } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,7 @@ function Mecze() {
   const [editScan, setEditScan] = useState<ScanRun | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const [predictionProgress, setPredictionProgress] = useState("");
+  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
 
   const delScan = useAction((id: string) => deleteRow("scan_runs", id), {
     success: "Usunięto skan",
@@ -363,6 +364,9 @@ function Mecze() {
                         </Badge>
                       )}
                       <div className="flex items-center">
+                        <Button variant="ghost" size="sm" aria-expanded={expandedMatchId === m.id} onClick={() => setExpandedMatchId(expandedMatchId === m.id ? null : m.id)}>
+                          {expandedMatchId === m.id ? <ChevronUp /> : <ChevronDown />} Szczegóły
+                        </Button>
                         <Button variant="ghost" size="icon" aria-label="Kursy" title="Dodaj kursy" disabled={!preds.some((prediction) => prediction.match_id === m.id && isActivePredictionVersion(prediction.model_version))} onClick={() => setOddsFor(m.id)}>
                           <CircleDollarSign />
                         </Button>
@@ -389,6 +393,40 @@ function Mecze() {
                         />
                       </div>
                     </div>
+                    {expandedMatchId === m.id && (
+                      <div className="surface-card mt-2 border border-primary/20 p-4">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <div className="font-semibold">{m.home_team} – {m.away_team}</div>
+                          <Badge variant="outline">{m.competition ?? m.league ?? "Liga nieznana"}{m.country ? " · " + m.country : ""}</Badge>
+                        </div>
+                        {(() => {
+                          const details = preds.filter((p) => p.match_id === m.id && isActivePredictionVersion(p.model_version))
+                            .sort((a, b) => (a.market + a.selection).localeCompare(b.market + b.selection));
+                          return details.length ? (
+                            <div className="grid gap-3 md:grid-cols-2">
+                              {details.map((p) => (
+                                <div key={p.id} className="rounded-lg border border-border p-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="font-semibold">{p.market === "DOUBLE_CHANCE" ? "Double Chance" : p.market === "GOALS" ? "Gole / BTTS" : "1X2"} · {p.selection}</span>
+                                    <Badge variant={p.verdict === "WYBRANY" ? "success" : "muted"}>{p.verdict}</Badge>
+                                  </div>
+                                  <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                                    <div><div className="text-xs text-muted-foreground">Prawdopodobieństwo</div><strong>{p.probability == null ? "Brak" : Number(p.probability).toFixed(1) + "%"}</strong></div>
+                                    <div><div className="text-xs text-muted-foreground">Kurs bukmachera</div><strong>{fmtOdds(p.odds)}</strong></div>
+                                    <div><div className="text-xs text-muted-foreground">Pewność</div><strong>{p.confidence ?? "—"}</strong></div>
+                                    <div><div className="text-xs text-muted-foreground">Rozliczenie</div><strong>{p.settlement_status}</strong></div>
+                                  </div>
+                                  {p.rationale && <p className="mt-3 text-sm leading-relaxed"><span className="font-medium">Dlaczego model tak typuje:</span> {p.rationale}</p>}
+                                  {p.rejection_reason && <p className="mt-2 text-sm text-amber-300"><span className="font-medium">Powód odrzucenia:</span> {p.rejection_reason}</p>}
+                                  <p className="mt-2 break-words text-xs text-muted-foreground">Źródło: {p.data_source ?? "niepodane"} · Model: {p.model_version}</p>
+                                  {p.data_coverage && <p className="mt-1 break-words text-xs text-muted-foreground">Pokrycie danych: {Object.entries(p.data_coverage).filter(([,v]) => v != null && v !== false && v !== "").map(([k,v]) => k + ": " + (typeof v === "object" ? JSON.stringify(v) : String(v))).join(" · ") || "brak szczegółów"}</p>}
+                                </div>
+                              ))}
+                            </div>
+                          ) : <p className="text-sm text-muted-foreground">Dla tego meczu nie ma jeszcze prognoz aktywnego modelu.</p>;
+                        })()}
+                      </div>
+                    )}
                   );
                 })}
               </div>
