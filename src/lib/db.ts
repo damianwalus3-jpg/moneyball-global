@@ -2,6 +2,20 @@ import { requireSupabase } from "./supabase";
 import { COLUMNS, OWNER_COLUMN } from "./schema";
 import type { TableName, TableRows } from "./types";
 
+export interface DashboardMarketStats {
+  won: number;
+  settled: number;
+  rate: number | null;
+}
+export interface DashboardSummary {
+  matches_today: number;
+  bankroll: number | null;
+  coupons_in_play: number;
+  candidates: number;
+  to_settle: number;
+  hit_rates: Partial<Record<"1X2" | "DOUBLE_CHANCE" | "GOALS", DashboardMarketStats>>;
+}
+
 interface PgError {
   code?: string;
   message?: string;
@@ -42,6 +56,12 @@ export async function currentUserId(): Promise<string> {
   const { data, error } = await requireSupabase().auth.getUser();
   if (error || !data.user?.id) throw new Error("Sesja wygasła. Zaloguj się ponownie.");
   return data.user.id;
+}
+
+export async function fetchDashboardSummary(): Promise<DashboardSummary> {
+  const { data, error } = await requireSupabase().rpc("moneyball_dashboard_summary");
+  if (error) throw new Error(humanizeError(error));
+  return data as DashboardSummary;
 }
 
 function clean(row: Record<string, unknown>) {
