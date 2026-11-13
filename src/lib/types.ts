@@ -1,7 +1,8 @@
-export type Market = "1X2" | "DOUBLE_CHANCE";
+export type Market = "1X2" | "DOUBLE_CHANCE" | "GOALS";
 export type Selection1X2 = "1" | "X" | "2";
 export type SelectionDC = "1X" | "X2" | "12";
-export type Selection = Selection1X2 | SelectionDC;
+export type SelectionGoals = "BTTS_YES" | "BTTS_NO" | "OVER_1.5" | "UNDER_1.5" | "OVER_2.5" | "UNDER_2.5" | "OVER_3.5" | "UNDER_3.5";
+export type Selection = Selection1X2 | SelectionDC | SelectionGoals;
 export type Outcome = Selection1X2;
 export type Verdict = "WYBRANY" | "ODRZUCONY";
 export type Settlement = "pending" | "won" | "lost" | "void";
@@ -12,7 +13,7 @@ export type ScanRunStatus = "started" | "completed" | "partial" | "failed";
 export type CouponType = "TEST" | "MAIN" | "MEGA" | "EXTRA";
 export type TransactionType = "deposit" | "withdrawal" | "stake" | "return" | "adjustment";
 // Legacy view-model aliases; the database still uses canonical columns.
-export type PredictionType = "1X2" | "DC";
+export type PredictionType = "1X2" | "DC" | "GOALS";
 export type SelectionStatus = Verdict;
 export type TxType = "deposit" | "withdrawal" | "stake" | "payout" | "adjustment";
 
