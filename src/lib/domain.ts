@@ -168,7 +168,7 @@ export function buildSingleCouponBatch<T extends { match_id: string; probability
 }
 
 export function validateCoupon(
-  legs: { match_id: string; probability: number | null }[],
+  legs: { match_id: string; probability: number | null; odds?: number | null }[],
   usedMatchIds: Set<string> = new Set(),
   targetLegs: 1 | 3 = COUPON_SIZE,
   requireOdds = false,
