@@ -1,4 +1,4 @@
-import { Pencil, Plus, Target } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Target } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ export function PredictionsView({ market }: { market: Market }) {
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<Prediction | null>(null);
   const [open, setOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const byId = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
   const visible = modelScope === "all"
     ? all
@@ -120,7 +121,7 @@ export function PredictionsView({ market }: { market: Market }) {
               : null;
             const fairSelectionOdds = fairSelectionProbability != null && fairSelectionProbability > 0 ? 1 / fairSelectionProbability : null;
             return (
-              <div key={prediction.id} className="surface-card flex flex-wrap items-center gap-3 p-3">
+              <div key={prediction.id} className="surface-card grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3 p-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
                 <div className="num flex size-12 items-center justify-center rounded-lg bg-primary/10 text-lg font-semibold text-primary">
                   {prediction.selection}
                 </div>
