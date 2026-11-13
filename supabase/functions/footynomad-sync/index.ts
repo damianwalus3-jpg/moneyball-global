@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-const SUPABASE_URL="https://gzgeklcukrclgwbsmbsp.supabase.co";
-const KEY="sb_publishable_YdT4Nm50NkbmjKnoQE8bNQ_aGeqzG3S";
+const SUPABASE_URL=Deno.env.get("SUPABASE_URL")||"https://xwrgfaarmwnguymresjy.supabase.co";
+const KEY=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||"sb_publishable_E27tyjResjElwC4AWbmILw_wbtibXhX";
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-requested-with, prefer, cache-control, pragma","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Max-Age":"86400","Vary":"Origin"};
 
 
@@ -60,7 +60,7 @@ Deno.serve(async(req)=>{
   let publicSourceStatus:any={ok:false,error:"not_called"};
   let publicFixtures:any[]=[];
   try{
-   const pr=await fetch("https://gzgeklcukrclgwbsmbsp.supabase.co/functions/v1/moneyball-public-sources?date="+date,{headers:{"Accept":"application/json"}});
+   const pr=await fetch(SUPABASE_URL+"/functions/v1/moneyball-public-sources?date="+date,{headers:{"Accept":"application/json"}});
    const pt=await pr.text();
    if(!pr.ok)throw new Error("Public sources HTTP "+pr.status+": "+pt.slice(0,300));
    const pj=JSON.parse(pt);publicFixtures=Array.isArray(pj.fixtures)?pj.fixtures.filter((f:any)=>isEuropeanFixture(f.country,f.league||f.competition,f.home_team||f.home,f.away_team||f.away)):[];
