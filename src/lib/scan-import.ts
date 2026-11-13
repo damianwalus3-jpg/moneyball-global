@@ -57,9 +57,11 @@ function parseMarket(raw: string, selection: string): Market | null {
   const market = raw.trim().toUpperCase().replace(/\s/g, "_");
   if (market === "1X2") return "1X2";
   if (market === "DOUBLE_CHANCE") return "DOUBLE_CHANCE";
+  if (market === "GOALS") return "GOALS";
   if (!market) {
     if (["1", "X", "2"].includes(selection)) return "1X2";
     if (["1X", "X2", "12"].includes(selection)) return "DOUBLE_CHANCE";
+    if (["BTTS_YES", "BTTS_NO", "OVER_1.5", "UNDER_1.5", "OVER_2.5", "UNDER_2.5", "OVER_3.5", "UNDER_3.5"].includes(selection)) return "GOALS";
   }
   return null;
 }
