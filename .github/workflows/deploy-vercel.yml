@@ -1,4 +1,4 @@
-name: Deploy Moneyball to Vercel
+name: Vercel deployment status
 
 on:
   push:
@@ -8,35 +8,12 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: vercel-production
-  cancel-in-progress: false
-
 jobs:
-  deploy:
+  deployment:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-      - name: Install locked dependencies
-        run: bun install --frozen-lockfile
-      - name: Build and deploy to Vercel
-        if: ${{ env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != '' }}
+      - name: Use native Vercel Git integration
         run: |
-          bunx vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-          bunx vercel build --prod --token="$VERCEL_TOKEN"
-          bunx vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
-      - name: Fail clearly when deployment credentials are missing
-        if: ${{ env.VERCEL_TOKEN == '' || env.VERCEL_ORG_ID == '' || env.VERCEL_PROJECT_ID == '' }}
-        run: |
-          echo "::error::Vercel deployment was NOT performed. Add VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID under Repository Settings > Secrets and variables > Actions."
-          exit 1
+          echo "Production deployments are handled by the connected Vercel Git integration."
+          echo "GitHub Actions does not need VERCEL_TOKEN, VERCEL_ORG_ID or VERCEL_PROJECT_ID."
+          echo "Build, type-check and tests are enforced by the Moneyball CI workflow."
