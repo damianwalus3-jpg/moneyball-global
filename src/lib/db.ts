@@ -69,17 +69,29 @@ async function fetchRawAll<K extends TableName>(table: K): Promise<TableRows[K][
   const sb = requireSupabase();
   const uid = await currentUserId();
   const columns = READ_COLUMNS[table].join(",");
+  const { count, error: countError } = await sb
+    .from(table)
+    .select("id", { count: "exact", head: true })
+    .eq(OWNER_COLUMN, uid);
+  if (countError) throw new Error(humanizeError(countError, table));
+  const pageCount = Math.ceil((count ?? 0) / PAGE);
+  if (pageCount === 0) return [];
+  // Fetch independent pages concurrently instead of waiting for each 1,000-row
+  // request to finish before starting the next one.
+  const pages = await Promise.all(
+    Array.from({ length: pageCount }, (_, page) =>
+      sb
+        .from(table)
+        .select(columns)
+        .eq(OWNER_COLUMN, uid)
+        .order("id", { ascending: true })
+        .range(page * PAGE, (page + 1) * PAGE - 1),
+    ),
+  );
   const rows: TableRows[K][] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await sb
-      .from(table)
-      .select(columns)
-      .eq(OWNER_COLUMN, uid)
-      .order("id", { ascending: true })
-      .range(from, from + PAGE - 1);
-    if (error) throw new Error(humanizeError(error, table));
-    rows.push(...((data ?? []) as unknown as TableRows[K][]));
-    if (!data || data.length < PAGE) break;
+  for (const page of pages) {
+    if (page.error) throw new Error(humanizeError(page.error, table));
+    rows.push(...((page.data ?? []) as unknown as TableRows[K][]));
   }
   return rows;
 }
@@ -98,8 +110,6 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
   }
   if (table === "predictions") {
     const predictions = rows as TableRows["predictions"][];
-    const matches = await fetchRawAll("matches");
-    const scanRunByMatch = new Map(matches.map((match) => [match.id, match.scan_run_id]));
     return predictions.map((row) => ({
       ...row,
       prediction_type: row.market === "DOUBLE_CHANCE" ? "DC" : row.market === "GOALS" ? "GOALS" : "1X2",
@@ -110,7 +120,7 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
       notes: row.note,
       data_source: row.data_source,
       data_coverage: row.data_coverage ?? null,
-      scan_run_id: row.scan_run_id ?? scanRunByMatch.get(row.match_id) ?? null,
+      scan_run_id: row.scan_run_id ?? null,
       settled_at: null,
     })) as TableRows[K][];
   }
