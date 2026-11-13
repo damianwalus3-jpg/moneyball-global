@@ -4,7 +4,7 @@ import { fetchAll, fetchDashboardSummary } from "./db";
 import type { TableName } from "./types";
 
 const LIVE_TABLES = new Set<TableName>([
-  "scan_runs", "matches", "predictions", "match_results", "provider_odds",
+  "scan_runs", "matches", "predictions", "match_results",
   "odds_snapshots", "coupons", "coupon_legs", "bankroll_transactions",
 ]);
 
