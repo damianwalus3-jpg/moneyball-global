@@ -20,7 +20,7 @@ describe("default Supabase connection", () => {
     vi.unstubAllEnvs();
   });
 
-  it("uses the built-in public key for the existing MONEYBALL project", () => {
+  it("uses the built-in public key for the isolated MONEYBALL test project", () => {
     expect(readConfig()).toEqual({
       url: DEFAULT_SUPABASE_URL,
       anonKey: DEFAULT_SUPABASE_PUBLISHABLE_KEY,
