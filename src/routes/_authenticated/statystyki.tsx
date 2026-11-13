@@ -42,6 +42,8 @@ function Statystyki() {
   const coupons = useTable("coupons");
   const legs = useTable("coupon_legs");
   const activePreds = preds.filter((prediction) => isActivePredictionVersion(prediction.model_version));
+  const settledSinglePicks = activePreds.filter((p) => p.verdict === "WYBRANY" && p.verified && (p.settlement_status === "won" || p.settlement_status === "lost" || p.settlement_status === "void"));
+  const singlePickProfit = settledSinglePicks.reduce((sum, p) => sum + Number(p.profit_loss ?? (p.settlement_status === "lost" ? -(p.stake ?? 5) : 0)), 0);
   const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
 
   const settledCoupons = coupons.filter((c) => c.status === "won" || c.status === "lost" || c.status === "void");
@@ -71,6 +73,15 @@ function Statystyki() {
         description="Statystyki pokazują aktywny model i wpisy ręczne; stare wersje pozostają w historii. Skuteczność = wygrane / (wygrane + przegrane)."
       />
 
+      <section className="mb-6">
+        <h2 className="mb-3 text-2xl font-semibold uppercase">Pojedyncze zakłady · 5 € każdy</h2>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard label="Rozliczone typy" value={settledSinglePicks.length} />
+          <StatCard label="Wygrane" value={settledSinglePicks.filter((p) => p.settlement_status === "won").length} />
+          <StatCard label="Przegrane" value={settledSinglePicks.filter((p) => p.settlement_status === "lost").length} />
+          <StatCard label="Zysk / strata" value={fmtMoney(singlePickProfit)} tone={singlePickProfit < 0 ? "danger" : "primary"} />
+        </div>
+      </section>
       <div className="grid gap-6">
         {(["1X2", "DOUBLE_CHANCE", "GOALS"] as Market[]).map((t) => (
           <MarketBlock key={t} type={t} preds={activePreds.filter((prediction) => prediction.market === t)} leagueOf={(p) => byId.get(p.match_id)?.competition ?? "—"} />
