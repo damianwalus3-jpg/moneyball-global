@@ -117,7 +117,7 @@ export function SelectionBadge({ status }: { status: Verdict | null | undefined 
 }
 
 export function TypeBadge({ type }: { type: Market }) {
-  return <Badge variant={type === "DOUBLE_CHANCE" ? "info" : "outline"}>{type === "DOUBLE_CHANCE" ? "Double Chance" : "1X2"}</Badge>;
+  return <Badge variant={type === "DOUBLE_CHANCE" ? "info" : type === "GOALS" ? "success" : "outline"}>{type === "DOUBLE_CHANCE" ? "Double Chance" : type === "GOALS" ? "Gole / BTTS" : "1X2"}</Badge>;
 }
 
 export function PageLoader() {
