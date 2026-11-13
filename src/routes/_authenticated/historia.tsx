@@ -42,6 +42,7 @@ function Historia() {
   const matches = useTable("matches");
   const preds = useTable("predictions");
   const results = useTable("match_results");
+  const legs = useTable("coupon_legs");
   const [tab, setTab] = useState<"todo" | "done">("todo");
   const [q, setQ] = useState("");
   const [settle, setSettle] = useState<Match | null>(null);
@@ -54,7 +55,12 @@ function Historia() {
       const started = m.kickoff_at && new Date(m.kickoff_at).getTime() < now;
       // Postponed/cancelled fixtures are already settled as void; they must not
       // remain in the pending queue just because no numeric score exists.
-      return !!started && !isVoided(m) && (!result || !result.verified);
+      if (!started || isVoided(m) || result?.verified) return false;
+      const matchPredictions = preds.filter((p) => p.match_id === m.id);
+      const selectedIds = new Set(matchPredictions.filter((p) => p.verdict === "WYBRANY").map((p) => p.id));
+      const selectedPending = matchPredictions.some((p) => p.verdict === "WYBRANY" && p.settlement_status === "pending");
+      const couponPending = legs.some((leg) => selectedIds.has(leg.prediction_id) && leg.status === "pending");
+      return selectedPending || couponPending;
     })
     .sort((a, b) => (a.kickoff_at ?? "").localeCompare(b.kickoff_at ?? ""));
   const done = matches
@@ -129,7 +135,7 @@ function Historia() {
                         <span className="num text-xs text-muted-foreground">{fmtPct(p.probability)}</span>
                         <SelectionBadge status={p.verdict} />
                         <span className="flex-1" />
-                        <SettlementBadge status={p.settlement_status} />
+                        {p.verdict === "WYBRANY" ? <SettlementBadge status={p.settlement_status} /> : <span className="text-xs text-muted-foreground">Nie obstawiono · bez rozliczenia</span>}
                       </div>
                     ))}
                   </div>

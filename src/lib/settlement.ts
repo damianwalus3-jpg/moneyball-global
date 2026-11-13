@@ -133,7 +133,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
 
   if (!verified) {
     if (input.existingResult?.verified) {
-      const affected = input.predictions.filter((prediction) => prediction.match_id === match.id);
+      const affected = input.predictions.filter((prediction) => prediction.match_id === match.id && prediction.verdict === "WYBRANY");
       for (const prediction of affected) {
         if (prediction.settlement_status !== "pending" || prediction.verified) {
           await updateRow("predictions", prediction.id, { settlement_status: "pending", verified: false });
@@ -171,7 +171,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
   };
 
   let changedPredictions = 0;
-  for (const prediction of input.predictions.filter((item) => item.match_id === match.id)) {
+  for (const prediction of input.predictions.filter((item) => item.match_id === match.id && item.verdict === "WYBRANY")) {
     const status = resolve(prediction);
     if (prediction.settlement_status !== status || !prediction.verified) {
       await updateRow("predictions", prediction.id, {
@@ -186,7 +186,10 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
 
   const predictionById = new Map(input.predictions.map((prediction) => [prediction.id, prediction]));
   const touchedLegs = input.legs.filter(
-    (leg) => predictionById.get(leg.prediction_id)?.match_id === match.id,
+    (leg) => {
+      const prediction = predictionById.get(leg.prediction_id);
+      return prediction?.match_id === match.id && prediction.verdict === "WYBRANY";
+    },
   );
   const touchedCouponIds = new Set<string>();
 
