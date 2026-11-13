@@ -356,7 +356,19 @@ Deno.serve(async(req:Request)=>{
       const alternates=alternateByMatch.get(x.m.id)||[];
       const conflicts=alternates.filter(a=>a.status==="finished"&&Number.isInteger(a.home_score)&&Number.isInteger(a.away_score)&&(a.home_score!==x.f.home_score||a.away_score!==x.f.away_score));
       if(conflicts.length)throw new Error("ROZBIEŻNOŚĆ WYNIKÓW: FootyNomad vs "+conflicts.map(a=>a.source).join(", ")+" — wstrzymano rozliczenie");
-      const prior=existingResultByMatch.get(x.m.id);if(prior?.verified===true&&Number(prior.home_score)===Number(x.f.home_score)&&Number(prior.away_score)===Number(x.f.away_score)){if(x.m.status!=="finished")await db("matches?id=eq."+x.m.id,"PATCH",{status:"finished",updated_at:new Date().toISOString()});return {settled:0,legsSettled:0,skipped:true};}return processFixture(x.f,x.m,"FootyNomad",x.f.external_id);
+      const prior=existingResultByMatch.get(x.m.id);
+      if(prior?.verified===true&&Number(prior.home_score)===Number(x.f.home_score)&&Number(prior.away_score)===Number(x.f.away_score)){
+       const storedPredictions=await db("predictions?select=id,settlement_status,verified&match_id=eq."+x.m.id);
+       const pendingLegs=await db("coupon_legs?select=id,status&match_id=eq."+x.m.id+"&status=eq.pending");
+       const needsSettlement=(storedPredictions||[]).some((p:any)=>p.settlement_status==="pending"||p.verified!==true)||(pendingLegs||[]).length>0;
+       if(!needsSettlement){
+        if(x.m.status!=="finished")await db("matches?id=eq."+x.m.id,"PATCH",{status:"finished",updated_at:new Date().toISOString()});
+        return {settled:0,legsSettled:0,skipped:true};
+       }
+      }
+      // A result may have been saved before late predictions/coupon legs were created.
+      // Re-run settlement whenever any linked prediction or leg is still pending.
+      return processFixture(x.f,x.m,"FootyNomad",x.f.external_id);
      }));
      for(let j=0;j<done.length;j++){const d=done[j];if(d.status==="fulfilled"){if(!(d.value as any).skipped)resultsSaved++;predictionsSettled+=d.value.settled;couponLegsSettled+=d.value.legsSettled;}else errors.push(date+" "+batch[j].f.external_id+": "+String(d.reason));}
     }
