@@ -7,7 +7,9 @@ export function tableQuery<K extends TableName>(table: K) {
   return queryOptions({
     queryKey: ["table", table] as const,
     queryFn: () => fetchAll(table),
-    staleTime: 30_000,
+    staleTime: 120_000,
+    gcTime: 600_000,
+    refetchOnWindowFocus: false,
   });
 }
 
