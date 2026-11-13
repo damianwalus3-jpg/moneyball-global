@@ -22,6 +22,7 @@ export function isActivePredictionVersion(version: string | null | undefined): b
 export const PICKS: Record<Market, Selection[]> = {
   "1X2": ["1", "X", "2"],
   DOUBLE_CHANCE: ["1X", "X2", "12"],
+  GOALS: ["BTTS_YES", "BTTS_NO", "OVER_1.5", "UNDER_1.5", "OVER_2.5", "UNDER_2.5", "OVER_3.5", "UNDER_3.5"],
 };
 
 export const PICK_LABELS: Record<Selection, string> = {
@@ -31,11 +32,20 @@ export const PICK_LABELS: Record<Selection, string> = {
   "1X": "1X · gospodarze lub remis",
   X2: "X2 · remis lub goście",
   "12": "12 · bez remisu",
+  BTTS_YES: "BTTS TAK · obie strzelą",
+  BTTS_NO: "BTTS NIE · nie obie strzelą",
+  "OVER_1.5": "Powyżej 1,5 gola",
+  "UNDER_1.5": "Poniżej 1,5 gola",
+  "OVER_2.5": "Powyżej 2,5 gola",
+  "UNDER_2.5": "Poniżej 2,5 gola",
+  "OVER_3.5": "Powyżej 3,5 gola",
+  "UNDER_3.5": "Poniżej 3,5 gola",
 };
 
 export const MARKET_LABELS: Record<Market, string> = {
   "1X2": "1X2",
   DOUBLE_CHANCE: "Double Chance",
+  GOALS: "Gole / BTTS",
 };
 
 export const SETTLEMENT_LABELS: Record<Settlement, string> = {
@@ -75,10 +85,28 @@ export function outcomeFromScore(home: number, away: number): Outcome {
 }
 
 export function settlePick(market: Market, selection: Selection, outcome: Outcome): "won" | "lost" {
+  if (market === "GOALS") throw new Error("Rynek GOALS wymaga dokładnego wyniku bramkowego.");
   if (market === "1X2") return selection === outcome ? "won" : "lost";
   if (selection === "1X") return outcome === "1" || outcome === "X" ? "won" : "lost";
   if (selection === "X2") return outcome === "X" || outcome === "2" ? "won" : "lost";
   return outcome === "1" || outcome === "2" ? "won" : "lost";
+}
+
+export function settleGoalsPick(selection: Selection, home: number, away: number): "won" | "lost" {
+  if (!Number.isInteger(home) || !Number.isInteger(away) || home < 0 || away < 0)
+    throw new Error("Wynik bramkowy musi zawierać nieujemne liczby całkowite.");
+  const total = home + away;
+  switch (selection) {
+    case "BTTS_YES": return home > 0 && away > 0 ? "won" : "lost";
+    case "BTTS_NO": return home === 0 || away === 0 ? "won" : "lost";
+    case "OVER_1.5": return total >= 2 ? "won" : "lost";
+    case "UNDER_1.5": return total <= 1 ? "won" : "lost";
+    case "OVER_2.5": return total >= 3 ? "won" : "lost";
+    case "UNDER_2.5": return total <= 2 ? "won" : "lost";
+    case "OVER_3.5": return total >= 4 ? "won" : "lost";
+    case "UNDER_3.5": return total <= 3 ? "won" : "lost";
+    default: throw new Error("Nieprawidłowy typ rynku GOALS.");
+  }
 }
 
 export function couponStatus(legs: (Settlement | null | undefined)[]): Settlement {
