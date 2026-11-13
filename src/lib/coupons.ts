@@ -16,7 +16,8 @@ export interface SaveBatchOptions {
 export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatchOptions) {
   if (!coupons.length) throw new Error("Brak kuponów do zapisania.");
   const targetLegs = options.targetLegs ?? 3;
-  const errors = validateBatch(coupons, targetLegs);
+  const requireOdds = options.couponType != null && options.couponType !== "TEST";
+  const errors = validateBatch(coupons, targetLegs, requireOdds);
   if (errors.length) throw new Error(errors.join(" "));
   if (options.recordStake && (options.stake == null || !Number.isFinite(options.stake) || options.stake <= 0))
     throw new Error("Podaj dodatnią stawkę albo wyłącz zapis stawki w bankrollu.");
