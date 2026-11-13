@@ -35,9 +35,10 @@ async function readFixtures(date:string){
   const country=cs>=0&&ce>cs?textOf(html.slice(cs,ce)).replace(/\s+\d+$/,"").trim():null;
   if(!isEuropeanFixture(country,league,home,away))continue;
   const cls=(attrs.match(/class=["']([^"']+)/i)||[])[1]||"",status=cls.includes("ticket-live")?"live":cls.includes("ticket-ft")?"finished":cls.includes("ticket-pst")?"postponed":cls.includes("ticket-canc")?"cancelled":"scheduled";
-  const hs=(body.match(/class=["'][^"']*ticket-hs[^"']*["'][^>]*>([0-9]+)</i)||[])[1],as=(body.match(/class=["'][^"']*ticket-as[^"']*["'][^>]*>([0-9]+)</i)||[])[1];
+  const bodyText=textOf(body),homeAt=bodyText.toLowerCase().indexOf(home.toLowerCase()),awayAt=bodyText.toLowerCase().lastIndexOf(away.toLowerCase()),scoreBetween=homeAt>=0&&awayAt>homeAt?bodyText.slice(homeAt+home.length,awayAt):"",scoreParts=scoreBetween.match(/[0-9]+/g)||[];
+  const hs=(body.match(/class=["'][^"']*ticket-hs[^"']*["'][^>]*>([0-9]+)</i)||[])[1]||scoreParts[0],as=(body.match(/class=["'][^"']*ticket-as[^"']*["'][^>]*>([0-9]+)</i)||[])[1]||scoreParts[1],liveMinute=(bodyText.match(/([0-9]{1,3}(?:\+[0-9]{1,2})?)\s*['’]\s*live/i)||[])[1]||null;
   const gender=/\bW\b|Women|female|girls/i.test(home+" "+away+" "+league)?"women":"men";
-  fixtures.push({external_id:id,source:"FootyNomad",date,competition:league||null,country,gender,home_team:home,away_team:away,kickoff_at:time?new Date(time).toISOString():null,status,home_score:hs==null?null:Number(hs),away_score:as==null?null:Number(as)});
+  fixtures.push({external_id:id,source:"FootyNomad",date,competition:league||null,country,gender,home_team:home,away_team:away,kickoff_at:time?new Date(time).toISOString():null,status,home_score:hs==null?null:Number(hs),away_score:as==null?null:Number(as),live_minute:status==="live"?liveMinute:null});
  }
  const total=fixtures.length;
  return {date,total_found:total,fixtures_count:fixtures.length,fixtures};
@@ -136,10 +137,10 @@ Deno.serve(async(req)=>{
     if(!exact&&byFixture)matchedByFixture++;
     const noteData={integration:"MONEYBALL_PUBLIC_AGGREGATOR",sources:(f as any).public_data?.sources||[source],home_form:(f as any).home_form||(f as any).public_data?.home_form||null,away_form:(f as any).away_form||(f as any).public_data?.away_form||null,public_data:(f as any).public_data||null};
     publicDataByKey.set(key,noteData);
-    const row={owner_id:ownerId,scan_run_id:run.id,external_id:sourceId,source,competition:f.competition||f.league||null,country:f.country||null,gender:f.gender||"unknown",home_team:f.home_team,away_team:f.away_team,kickoff_at:f.kickoff_at||null,kickoff_date:String(f.date||date).slice(0,10),status:f.status||"scheduled"};
+    const row={owner_id:ownerId,scan_run_id:run.id,external_id:sourceId,source,competition:f.competition||f.league||null,country:f.country||null,gender:f.gender||"unknown",home_team:f.home_team,away_team:f.away_team,kickoff_at:f.kickoff_at||null,kickoff_date:String(f.date||date).slice(0,10),status:f.status||"scheduled",live_home_score:f.status==="live"&&Number.isInteger(f.home_score)?f.home_score:null,live_away_score:f.status==="live"&&Number.isInteger(f.away_score)?f.away_score:null,live_minute:f.status==="live"?f.live_minute||null:null,live_updated_at:f.status==="live"?new Date().toISOString():null};
     if(existing){
      if(source==="FootyNomad"||String(existing.source)===source){
-      const patch:any={scan_run_id:run.id,kickoff_at:row.kickoff_at,kickoff_date:row.kickoff_date,status:row.status,competition:row.competition,gender:row.gender,country:row.country};
+      const patch:any={scan_run_id:run.id,kickoff_at:row.kickoff_at,kickoff_date:row.kickoff_date,status:row.status,live_home_score:row.live_home_score,live_away_score:row.live_away_score,live_minute:row.live_minute,live_updated_at:row.live_updated_at,competition:row.competition,gender:row.gender,country:row.country};
       if(source==="FootyNomad"&&String(existing.source)!=="FootyNomad"){patch.source=source;patch.external_id=sourceId;promotedToPrimary++;}
       await db("matches?id=eq."+existing.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",patch);
       updated++;
