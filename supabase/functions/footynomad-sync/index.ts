@@ -171,9 +171,37 @@ Deno.serve(async(req)=>{
    }
    await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"completed",completed_at:new Date().toISOString(),matches_found:combined.length,notes:"FootyNomad "+result.fixtures.length+"; public fixtures "+publicFixtures.length+"; enriched "+enriched+"; public-only "+publicOnly+"; inserted "+inserted+"; updated "+updated+"; settled "+settled+"; matched by fixture "+matchedByFixture+"; promoted "+promotedToPrimary+"; public source status "+JSON.stringify(publicSourceStatus).slice(0,900)});
   }catch(e){await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"partial",completed_at:new Date().toISOString(),notes:"Import częściowy: "+String(e)});throw e;}
-  // Run the same verified result settlement pipeline used by the scheduled synchronizer.
-  // This ensures match results, predictions, coupon legs and coupon statuses stay consistent
-  // after a manual fixture scan, including finished matches returned by the fixture source.
+  // Automatically run the prediction engine for every page of matches after fixture import.
+  // The predictor reads a seven-day window and processes 30 matches per request.
+  // Continue until has_more is false so no fixtures are silently skipped.
+  let predictionSync:any={ok:false,error:"not_run",batches:[]};
+  try{
+   const batches:any[]=[];
+   let offset=0,hasMore=true;
+   while(hasMore&&batches.length<50){
+    const predictionResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-predict",{
+     method:"POST",
+     headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},
+     body:JSON.stringify({date,offset}),
+    });
+    const predictionText=await predictionResponse.text();
+    let predictionResult:any;
+    try{predictionResult=predictionText?JSON.parse(predictionText):{ok:false,error:"Empty prediction response"};}
+    catch(_){predictionResult={ok:false,error:predictionText.slice(0,500)};}
+    if(!predictionResponse.ok||predictionResult?.ok!==true){
+     throw new Error("Prediction batch offset "+offset+" failed (HTTP "+predictionResponse.status+"): "+String(predictionResult?.error||predictionResult?.message||predictionText).slice(0,700));
+    }
+    batches.push({offset,matches:predictionResult.matches||0,predictions:predictionResult.predictions||0,created:predictionResult.created||0,updated:predictionResult.updated||0,selected:predictionResult.selected||0,covered:predictionResult.covered||0,missing:predictionResult.missing||0,has_more:!!predictionResult.has_more});
+    hasMore=!!predictionResult.has_more;
+    const nextOffset=offset+Number(predictionResult.batch_size||30);
+    if(hasMore&&nextOffset<=offset)throw new Error("Prediction pagination did not advance.");
+    offset=nextOffset;
+   }
+   if(hasMore)throw new Error("Prediction stopped at safety limit of 50 batches; remaining matches need another run.");
+   predictionSync={ok:true,batches: batches.length,total_matches:batches.reduce((n,x)=>n+x.matches,0),total_predictions:batches.reduce((n,x)=>n+x.predictions,0),created:batches.reduce((n,x)=>n+x.created,0),updated:batches.reduce((n,x)=>n+x.updated,0),selected:batches.reduce((n,x)=>n+x.selected,0),covered:batches.reduce((n,x)=>n+x.covered,0),missing:batches.reduce((n,x)=>n+x.missing,0),details:batches};
+  }catch(e){predictionSync={ok:false,error:String(e),details:predictionSync.batches||[]};}
+  // Run verified result settlement after predictions exist, so already-finished fixtures
+  // can settle newly-created predictions and coupon legs in the same scan.
   let resultSync:any={ok:false,error:"not_run"};
   try{
    const syncResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-results-sync?date="+encodeURIComponent(date),{
@@ -185,6 +213,6 @@ Deno.serve(async(req)=>{
    try{resultSync=syncText?JSON.parse(syncText):{ok:false,error:"Empty result-sync response"};}catch(_){resultSync={ok:false,error:syncText.slice(0,500)};}
    if(!syncResponse.ok)resultSync={...resultSync,ok:false,http_status:syncResponse.status};
   }catch(e){resultSync={ok:false,error:String(e)};}
-  return new Response(JSON.stringify({ok:true,date,total_found:result.total_found,fixtures_count:result.fixtures.length,combined_count:combined.length,public_fixtures:publicFixtures.length,enriched,public_only:publicOnly,public_source_status:publicSourceStatus,inserted,updated,settled,matched_by_fixture:matchedByFixture,promoted_to_primary:promotedToPrimary,scan_run_id:run.id,result_sync:resultSync}),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
+  return new Response(JSON.stringify({ok:predictionSync.ok&&resultSync.ok!==false,date,total_found:result.total_found,fixtures_count:result.fixtures.length,combined_count:combined.length,public_fixtures:publicFixtures.length,enriched,public_only:publicOnly,public_source_status:publicSourceStatus,inserted,updated,settled,matched_by_fixture:matchedByFixture,promoted_to_primary:promotedToPrimary,scan_run_id:run.id,prediction_sync:predictionSync,result_sync:resultSync}),{status:predictionSync.ok&&resultSync.ok!==false?200:502,headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
  }catch(e){return new Response(JSON.stringify({error:String(e)}),{status:400,headers:{...cors,"Content-Type":"application/json"}});}
 });
