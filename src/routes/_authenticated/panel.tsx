@@ -56,6 +56,7 @@ function Panel() {
         <StatCard label="Mecze dziś" value={todayCount} icon={CalendarDays} />
         <StatCard label="Skuteczność 1X2" value={fmtPct(hr1.rate)} hint={`${hr1.won}/${hr1.settled}`} icon={Trophy} />
         <StatCard label="Skuteczność DC" value={fmtPct(hrDc.rate)} hint={`${hrDc.won}/${hrDc.settled}`} icon={Trophy} />
+        <StatCard label="Skuteczność goli" value={fmtPct(hrGoals.rate)} hint={`${hrGoals.won}/${hrGoals.settled}`} icon={Trophy} />
         <StatCard label="Kupony w grze" value={coupons.filter((c) => (c.status ?? "pending") === "pending").length} icon={Ticket} />
         <StatCard label="Kandydaci >75%" value={candidates} hint="mecze do kuponów" />
         <StatCard label="Do rozliczenia" value={toSettle} tone={toSettle ? "warning" : "default"} />
