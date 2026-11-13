@@ -14,51 +14,6 @@ export type SettleMode =
   | { kind: "score"; home: number; away: number; source?: string; verified?: boolean }
   | { kind: "void"; status: "cancelled" | "postponed"; source?: string; verified?: boolean };
 
-async function reconcileCouponLedger(coupon: Coupon, status: Settlement, occurredAt: string) {
-  const transactions = await fetchAll("bankroll_transactions");
-  const related = transactions.filter((transaction) => transaction.coupon_id === coupon.id);
-  if (!related.some((transaction) => transaction.transaction_type === "stake")) return;
-
-  let desiredReturn: number | null = null;
-  if (status === "won") {
-    desiredReturn = coupon.potential_return ??
-      (coupon.stake != null && coupon.combined_odds != null
-        ? Math.round(coupon.stake * coupon.combined_odds * 100) / 100
-        : null);
-  } else if (status === "void") {
-    desiredReturn = coupon.stake;
-  } else if (status === "lost" || status === "pending") {
-    desiredReturn = 0;
-  }
-  if (desiredReturn == null) return;
-
-  const recordedNet = related
-    .filter((transaction) => transaction.transaction_type === "return" || transaction.transaction_type === "adjustment")
-    .reduce((sum, transaction) => sum + signedAmount(transaction), 0);
-  const difference = Math.round((desiredReturn - recordedNet) * 100) / 100;
-  if (Math.abs(difference) < 0.01) return;
-
-  const transactionType = recordedNet === 0 && desiredReturn > 0 ? "return" : "adjustment";
-  await insertRow("bankroll_transactions", {
-    transaction_type: transactionType,
-    amount: transactionType === "return" ? desiredReturn : difference,
-    balance_after: null,
-    coupon_id: coupon.id,
-    occurred_at: occurredAt,
-    note: transactionType === "return"
-      ? `Zwrot / wygrana kuponu: ${coupon.name}`
-      : `Korekta rozliczenia kuponu: ${coupon.name}`,
-  });
-
-  const updated = await fetchAll("bankroll_transactions");
-  let balance = 0;
-  for (const transaction of [...updated].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))) {
-    balance = Math.round((balance + signedAmount(transaction)) * 100) / 100;
-    if (transaction.balance_after !== balance)
-      await updateRow("bankroll_transactions", transaction.id, { balance_after: balance });
-  }
-}
-
 async function refreshCouponTotals(coupon: Coupon, legs: CouponLeg[], status: Settlement, occurredAt: string) {
   const odds = effectiveOdds(legs);
   const combinedOdds = odds ?? coupon.combined_odds;
@@ -84,7 +39,6 @@ async function refreshCouponTotals(coupon: Coupon, legs: CouponLeg[], status: Se
     coupon.potential_return = potentialReturn;
     coupon.settled_at = settledAt;
   }
-  await reconcileCouponLedger(coupon, status, occurredAt);
 }
 
 /**
