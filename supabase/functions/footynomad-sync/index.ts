@@ -117,7 +117,7 @@ Deno.serve(async(req)=>{
   let inserted=0,updated=0,settled=0,matchedByFixture=0,promotedToPrimary=0;
   try{
    const dayStart=new Date(Date.parse(date+"T00:00:00Z")-86400000).toISOString(),nextDate=new Date(Date.parse(date+"T00:00:00Z")+2*86400000).toISOString();
-   const existingRows=await db("matches?select=id,owner_id,external_id,source,competition,country,gender,home_team,away_team,kickoff_at,status&owner_id=eq."+encodeURIComponent(ownerId),token);
+   const existingRows=await db("matches?select=id,owner_id,external_id,source,competition,country,gender,home_team,away_team,kickoff_at,kickoff_date,status,live_home_score,live_away_score,live_minute&owner_id=eq."+encodeURIComponent(ownerId),token);
    const existingBySourceId=new Map((existingRows||[]).map((x:any)=>[String(x.source)+"|"+String(x.external_id),x]));
    const existingByFixture=new Map<string,any[]>();
    for(const x of existingRows||[]){const k=fixtureBaseKey(x),arr=existingByFixture.get(k)||[];arr.push(x);existingByFixture.set(k,arr);}
@@ -140,10 +140,28 @@ Deno.serve(async(req)=>{
     const row={owner_id:ownerId,scan_run_id:run.id,external_id:sourceId,source,competition:f.competition||f.league||null,country:f.country||null,gender:f.gender||"unknown",home_team:f.home_team,away_team:f.away_team,kickoff_at:f.kickoff_at||null,kickoff_date:String(f.date||date).slice(0,10),status:f.status||"scheduled",live_home_score:f.status==="live"&&Number.isInteger(f.home_score)?f.home_score:null,live_away_score:f.status==="live"&&Number.isInteger(f.away_score)?f.away_score:null,live_minute:f.status==="live"?f.live_minute||null:null,live_updated_at:f.status==="live"?new Date().toISOString():null};
     if(existing){
      if(source==="FootyNomad"||String(existing.source)===source){
-      const patch:any={scan_run_id:run.id,kickoff_at:row.kickoff_at,kickoff_date:row.kickoff_date,status:row.status,live_home_score:row.live_home_score,live_away_score:row.live_away_score,live_minute:row.live_minute,live_updated_at:row.live_updated_at,competition:row.competition,gender:row.gender,country:row.country};
-      if(source==="FootyNomad"&&String(existing.source)!=="FootyNomad"){patch.source=source;patch.external_id=sourceId;promotedToPrimary++;}
-      await db("matches?id=eq."+existing.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",patch);
-      updated++;
+      const patch:any={scan_run_id:run.id,kickoff_at:row.kickoff_at,kickoff_date:row.kickoff_date,status:row.status,live_home_score:row.live_home_score,live_away_score:row.live_away_score,live_minute:row.live_minute,live_updated_at:row.live_updated_at,competition:row.competition,country:row.country,gender:row.gender,home_team:row.home_team,away_team:row.away_team};
+      const promote=source==="FootyNomad"&&String(existing.source)!=="FootyNomad";
+      if(promote){patch.source=source;patch.external_id=sourceId;}
+      const same=(a:any,b:any)=>(a??null)===(b??null);
+      const changed=promote||
+       !same(existing.kickoff_at,row.kickoff_at)||
+       !same(existing.kickoff_date,row.kickoff_date)||
+       !same(existing.status,row.status)||
+       !same(existing.live_home_score,row.live_home_score)||
+       !same(existing.live_away_score,row.live_away_score)||
+       !same(existing.live_minute,row.live_minute)||
+       !same(existing.competition,row.competition)||
+       !same(existing.country,row.country)||
+       !same(existing.gender,row.gender)||
+       !same(existing.home_team,row.home_team)||
+       !same(existing.away_team,row.away_team);
+      // Avoid a REST PATCH on every hourly scan when a fixture has not changed.
+      if(changed){
+       await db("matches?id=eq."+existing.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",patch);
+       updated++;
+       if(promote)promotedToPrimary++;
+      }
      }
      continue;
     }
@@ -159,6 +177,7 @@ Deno.serve(async(req)=>{
    const allSources=[...new Set(combined.map((f:any)=>String(f.source||"FootyNomad")))];
    const latestRows=allIds.length?await db("matches?select=id,owner_id,external_id,source,competition,home_team,away_team,kickoff_at,gender&owner_id=eq."+encodeURIComponent(ownerId)+"&kickoff_at=gte."+encodeURIComponent(dayStart)+"&kickoff_at=lt."+encodeURIComponent(nextDate),token):[];
    const matchBySourceId=new Map((latestRows||[]).map((row:any)=>[String(row.source)+"|"+String(row.external_id),row]));
+   const cacheRows:any[]=[];
    for(const f of combined){
     const source=String(f.source||"FootyNomad"),sourceId=String(f.external_id||""),match=matchBySourceId.get(source+"|"+sourceId);
     const data=publicDataByKey.get(source+"|"+sourceId);
@@ -169,24 +188,16 @@ Deno.serve(async(req)=>{
     const provider_data:any={footynomad_sync:data};
     const cacheSource=validForm(homeForm)&&validForm(awayForm)?"FootyNomad":"MONEYBALL_PUBLIC_AGGREGATOR";
     if(cacheSource==="FootyNomad")provider_data.footy_nomad_form={home_name:f.home_team,away_name:f.away_team,home:homeForm,away:awayForm,fetched_at:capturedAt};
-    await db("match_market_data?on_conflict=owner_id,match_id,source",token,"POST",{owner_id:ownerId,match_id:match.id,source:cacheSource,provider_data,captured_at:capturedAt},"resolution=merge-duplicates,return=minimal").catch((e:any)=>console.error("Public data cache write failed:",String(e)));
+    cacheRows.push({owner_id:ownerId,match_id:match.id,source:cacheSource,provider_data,captured_at:capturedAt});
    }
-   const matchByFixture=new Map<string,any[]>();
-   for(const x of latestRows||[]){const k=fixtureBaseKey(x),arr=matchByFixture.get(k)||[];arr.push(x);matchByFixture.set(k,arr);}
-   for(const f of combined){
-    const candidates=(matchByFixture.get(fixtureBaseKey(f))||[]).filter((x:any)=>genderCompatible(x,f)).sort((a:any,b:any)=>fixturePriority(b)-fixturePriority(a));
-    const row=candidates[0] as any;
-    if(!row)continue;
-    if(f.status==="finished"&&Number.isInteger(f.home_score)&&Number.isInteger(f.away_score)){
-     const outcome=f.home_score>f.away_score?"1":f.home_score<f.away_score?"2":"X";
-     const oldResults=await db("match_results?select=id&owner_id=eq."+encodeURIComponent(ownerId)+"&match_id=eq."+row.id,token);
-     const finishedAt=new Date().toISOString();
-     const rb={owner_id:ownerId,home_score:f.home_score,away_score:f.away_score,outcome_1x2:outcome,verified:true,source:f.source||"FootyNomad",finished_at:finishedAt,verified_at:finishedAt};
-     if(oldResults?.length)await db("match_results?id=eq."+oldResults[0].id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",rb);else await db("match_results",token,"POST",{match_id:row.id,...rb});
-     const ps=await db("predictions?select=id,market,selection&owner_id=eq."+encodeURIComponent(ownerId)+"&match_id=eq."+row.id,token);
-     for(const p of ps||[]){const won=p.market==="1X2"?p.selection===outcome:(p.selection==="1X"?outcome!=="2":p.selection==="X2"?outcome!=="1":outcome!=="X");await db("predictions?id=eq."+p.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{settlement_status:won?"won":"lost",verified:true});settled++;}
-    }
+   // Batch public-data cache writes instead of issuing one REST request per fixture.
+   for(let i=0;i<cacheRows.length;i+=100){
+    await db("match_market_data?on_conflict=owner_id,match_id,source",token,"POST",cacheRows.slice(i,i+100),"resolution=merge-duplicates,return=minimal")
+     .catch((e:any)=>console.error("Public data cache batch failed:",String(e)));
    }
+   // Verified score settlement is handled by the dedicated five-minute results sync.
+   // This avoids repeating per-match result and prediction updates during fixture import.
+   settled=0;
    await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"completed",completed_at:new Date().toISOString(),matches_found:combined.length,notes:"FootyNomad "+result.fixtures.length+"; public fixtures "+publicFixtures.length+"; enriched "+enriched+"; public-only "+publicOnly+"; inserted "+inserted+"; updated "+updated+"; settled "+settled+"; matched by fixture "+matchedByFixture+"; promoted "+promotedToPrimary+"; public source status "+JSON.stringify(publicSourceStatus).slice(0,900)});
   }catch(e){await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"partial",completed_at:new Date().toISOString(),notes:"Import częściowy: "+String(e)});throw e;}
   // No-key market source: moneyball-predict fetches TipsAudit fair odds directly.
