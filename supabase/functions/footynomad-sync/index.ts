@@ -192,48 +192,57 @@ Deno.serve(async(req)=>{
   // No-key market source: moneyball-predict fetches TipsAudit fair odds directly.
   // This removes the optional StrikerAPI dependency; no API key or secret is required.
   const oddsSync:any={ok:true,source:"TipsAudit",mode:"direct_public_feed",api_key_required:false,note:"Kursy fair i dostępne ceny bukmacherskie są pobierane bezpośrednio przez moneyball-predict."};
-  // Automatically run the prediction engine for every page of matches after fixture import.
-  // The predictor reads a seven-day window and processes 30 matches per request.
-  // Continue until has_more is false so no fixtures are silently skipped.
-  let predictionSync:any={ok:false,error:"not_run",batches:[]};
-  try{
-   const batches:any[]=[];
-   let offset=0,hasMore=true;
-   while(hasMore&&batches.length<50){
-    const predictionResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-predict",{
-     method:"POST",
-     headers:{apikey:KEY,Authorization:"Bearer "+token,...(cronToken?{"x-cron-token":cronToken}:{}),"Content-Type":"application/json",Accept:"application/json"},
-     body:JSON.stringify({date,offset,owner_id:ownerId}),
-    });
-    const predictionText=await predictionResponse.text();
-    let predictionResult:any;
-    try{predictionResult=predictionText?JSON.parse(predictionText):{ok:false,error:"Empty prediction response"};}
-    catch(_){predictionResult={ok:false,error:predictionText.slice(0,500)};}
-    if(!predictionResponse.ok||predictionResult?.ok!==true){
-     throw new Error("Prediction batch offset "+offset+" failed (HTTP "+predictionResponse.status+"): "+String(predictionResult?.error||predictionResult?.message||predictionText).slice(0,700));
+  // Scheduled scans own the full server-side pipeline. Manual scans are
+  // orchestrated by the browser, which already pages through moneyball-predict.
+  // Running both here and in the browser doubled work and caused long scans.
+  let predictionSync:any;
+  let resultSync:any;
+  if (!cronToken) {
+   predictionSync={ok:true,skipped:true,mode:"client_orchestrated",batches:[]};
+   // Results are refreshed by the independent five-minute cron job.
+   resultSync={ok:true,skipped:true,mode:"five_minute_cron"};
+  } else {
+   // Cron-triggered scans must finish predictions even when nobody has the app open.
+   predictionSync={ok:false,error:"not_run",batches:[]};
+   try{
+    const batches:any[]=[];
+    let offset=0,hasMore=true;
+    while(hasMore&&batches.length<50){
+     const predictionResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-predict",{
+      method:"POST",
+      headers:{apikey:KEY,Authorization:"Bearer "+token,"x-cron-token":cronToken,"Content-Type":"application/json",Accept:"application/json"},
+      body:JSON.stringify({date,offset,owner_id:ownerId}),
+     });
+     const predictionText=await predictionResponse.text();
+     let predictionResult:any;
+     try{predictionResult=predictionText?JSON.parse(predictionText):{ok:false,error:"Empty prediction response"};}
+     catch(_){predictionResult={ok:false,error:predictionText.slice(0,500)};}
+     if(!predictionResponse.ok||predictionResult?.ok!==true){
+      throw new Error("Prediction batch offset "+offset+" failed (HTTP "+predictionResponse.status+"): "+String(predictionResult?.error||predictionResult?.message||predictionText).slice(0,700));
+     }
+     batches.push({offset,matches:predictionResult.matches||0,predictions:predictionResult.predictions||0,created:predictionResult.created||0,updated:predictionResult.updated||0,selected:predictionResult.selected||0,covered:predictionResult.covered||0,missing:predictionResult.missing||0,has_more:!!predictionResult.has_more});
+     hasMore=!!predictionResult.has_more;
+     const nextOffset=offset+Number(predictionResult.batch_size||30);
+     if(hasMore&&nextOffset<=offset)throw new Error("Prediction pagination did not advance.");
+     offset=nextOffset;
     }
-    batches.push({offset,matches:predictionResult.matches||0,predictions:predictionResult.predictions||0,created:predictionResult.created||0,updated:predictionResult.updated||0,selected:predictionResult.selected||0,covered:predictionResult.covered||0,missing:predictionResult.missing||0,has_more:!!predictionResult.has_more});
-    hasMore=!!predictionResult.has_more;
-    const nextOffset=offset+Number(predictionResult.batch_size||30);
-    if(hasMore&&nextOffset<=offset)throw new Error("Prediction pagination did not advance.");
-    offset=nextOffset;
-   }
-   if(hasMore)throw new Error("Prediction stopped at safety limit of 50 batches; remaining matches need another run.");
-   predictionSync={ok:true,batches: batches.length,total_matches:batches.reduce((n,x)=>n+x.matches,0),total_predictions:batches.reduce((n,x)=>n+x.predictions,0),created:batches.reduce((n,x)=>n+x.created,0),updated:batches.reduce((n,x)=>n+x.updated,0),selected:batches.reduce((n,x)=>n+x.selected,0),covered:batches.reduce((n,x)=>n+x.covered,0),missing:batches.reduce((n,x)=>n+x.missing,0),details:batches};
-  }catch(e){predictionSync={ok:false,error:String(e),details:predictionSync.batches||[]};}
-  // Run verified result settlement after predictions exist, so already-finished fixtures
-  // can settle newly-created predictions and coupon legs in the same scan.
-  let resultSync:any={ok:false,error:"not_run"};
-  try{
-   const syncResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-results-sync?date="+encodeURIComponent(date),{
-    method:"POST",
-    headers:{apikey:KEY,Authorization:"Bearer "+token,...(cronToken?{"x-cron-token":cronToken}:{}),"Content-Type":"application/json",Accept:"application/json"},
-    body:"{}",
-   });
-   const syncText=await syncResponse.text();
-   try{resultSync=syncText?JSON.parse(syncText):{ok:false,error:"Empty result-sync response"};}catch(_){resultSync={ok:false,error:syncText.slice(0,500)};}
-   if(!syncResponse.ok)resultSync={...resultSync,ok:false,http_status:syncResponse.status};
-  }catch(e){resultSync={ok:false,error:String(e)};}
+    if(hasMore)throw new Error("Prediction stopped at safety limit of 50 batches; remaining matches need another run.");
+    predictionSync={ok:true,batches:batches.length,total_matches:batches.reduce((n,x)=>n+x.matches,0),total_predictions:batches.reduce((n,x)=>n+x.predictions,0),created:batches.reduce((n,x)=>n+x.created,0),updated:batches.reduce((n,x)=>n+x.updated,0),selected:batches.reduce((n,x)=>n+x.selected,0),covered:batches.reduce((n,x)=>n+x.covered,0),missing:batches.reduce((n,x)=>n+x.missing,0),details:batches};
+   }catch(e){predictionSync={ok:false,error:String(e),details:predictionSync.batches||[]};}
+
+   // Scheduled result settlement runs after the prediction batches are written.
+   resultSync={ok:false,error:"not_run"};
+   try{
+    const syncResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-results-sync?date="+encodeURIComponent(date),{
+     method:"POST",
+     headers:{apikey:KEY,Authorization:"Bearer "+token,"x-cron-token":cronToken,"Content-Type":"application/json",Accept:"application/json"},
+     body:"{}",
+    });
+    const syncText=await syncResponse.text();
+    try{resultSync=syncText?JSON.parse(syncText):{ok:false,error:"Empty result-sync response"};}catch(_){resultSync={ok:false,error:syncText.slice(0,500)};}
+    if(!syncResponse.ok)resultSync={...resultSync,ok:false,http_status:syncResponse.status};
+   }catch(e){resultSync={ok:false,error:String(e)};}
+  }
   const pipelineOk=predictionSync.ok&&resultSync.ok!==false;
   await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{
    status:pipelineOk?"completed":"partial",
