@@ -188,4 +188,4 @@ export function parseScanRows(
 
 export const SCAN_TEMPLATE_CSV =
   "kickoff_at,competition,country,gender,home_team,away_team,market,selection,probability,odds,confidence,verdict,rationale,model_version,group_name\n" +
-  "2026-11-14 20:45,Premier League,England,men,Team A,Team B,1X2,1,78,1.65,wysoka,WYBRANY,Przykładowe uzasadnienie,MONEYBALL GLOBAL 3.8,TEST\n";
+  "2026-11-14 20:45,Premier League,England,men,Team A,Team B,1X2,1,78,1.65,wysoka,WYBRANY,Przykładowe uzasadnienie,MONEYBALL GLOBAL 3.9,TEST\n";
