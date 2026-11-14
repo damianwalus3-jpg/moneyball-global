@@ -98,7 +98,7 @@ Deno.serve(async(req)=>{
   if(cronToken){
    const authResponse=await fetch(SUPABASE_URL+"/rest/v1/rpc/moneyball_cron_token_valid",{
     method:"POST",
-    headers:{apikey:KEY,Authorization:"Bearer "+(token||KEY),"Content-Type":"application/json"},
+    headers:{apikey:SERVICE_KEY||KEY,Authorization:"Bearer "+(SERVICE_KEY||token||KEY),"Content-Type":"application/json"},
     body:JSON.stringify({p_token:cronToken})
    });
    if(!authResponse.ok||(await authResponse.json())!==true)throw new Error("Nieprawidłowy token harmonogramu.");
