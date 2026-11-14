@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-const S=Deno.env.get("SUPABASE_URL")||"https://xwrgfaarmwnguymresjy.supabase.co",K=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||"",SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"",V="MONEYBALL GLOBAL 3.9";
+const S=Deno.env.get("SUPABASE_URL")||"https://xwrgfaarmwnguymresjy.supabase.co",K=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||"",SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"",V="MONEYBALL GLOBAL 3.10";
 let CRON_FALLBACK_TOKEN="",CRON_JWT_TOKEN="";
 const C={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-requested-with, prefer, cache-control, pragma","Access-Control-Allow-Methods":"POST, GET, OPTIONS","Access-Control-Max-Age":"86400","Vary":"Origin"};
 const out=(x:any,n=200)=>new Response(JSON.stringify(x),{status:n,headers:{...C,"Content-Type":"application/json"}});
@@ -241,7 +241,9 @@ async function getTipsAuditFeed(){
  if(tipsAuditFeedCache&&tipsAuditFeedCache.expiresAt>Date.now())return tipsAuditFeedCache.payload;
  if(!tipsAuditFeedPromise){
   tipsAuditFeedPromise=(async()=>{
-   const payload=await getTipsAuditFeed();
+   const response=await fetch("https://tipsaudit.com/api/v1/predictions",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/3.10 (+https://moneyball-global-test.damianwalus3.workers.dev)"},signal:AbortSignal.timeout(12000)});
+   if(!response.ok)throw new Error("TipsAudit HTTP "+response.status);
+   const payload=await response.json();
    tipsAuditFeedCache={expiresAt:Date.now()+5*60*1000,payload};
    return payload;
   })().finally(()=>{tipsAuditFeedPromise=null;});
@@ -251,9 +253,7 @@ async function getTipsAuditFeed(){
 async function readTipsAuditFairMarket(date:string,matches:any[]){
  const byMatch=new Map<string,any>();
  try{
-  const response=await fetch("https://tipsaudit.com/api/v1/predictions",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/3.9 (+https://moneyball-global-test.damianwalus3.workers.dev)"},signal:AbortSignal.timeout(12000)});
-  if(!response.ok)throw new Error("TipsAudit HTTP "+response.status);
-  const payload=await response.json();
+  const payload=await getTipsAuditFeed();
   const generatedAt=Date.parse(String(payload?.generated_at||""));
   if(!Number.isFinite(generatedAt)||Date.now()-generatedAt>90*60*1000||generatedAt>Date.now()+5*60*1000)throw new Error("TipsAudit feed is stale or has an invalid generated_at timestamp");
   const toDay=(value:any)=>{const stamp=Date.parse(String(value||""));return Number.isFinite(stamp)?new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(stamp)):"";};
@@ -556,7 +556,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    const verdictBase=futureEligible&&bothTeamsCovered&&model.source!=="BASELINE_ONLY"&&p.probability>75&&model.coverage>=55;
    const verdict=verdictBase&&referenceOdds!=null&&Number.isFinite(referenceOdds)&&referenceOdds>1?"WYBRANY":"ODRZUCONY";
    const rejectionReason=verdict==="WYBRANY"?null:!m.kickoff_at?"Brak potwierdzonej godziny rozpoczęcia meczu.":!["scheduled","unknown"].includes(String(m.status||""))?"Mecz jest w trakcie, zakończony lub ma nieaktywny status.":new Date(m.kickoff_at).getTime()<=Date.now()?"Mecz już się rozpoczął.":!bothTeamsCovered?"Brak minimum 3 zweryfikowanych ostatnich meczów dla obu drużyn.":model.source==="BASELINE_ONLY"?"Dostępny jest wyłącznie model bazowy bez potwierdzonej formy.":p.probability==null||p.probability<=75?"Prawdopodobieństwo nie przekracza wymaganego progu 75%.":Number(model.coverage||0)<55?"Pokrycie danych modelu poniżej 55%.":referenceOdds==null||!Number.isFinite(referenceOdds)||referenceOdds<=1?"Brak aktualnego, potwierdzonego kursu dla tego rynku i typu.":"Nie spełniono warunków zatwierdzenia.";
-   if(referenceOdds!=null){coverage.odds_source=providerQuote?.provider||(tipsOdds?"TipsAudit":null);coverage.odds_bookmaker=providerQuote?.bookmaker||(tipsOdds?market?.market_reference_bookmaker:null);coverage.odds_captured_at=providerQuote?.captured_at||(tipsOdds?market?.captured_at:null)||null;coverage.odds_price_timestamp=providerQuote?.price_timestamp||(tipsOdds?market?.captured_at:null)||null;}
+   if(referenceOdds!=null){coverage.odds_source=providerQuote?.provider||(tipsOdds?"TipsAudit":null);coverage.odds_bookmaker=providerQuote?.bookmaker||(tipsOdds?market?.market_reference_bookmaker:null);coverage.odds_captured_at=providerQuote?.captured_at||(tipsOdds?market?.captured_at:null)||null;coverage.odds_price_timestamp=providerQuote?.price_timestamp||(tipsOdds?market?.captured_at:null)||null;coverage.odds_source_url=tipsOdds?market?.fair_source_url||"https://tipsaudit.com":null;coverage.odds_source_attribution=tipsOdds?"Data: TipsAudit":null;}
    const type=p.market==="DOUBLE_CHANCE"?"DC":"1X2";
     const baseSource=model.market?(model.source==="TIPSAUDIT_FAIR_MARKET"?"TIPSAUDIT_FAIR_MARKET":"VERIFIED_MARKET_DATA"):model.source==="BASELINE_ONLY"?"NO_VERIFIED_SOURCE":model.source==="BEYONDELO_ONLY"?"BEYONDELO_ELO_ONLY":model.source==="KEYLESS_GITHUB_LAST10"?"KEYLESS_GITHUB_LAST10_FORM":model.source==="STATSBOMB_OPEN_DATA"?"STATSBOMB_OPEN_DATA_FORM":model.source==="AMERICAN_SOCCER_ANALYSIS"?"AMERICAN_SOCCER_ANALYSIS_FORM":model.source==="ESPN_WOMEN_LAST10"?"ESPN_WOMEN_LAST10_FORM":model.publicForm?"OPENMATCHDAY_LAST10_FORM":model.footyForm?"FOOTYNOMAD_LAST5_FORM":"MONEYBALL_VERIFIED_HISTORY";const xgSources=model.xg_sources||[];const xgSuffix=model.xg_used?"+HISTORICAL_XG"+(xgSources.some((x:string)=>x.toLowerCase().includes("openplay"))?"+OPENPLAY_XG":"")+(xgSources.some((x:string)=>x.toLowerCase().includes("statsbomb"))?"+STATSBOMB_XG":"")+(xgSources.some((x:string)=>x.toLowerCase().includes("american_soccer_analysis"))?"+ASA_XG":""):"";const dataSource=(model.elo_used&&model.source!=="BEYONDELO_ONLY"?baseSource+"+BEYONDELO_ELO":baseSource)+xgSuffix;
     rows.push({owner_id:ownerId,match_id:m.id,scan_run_id:m.scan_run_id||null,model_version:V,market:p.market,selection:p.selection,pick:p.selection,prediction_type:type,selection_status:verdict,rejection_reason:rejectionReason,probability:p.probability,odds:referenceOdds,confidence:model?String(model.coverage):null,verdict,rationale:reason,group_name:p.market==="1X2"?"MAIN":"MEGA",data_source:oddsSource||dataSource,data_coverage:{...coverage,model_source:dataSource},note:JSON.stringify({source:dataSource,odds_source:oddsSource,coverage}),stake:verdict==="WYBRANY"?5:0,potential_return:verdict==="WYBRANY"&&referenceOdds!=null?Math.round(5*Number(referenceOdds)*100)/100:null,profit_loss:null,settlement_status:"pending",result_status:"pending",verified:false});
@@ -574,7 +574,9 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   const goalsModel=model?.expected_home_goals!=null&&model?.expected_away_goals!=null?model:historyModel(m.home_team,m.away_team,goalKickoff,history||[],footyForms.get(m.id)||null,goalSupplement,String(m.gender||"unknown"));
   if(goalsModel&&goalsModel.expected_home_goals!=null&&goalsModel.expected_away_goals!=null&&goalsModel.home_matches>=3&&goalsModel.away_matches>=3){
    const lh=Number(goalsModel.expected_home_goals),la=Number(goalsModel.expected_away_goals),hp=Array.from({length:10},(_,i)=>poisson(lh,i)),ap=Array.from({length:10},(_,i)=>poisson(la,i));
-   const total=Array.from({length:19},(_,t)=>{let v=0;for(let h=0;h<=9;h++){const a=t-h;if(a>=0&&a<=9)v+=hp[h]*ap[a];}return v;});
+    const totalRaw=Array.from({length:19},(_,t)=>{let v=0;for(let h=0;h<=9;h++){const a=t-h;if(a>=0&&a<=9)v+=hp[h]*ap[a];}return v;});
+    const totalMass=totalRaw.reduce((sum,value)=>sum+value,0);
+    const total=totalMass>0?totalRaw.map(value=>value/totalMass):totalRaw;
    const over=(line:number)=>total.reduce((v,p,i)=>v+(i>line?p:0),0),btts=1-hp[0]-ap[0]+hp[0]*ap[0];
    const goalMarkets=[["OVER_1.5",over(1.5)],["UNDER_1.5",1-over(1.5)],["OVER_2.5",over(2.5)],["UNDER_2.5",1-over(2.5)],["OVER_3.5",over(3.5)],["UNDER_3.5",1-over(3.5)],["BTTS_YES",btts],["BTTS_NO",1-btts]];
    for(const [selection,prob] of goalMarkets){
