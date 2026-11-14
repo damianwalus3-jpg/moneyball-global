@@ -64,7 +64,14 @@ async function readFixtures(date: string) {
     const home = textOf((body.match(/<span[^>]*class=["'][^"']*ticket-home[^"']*["'][^>]*>([\s\S]*?)<\/span>/i) || [])[1] || "");
     const away = textOf((body.match(/<span[^>]*class=["'][^"']*ticket-away[^"']*["'][^>]*>([\s\S]*?)<\/span>/i) || [])[1] || "");
     const time = (body.match(/<time[^>]*datetime=["']([^"']+)/i) || [])[1] || null;
-    if (!externalId || !home || !away || seen.has(externalId)) continue;
+    if (!externalId || !home || !away || seen.has(externalId) || !time) continue;
+    const kickoff = new Date(time);
+    if (!Number.isFinite(kickoff.getTime())) continue;
+    const kickoffBrusselsDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(kickoff);
+    // The public fixture page can include adjacent dates; only persist the requested Brussels day.
+    if (kickoffBrusselsDate !== date) continue;
     seen.add(externalId);
 
     const groupStart = html.lastIndexOf('<details class="league-group', match.index);
