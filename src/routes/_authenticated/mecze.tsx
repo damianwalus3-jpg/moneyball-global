@@ -630,6 +630,17 @@ function Mecze() {
                                           {coverage["xg_used"] === true
                                             ? <p className="mt-2 text-[11px] text-muted-foreground">Analiza uwzględnia również jakość sytuacji bramkowych (xG), jeśli dane były dostępne.</p>
                                             : <p className="mt-2 text-[11px] text-muted-foreground">Dla tego meczu nie było wiarygodnych danych xG — prognoza opiera się na wynikach, skuteczności i formie obu drużyn.</p>}
+                                          {coverage["market_source"] === "TIPSAUDIT_FAIR_MARKET" && (
+                                            <div className="mt-2 text-[11px] text-muted-foreground">
+                                              <p>Źródło prawdopodobieństw rynkowych: <a href="https://tipsaudit.com" target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-2">TipsAudit</a>.</p>
+                                              {(() => {
+                                                const fair = asObject(coverage["fair_odds"]);
+                                                const values = [fair["home"], fair["draw"], fair["away"]].map(Number);
+                                                if (!values.every((value) => Number.isFinite(value) && value > 1)) return null;
+                                                return <p className="mt-1">Kursy fair bez marży (nie są ofertą bukmachera): 1 {fmtOdds(values[0])} · X {fmtOdds(values[1])} · 2 {fmtOdds(values[2])}</p>;
+                                              })()}
+                                            </div>
+                                          )}
                                         </div>
                                         <div>
                                           <div className="mb-2 text-sm font-semibold">Ostatnie 5 meczów każdej drużyny</div>
