@@ -20,17 +20,14 @@ function json(data: unknown, status = 200) {
 const EUROPE_ISO3 = new Set(["ALB","AND","ARM","AUT","AZE","BLR","BEL","BIH","BUL","CRO","CYP","CZE","DNK","ENG","EST","FRO","FIN","FRA","GEO","DEU","GER","GIB","GRC","GRE","HUN","ISL","IRL","ITA","KAZ","KOS","LVA","LIE","LTU","LUX","MLT","MDA","MNE","NLD","MKD","NIR","NOR","POL","PRT","POR","ROU","RUS","SMR","SCO","SRB","SVK","SVN","ESP","SWE","CHE","SUI","TUR","UKR","WAL","GBR","UK"]);
 const EUROPE_COUNTRIES = new Set(["albania","andorra","armenia","austria","azerbaijan","belarus","belgium","bosnia and herzegovina","bulgaria","croatia","cyprus","czechia","czech republic","denmark","england","estonia","faroe islands","finland","france","georgia","germany","gibraltar","greece","hungary","iceland","ireland","isle of man","italy","kazakhstan","kosovo","latvia","liechtenstein","lithuania","luxembourg","malta","moldova","monaco","montenegro","netherlands","north macedonia","northern ireland","norway","poland","portugal","romania","russia","san marino","scotland","serbia","slovakia","slovenia","spain","sweden","switzerland","turkey","türkiye","ukraine","wales","united kingdom","uk","europe","uefa"]);
 function isEuropeanFixture(country: unknown, competition: unknown, home?: unknown, away?: unknown): boolean {
- const norm=(v:unknown)=>String(v??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+ const norm=(v:unknown)=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
  const c=norm(country), comp=norm(competition);
- const countryParts=c.split(/[\\/,;|]+/).map((x:string)=>x.trim()).filter(Boolean);
+ const countryParts=c.split(/[\/,;|]+/).map((x:string)=>x.trim()).filter(Boolean);
  const isEurope=EUROPE_COUNTRIES.has(c)||countryParts.some((x:string)=>EUROPE_COUNTRIES.has(x)||EUROPE_ISO3.has(x.toUpperCase()))||EUROPE_ISO3.has(String(country??"").trim().toUpperCase());
- const nationsLeague=/\\b(nations league|uefa nations league)\\b/.test(comp);
- if(nationsLeague)return true;
+ if(/\b(nations league|uefa nations league)\b/.test(comp))return true;
  if(!isEurope)return false;
- // International tournaments, cups and friendlies are deliberately outside the selected scope.
- if(/\\b(cup|copa|trophy|shield|friendly|friendlies|qualif|qualifier|champions league|europa league|conference league|world cup|super cup|play off|playoff)\\b/.test(comp))return false;
- // Keep domestic league competitions only; unknown competition labels are excluded safely.
- return /\\b(league|liga|ligue|lig|divisie|lyga|virsliga|meistriliiga|klasse|deild|besta deild|campeonato|oberliga|regionalliga|verbandsliga|landesliga|superettan|veikkausliiga|esiliiga|ykkosliiga|serie|division|div|premier|bundesliga|eredivisie|ekstraklasa|allsvenskan|eliteserien|superliga|premiership|championship|pro league|jupiler|prva liga|national league|1 hnl|2 hnl)\\b/.test(comp);
+ if(/\b(cup|copa|trophy|shield|friendly|friendlies|qualif|qualifier|champions league|europa league|conference league|world cup|super cup|play off|playoff)\b/.test(comp))return false;
+ return /\b(league|liga|ligue|lig|divisie|lyga|virsliga|meistriliiga|klasse|deild|besta deild|campeonato|oberliga|regionalliga|verbandsliga|landesliga|superettan|veikkausliiga|esiliiga|ykkosliiga|serie|division|div|premier|bundesliga|eredivisie|ekstraklasa|allsvenskan|eliteserien|superliga|premiership|championship|pro league|jupiler|prva liga|national league|1 hnl|2 hnl)\b/.test(comp);
 }
 
 function textOf(s: string) {
