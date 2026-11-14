@@ -59,10 +59,10 @@ Deno.serve(async(req)=>{
  try{
   if(!(await authorized(req.headers.get("x-cron-token")||"")))return json({error:"Unauthorized"},401);
   const body=await req.json().catch(()=>({}));
-  const now=new Date(),from=new Date(now.getTime()-2*3600000).toISOString(),to=new Date(now.getTime()+48*3600000).toISOString();
+  const now=new Date(),day=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
   const owner=String(body.owner_id||"");
   const ownerFilter=owner?"&owner_id=eq."+encodeURIComponent(owner):"";
-  const matches=await db("matches?select=id,owner_id,user_id,home_team,away_team,competition,league,kickoff_at,status&kickoff_at=gte."+encodeURIComponent(from)+"&kickoff_at=lte."+encodeURIComponent(to)+"&order=kickoff_at.asc"+ownerFilter);
+  const matches=await db("matches?select=id,owner_id,user_id,home_team,away_team,competition,league,kickoff_at,kickoff_date,status&kickoff_date=eq."+encodeURIComponent(day)+"&competition=ilike.*Nations%20League*&order=kickoff_at.asc"+ownerFilter);
   const catalog=await movi("/catalog?sport=soccer");
   const fixtures=Array.isArray(catalog.fixtures)?catalog.fixtures:[];
   const pairs:any[]=[];
