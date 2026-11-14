@@ -235,6 +235,19 @@ async function readPublicSourceForms(date:string,token:string){
   return {byPair,byTeam,eloByTeam,eloMeta,fixtures:Number(j?.european_fixtures||0),error:null};
  }catch(e){console.error("OpenMatchday supplemental form unavailable:",String(e));return {byPair,byTeam,eloByTeam,eloMeta:null,fixtures:0,error:String(e)};}
 }
+let tipsAuditFeedCache: { expiresAt: number; payload: any } | null = null;
+let tipsAuditFeedPromise: Promise<any> | null = null;
+async function getTipsAuditFeed(){
+ if(tipsAuditFeedCache&&tipsAuditFeedCache.expiresAt>Date.now())return tipsAuditFeedCache.payload;
+ if(!tipsAuditFeedPromise){
+  tipsAuditFeedPromise=(async()=>{
+   const payload=await getTipsAuditFeed();
+   tipsAuditFeedCache={expiresAt:Date.now()+5*60*1000,payload};
+   return payload;
+  })().finally(()=>{tipsAuditFeedPromise=null;});
+ }
+ return await tipsAuditFeedPromise;
+}
 async function readTipsAuditFairMarket(date:string,matches:any[]){
  const byMatch=new Map<string,any>();
  try{
