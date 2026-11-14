@@ -10,6 +10,7 @@ import type {
   CouponStatus,
   TransactionType,
 } from "./types";
+import { brusselsDayKey } from "./time";
 
 export const COUPON_SIZE = 3;
 export const CANDIDATE_MIN_PROBABILITY = 75;
@@ -158,6 +159,20 @@ export function isCouponCandidate(prediction: Prediction, match: Match | undefin
   if (isFinishedStatus(match.status) || match.status === "live") return false;
   if (!match.kickoff_at || new Date(match.kickoff_at).getTime() <= nowMs) return false;
   return prediction.selection !== "—" && isValidPick(prediction.market, prediction.selection);
+}
+
+/** Coupons are built only from matches kicking off today (Europe/Brussels calendar day). */
+export function isKickoffToday(kickoffAt: string | null | undefined, nowMs: number): boolean {
+  if (!kickoffAt) return false;
+  const kickoff = new Date(kickoffAt);
+  if (Number.isNaN(kickoff.getTime())) return false;
+  return brusselsDayKey(kickoff) === brusselsDayKey(new Date(nowMs));
+}
+
+/** Running balance after each new stake, continuing from the existing ledger (no ledger = 0). */
+export function stakeBalances(existing: BankrollTransaction[], stake: number, count: number): number[] {
+  let balance = bankrollBalance(existing) ?? 0;
+  return Array.from({ length: count }, () => (balance = Math.round((balance - Math.abs(stake)) * 100) / 100));
 }
 
 export function buildCouponBatch<T extends { match_id: string; probability: number | null }>(

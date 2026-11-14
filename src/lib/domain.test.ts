@@ -10,6 +10,8 @@ import {
   groupHitRates,
   isCouponCandidate,
   modelHitRate,
+  isKickoffToday,
+  stakeBalances,
   settlePick,
   settleGoalsPick,
   outcomeFromScore,
@@ -250,5 +252,31 @@ describe("overall model hit rate (Panel)", () => {
   it("does not relax coupon rules: ODRZUCONY is still not a candidate", () => {
     const now = Date.parse("2026-11-10T12:00:00Z");
     expect(isCouponCandidate(prediction("p", "m1", 90, { verdict: "ODRZUCONY" }), match("m1"), now)).toBe(false);
+  });
+});
+
+describe("coupon generator rules", () => {
+  const now = Date.parse("2026-11-14T16:00:00Z"); // 17:00 in Brussels
+  it("only accepts matches kicking off today in Brussels", () => {
+    expect(isKickoffToday("2026-11-14T20:00:00Z", now)).toBe(true);
+    expect(isKickoffToday("2026-11-14T23:30:00Z", now)).toBe(false); // 00:30 on 15 Nov in Brussels
+    expect(isKickoffToday("2026-11-15T12:00:00Z", now)).toBe(false);
+    expect(isKickoffToday(null, now)).toBe(false);
+  });
+  it("records a 5 EUR stake per coupon and continues the existing balance", () => {
+    const ledger = [
+      { id: "t1", owner_id: "o", transaction_type: "deposit", amount: 100, balance_after: 100, coupon_id: null, occurred_at: "2026-11-01T10:00:00Z", note: null },
+    ] as BankrollTransaction[];
+    expect(stakeBalances(ledger, 5, 2)).toEqual([95, 90]);
+    expect(stakeBalances([], 5, 1)).toEqual([-5]);
+  });
+  it("builds coupons of 3 distinct matches with no reuse across coupons", () => {
+    const batch = buildCouponBatch(
+      ["m1", "m2", "m3", "m4", "m5", "m6", "m1"].map((m, i) => prediction("p" + i, m, 90 - i)),
+      5,
+    );
+    expect(batch.length).toBe(2);
+    const ids = batch.flat().map((p) => p.match_id);
+    expect(new Set(ids).size).toBe(6);
   });
 });

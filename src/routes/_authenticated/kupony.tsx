@@ -9,16 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { EmptyState, Field, NoGuarantee, PageHeader, PageLoader, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { saveCouponBatch } from "@/lib/coupons";
 import { deleteRow } from "@/lib/db";
-import { buildCouponBatch, buildSingleCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, MARKET_LABELS } from "@/lib/domain";
+import { buildCouponBatch, buildSingleCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, isKickoffToday, MARKET_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel, parseDecimal } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
 import type { Coupon, CouponStatus, CouponType, Prediction } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/kupony")({
-  head: () => ({ meta: [{ title: "Kupony — MONEYBALL GLOBAL 2.0" }] }),
+  head: () => ({ meta: [{ title: "Kupony — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Generator kuponów z dzisiejszych meczów: 3 różne spotkania, prawdopodobieństwo powyżej 75%." }, { property: "og:title", content: "Kupony — MONEYBALL GLOBAL 2.0" }, { property: "og:description", content: "Generuj i zapisuj kupony z dzisiejszych meczów." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context }) =>
-    ensureTables(context.queryClient, ["matches", "predictions", "coupons", "coupon_legs", "scan_runs"]),
+    ensureTables(context.queryClient, ["matches", "predictions", "coupons", "coupon_legs", "scan_runs", "bankroll_transactions"]),
   pendingComponent: PageLoader,
   component: Kupony,
 });
@@ -46,7 +46,8 @@ function Kupony() {
 
   const [couponCount, setCouponCount] = useState("2");
   const [couponSize, setCouponSize] = useState<1 | 3>(3);
-  const stake = "5";
+  const [stake, setStake] = useState("5");
+  const [recordStake, setRecordStake] = useState(true);
   const [couponType, setCouponType] = useState<CouponType>("TEST");
   const [namePrefix, setNamePrefix] = useState("MONEYBALL");
   const [excludeActive, setExcludeActive] = useState(true);
@@ -70,6 +71,7 @@ function Kupony() {
   const candidates = predictions
     .filter((prediction) => isActivePredictionVersion(prediction.model_version))
     .filter((prediction) => isCouponCandidate(prediction, matchById.get(prediction.match_id), Date.now()))
+    .filter((prediction) => isKickoffToday(matchById.get(prediction.match_id)?.kickoff_at, Date.now()))
     .filter((prediction) => !excludeActive || !activeMatchIds.has(prediction.match_id))
     .sort((a, b) => Number(b.probability) - Number(a.probability));
 
@@ -87,6 +89,7 @@ function Kupony() {
       scanRunId: [...scans].sort((a, b) => b.started_at.localeCompare(a.started_at))[0]?.id ?? null,
       stake: stakeValue,
       targetLegs: couponSize,
+      recordStake,
     }),
     { success: (count) => `Zapisano ${count} ${couponSize === 1 ? "pojedynczych kuponów" : "kuponów po 3 zdarzenia"}`, onDone: () => setGenerated([]) },
   );
@@ -109,16 +112,34 @@ function Kupony() {
     void: coupons.filter((coupon) => coupon.status === "void").length,
   };
 
-  function generate() {
-    setGenerated(couponSize === 1
+  function buildBatch() {
+    return couponSize === 1
       ? buildSingleCouponBatch(candidates, requestedCount)
-      : buildCouponBatch(candidates, requestedCount));
+      : buildCouponBatch(candidates, requestedCount);
   }
+  function generate() {
+    setGenerated(buildBatch());
+  }
+  function generateAndSave() {
+    if (preview.length > 0) {
+      saveBatch.mutate(preview);
+      return;
+    }
+    const batch = buildBatch();
+    setGenerated(batch);
+    if (batch.length > 0) saveBatch.mutate(batch);
+  }
+  const saveDisabled =
+    !!stakeError ||
+    saveBatch.isPending ||
+    candidates.length < couponSize ||
+    preview.some((coupon) => coupon.length !== couponSize) ||
+    (couponType !== "TEST" && previewMissingOdds);
 
   return (
     <div>
       <PageHeader
-        eyebrow={couponSize === 1 ? "Pojedyncze typy · prawdopodobieństwo >75%" : "Dokładnie 3 mecze · prawdopodobieństwo >75%"}
+        eyebrow={couponSize === 1 ? "Dzisiejsze mecze · pojedyncze typy · prawdopodobieństwo >75%" : "Dzisiejsze mecze · dokładnie 3 różne spotkania · prawdopodobieństwo >75%"}
         title="Kupony"
         description={couponSize === 1
           ? "Każdy kupon zawiera jeden typ. W partii nie powtarzamy tego samego meczu."
@@ -128,14 +149,17 @@ function Kupony() {
         <StatCard label="W grze" value={counts.pending} />
         <StatCard label="Wygrane" value={counts.won} />
         <StatCard label="Przegrane" value={counts.lost} />
-        <StatCard label="Dostępne mecze" value={uniqueCandidateMatches} hint="WYBRANY · >75% · przed startem" tone="primary" />
+        <StatCard label="Dostępne mecze" value={uniqueCandidateMatches} hint="dziś · WYBRANY · >75% · przed startem" tone="primary" />
       </div>
 
       <section className="surface-card mb-6 p-4">
         <div className="mb-3 flex items-center gap-2">
           <Sparkles className="size-5 text-primary" />
-          <h2 className="text-xl font-semibold uppercase">Generator kuponów</h2>
+          <h2 className="text-xl font-semibold uppercase">GENERATOR KUPONÓW</h2>
         </div>
+        <p className="mb-4 rounded-md border border-primary/40 bg-primary/10 p-3 text-sm text-foreground">
+          <strong>Skanowanie analizuje mecze, ale nie tworzy kuponów.</strong> Kupony powstają dopiero po kliknięciu „GENERUJ I ZAPISZ KUPONY”, wyłącznie z dzisiejszych meczów (Europe/Brussels), z 3 różnych spotkań bez powtórzeń i z prawdopodobieństwem powyżej 75%.
+        </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Liczba kuponów">
             <Input inputMode="numeric" className="num" value={couponCount} onChange={(event) => { setCouponCount(event.target.value); setGenerated([]); }} />
@@ -158,15 +182,18 @@ function Kupony() {
           <Field label="Nazwa partii">
             <Input value={namePrefix} onChange={(event) => setNamePrefix(event.target.value)} />
           </Field>
-          <div className="rounded-lg border border-border px-3 py-2">
-            <div className="text-xs text-muted-foreground">Stała stawka na każdy kupon</div>
-            <div className="num text-lg font-semibold">5,00 €</div>
-          </div>
+          <Field label="Stawka na kupon (EUR)" htmlFor="coupon-stake" error={stakeError || undefined}>
+            <Input id="coupon-stake" inputMode="decimal" className="num" value={stake} onChange={(event) => setStake(event.target.value)} />
+          </Field>
         </div>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2">
             <Checkbox checked={excludeActive} onCheckedChange={(value) => { setExcludeActive(value === true); setGenerated([]); }} />
             Pomiń mecze z aktywnych kuponów
+          </label>
+          <label className="flex items-center gap-2">
+            <Checkbox checked={recordStake} onCheckedChange={(value) => setRecordStake(value === true)} />
+            Zapisz stawkę każdego kuponu w bankrollu
           </label>
 
         </div>
@@ -178,7 +205,7 @@ function Kupony() {
         </div>
         {preview.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
-            Wybierz „Generuj kupony”. Potrzeba minimum {couponSize} różnych meczów z WYBRANY i prawdopodobieństwem ściśle powyżej 75%.
+            Wybierz „Generuj kupony”, aby zobaczyć podgląd, albo od razu „GENERUJ I ZAPISZ KUPONY”. Potrzeba minimum {couponSize} różnych dzisiejszych meczów z WYBRANY i prawdopodobieństwem ściśle powyżej 75%.
           </p>
         ) : (
           <>
@@ -216,11 +243,26 @@ function Kupony() {
                 );
               })}
             </div>
-            <Button className="mt-4" disabled={!!stakeError || saveBatch.isPending || preview.some((coupon) => coupon.length !== couponSize) || (couponType !== "TEST" && previewMissingOdds)} onClick={() => saveBatch.mutate(preview)}>
-              <Ticket /> {saveBatch.isPending ? "Zapisywanie…" : couponType !== "TEST" && previewMissingOdds ? "Brak kursów — wybierz TEST" : `Zapisz ${preview.length} kuponów`}
-            </Button>
           </>
         )}
+        <Button
+          size="lg"
+          className="mt-5 h-14 w-full text-base font-extrabold uppercase tracking-wider shadow-lg sm:text-lg"
+          disabled={saveDisabled}
+          onClick={generateAndSave}
+        >
+          <Ticket className="size-5" />
+          {saveBatch.isPending
+            ? "Zapisywanie…"
+            : couponType !== "TEST" && previewMissingOdds
+              ? "Brak kursów — wybierz TEST"
+              : "GENERUJ I ZAPISZ KUPONY"}
+        </Button>
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          {stakeError
+            ? stakeError
+            : `Stawka ${fmtMoney(stakeValue)} na kupon${recordStake ? " · zapis do bankrolla" : " · bez zapisu do bankrolla"}${preview.length ? ` · ${preview.length} kuponów w podglądzie` : ""}`}
+        </p>
       </section>
 
       <div className="mb-3 flex flex-wrap gap-2">

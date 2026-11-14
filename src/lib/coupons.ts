@@ -1,5 +1,5 @@
-import { totalOdds, validateBatch } from "./domain";
-import { deleteRow, insertRow, insertRows } from "./db";
+import { stakeBalances, totalOdds, validateBatch } from "./domain";
+import { deleteRow, fetchAll, insertRow, insertRows } from "./db";
 import type { CouponType, Prediction } from "./types";
 
 export interface SaveBatchOptions {
@@ -9,6 +9,8 @@ export interface SaveBatchOptions {
   stake: number | null;
   notes?: string | null;
   targetLegs?: 1 | 3;
+  /** Adds one bankroll "stake" transaction per saved coupon. */
+  recordStake?: boolean;
 }
 
 /** Saves complete single-pick or 3-leg coupons. A failed batch rolls back only rows created by this call. */
@@ -18,9 +20,16 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
   const requireOdds = options.couponType != null && options.couponType !== "TEST";
   const errors = validateBatch(coupons, targetLegs, requireOdds);
   if (errors.length) throw new Error(errors.join(" "));
+  if (options.stake == null || !Number.isFinite(options.stake) || options.stake <= 0)
+    throw new Error("Stawka musi być większa od zera.");
+  const stake = options.stake;
   const createdCoupons: string[] = [];
   const createdLegs: string[] = [];
+  const createdTransactions: string[] = [];
   try {
+    const balances = options.recordStake
+      ? stakeBalances(await fetchAll("bankroll_transactions"), stake, coupons.length)
+      : [];
     for (const [index, predictions] of coupons.entries()) {
       const odds = totalOdds(predictions.map((prediction) => prediction.odds));
       const potentialReturn =
@@ -53,8 +62,22 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
       createdLegs.push(...legs.map((leg) => leg.id));
       if (legs.length !== predictions.length)
         throw new Error("Kupon " + coupon.name + ": zapisano " + legs.length + " z " + predictions.length + " zdarzeń.");
+      if (options.recordStake) {
+        const transaction = await insertRow("bankroll_transactions", {
+          transaction_type: "stake",
+          amount: stake,
+          balance_after: balances[index] ?? null,
+          coupon_id: coupon.id,
+          occurred_at: new Date().toISOString(),
+          note: `Stawka kuponu ${coupon.name}`,
+        });
+        createdTransactions.push(transaction.id);
+      }
     }
   } catch (error) {
+    for (const id of createdTransactions.reverse()) {
+      try { await deleteRow("bankroll_transactions", id); } catch { /* best-effort rollback of this new batch only */ }
+    }
     for (const id of createdLegs.reverse()) {
       try { await deleteRow("coupon_legs", id); } catch { /* best-effort rollback of this new batch only */ }
     }
