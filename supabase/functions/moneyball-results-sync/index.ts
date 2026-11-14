@@ -192,13 +192,25 @@ async function saveSourceObservation(m:any,f:ScoreFeed){
 
 function outcome(h:number,a:number){return h>a?"1":h<a?"2":"X";}
 function won(selection:string,result:string):boolean|null{if(selection==="1X")return result!=="2";if(selection==="X2")return result!=="1";if(selection==="12")return result!=="X";if(["1","X","2"].includes(selection))return selection===result;return null;}
+function wonGoals(selection:string,home:number,away:number):boolean|null{
+ const total=home+away;
+ if(selection==="BTTS_YES")return home>0&&away>0;
+ if(selection==="BTTS_NO")return home===0||away===0;
+ const over=selection.startsWith("OVER_"),under=selection.startsWith("UNDER_");
+ if(!over&&!under)return null;
+ const line=Number(selection.replace(/^OVER_|^UNDER_/,"").replace(/_/g,"."));
+ if(!Number.isFinite(line))return null;
+ return over?total>line:total<line;
+}
 async function markVoid(m:any,reason:string){
  const now=new Date().toISOString();
  await db("matches?id=eq."+m.id,"PATCH",{status:reason,live_home_score:null,live_away_score:null,live_minute:null,live_updated_at:null,updated_at:now});
- const preds=await db("predictions?select=id,selection,pick&match_id=eq."+m.id);
+ const preds=await db("predictions?select=id,selection,pick,verdict,stake&match_id=eq."+m.id);
  for(const p of preds||[]){
-  const pick=String(p.selection||p.pick||"").trim();if(!pick||pick==="—"){await db("predictions?id=eq."+p.id,"PATCH",{settlement_status:"void",result_status:"void",verified:true,settled_at:now,note:"Brak poprawnego typu — wyłączono z rozliczenia skuteczności."});continue;}
-  await db("predictions?id=eq."+p.id,"PATCH",{settlement_status:"void",result_status:"void",verified:true,settled_at:now});
+  const pick=String(p.selection||p.pick||"").trim(),selected=String(p.verdict||"")==="WYBRANY",stake=selected?Number(p.stake??5):0;
+  const settlement={settlement_status:"void",result_status:"void",verified:true,settled_at:now,...(selected?{stake,potential_return:stake,profit_loss:0}:{})};
+  if(!pick||pick==="—")await db("predictions?id=eq."+p.id,"PATCH",{...settlement,note:"Brak poprawnego typu — wyłączono z rozliczenia skuteczności."});
+  else await db("predictions?id=eq."+p.id,"PATCH",settlement);
   const legs=await db("coupon_legs?select=id,coupon_id&prediction_id=eq."+p.id);
   for(const leg of legs||[]){
    await db("coupon_legs?id=eq."+leg.id,"PATCH",{status:"void",result_status:"void"});
@@ -225,15 +237,31 @@ async function processFixture(f:any,m:any,source="FootyNomad",externalId?:string
  if(old?.length)await db("match_results?id=eq."+old[0].id,"PATCH",row);else await db("match_results","POST",{match_id:m.id,...row});
  await saveSourceObservation(m,{source,external_id:String(externalId||f.external_id||""),home:m.home_team,away:m.away_team,home_score:f.home_score,away_score:f.away_score,status:"finished",date:m.kickoff_at||now,url:f.url||f.source_url||(source==="FootyNomad"?"https://footynomad.com/fixture/"+String(externalId||f.external_id||""):""),raw:f});
  await db("matches?id=eq."+m.id,"PATCH",{status:"finished",live_home_score:null,live_away_score:null,live_updated_at:null,updated_at:now});
- const preds=await db("predictions?select=id,market,selection,prediction_type,pick&match_id=eq."+m.id);
+ const preds=await db("predictions?select=id,market,selection,prediction_type,pick,verdict,stake,odds,potential_return&match_id=eq."+m.id);
  let settled=0,legsSettled=0;
  for(const p of preds||[]){
-  const selection=String(p.selection||p.pick||"").trim();if(!selection||selection==="—"){await db("predictions?id=eq."+p.id,"PATCH",{settlement_status:"void",result_status:"void",verified:true,settled_at:now,note:"Brak poprawnego typu — wyłączono z rozliczenia skuteczności."});settled++;continue;}
-  const isDc=String(p.market||p.prediction_type||"").toUpperCase().includes("DOUBLE")||String(p.prediction_type||"").toUpperCase()==="DC"||["1X","X2","12"].includes(selection);
-  if(isDc&&!["1X","X2","12"].includes(selection))continue;
-  if(!isDc&&!["1","X","2"].includes(selection))continue;
-  const isWon=won(selection,result);if(isWon===null)continue;
-  await db("predictions?id=eq."+p.id,"PATCH",{settlement_status:isWon?"won":"lost",result_status:isWon?"won":"lost",verified:true,settled_at:now});settled++;
+  const selection=String(p.selection||p.pick||"").trim();
+  if(!selection||selection==="—"){
+   await db("predictions?id=eq."+p.id,"PATCH",{settlement_status:"void",result_status:"void",verified:true,settled_at:now,...(p.verdict==="WYBRANY"?{profit_loss:0}:{})});
+   settled++;continue;
+  }
+  const market=String(p.market||p.prediction_type||"").toUpperCase();
+  const isGoals=market==="GOALS"||/^(BTTS_|OVER_|UNDER_)/.test(selection);
+  let isWon:boolean|null=null;
+  if(isGoals)isWon=wonGoals(selection,Number(f.home_score),Number(f.away_score));
+  else{
+   const isDc=market.includes("DOUBLE")||String(p.prediction_type||"").toUpperCase()==="DC"||["1X","X2","12"].includes(selection);
+   if(isDc&&!["1X","X2","12"].includes(selection))continue;
+   if(!isDc&&!["1","X","2"].includes(selection))continue;
+   isWon=won(selection,result);
+  }
+  if(isWon===null)continue;
+  const selected=String(p.verdict||"")==="WYBRANY",stake=selected?Number(p.stake??5):0;
+  const gross=selected?(Number(p.odds)>1?Math.round(stake*Number(p.odds)*100)/100:stake):null;
+  const profitLoss=selected?(isWon?(gross==null?null:Math.round((gross-stake)*100)/100):-stake):null;
+  const patch:any={settlement_status:isWon?"won":"lost",result_status:isWon?"won":"lost",verified:true,settled_at:now};
+  if(selected){patch.stake=stake;patch.potential_return=gross;patch.profit_loss=profitLoss;}
+  await db("predictions?id=eq."+p.id,"PATCH",patch);settled++;
   const legs=await db("coupon_legs?select=id,coupon_id&prediction_id=eq."+p.id);
   for(const leg of legs||[]){
    await db("coupon_legs?id=eq."+leg.id,"PATCH",{status:isWon?"won":"lost",result_status:isWon?"won":"lost"});legsSettled++;
@@ -244,7 +272,6 @@ async function processFixture(f:any,m:any,source="FootyNomad",externalId?:string
  }
  return {settled,legsSettled};
 }
-
 async function reconcileRescheduledMatches(ownerId:string|null=null){
  const today=day(new Date()),cursor=new Date(today+"T12:00:00Z"),futureDates:string[]=[];
  for(let i=1;i<=7;i++){cursor.setUTCDate(cursor.getUTCDate()+1);futureDates.push(day(cursor));}
