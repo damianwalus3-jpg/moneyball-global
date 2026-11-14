@@ -130,7 +130,7 @@ export function PredictionsView({ market }: { market: Market }) {
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{matchLabel(match)}</div>
                   <div className="mt-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2">
-                    <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Wybrany typ · {MARKET_LABELS[prediction.market]}</div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-primary">Typ modelu · {MARKET_LABELS[prediction.market]}</div>
                     <div className="mt-0.5 text-base font-extrabold leading-snug text-foreground sm:text-lg">{prediction.selection === "—" ? "—" : PICK_LABELS[prediction.selection] ?? prediction.selection}</div>
                   </div>
                   <div className="text-xs text-muted-foreground">
@@ -171,24 +171,31 @@ export function PredictionsView({ market }: { market: Market }) {
                       <div><span className="eyebrow">Źródła i pokrycie</span><p className="break-words">{sourceLabel(prediction.data_source)} · {coverageLabel(prediction.data_coverage)}</p></div>
                       <div><span className="eyebrow">Rynek / kurs</span><p>{MARKET_LABELS[prediction.market]} · {prediction.selection} · {fmtOdds(prediction.odds)}{referenceBookmaker ? ` · ${referenceBookmaker}` : ""}</p></div>
                       {Boolean(prediction.data_coverage?.["odds_price_timestamp"]) && <div><span className="eyebrow">Aktualizacja kursu</span><p>{fmtDateTime(String(prediction.data_coverage?.["odds_price_timestamp"]))} · kurs z chwili pobrania u bukmachera</p></div>}
-                      {prediction.verdict === "WYBRANY" && (() => {
-                        const stake = Number(prediction.stake ?? 5);
-                        const potentialReturn = prediction.potential_return != null
-                          ? Number(prediction.potential_return)
-                          : prediction.odds != null && Number(prediction.odds) > 1
-                            ? Math.round(stake * Number(prediction.odds) * 100) / 100
-                            : null;
+                      {(() => {
+                        const selected = prediction.verdict === "WYBRANY";
+                        const stake = selected ? Number(prediction.stake ?? 5) : 5;
+                        const hasOdds = prediction.odds != null && Number(prediction.odds) > 1;
+                        const potentialReturn = hasOdds
+                          ? selected && prediction.potential_return != null
+                            ? Number(prediction.potential_return)
+                            : Math.round(stake * Number(prediction.odds) * 100) / 100
+                          : null;
                         const potentialProfit = potentialReturn == null ? null : Math.round((potentialReturn - stake) * 100) / 100;
+                        const oddsSource = String(prediction.data_coverage?.["odds_source"] ?? "");
+                        const oddsUrl = String(prediction.data_coverage?.["odds_source_url"] ?? "https://tipsaudit.com");
                         return (
                           <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 sm:col-span-2">
-                            <div className="eyebrow mb-2">Rozliczenie pojedynczego typu · stała stawka</div>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div><span className="text-xs text-muted-foreground">Stawka</span><p className="num font-semibold">{fmtMoney(stake)}</p></div>
-                              <div><span className="text-xs text-muted-foreground">Możliwy zwrot</span><p className="num font-semibold">{fmtMoney(potentialReturn)}</p></div>
-                              <div><span className="text-xs text-muted-foreground">Możliwy zysk netto</span><p className="num font-semibold text-success">{fmtMoney(potentialProfit)}</p></div>
-                              <div><span className="text-xs text-muted-foreground">Wynik rozliczenia</span><p className={prediction.profit_loss != null && prediction.profit_loss > 0 ? "num font-semibold text-success" : prediction.profit_loss != null && prediction.profit_loss < 0 ? "num font-semibold text-destructive" : "num font-semibold"}>{prediction.verified ? fmtMoney(prediction.profit_loss) : "Oczekuje na wynik"}</p></div>
-                            </div>
-                            {prediction.odds == null && <p className="mt-2 text-xs text-warning">Brak zapisanego kursu — potencjalna wypłata i zysk nie są wyliczane.</p>}
+                            <div className="eyebrow mb-2">{selected ? "Rozliczenie pojedynczego typu" : "Symulacja stawki 5 € · typ nie jest wybrany"}</div>
+                            {hasOdds ? (
+                              <div className="grid grid-cols-2 gap-3">
+                                <div><span className="text-xs text-muted-foreground">{selected ? "Stawka" : "Stawka symulowana"}</span><p className="num font-semibold">{fmtMoney(stake)}</p></div>
+                                <div><span className="text-xs text-muted-foreground">Możliwy zwrot</span><p className="num font-semibold">{fmtMoney(potentialReturn)}</p></div>
+                                <div><span className="text-xs text-muted-foreground">Możliwy zysk netto</span><p className="num font-semibold text-success">{fmtMoney(potentialProfit)}</p></div>
+                                <div><span className="text-xs text-muted-foreground">Możliwa strata</span><p className="num font-semibold text-destructive">{fmtMoney(-stake)}</p></div>
+                                {selected && <div><span className="text-xs text-muted-foreground">Wynik rozliczenia</span><p className={prediction.profit_loss != null && prediction.profit_loss > 0 ? "num font-semibold text-success" : prediction.profit_loss != null && prediction.profit_loss < 0 ? "num font-semibold text-destructive" : "num font-semibold"}>{prediction.verified ? fmtMoney(prediction.profit_loss) : "Oczekuje na wynik"}</p></div>}
+                              </div>
+                            ) : <p className="text-xs text-warning">Brak aktualnego, potwierdzonego kursu dla tego typu — nie wyliczamy wypłaty ani zysku. Nie dopisujemy kursów szacunkowych.</p>}
+                            {oddsSource === "TipsAudit" && <p className="mt-2 text-[11px] text-muted-foreground"><a href={oddsUrl} target="_blank" rel="noreferrer" className="underline">Data: TipsAudit</a></p>}
                           </div>
                         );
                       })()}
