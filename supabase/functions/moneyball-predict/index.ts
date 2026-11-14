@@ -354,13 +354,15 @@ function historyModel(home:string,away:string,kickoff:string,history:any[],footy
   return {p1:+(p1/total*100).toFixed(1),px:+(px/total*100).toFixed(1),p2:+(p2/total*100).toFixed(1),coverage,home_matches:hn,away_matches:an,home_form:Object.keys(hf).length?hf:null,away_form:Object.keys(af).length?af:null,source,footyForm:!!footyForm,publicForm:source==="OPENMATCHDAY_LAST10"||source==="ESPN_WOMEN_LAST10"||source==="ESPN_FORM_LAST5",espnWomenForm:source==="ESPN_WOMEN_LAST10",pitchForm:source==="PITCHAPI_LAST5",method,expected_home_goals:expectedHomeGoals,expected_away_goals:expectedAwayGoals,expected_total_goals:expectedHomeGoals==null||expectedAwayGoals==null?null:+(expectedHomeGoals+expectedAwayGoals).toFixed(2),xg_used:xgUsed,xg_home_matches:xgHomeMatches,xg_away_matches:xgAwayMatches,xg_home_source_counts:xgHomeSourceCounts,xg_away_source_counts:xgAwaySourceCounts,xg_sources:xgSources,calibration_temperature:calibrationTemperature,calibration_method:calibrationMethod,elo_used:eloUsed,elo_home:eloHome,elo_away:eloAway,elo_diff:eloDiff,elo_weight:eloWeight,elo_as_of:eloAsOf};
  return {p1:+(p1/total*100).toFixed(1),px:+(px/total*100).toFixed(1),p2:+(p2/total*100).toFixed(1),coverage:Math.min(75,n*15),home_matches:hn,away_matches:an,home_form:hf||null,away_form:af||null,source,footyForm:!!footyForm,publicForm:source==="OPENMATCHDAY_LAST10",pitchForm:source==="PITCHAPI_LAST5",method};
 }
+let githubPublicTeamHistoryCache:any=null;let githubPublicTeamHistoryCacheAt=0;
 async function readGitHubPublicTeamHistory(){
+ if(githubPublicTeamHistoryCache&&Date.now()-githubPublicTeamHistoryCacheAt<30*60*1000)return githubPublicTeamHistoryCache;
  try{
   const r=await fetch("https://raw.githubusercontent.com/damianwalus3-jpg/moneyball-global-web/main/public-data/team-history.json",{headers:{"Accept":"application/json"},signal:AbortSignal.timeout(18000)});
   if(!r.ok)throw new Error("GitHub public history HTTP "+r.status);
   const data=await r.json();
   if(data?.schema_version!==1||!data?.teams||Object.keys(data.teams).length<100)throw new Error("GitHub public history validation failed");
-  return data;
+  githubPublicTeamHistoryCache=data;githubPublicTeamHistoryCacheAt=Date.now();return data;
  }catch(e){return {teams:{},error:String(e),generated_at:null,coverage:null};}
 }
 let historicalXgCache:any=null;let historicalXgCacheAt=0;
