@@ -68,9 +68,13 @@ function Login() {
         if (data.session) router.history.push("/panel");
         else setInfo("Sprawdź skrzynkę e-mail i potwierdź konto, a potem zaloguj się.");
       } else {
-        const { error } = await sb.auth.resetPasswordForEmail(email.trim(), {
-          redirectTo: window.location.origin + "/reset-password",
-        });
+        // Preserve the app base path when hosted below a GitHub Pages project URL.
+        const appBase = window.location.pathname.startsWith("/moneyball-global-web/")
+          ? "/moneyball-global-web/"
+          : import.meta.env.BASE_URL;
+        const redirectPath = `${appBase.replace(/\/?$/, "/")}reset-password`;
+        const redirectTo = new URL(redirectPath, window.location.origin).toString();
+        const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo });
         if (error) throw new Error(error.message);
         setInfo("Jeśli konto istnieje, wysłaliśmy link do zmiany hasła.");
       }
