@@ -217,7 +217,7 @@ function Mecze() {
       const totals = {
         matches: 0, predictions: 0, created: 0, updated: 0, preserved: 0,
         selected: 0, covered: 0, missing: 0, footy_form_matches: 0,
-        github_form_matches: 0, batches: 0,
+        github_form_matches: 0, auto_single_bets: 0, batches: 0,
       };
       let offset = 0;
       let hasMore = true;
@@ -242,7 +242,7 @@ function Mecze() {
         for (const data of results) {
           for (const key of [
             "matches", "predictions", "created", "updated", "preserved", "selected",
-            "covered", "missing", "footy_form_matches", "github_form_matches",
+            "covered", "missing", "footy_form_matches", "github_form_matches", "auto_single_bets",
           ] as const) {
             totals[key] += Number(data[key] ?? 0);
           }
@@ -269,7 +269,8 @@ function Mecze() {
       "; forma FootyNomad/GitHub: " + (r.prediction?.footy_form_matches ?? 0) + "/" + (r.prediction?.github_form_matches ?? 0) +
       "; partie: " + (r.prediction?.batches ?? 0) +
       "; kursy bet365: " + (r.odds ? (r.odds.quotes_saved ?? 0) : "źródło niedostępne") +
-      "; kupony pojedyncze i AKO: generator dostępny w zakładce Kupony" +
+      "; pojedyncze zakłady 5 EUR: " + (r.prediction?.auto_single_bets ?? 0) +
+      "; kupony AKO: generator dostępny w zakładce Kupony" +
       "; wyniki: " + (r.sync?.result_sync?.skipped ? "aktualizowane automatycznie co 5 minut" : r.sync?.result_sync?.ok ? "zsynchronizowane" : "wymagają kontroli") + ".",
   });
 
