@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "https://xwrgfaarmwnguymresjy.supabase.co";
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY") || "sb_publishable_E27tyjResjElwC4AWbmILw_wbtibXhX";
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 const STRIKER_API_KEY = Deno.env.get("STRIKER_API_KEY") || "";
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -54,7 +55,7 @@ async function authenticate(req: Request, body: any): Promise<string> {
   if (cronToken) {
     const response = await fetch(SUPABASE_URL + "/rest/v1/rpc/moneyball_cron_token_valid", {
       method: "POST",
-      headers: { apikey: ANON_KEY, Authorization: "Bearer " + (bearer || ANON_KEY), "Content-Type": "application/json" },
+      headers: { apikey: SERVICE_KEY || ANON_KEY, Authorization: "Bearer " + (SERVICE_KEY || bearer || ANON_KEY), "Content-Type": "application/json" },
       body: JSON.stringify({ p_token: cronToken }),
     });
     if (!response.ok || (await response.json()) !== true) throw new Error("Invalid scheduled-task token");
