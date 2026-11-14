@@ -189,6 +189,20 @@ Deno.serve(async(req)=>{
    }
    await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"completed",completed_at:new Date().toISOString(),matches_found:combined.length,notes:"FootyNomad "+result.fixtures.length+"; public fixtures "+publicFixtures.length+"; enriched "+enriched+"; public-only "+publicOnly+"; inserted "+inserted+"; updated "+updated+"; settled "+settled+"; matched by fixture "+matchedByFixture+"; promoted "+promotedToPrimary+"; public source status "+JSON.stringify(publicSourceStatus).slice(0,900)});
   }catch(e){await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"partial",completed_at:new Date().toISOString(),notes:"Import częściowy: "+String(e)});throw e;}
+  // Pull optional free-tier median bookmaker prices before prediction, so the model can consume fresh market context.
+  // The provider function returns a safe skipped response when STRIKER_API_KEY has not been configured.
+  let oddsSync:any={ok:false,skipped:true,error:"not_run"};
+  try{
+   const oddsResponse=await fetch(SUPABASE_URL+"/functions/v1/strikerapi-odds-sync",{
+    method:"POST",
+    headers:{apikey:KEY,Authorization:"Bearer "+token,...(cronToken?{"x-cron-token":cronToken}:{}),"Content-Type":"application/json",Accept:"application/json"},
+    body:JSON.stringify({owner_id:ownerId}),
+   });
+   const oddsText=await oddsResponse.text();
+   try{oddsSync=oddsText?JSON.parse(oddsText):{ok:false,error:"Empty odds-sync response"};}
+   catch(_){oddsSync={ok:false,error:oddsText.slice(0,500)};}
+   if(!oddsResponse.ok)oddsSync={...oddsSync,ok:false,http_status:oddsResponse.status};
+  }catch(e){oddsSync={ok:false,error:String(e)};}
   // Automatically run the prediction engine for every page of matches after fixture import.
   // The predictor reads a seven-day window and processes 30 matches per request.
   // Continue until has_more is false so no fixtures are silently skipped.
@@ -237,6 +251,6 @@ Deno.serve(async(req)=>{
    completed_at:new Date().toISOString(),
    notes:"FootyNomad "+result.fixtures.length+"; inserted "+inserted+"; updated "+updated+"; predictions "+JSON.stringify({ok:predictionSync.ok,batches:predictionSync.batches,total:predictionSync.total_predictions,selected:predictionSync.selected,error:predictionSync.error||null}).slice(0,900)+"; results "+JSON.stringify({ok:resultSync.ok,results_saved:resultSync.results_saved,predictions_settled:resultSync.predictions_settled,coupon_legs_settled:resultSync.coupon_legs_settled,error:resultSync.error||null}).slice(0,900)
   }).catch((e:any)=>console.error("Final scan status update failed:",String(e)));
-  return new Response(JSON.stringify({ok:pipelineOk,date,total_found:result.total_found,fixtures_count:result.fixtures.length,combined_count:combined.length,public_fixtures:publicFixtures.length,enriched,public_only:publicOnly,public_source_status:publicSourceStatus,inserted,updated,settled,matched_by_fixture:matchedByFixture,promoted_to_primary:promotedToPrimary,scan_run_id:run.id,prediction_sync:predictionSync,result_sync:resultSync}),{status:pipelineOk?200:502,headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
+  return new Response(JSON.stringify({ok:pipelineOk,date,odds_sync:oddsSync,total_found:result.total_found,fixtures_count:result.fixtures.length,combined_count:combined.length,public_fixtures:publicFixtures.length,enriched,public_only:publicOnly,public_source_status:publicSourceStatus,inserted,updated,settled,matched_by_fixture:matchedByFixture,promoted_to_primary:promotedToPrimary,scan_run_id:run.id,prediction_sync:predictionSync,result_sync:resultSync}),{status:pipelineOk?200:502,headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
  }catch(e){return new Response(JSON.stringify({error:String(e)}),{status:400,headers:{...cors,"Content-Type":"application/json"}});}
 });
