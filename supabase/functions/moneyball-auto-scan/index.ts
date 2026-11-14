@@ -58,12 +58,14 @@ Deno.serve(async(req:Request)=>{
   const apiKey=req.headers.get("apikey")||SERVICE_KEY;
   if(!bearer)return json({ok:false,error:"Missing scheduled Authorization token"},401);
   const offsets=[offset,offset+30,offset+60];
-  const pageResults=await Promise.all(offsets.map(async(pageOffset)=>{
+  const pageResults:any[]=[];
+  for(const pageOffset of offsets){
    const response=await fetch(SUPABASE_URL+"/functions/v1/moneyball-predict",{method:"POST",headers:{apikey:apiKey,Authorization:"Bearer "+bearer,"x-cron-token":req.headers.get("x-cron-token")||"","Content-Type":"application/json"},body:JSON.stringify({owner_id:ownerId,date,offset:pageOffset}),signal:AbortSignal.timeout(115000)});
    const raw=await response.text();let result:any;try{result=raw?JSON.parse(raw):null}catch{result={error:raw.slice(0,500)};}
    if(!response.ok||!result?.ok)throw new Error("Predict offset "+pageOffset+" failed ("+response.status+"): "+String(result?.error||raw).slice(0,400));
-   return result;
-  }));
+   pageResults.push(result);
+   if(result.has_more!==true)break;
+  }
 
   const totals={matches:0,predictions:0,created:0,updated:0,preserved:0,selected:0,auto_single_bets:0,covered:0,missing:0,footy_form_matches:0,github_form_matches:0};
   for(const result of pageResults)for(const key of Object.keys(totals) as (keyof typeof totals)[])totals[key]+=Number(result[key]||0);
