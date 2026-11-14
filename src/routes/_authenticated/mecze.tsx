@@ -583,21 +583,22 @@ function Mecze() {
                                   </div>
                                   <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                                     <div><div className="text-xs text-muted-foreground">Prawdopodobieństwo</div><strong>{p.probability == null ? "Brak" : Number(p.probability).toFixed(1) + "%"}</strong></div>
-                                    <div><div className="text-xs text-muted-foreground">Kurs wybranego typu</div><strong>{fmtOdds(p.odds)}{p.odds != null && asObject(p.data_coverage)["odds_bookmaker"] ? ` · ${String(asObject(p.data_coverage)["odds_bookmaker"])}` : ""}</strong>{asObject(p.data_coverage)["odds_source"] === "TipsAudit" && <div className="text-[10px]"><a href="https://tipsaudit.com" target="_blank" rel="noreferrer" className="underline decoration-dotted">Data: TipsAudit</a></div>}</div>
+                                    <div><div className="text-xs text-muted-foreground">Kurs typu</div><strong>{fmtOdds(p.odds)}{p.odds != null && asObject(p.data_coverage)["odds_bookmaker"] ? ` · ${String(asObject(p.data_coverage)["odds_bookmaker"])}` : ""}</strong>{asObject(p.data_coverage)["odds_source"] === "TipsAudit" && <div className="text-[10px]"><a href="https://tipsaudit.com" target="_blank" rel="noreferrer" className="underline decoration-dotted">Data: TipsAudit</a></div>}</div>
                                     <div><div className="text-xs text-muted-foreground">Pewność</div><strong>{p.confidence ?? "—"}</strong></div>
                                     <div><div className="text-xs text-muted-foreground">Rozliczenie</div><strong>{p.settlement_status}</strong></div>
                                   </div>
-                                  {p.verdict === "WYBRANY" && (
-                                    <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 p-2 text-xs">
-                                      <div className="flex flex-wrap gap-x-3 gap-y-1">
-                                        <span>Stawka pojedyncza: <strong>5,00 €</strong></span>
-                                        <span>Kurs: <strong>{fmtOdds(p.odds)}</strong></span>
-                                        <span>Możliwy zwrot: <strong>{p.odds != null ? fmtMoney(5 * Number(p.odds)) : "brak kursu"}</strong></span>
-                                        <span>Możliwy zysk: <strong>{p.odds != null ? fmtMoney(5 * (Number(p.odds) - 1)) : "—"}</strong></span>
-                                        {p.verified && <span>Wynik: <strong>{fmtMoney(p.profit_loss)}</strong></span>}
-                                      </div>
-                                    </div>
-                                  )}
+                                   <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 p-2 text-xs">
+                                     {p.odds != null && Number(p.odds) > 1 ? (
+                                       <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                         <span>{p.verdict === "WYBRANY" ? "Stawka pojedyncza" : "Stawka symulowana"}: <strong>5,00 €</strong></span>
+                                         <span>Kurs: <strong>{fmtOdds(p.odds)}</strong></span>
+                                         <span>Możliwy zwrot: <strong>{fmtMoney(5 * Number(p.odds))}</strong></span>
+                                         <span>Możliwy zysk netto: <strong>{fmtMoney(5 * (Number(p.odds) - 1))}</strong></span>
+                                         <span>Możliwa strata: <strong>{fmtMoney(-5)}</strong></span>
+                                         {p.verdict === "WYBRANY" && p.verified && <span>Wynik: <strong>{fmtMoney(p.profit_loss)}</strong></span>}
+                                       </div>
+                                     ) : <span className="text-warning">Brak aktualnego kursu dla tego typu — symulacja stawki 5 € niedostępna.</span>}
+                                   </div>
                                   {(() => {
                                     const linked = couponLegs.filter((leg) => leg.prediction_id === p.id)
                                       .map((leg) => ({ leg, coupon: coupons.find((item) => item.id === leg.coupon_id) }))
