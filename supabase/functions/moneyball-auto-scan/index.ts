@@ -23,7 +23,7 @@ function ageMs(value:string|null|undefined){const t=value?Date.parse(value):NaN;
 
 Deno.serve(async(req:Request)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
- if(req.method==="GET")return json({ok:true,service:"MONEYBALL automatic daily analysis",batch_size:15,batches_per_run:3,schedule:"every 2 minutes",timezone:"Europe/Brussels"});
+ if(req.method==="GET")return json({ok:true,service:"MONEYBALL automatic daily analysis",batch_size:20,batches_per_run:3,schedule:"every 2 minutes",timezone:"Europe/Brussels"});
  if(req.method!=="POST")return json({ok:false,error:"POST required"},405);
  let failureOwner="",failureDate="";
  try{
