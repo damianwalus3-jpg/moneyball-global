@@ -170,6 +170,7 @@ export function PredictionsView({ market }: { market: Market }) {
                       <div><span className="eyebrow">Poziom pewności</span><p>{prediction.confidence || "nie podano"}</p></div>
                       <div><span className="eyebrow">Źródła i pokrycie</span><p className="break-words">{sourceLabel(prediction.data_source)} · {coverageLabel(prediction.data_coverage)}</p></div>
                       <div><span className="eyebrow">Rynek / kurs</span><p>{MARKET_LABELS[prediction.market]} · {prediction.selection} · {fmtOdds(prediction.odds)}{referenceBookmaker ? ` · ${referenceBookmaker}` : ""}</p></div>
+                      {prediction.data_coverage?.["odds_price_timestamp"] && <div><span className="eyebrow">Aktualizacja kursu</span><p>{fmtDateTime(String(prediction.data_coverage["odds_price_timestamp"]))} · kurs z chwili pobrania u bukmachera</p></div>}
                       {prediction.verdict === "WYBRANY" && (() => {
                         const stake = Number(prediction.stake ?? 5);
                         const potentialReturn = prediction.potential_return != null
