@@ -273,13 +273,10 @@ export function signedAmount(transaction: Pick<BankrollTransaction, "transaction
   return TX_SIGN[transaction.transaction_type] * Math.abs(amount);
 }
 
-/** Uses the latest stored balance_after; falls back to the signed ledger. */
+/** Always sums the signed ledger; balance_after is only a cached snapshot and may lag automatic coupon entries. */
 export function bankrollBalance(transactions: BankrollTransaction[]): number | null {
   if (transactions.length === 0) return null;
-  const ordered = [...transactions].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
-  const latest = [...ordered].reverse().find((transaction) => transaction.balance_after != null);
-  if (latest?.balance_after != null) return Math.round(Number(latest.balance_after) * 100) / 100;
-  return Math.round(ordered.reduce((sum, transaction) => sum + signedAmount(transaction), 0) * 100) / 100;
+  return Math.round(transactions.reduce((sum, transaction) => sum + signedAmount(transaction), 0) * 100) / 100;
 }
 
 export function couponPayout(
