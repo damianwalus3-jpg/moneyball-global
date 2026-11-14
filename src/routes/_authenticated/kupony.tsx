@@ -72,6 +72,7 @@ function Kupony() {
     .filter((prediction) => isActivePredictionVersion(prediction.model_version))
     .filter((prediction) => isCouponCandidate(prediction, matchById.get(prediction.match_id), Date.now()))
     .filter((prediction) => isKickoffToday(matchById.get(prediction.match_id)?.kickoff_at, Date.now()))
+    .filter((prediction) => /nations league/i.test(`${matchById.get(prediction.match_id)?.competition ?? ""} ${matchById.get(prediction.match_id)?.league ?? ""}`))
     .filter((prediction) => !excludeActive || !activeMatchIds.has(prediction.match_id))
     .sort((a, b) => Number(b.probability) - Number(a.probability));
 
