@@ -92,8 +92,8 @@ Deno.serve(async(req)=>{
   const date=String(body.date||new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()));
   const bounds=brusselsDayBounds(date);
   const matches=await db("matches?select=id,owner_id,user_id,home_team,away_team,competition,league,country,kickoff_at,status&owner_id=eq."+encodeURIComponent(owner)+"&kickoff_at=gte."+encodeURIComponent(bounds.start)+"&kickoff_at=lt."+encodeURIComponent(bounds.end)+"&status=in.(scheduled,unknown,live)&order=kickoff_at.asc");
-  const catalog=await movi("/catalog?sport=soccer");
-  const fixtures=Array.isArray(catalog.fixtures)?catalog.fixtures:[];
+  const board=await movi("/odds?sport=soccer&groups=40,10114,10143,981,10202");
+  const fixtures=Array.isArray(board.matches)?board.matches:[];
   const pairs:any[]=[];
   const used=new Set<string>();
   for(const m of matches||[]){
@@ -112,29 +112,23 @@ Deno.serve(async(req)=>{
    if(best){used.add(String(best.id));pairs.push({match:m,fixture:best});}
   }
   const processed:any[]=[];
-  let errors=0;
-  for(let i=0;i<pairs.length;i+=12){
-   const batch=pairs.slice(i,i+12);
-   const results=await Promise.all(batch.map(async pair=>{
-    try{
-     const snap=await movi("/snapshot?fi="+encodeURIComponent(String(pair.fixture.id)));
-     return {pair,snap};
-    }catch(e){errors++;return {pair,snap:null,error:String(e)}}
-   }));
-   for(const item of results){
-    if(!item.snap||!Array.isArray(item.snap.quotes))continue;
-    const {match,fixture}=item.pair;
-    const quotes=item.snap.quotes as any[];
-    const rows=quotes.filter(q=>!q.suspended&&Number(q.odds_dec)>1&&Number.isFinite(Number(q.odds_dec))).map(q=>{
-     const mapped=selectionFor(q,match.home_team,match.away_team);
-     return {owner_id:match.owner_id||match.user_id,match_id:match.id,provider:"MoviOdds",provider_fixture_id:String(fixture.id),bookmaker:"bet365",sport:"soccer",market_group_id:String(q.group_id||""),market_id:String(q.market_id||""),market_name:String(q.group_name||"Unknown"),selection_id:String(q.sel_id||""),selection_label:q.label??null,selection_side:q.side??null,selection_line:q.line??null,selection_handicap:q.handicap??null,odds:Number(q.odds_dec),suspended:!!q.suspended,phase:String(q.phase|| (fixture.in_play?"inplay":"prematch")),price_timestamp:q.ts||null,provider_polled_at:item.snap.polled_at||item.snap.server_time||null,captured_at:new Date().toISOString(),raw_quote:q,mapped_market:mapped?.market??null,mapped_selection:mapped?.selection??null};
-    }).filter(r=>r.owner_id&&r.selection_id&&r.market_group_id);
-    for(let j=0;j<rows.length;j+=250){
-     await db("provider_odds?on_conflict=provider,provider_fixture_id,market_group_id,market_id,selection_id","POST",rows.slice(j,j+250),"resolution=merge-duplicates,return=minimal");
-    }
-    processed.push({match_id:match.id,provider_fixture_id:String(fixture.id),quotes:rows.length,home:fixture.home,away:fixture.away});
+  let quotesSaved=0,mappedQuotes=0;
+  const polledAt=board.server_time||board.generated_at||new Date().toISOString();
+  for(const pair of pairs){
+   const {match,fixture}=pair;
+   const quotes=Array.isArray(fixture.quotes)?fixture.quotes as any[]:[];
+   const capturedAt=new Date().toISOString();
+   const rows=quotes.filter(q=>!q.suspended&&Number(q.odds_dec)>1&&Number.isFinite(Number(q.odds_dec))).map(q=>{
+    const mapped=selectionFor(q,match.home_team,match.away_team);
+    return {owner_id:match.owner_id||match.user_id,match_id:match.id,provider:"MoviOdds",provider_fixture_id:String(fixture.id),bookmaker:"bet365",sport:"soccer",market_group_id:String(q.group_id||""),market_id:String(q.market_id||""),market_name:String(q.group_name||"Unknown"),selection_id:String(q.sel_id||""),selection_label:q.label??null,selection_side:q.side??null,selection_line:q.line??null,selection_handicap:q.handicap??null,odds:Number(q.odds_dec),suspended:!!q.suspended,phase:String(q.phase||(fixture.in_play?"inplay":"prematch")),price_timestamp:q.ts||null,provider_polled_at:polledAt,captured_at:capturedAt,raw_quote:q,mapped_market:mapped?.market??null,mapped_selection:mapped?.selection??null};
+   }).filter(r=>r.owner_id&&r.selection_id&&r.market_group_id);
+   for(let j=0;j<rows.length;j+=250){
+    await db("provider_odds?on_conflict=provider,provider_fixture_id,market_group_id,market_id,selection_id","POST",rows.slice(j,j+250),"resolution=merge-duplicates,return=minimal");
    }
+   quotesSaved+=rows.length;
+   mappedQuotes+=rows.filter(r=>r.mapped_market&&r.mapped_selection).length;
+   processed.push({match_id:match.id,provider_fixture_id:String(fixture.id),quotes:rows.length,mapped_quotes:rows.filter(r=>r.mapped_market&&r.mapped_selection).length,home:fixture.home,away:fixture.away});
   }
-  return json({ok:true,provider:"MoviOdds",bookmaker:"bet365",catalog_count:fixtures.length,app_matches:matches.length,matched_fixtures:pairs.length,snapshots_ok:processed.length,quotes_saved:processed.reduce((n,x)=>n+x.quotes,0),snapshot_errors:errors,processed,server_time:catalog.server_time||new Date().toISOString(),note:"Coverage is limited to fixtures found in both catalogs and markets currently priced by bet365."});
+  return json({ok:true,provider:"MoviOdds",bookmaker:"bet365",board_matches:fixtures.length,catalog_matches:board.catalog_matches??null,app_matches:matches.length,matched_fixtures:pairs.length,fixtures_with_quotes:processed.filter(x=>x.quotes>0).length,quotes_saved:quotesSaved,mapped_quotes:mappedQuotes,processed,server_time:polledAt,note:"Bulk odds feed: Full Time Result, Double Chance and full-time goal totals; stale and half-time quotes are not mapped."});
  }catch(e){return json({ok:false,error:String(e)},500)}
 });
