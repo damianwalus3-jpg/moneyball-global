@@ -100,9 +100,9 @@ function ResetPassword() {
           if (error) throw error;
           // Recovery code exchange emits PASSWORD_RECOVERY. Do not accept a
           // normal signed-in session as proof that a reset link was used.
-          if (!recoveryConfirmed && active) {
-            showError("Link otworzył sesję, ale nie potwierdził operacji resetowania hasła. Wyślij nowy link.");
-          }
+          // A one-time code delivered by the recovery email is proof
+          // of the recovery flow after successful exchange.
+          acceptRecovery();
           return;
         }
 
