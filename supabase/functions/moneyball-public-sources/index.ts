@@ -144,15 +144,36 @@ function statusFromEspn(e: any): string {
   if (s === "post") return "finished";
   return "scheduled";
 }
+async function fetchPublicWithRetry(url: string, accept: string, timeoutMs: number): Promise<Response> {
+  let lastError = "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 MoneyballGlobal/2.0", "Accept": accept },
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (response.ok) return response;
+      lastError = "HTTP " + response.status + " " + url;
+      if (![429, 500, 502, 503, 520, 522, 524, 546].includes(response.status) || attempt === 2) {
+        throw new Error(lastError);
+      }
+    } catch (error) {
+      lastError = String(error);
+      if (attempt === 2 || (!/timeout|network|fetch/i.test(lastError) && !/HTTP (429|500|502|503|520|522|524|546)/.test(lastError))) {
+        throw error;
+      }
+    }
+    await new Promise(resolve => setTimeout(resolve, 900 * (attempt + 1)));
+  }
+  throw new Error(lastError || "Public source unavailable after retries");
+}
 async function safeJson(url: string) {
-  const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 MoneyballGlobal/2.0", "Accept": "application/json" }, signal: AbortSignal.timeout(10000) });
-  if (!r.ok) throw new Error("HTTP " + r.status + " " + url);
-  return await r.json();
+  const response = await fetchPublicWithRetry(url, "application/json", 10000);
+  return await response.json();
 }
 async function safeText(url: string) {
-  const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 MoneyballGlobal/2.0", "Accept": "text/csv,text/plain,*/*" }, signal: AbortSignal.timeout(15000) });
-  if (!r.ok) throw new Error("HTTP " + r.status + " " + url);
-  return await r.text();
+  const response = await fetchPublicWithRetry(url, "text/csv,text/plain,*/*", 12000);
+  return await response.text();
 }
 async function mapLimit<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
@@ -174,7 +195,7 @@ async function openMatchday(date: string) {
   const folders = indexRows.map(m => m[1]);
   const unique = [...new Set(folders)];
   const githubHistoryPromise = readGithubTeamHistory();
-  const results = await mapLimit(unique, 8, async (folder) => {
+  const results = await mapLimit(unique, 4, async (folder) => {
     const raw = await safeText(BASE + "/data/" + folder + "/fixtures_2627.csv")
       .catch(() => safeText(BASE + "/data/" + folder + "/fixtures_2026.csv"));
     const rows = csvRows(raw);
