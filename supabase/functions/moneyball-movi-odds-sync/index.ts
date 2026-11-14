@@ -14,8 +14,8 @@ function brusselsDayBounds(date:string){
   const label=parts.find((part)=>part.type==="timeZoneName")?.value||"GMT";
   const offsetText=label.startsWith("GMT")?label.slice(3):"";
   const sign=offsetText.startsWith("-")?-1:1;
-  const parts=offsetText.replace(/^[+-]/,"").split(":");
-  const minutes=(Number(parts[0]||0)*60+Number(parts[1]||0))*sign;
+  const offsetParts=offsetText.replace(/^[+-]/,"").split(":");
+  const minutes=(Number(offsetParts[0]||0)*60+Number(offsetParts[1]||0))*sign;
   return minutes*60000;
  };
  const start=Date.UTC(year,month-1,day),end=Date.UTC(year,month-1,day+1);
