@@ -10,7 +10,7 @@ export type CouponStatus = Settlement | "cancelled";
 export type MatchStatus = "scheduled" | "live" | "finished" | "postponed" | "cancelled" | "unknown";
 export type Gender = "men" | "women" | "mixed" | "unknown";
 export type ScanRunStatus = "started" | "completed" | "partial" | "failed";
-export type CouponType = "TEST" | "MAIN" | "MEGA" | "EXTRA";
+export type CouponType = "TEST" | "MAIN" | "MEGA" | "EXTRA" | "SINGLE";
 export type TransactionType = "deposit" | "withdrawal" | "stake" | "return" | "adjustment";
 // Legacy view-model aliases; the database still uses canonical columns.
 export type PredictionType = "1X2" | "DC" | "GOALS";
