@@ -15,10 +15,13 @@ export function getSupabase(): SupabaseClient | null {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        // Supabase password recovery supports PKCE. The recovery route exchanges
-        // the one-time ?code= explicitly after the user lands on /reset-password.
-        // Disable automatic URL handling so the router cannot consume the code first.
-        flowType: "pkce",
+        // Use implicit recovery tokens so a password-reset link also works when
+        // the email is opened in a different browser/webview than the one that
+        // requested it. The /reset-password route validates the recovery type
+        // and installs the temporary session explicitly; it never treats an
+        // arbitrary existing session as proof of a recovery link.
+        // Keep URL handling manual so the router cannot consume the tokens first.
+        flowType: "implicit",
         detectSessionInUrl: false,
         storageKey: "moneyball-auth",
       },
