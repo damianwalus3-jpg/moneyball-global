@@ -416,7 +416,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  CRON_FALLBACK_TOKEN=cronToken;
  CRON_JWT_TOKEN=requestToken;
  if(cronToken){
-  const check=await fetch(S+"/rest/v1/rpc/moneyball_cron_token_valid",{method:"POST",headers:{apikey:K,Authorization:"Bearer "+requestToken,"Content-Type":"application/json"},body:JSON.stringify({p_token:cronToken})});
+  const check=await fetch(S+"/rest/v1/rpc/moneyball_cron_token_valid",{method:"POST",headers:{apikey:SERVICE_KEY||K,Authorization:"Bearer "+(SERVICE_KEY||requestToken),"Content-Type":"application/json"},body:JSON.stringify({p_token:cronToken})});
   if(!check.ok||(await check.json())!==true)throw Error("Nieprawidłowy token harmonogramu.");
   ownerId=String(body.owner_id||"");
   if(!ownerId)throw Error("Brak właściciela dla automatycznego skanu.");
