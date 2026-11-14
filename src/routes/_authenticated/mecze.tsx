@@ -238,8 +238,8 @@ function Mecze() {
           ? [offset]
           : [offset, offset + batchSize, offset + batchSize * 2].slice(0, remaining);
         setPredictionProgress("Analiza partii " + (totals.batches + 1) + (offsets.length > 1 ? "–" + (totals.batches + offsets.length) : "") + " · od meczu " + (offset + 1) + "…");
-        const results = await Promise.all(offsets.map((batchOffset, i) => runBatch(batchOffset, totals.batches + i + 1)));
-        for (const data of results) {
+        for (let i = 0; i < offsets.length; i++) {
+          const data = await runBatch(offsets[i], totals.batches + 1);
           for (const key of [
             "matches", "predictions", "created", "updated", "preserved", "selected",
             "covered", "missing", "footy_form_matches", "github_form_matches", "auto_single_bets",
