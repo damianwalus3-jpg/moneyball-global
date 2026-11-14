@@ -3,12 +3,11 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { CalendarDays, ChevronRight, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
 import { fmtPct } from "@/lib/format";
-import { modelHitRate } from "@/lib/domain";
-import { dashboardSummaryQuery, tableQuery } from "@/lib/queries";
+import { dashboardSummaryQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => ({ meta: [{ title: "Panel — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Podsumowanie prognoz, kuponów i bankrolla." }, { property: "og:title", content: "Panel — MONEYBALL" }, { property: "og:description", content: "Podsumowanie prognoz." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
-  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(dashboardSummaryQuery()), context.queryClient.ensureQueryData(tableQuery("predictions"))]),
+  loader: ({ context }) => context.queryClient.ensureQueryData(dashboardSummaryQuery()),
   pendingComponent: PageLoader,
   errorComponent: DataError,
   component: Panel,
@@ -38,9 +37,8 @@ function DashboardTile({ to, label, value, hint, icon, tone = "default" }: {
 
 function Panel() {
   const { data: summary } = useSuspenseQuery(dashboardSummaryQuery());
-  const { data: predictions } = useSuspenseQuery(tableQuery("predictions"));
-  const hr1 = modelHitRate(predictions, "1X2");
-  const hrDc = modelHitRate(predictions, "DOUBLE_CHANCE");
+  const hr1 = summary.hit_rates["1X2"] ?? { rate: null, won: 0, settled: 0 };
+  const hrDc = summary.hit_rates["DOUBLE_CHANCE"] ?? { rate: null, won: 0, settled: 0 };
   const hrGoals = summary.hit_rates.GOALS;
 
   return (
