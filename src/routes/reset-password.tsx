@@ -34,70 +34,109 @@ function ResetPassword() {
   useEffect(() => {
     const sb = getSupabase();
     if (!sb) {
-      setChecking(false);
       setErr("Brak połączenia z bazą. Wróć do aplikacji i sprawdź konfigurację.");
+      setChecking(false);
       return;
     }
 
     let active = true;
-    let verified = false;
-    const params = new URLSearchParams(window.location.search);
-    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const recoveryError = params.get("error_description") || hash.get("error_description");
-    const hasRecoveryPayload =
-      params.has("code") ||
-      hash.get("type") === "recovery" ||
-      hash.has("access_token") ||
-      hash.has("token_hash");
+    let recoveryConfirmed = false;
+    const url = new URL(window.location.href);
+    const query = url.searchParams;
+    const hash = new URLSearchParams(url.hash.replace(/^#/, ""));
+    const authError = query.get("error_description") || hash.get("error_description") || query.get("error") || hash.get("error");
+    const tokenHash = query.get("token_hash");
+    const tokenType = query.get("type");
+    const code = query.get("code");
+    const hashRecovery = hash.get("type") === "recovery";
 
-    if (recoveryError) {
-      setErr(decodeURIComponent(recoveryError.replace(/\+/g, " ")));
+    const showError = (message: string) => {
+      if (!active) return;
+      setErr(message);
+      setReady(false);
       setChecking(false);
+    };
+
+    const acceptRecovery = () => {
+      if (!active) return;
+      recoveryConfirmed = true;
+      setErr("");
+      setReady(true);
+      setChecking(false);
+    };
+
+    if (authError) {
+      showError(decodeURIComponent(authError.replace(/\+/g, " ")));
+      return () => { active = false; };
     }
 
-    const { data } = sb.auth.onAuthStateChange((event, session) => {
+    // PKCE recovery links can carry a one-time code in the query string.
+    // Some Supabase email templates instead provide token_hash + type=recovery.
+    const subscription = sb.auth.onAuthStateChange((event, session) => {
       if (!active) return;
-      if (event === "PASSWORD_RECOVERY" || (hasRecoveryPayload && session)) {
-        verified = true;
-        verified = true;
-        setReady(true);
-        setErr("");
+      if (event === "PASSWORD_RECOVERY") {
+        acceptRecovery();
+      } else if (hashRecovery && session) {
+        // The implicit-flow token is accepted only when the URL explicitly marks
+        // this session as a password-recovery flow.
+        acceptRecovery();
       }
-      if (event === "SIGNED_OUT" && !ready) {
-        setReady(false);
-      }
-      setChecking(false);
     });
 
-    // Supabase may finish exchanging the recovery token before the listener is attached.
-    sb.auth.getSession().then(({ data: sessionData, error }) => {
-      if (!active) return;
-      if (error) {
-        setErr("Nie udało się zweryfikować linku. Poproś o nowy link resetujący.");
-      } else if (sessionData.session && hasRecoveryPayload) {
-        setReady(true);
-        setErr("");
-      } else if (!hasRecoveryPayload && !recoveryError) {
-        setErr("Ten adres nie zawiera linku odzyskiwania hasła. Wróć do logowania i wyślij nowy link.");
-      }
-      setChecking(false);
-    }).catch(() => {
-      if (!active) return;
-      setErr("Nie udało się zweryfikować linku. Sprawdź połączenie i poproś o nowy link.");
-      setChecking(false);
-    });
+    const verifyLink = async () => {
+      try {
+        if (tokenHash && tokenType === "recovery") {
+          const { error } = await sb.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: "recovery",
+          });
+          if (error) throw error;
+          acceptRecovery();
+          return;
+        }
 
+        if (code) {
+          const { error } = await sb.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+          // Recovery code exchange emits PASSWORD_RECOVERY. Do not accept a
+          // normal signed-in session as proof that a reset link was used.
+          if (!recoveryConfirmed && active) {
+            showError("Link otworzył sesję, ale nie potwierdził operacji resetowania hasła. Wyślij nowy link.");
+          }
+          return;
+        }
+
+        if (hashRecovery) {
+          const { data, error } = await sb.auth.getSession();
+          if (error) throw error;
+          if (data.session) {
+            acceptRecovery();
+            return;
+          }
+        }
+
+        if (!recoveryConfirmed && active) {
+          showError("Ten link nie jest prawidłowym linkiem resetowania hasła albo wygasł. Wróć do logowania i wyślij nowy.");
+        }
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "Nie udało się zweryfikować linku.";
+        showError(/expired|invalid|otp|token|code verifier/i.test(message)
+          ? "Link resetujący jest nieprawidłowy, wygasł lub został już użyty. Wyślij nowy link."
+          : message);
+      }
+    };
+
+    void verifyLink();
     const timeout = window.setTimeout(() => {
-      if (active && !verified && !recoveryError) {
-        setChecking(false);
-        setErr("Link nie został potwierdzony. Mógł wygasnąć lub został już użyty. Wyślij nowy link resetujący.");
+      if (active && !recoveryConfirmed && checking) {
+        showError("Nie udało się potwierdzić linku. Wyślij nowy link resetujący.");
       }
-    }, 10000);
+    }, 12000);
 
     return () => {
       active = false;
       window.clearTimeout(timeout);
-      data.subscription.unsubscribe();
+      subscription.data.subscription.unsubscribe();
     };
   }, []);
 
@@ -113,16 +152,14 @@ function ResetPassword() {
     try {
       const { error } = await sb.auth.updateUser({ password: pw });
       if (error) throw error;
-      toast.success("Hasło zostało zmienione. Możesz się zalogować.");
+      toast.success("Hasło zostało zmienione.");
       await sb.auth.signOut();
-      navigate({ to: "/login" });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Nie udało się zmienić hasła.";
-      setErr(
-        /expired|invalid|otp|token/i.test(message)
-          ? "Link resetujący jest nieprawidłowy lub wygasł. Wyślij nowy link."
-          : message,
-      );
+      await navigate({ to: "/login", replace: true });
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Nie udało się zmienić hasła.";
+      setErr(/expired|invalid|otp|token|session/i.test(message)
+        ? "Sesja resetowania wygasła. Wyślij nowy link resetujący."
+        : message);
     } finally {
       setBusy(false);
     }
@@ -131,9 +168,7 @@ function ResetPassword() {
   return (
     <div className="flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex justify-center">
-          <Brand />
-        </div>
+        <div className="mb-6 flex justify-center"><Brand /></div>
         <div className="surface-card p-6">
           <h1 className="text-3xl font-bold uppercase">Nowe hasło</h1>
           {checking && !ready ? (
@@ -143,25 +178,19 @@ function ResetPassword() {
               <Field label="Nowe hasło" htmlFor="pw">
                 <Input id="pw" type="password" autoComplete="new-password" minLength={8} required value={pw} onChange={(e) => setPw(e.target.value)} />
               </Field>
-              <Field label="Powtórz hasło" htmlFor="pw2" error={err}>
+              <Field label="Powtórz hasło" htmlFor="pw2">
                 <Input id="pw2" type="password" autoComplete="new-password" minLength={8} required value={pw2} onChange={(e) => setPw2(e.target.value)} />
               </Field>
-              <Button type="submit" disabled={busy}>
-                {busy ? "Zapisywanie…" : "Zapisz nowe hasło"}
-              </Button>
+              {err && <p role="alert" className="text-sm text-destructive">{err}</p>}
+              <Button type="submit" disabled={busy}>{busy ? "Zapisywanie…" : "Zapisz nowe hasło"}</Button>
             </form>
           ) : (
             <div className="mt-4 grid gap-3">
               {err && <p role="alert" className="text-sm text-destructive">{err}</p>}
-              <Button type="button" onClick={() => navigate({ to: "/login" })}>
-                Wróć do logowania
-              </Button>
-              <Link to="/login" className="text-center text-sm text-primary underline">
-                Wyślij ponownie link resetujący
-              </Link>
+              <Button type="button" onClick={() => navigate({ to: "/login" })}>Wróć do logowania</Button>
+              <Link to="/login" className="text-center text-sm text-primary underline">Wyślij ponownie link resetujący</Link>
             </div>
           )}
-          {ready && err && <p role="alert" className="mt-3 text-sm text-destructive">{err}</p>}
         </div>
       </div>
     </div>
