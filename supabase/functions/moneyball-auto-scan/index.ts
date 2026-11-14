@@ -65,7 +65,7 @@ Deno.serve(async(req:Request)=>{
    return result;
   }));
 
-  const totals={matches:0,predictions:0,created:0,updated:0,preserved:0,selected:0,covered:0,missing:0,footy_form_matches:0,github_form_matches:0};
+  const totals={matches:0,predictions:0,created:0,updated:0,preserved:0,selected:0,auto_single_bets:0,covered:0,missing:0,footy_form_matches:0,github_form_matches:0};
   for(const result of pageResults)for(const key of Object.keys(totals) as (keyof typeof totals)[])totals[key]+=Number(result[key]||0);
   const done=pageResults.some((result)=>result.has_more!==true);
   const nextOffset=done?0:offset+30*pageResults.length;
