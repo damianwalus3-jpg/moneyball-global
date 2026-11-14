@@ -50,11 +50,14 @@ Deno.serve(async(req:Request)=>{
    state={owner_id:ownerId,scan_date:date,scan_run_id:latest.id,next_offset:0,status:"queued",last_started_at:null,last_completed_at:null};
   }
   if(state?.status==="completed")return json({ok:true,skipped:true,reason:"today_analysis_complete",date,scan_run_id:latest.id,last_completed_at:state.last_completed_at,summary:state.last_summary});
-  if(state?.status==="running"&&ageMs(state.last_started_at)<118*1000)return json({ok:true,skipped:true,reason:"analysis_batch_in_progress",date,next_offset:state.next_offset});
-
-  const offset=Math.max(0,Number(state?.next_offset)||0);
+  const offsetFallback=Math.max(0,Number(state?.next_offset)||0);
   const startedAt=new Date().toISOString();
-  await db("moneyball_auto_scan_state?owner_id=eq."+encodeURIComponent(ownerId)+"&scan_date=eq."+encodeURIComponent(date),"PATCH",{scan_run_id:latest.id,status:"running",last_started_at:startedAt,last_error:null},"return=minimal");
+  const staleCutoff=new Date(Date.now()-118*1000).toISOString();
+  const claimPath="moneyball_auto_scan_state?owner_id=eq."+encodeURIComponent(ownerId)+"&scan_date=eq."+encodeURIComponent(date)
+   +"&or=(status.eq.queued,status.eq.failed,and(status.eq.running,last_started_at.lt."+encodeURIComponent(staleCutoff)+"),and(status.eq.running,last_started_at.is.null))";
+  const claimed=await db(claimPath,"PATCH",{scan_run_id:latest.id,status:"running",last_started_at:startedAt,last_error:null,updated_at:startedAt},"return=representation");
+  if(!Array.isArray(claimed)||!claimed.length)return json({ok:true,skipped:true,reason:"analysis_batch_already_claimed",date,next_offset:offsetFallback});
+  const offset=Math.max(0,Number(claimed[0].next_offset)||0);
 
   const authHeader=req.headers.get("Authorization")||"";const bearer=authHeader.toLowerCase().startsWith("bearer ")?authHeader.slice(7).trim():authHeader.trim();
   const apiKey=req.headers.get("apikey")||SERVICE_KEY;
