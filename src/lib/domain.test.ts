@@ -9,6 +9,7 @@ import {
   isValidPick,
   groupHitRates,
   isCouponCandidate,
+  isActivePredictionVersion,
   settlePick,
   settleGoalsPick,
   outcomeFromScore,
@@ -55,6 +56,13 @@ const match = (id: string, kickoff_at = "2026-11-11T20:00:00.000Z") =>
     created_at: "2026-11-10T10:00:00.000Z",
     updated_at: "2026-11-10T10:00:00.000Z",
   }) as Match;
+
+describe("active model version", () => {
+  it("shows version 3.9 predictions and excludes the legacy 3.8 model", () => {
+    expect(isActivePredictionVersion("MONEYBALL GLOBAL 3.9")).toBe(true);
+    expect(isActivePredictionVersion("MONEYBALL GLOBAL 3.8")).toBe(false);
+  });
+});
 
 describe("pick validation", () => {
   it("safely rejects missing or unknown market values from legacy rows", () => {
