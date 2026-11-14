@@ -287,7 +287,7 @@ Deno.serve(async(req:Request)=>{
  let ownerId:string|null=null,authorizedCron=false;
  if(cronToken){
   try{
-   const authResponse=await fetch(SUPABASE_URL+"/rest/v1/rpc/moneyball_cron_token_valid",{method:"POST",headers:{apikey:ANON_KEY||SERVICE_KEY,Authorization:"Bearer "+(bearer||ANON_KEY||SERVICE_KEY),"Content-Type":"application/json"},body:JSON.stringify({p_token:cronToken})});
+   const authResponse=await fetch(SUPABASE_URL+"/rest/v1/rpc/moneyball_cron_token_valid",{method:"POST",headers:{apikey:SERVICE_KEY||ANON_KEY,Authorization:"Bearer "+(SERVICE_KEY||bearer||ANON_KEY),"Content-Type":"application/json"},body:JSON.stringify({p_token:cronToken})});
    authorizedCron=authResponse.ok&&(await authResponse.json())===true;
   }catch(_){authorizedCron=false;}
  }

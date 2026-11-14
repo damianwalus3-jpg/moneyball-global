@@ -247,7 +247,7 @@ function Mecze() {
       "; forma FootyNomad/GitHub: " + (r.prediction?.footy_form_matches ?? 0) + "/" + (r.prediction?.github_form_matches ?? 0) +
       "; partie: " + (r.prediction?.batches ?? 0) +
       "; kupony pojedyncze i AKO: generator dostępny w zakładce Kupony" +
-      "; wyniki: " + (r.sync?.result_sync?.ok ? "zsynchronizowane" : "wymagają kontroli") + ".",
+      "; wyniki: " + (r.sync?.result_sync?.skipped ? "aktualizowane automatycznie co 5 minut" : r.sync?.result_sync?.ok ? "zsynchronizowane" : "wymagają kontroli") + ".",
   });
 
   const resultBy = useMemo(() => new Map(results.map((result) => [result.match_id, result])), [results]);
@@ -295,7 +295,7 @@ function Mecze() {
     .filter((match) => {
       const day = matchDay(match);
       const time = match.kickoff_at ? new Date(match.kickoff_at).getTime() : null;
-      if (view === "upcoming") return time != null ? time >= now - 2 * 3600_000 : !!day && day >= today;
+      if (view === "upcoming") return day === today && (time == null || time >= now - 2 * 3600_000);
       if (view === "past") return time != null ? time < now : !!day && day < today;
       return true;
     })
@@ -345,7 +345,7 @@ function Mecze() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {(
           [
-            ["upcoming", "Nadchodzące"],
+            ["upcoming", "Dzisiaj"],
             ["past", "Rozegrane"],
             ["all", "Wszystkie"],
             ["scans", `Skany (${scans.length})`],
