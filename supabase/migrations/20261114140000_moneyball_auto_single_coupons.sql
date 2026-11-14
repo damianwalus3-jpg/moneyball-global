@@ -47,7 +47,8 @@ BEGIN
     AND NEW.stake=5
     AND NEW.probability>75
     AND NEW.odds IS NOT NULL
-    AND NEW.odds>=1.60 THEN
+    AND NEW.odds>=1.60
+    AND ((NEW.probability/100.0)*NEW.odds-1)>=0.03 THEN
 
    INSERT INTO public.coupons(
      owner_id,user_id,name,batch_id,stake,total_odds,combined_probability,status,notes,
@@ -73,12 +74,7 @@ BEGIN
      SET name=v_name,stake=5,total_odds=NEW.odds,combined_odds=NEW.odds,
          combined_probability=NEW.probability,potential_return=ROUND(5*NEW.odds,2),
          status='pending',settled_at=NULL,scan_run_id=NEW.scan_run_id
-     WHERE id=v_coupon_id AND status='void';
-
-     UPDATE public.coupons
-     SET name=v_name,stake=5,total_odds=NEW.odds,combined_odds=NEW.odds,
-         combined_probability=NEW.probability,potential_return=ROUND(5*NEW.odds,2)
-     WHERE id=v_coupon_id AND status='pending';
+     WHERE id=v_coupon_id;
 
      IF NOT EXISTS (
        SELECT 1 FROM public.coupon_legs
@@ -96,7 +92,7 @@ BEGIN
        SET prediction_type=v_prediction_type,pick=NEW.selection,
            probability=NEW.probability,odds=NEW.odds,
            result_status='pending',status='pending'
-       WHERE coupon_id=v_coupon_id AND prediction_id=NEW.id AND status='pending';
+       WHERE coupon_id=v_coupon_id AND prediction_id=NEW.id;
      END IF;
    END IF;
 
