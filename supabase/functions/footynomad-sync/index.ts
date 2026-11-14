@@ -217,25 +217,35 @@ Deno.serve(async(req)=>{
    predictionSync={ok:false,error:"not_run",batches:[]};
    try{
     const batches:any[]=[];
+    const batchSize=30;
     let offset=0,hasMore=true;
-    while(hasMore&&batches.length<50){
+    const runBatch=async(batchOffset:number)=>{
      const predictionResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-predict",{
       method:"POST",
       headers:{apikey:KEY,Authorization:"Bearer "+token,"x-cron-token":cronToken,"Content-Type":"application/json",Accept:"application/json"},
-      body:JSON.stringify({date,offset,owner_id:ownerId}),
+      body:JSON.stringify({date,offset:batchOffset,owner_id:ownerId}),
      });
      const predictionText=await predictionResponse.text();
      let predictionResult:any;
      try{predictionResult=predictionText?JSON.parse(predictionText):{ok:false,error:"Empty prediction response"};}
      catch(_){predictionResult={ok:false,error:predictionText.slice(0,500)};}
      if(!predictionResponse.ok||predictionResult?.ok!==true){
-      throw new Error("Prediction batch offset "+offset+" failed (HTTP "+predictionResponse.status+"): "+String(predictionResult?.error||predictionResult?.message||predictionText).slice(0,700));
+      throw new Error("Prediction batch offset "+batchOffset+" failed (HTTP "+predictionResponse.status+"): "+String(predictionResult?.error||predictionResult?.message||predictionText).slice(0,700));
      }
-     batches.push({offset,matches:predictionResult.matches||0,predictions:predictionResult.predictions||0,created:predictionResult.created||0,updated:predictionResult.updated||0,selected:predictionResult.selected||0,covered:predictionResult.covered||0,missing:predictionResult.missing||0,has_more:!!predictionResult.has_more});
-     hasMore=!!predictionResult.has_more;
-     const nextOffset=offset+Number(predictionResult.batch_size||30);
-     if(hasMore&&nextOffset<=offset)throw new Error("Prediction pagination did not advance.");
-     offset=nextOffset;
+     return {offset:batchOffset,matches:predictionResult.matches||0,predictions:predictionResult.predictions||0,created:predictionResult.created||0,updated:predictionResult.updated||0,selected:predictionResult.selected||0,covered:predictionResult.covered||0,missing:predictionResult.missing||0,has_more:!!predictionResult.has_more,batch_size:Number(predictionResult.batch_size)||batchSize};
+    };
+    // Run three independent pages concurrently; stable ordering in moneyball-predict
+    // keeps offsets disjoint and avoids the previous 150-second sequential timeout.
+    while(hasMore&&batches.length<50){
+     const remaining=50-batches.length;
+     const offsets=batches.length===0?[offset]:[offset,offset+batchSize,offset+2*batchSize].slice(0,remaining);
+     const group=await Promise.all(offsets.map(runBatch));
+     for(const batch of group){
+      batches.push(batch);
+      hasMore=batch.has_more;
+      offset+=batch.batch_size;
+      if(!hasMore)break;
+     }
     }
     if(hasMore)throw new Error("Prediction stopped at safety limit of 50 batches; remaining matches need another run.");
     predictionSync={ok:true,batches:batches.length,total_matches:batches.reduce((n,x)=>n+x.matches,0),total_predictions:batches.reduce((n,x)=>n+x.predictions,0),created:batches.reduce((n,x)=>n+x.created,0),updated:batches.reduce((n,x)=>n+x.updated,0),selected:batches.reduce((n,x)=>n+x.selected,0),covered:batches.reduce((n,x)=>n+x.covered,0),missing:batches.reduce((n,x)=>n+x.missing,0),details:batches};
