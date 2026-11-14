@@ -279,12 +279,12 @@ function Mecze() {
   const resultBy = useMemo(() => new Map(results.map((result) => [result.match_id, result])), [results]);
   const predictionById = useMemo(() => new Map(preds.map((prediction) => [prediction.id, prediction])), [preds]);
   const latestOdds = useMemo(() => {
-    const byMatch = new Map<string, { odds: number; bookmaker: string | null; selection: string; captured_at: string }>();
-    const add = (matchId: string, price: number, bookmaker: string | null, selection: string, capturedAt: string) => {
+    const byMatch = new Map<string, { odds: number; bookmaker: string | null; selection: string; source: string | null; captured_at: string }>();
+    const add = (matchId: string, price: number, bookmaker: string | null, selection: string, source: string | null, capturedAt: string) => {
       if (!Number.isFinite(price) || price <= 1) return;
       const current = byMatch.get(matchId);
       if (!current || capturedAt > current.captured_at)
-        byMatch.set(matchId, { odds: price, bookmaker, selection, captured_at: capturedAt });
+        byMatch.set(matchId, { odds: price, bookmaker, selection, source, captured_at: capturedAt });
     };
     // Provider quotes are written to predictions by the DB sync trigger, not to odds_snapshots.
     for (const prediction of preds) {
@@ -293,14 +293,14 @@ function Mecze() {
       const source = String(coverage["odds_source"] ?? prediction.data_source ?? "");
       if (!source) continue;
       const capturedAt = String(coverage["odds_price_timestamp"] ?? coverage["odds_captured_at"] ?? prediction.created_at);
-      add(prediction.match_id, Number(prediction.odds), String(coverage["odds_bookmaker"] ?? prediction.data_source ?? "") || null, prediction.selection, capturedAt);
+      add(prediction.match_id, Number(prediction.odds), String(coverage["odds_bookmaker"] ?? prediction.data_source ?? "") || null, prediction.selection, source, capturedAt);
     }
     // Manual snapshots remain supported and take precedence when newer.
     for (const snapshot of odds) {
       if (!snapshot.prediction_id) continue;
       const prediction = predictionById.get(snapshot.prediction_id);
       if (!prediction || !isActivePredictionVersion(prediction.model_version)) continue;
-      add(prediction.match_id, Number(snapshot.odds), snapshot.bookmaker || null, prediction.selection, snapshot.captured_at);
+      add(prediction.match_id, Number(snapshot.odds), snapshot.bookmaker || null, prediction.selection, "manual", snapshot.captured_at);
     }
     return byMatch;
   }, [preds, odds, predictionById]);
@@ -509,7 +509,7 @@ function Mecze() {
                         </div>
                         {o && (
                           <div className="num text-xs text-muted-foreground">
-                            Kurs {fmtOdds(o.odds)}{o.bookmaker ? ` (${o.bookmaker})` : ""} · {o.selection}
+                            Kurs {fmtOdds(o.odds)}{o.bookmaker ? ` (${o.bookmaker})` : ""} · {o.selection}{o.source === "TipsAudit" && <> · <a href="https://tipsaudit.com" target="_blank" rel="noreferrer" className="underline decoration-dotted">Data: TipsAudit</a></>}
                           </div>
                         )}
                       </div>
@@ -583,7 +583,7 @@ function Mecze() {
                                   </div>
                                   <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
                                     <div><div className="text-xs text-muted-foreground">Prawdopodobieństwo</div><strong>{p.probability == null ? "Brak" : Number(p.probability).toFixed(1) + "%"}</strong></div>
-                                    <div><div className="text-xs text-muted-foreground">Kurs wybranego typu</div><strong>{fmtOdds(p.odds)}{p.odds != null && asObject(p.data_coverage)["odds_bookmaker"] ? ` · ${String(asObject(p.data_coverage)["odds_bookmaker"])}` : ""}</strong></div>
+                                    <div><div className="text-xs text-muted-foreground">Kurs wybranego typu</div><strong>{fmtOdds(p.odds)}{p.odds != null && asObject(p.data_coverage)["odds_bookmaker"] ? ` · ${String(asObject(p.data_coverage)["odds_bookmaker"])}` : ""}</strong>{asObject(p.data_coverage)["odds_source"] === "TipsAudit" && <div className="text-[10px]"><a href="https://tipsaudit.com" target="_blank" rel="noreferrer" className="underline decoration-dotted">Data: TipsAudit</a></div>}</div>
                                     <div><div className="text-xs text-muted-foreground">Pewność</div><strong>{p.confidence ?? "—"}</strong></div>
                                     <div><div className="text-xs text-muted-foreground">Rozliczenie</div><strong>{p.settlement_status}</strong></div>
                                   </div>
