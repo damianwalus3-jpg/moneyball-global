@@ -12,9 +12,11 @@ function brusselsDayBounds(date:string){
  const offsetAt=(utcMs:number)=>{
   const parts=new Intl.DateTimeFormat("en-US",{timeZone:"Europe/Brussels",timeZoneName:"shortOffset"}).formatToParts(new Date(utcMs));
   const label=parts.find((part)=>part.type==="timeZoneName")?.value||"GMT";
-  const match=/GMT([+-])(\\d{1,2})(?::(\\d{2}))?/.exec(label);
-  if(!match)return 0;
-  return (Number(match[2])*60+Number(match[3]||0))*(match[1]==="-"?-1:1)*60000;
+  const offsetText=label.startsWith("GMT")?label.slice(3):"";
+  const sign=offsetText.startsWith("-")?-1:1;
+  const offsetParts=offsetText.replace(/^[+-]/,"").split(":");
+  const minutes=(Number(offsetParts[0]||0)*60+Number(offsetParts[1]||0))*sign;
+  return minutes*60000;
  };
  const start=Date.UTC(year,month-1,day),end=Date.UTC(year,month-1,day+1);
  return {start:new Date(start-offsetAt(start)).toISOString(),end:new Date(end-offsetAt(end)).toISOString()};
@@ -75,7 +77,7 @@ Deno.serve(async(req)=>{
  try{
   const body=await req.json().catch(()=>({}));
   const cronAuthorized=await authorized(req.headers.get("x-cron-token")||"");
-  const bearer=(req.headers.get("Authorization")||"").replace(/^Bearer\\s+/i,"");
+  const authHeader=req.headers.get("Authorization")||"";const bearer=authHeader.toLowerCase().startsWith("bearer ")?authHeader.slice(7).trim():authHeader.trim();
   const subject=cronAuthorized?"":jwtSubject(bearer);
   if(!cronAuthorized&&!subject)return json({error:"Unauthorized"},401);
   if(!cronAuthorized&&body.owner_id&&String(body.owner_id)!==subject)return json({error:"Forbidden owner scope"},403);

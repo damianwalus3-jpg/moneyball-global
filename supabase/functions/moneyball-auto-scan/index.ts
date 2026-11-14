@@ -31,7 +31,7 @@ Deno.serve(async(req:Request)=>{
   const ownerId=String(body.owner_id||"");
   const date=String(body.date||brusselsDate());
   if(!ownerId)return json({ok:false,error:"Missing owner_id"},400);
-  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(date))return json({ok:false,error:"Invalid date"},400);
+  const dateCheck=new Date(date+"T12:00:00Z");if(!Number.isFinite(dateCheck.getTime())||dateCheck.toISOString().slice(0,10)!==date)return json({ok:false,error:"Invalid date"},400);
 
   const scanPath="scan_runs?select=id,source,scan_date,status,started_at&owner_id=eq."+encodeURIComponent(ownerId)+"&scan_date=eq."+encodeURIComponent(date)+"&source=ilike.*FootyNomad*&order=started_at.desc&limit=1";
   const scans=await db(scanPath);
@@ -54,7 +54,7 @@ Deno.serve(async(req:Request)=>{
   const startedAt=new Date().toISOString();
   await db("moneyball_auto_scan_state?owner_id=eq."+encodeURIComponent(ownerId)+"&scan_date=eq."+encodeURIComponent(date),"PATCH",{scan_run_id:latest.id,status:"running",last_started_at:startedAt,last_error:null},"return=minimal");
 
-  const bearer=(req.headers.get("Authorization")||"").replace(/^Bearer\\s+/i,"");
+  const authHeader=req.headers.get("Authorization")||"";const bearer=authHeader.toLowerCase().startsWith("bearer ")?authHeader.slice(7).trim():authHeader.trim();
   const apiKey=req.headers.get("apikey")||SERVICE_KEY;
   if(!bearer)return json({ok:false,error:"Missing scheduled Authorization token"},401);
   const offsets=[offset,offset+30,offset+60];
