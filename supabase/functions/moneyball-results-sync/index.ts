@@ -17,7 +17,7 @@ function isEuropeanFixture(country: unknown, competition: unknown, home?: unknow
  if(/\\b(nations league|uefa nations league)\\b/.test(comp))return true;
  if(!isEurope)return false;
  if(/\\b(cup|copa|trophy|shield|friendly|friendlies|qualif|qualifier|champions league|europa league|conference league|world cup|super cup|play off|playoff)\\b/.test(comp))return false;
- return /\\b(league|liga|ligue|serie|division|div|premier|bundesliga|eredivisie|ekstraklasa|allsvenskan|eliteserien|superliga|premiership|championship|pro league|jupiler|prva liga|national league|1 hnl|2 hnl)\\b/.test(comp);
+ return /\\b(league|liga|ligue|lig|campeonato|oberliga|regionalliga|verbandsliga|landesliga|superettan|veikkausliiga|esiliiga|ykkosliiga|serie|division|div|premier|bundesliga|eredivisie|ekstraklasa|allsvenskan|eliteserien|superliga|premiership|championship|pro league|jupiler|prva liga|national league|1 hnl|2 hnl)\\b/.test(comp);
 }
 
 function clean(s:string){return s.replace(/<[^>]*>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&nbsp;/g," ").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/\s+/g," ").trim();}
@@ -67,7 +67,7 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
  const timedMatches=await db("matches?"+matchFields+"&kickoff_at=gte."+encodeURIComponent(startDate+"T00:00:00Z")+"&kickoff_at=lt."+encodeURIComponent(endDate+"T23:59:59Z")).catch(()=>[]);
  const dateOnlyMatches=await db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=gte."+encodeURIComponent(startDate)+"&kickoff_date=lte."+encodeURIComponent(endDate)).catch(()=>[]);
  const unresolved=[...(timedMatches||[]),...(dateOnlyMatches||[])],todayKey=day(new Date());
- const due=unresolved.filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team)&&((m.kickoff_at&&new Date(m.kickoff_at).getTime()<Date.now())||(!m.kickoff_at&&m.kickoff_date&&String(m.kickoff_date)<=todayKey))&& !["finished","postponed","cancelled"].includes(String(m.status||"").toLowerCase()));
+ const due=unresolved.filter((m:any)=>isEuropeanFixture(m.country,m.competition||m.league,m.home_team,m.away_team)&&((m.kickoff_at&&new Date(m.kickoff_at).getTime()<Date.now())||(!m.kickoff_at&&m.kickoff_date&&String(m.kickoff_date)<=todayKey))&& !["finished","postponed","cancelled"].includes(String(m.status||"").toLowerCase()));
  const prefixes=new Set<string>(),worldHints:string[]=[];
  for(const m of due){const c=teamKey(m.country||"");const prefix=ESPN_COUNTRY_PREFIX[c];if(prefix)prefixes.add(prefix);if(c==="world")worldHints.push(String(m.league||""));}
  let leagues=[...ESPN_LEAGUES];
@@ -292,7 +292,7 @@ async function reconcileRescheduledMatches(ownerId:string|null=null){
  if(!futureById.size)return {updated:0,errors:readErrors};
  const cutoff=new Date(Date.now()-3*60*60*1000).toISOString();
  const stale=await db("matches?select=id,external_id,source,kickoff_at,status,home_team,away_team,country,league,notes&kickoff_at=lt."+encodeURIComponent(cutoff)+"&status=in.(scheduled,unknown,live)"+(ownerId?"&owner_id=eq."+encodeURIComponent(ownerId):""));
- const candidates=(stale||[]).filter((m:any)=>String(m.source||"").toLowerCase()==="footynomad"&&m.external_id&&isEuropeanFixture(m.country,m.league,m.home_team,m.away_team)&&futureById.has(String(m.external_id)));
+ const candidates=(stale||[]).filter((m:any)=>String(m.source||"").toLowerCase()==="footynomad"&&m.external_id&&isEuropeanFixture(m.country,m.competition||m.league,m.home_team,m.away_team)&&futureById.has(String(m.external_id)));
  if(!candidates.length)return {updated:0,errors:readErrors};
  const ids=candidates.map((m:any)=>m.id);
  const existing=await db("match_results?select=match_id&match_id=in.("+ids.join(",")+")");
@@ -342,11 +342,11 @@ Deno.serve(async(req:Request)=>{
    try{
     // Query a wide UTC window, then filter by the actual Brussels calendar day.
     const start=new Date(Date.parse(date+"T00:00:00.000Z")-86400000),end=new Date(Date.parse(date+"T00:00:00.000Z")+2*86400000);
-     const matchFields="select=id,external_id,source,home_team,away_team,country,league,gender,kickoff_at,kickoff_date,status,owner_id";
+     const matchFields="select=id,external_id,source,home_team,away_team,country,competition,league,gender,kickoff_at,kickoff_date,status,owner_id";
      const ownerFilter=ownerId?"&owner_id=eq."+encodeURIComponent(ownerId):"";
      const rawMatches=await db("matches?"+matchFields+"&kickoff_at=gte."+encodeURIComponent(start.toISOString())+"&kickoff_at=lt."+encodeURIComponent(end.toISOString())+ownerFilter);
      const rawDateOnly=await db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=eq."+encodeURIComponent(date)+ownerFilter);
-     const matches=[...(rawMatches||[]).filter((m:any)=>m.kickoff_at&&day(new Date(m.kickoff_at))===date),...(rawDateOnly||[]).filter((m:any)=>String(m.kickoff_date||"").slice(0,10)===date)].filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team));
+     const matches=[...(rawMatches||[]).filter((m:any)=>m.kickoff_at&&day(new Date(m.kickoff_at))===date),...(rawDateOnly||[]).filter((m:any)=>String(m.kickoff_date||"").slice(0,10)===date)].filter((m:any)=>isEuropeanFixture(m.country,m.competition||m.league,m.home_team,m.away_team));
     const existingResults=matches.length?await db("match_results?select=match_id,home_score,away_score,verified&match_id=in.("+matches.map((m:any)=>m.id).join(",")+")"):[];
     const existingResultByMatch=new Map((existingResults||[]).map((r:any)=>[r.match_id,r]));
     const map=new Map(matches.filter((m:any)=>m.external_id&&String(m.source||"").toLowerCase()==="footynomad").map((m:any)=>[String(m.external_id),m]));
