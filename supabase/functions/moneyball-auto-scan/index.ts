@@ -25,11 +25,13 @@ Deno.serve(async(req:Request)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
  if(req.method==="GET")return json({ok:true,service:"MONEYBALL automatic daily analysis",batch_size:15,batches_per_run:3,schedule:"every 2 minutes",timezone:"Europe/Brussels"});
  if(req.method!=="POST")return json({ok:false,error:"POST required"},405);
+ let failureOwner="",failureDate="";
  try{
   if(!(await authorized(req.headers.get("x-cron-token")||"")))return json({ok:false,error:"Unauthorized"},401);
   const body=await req.json().catch(()=>({}));
   const ownerId=String(body.owner_id||"");
   const date=String(body.date||brusselsDate());
+  failureOwner=ownerId;failureDate=date;
   if(!ownerId)return json({ok:false,error:"Missing owner_id"},400);
   const dateCheck=new Date(date+"T12:00:00Z");if(!Number.isFinite(dateCheck.getTime())||dateCheck.toISOString().slice(0,10)!==date)return json({ok:false,error:"Invalid date"},400);
 
@@ -77,6 +79,11 @@ Deno.serve(async(req:Request)=>{
   return json({ok:true,date,scan_run_id:latest.id,status:done?"completed":"running",from_offset:offset,next_offset:nextOffset,batches:pageResults.length,done,totals});
  }catch(error){
   const message=String(error);
+  if(failureOwner&&failureDate){
+   try{
+    await db("moneyball_auto_scan_state?owner_id=eq."+encodeURIComponent(failureOwner)+"&scan_date=eq."+encodeURIComponent(failureDate),"PATCH",{status:"failed",last_error:message.slice(0,1200),last_started_at:null,updated_at:new Date().toISOString()},"return=minimal");
+   }catch(_){}
+  }
   return json({ok:false,error:message.slice(0,1200)},500);
  }
 });
