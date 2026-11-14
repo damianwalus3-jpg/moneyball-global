@@ -40,6 +40,7 @@ function ResetPassword() {
     }
 
     let active = true;
+    let verified = false;
     const params = new URLSearchParams(window.location.search);
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
     const recoveryError = params.get("error_description") || hash.get("error_description");
@@ -57,6 +58,8 @@ function ResetPassword() {
     const { data } = sb.auth.onAuthStateChange((event, session) => {
       if (!active) return;
       if (event === "PASSWORD_RECOVERY" || (hasRecoveryPayload && session)) {
+        verified = true;
+        verified = true;
         setReady(true);
         setErr("");
       }
@@ -85,7 +88,7 @@ function ResetPassword() {
     });
 
     const timeout = window.setTimeout(() => {
-      if (active && !ready && !recoveryError) {
+      if (active && !verified && !recoveryError) {
         setChecking(false);
         setErr("Link nie został potwierdzony. Mógł wygasnąć lub został już użyty. Wyślij nowy link resetujący.");
       }
