@@ -212,23 +212,35 @@ function Mecze() {
       let offset = 0;
       let hasMore = true;
       const maxBatches = 100;
+      const batchSize = 30;
+
+      const runBatch = async (batchOffset: number, batchNumber: number) => {
+        const prediction = await sb.functions.invoke("moneyball-predict", { body: { date, offset: batchOffset } });
+        if (prediction.error) throw new Error("Prognozowanie partii " + batchNumber + " nie powiodło się: " + prediction.error.message);
+        if (!prediction.data || prediction.data.ok === false)
+          throw new Error("Prognozowanie partii " + batchNumber + " nie powiodło się: " + (prediction.data?.error ?? "Nieznany błąd silnika."));
+        return prediction.data;
+      };
 
       while (hasMore && totals.batches < maxBatches) {
-        setPredictionProgress("Analiza partii " + (totals.batches + 1) + " · od meczu " + (offset + 1) + "…");
-        const prediction = await sb.functions.invoke("moneyball-predict", { body: { date, offset } });
-        if (prediction.error) throw new Error("Prognozowanie partii " + (totals.batches + 1) + " nie powiodło się: " + prediction.error.message);
-        if (!prediction.data || prediction.data.ok === false)
-          throw new Error("Prognozowanie partii " + (totals.batches + 1) + " nie powiodło się: " + (prediction.data?.error ?? "Nieznany błąd silnika."));
-
-        for (const key of [
-          "matches", "predictions", "created", "updated", "preserved", "selected",
-          "covered", "missing", "footy_form_matches", "github_form_matches",
-        ] as const) {
-          totals[key] += Number(prediction.data[key] ?? 0);
+        const remaining = maxBatches - totals.batches;
+        const offsets = totals.batches === 0
+          ? [offset]
+          : [offset, offset + batchSize, offset + batchSize * 2].slice(0, remaining);
+        setPredictionProgress("Analiza partii " + (totals.batches + 1) + (offsets.length > 1 ? "–" + (totals.batches + offsets.length) : "") + " · od meczu " + (offset + 1) + "…");
+        const results = await Promise.all(offsets.map((batchOffset, i) => runBatch(batchOffset, totals.batches + i + 1)));
+        for (const data of results) {
+          for (const key of [
+            "matches", "predictions", "created", "updated", "preserved", "selected",
+            "covered", "missing", "footy_form_matches", "github_form_matches",
+          ] as const) {
+            totals[key] += Number(data[key] ?? 0);
+          }
+          totals.batches += 1;
+          hasMore = data.has_more === true;
+          offset += Math.max(1, Number(data.batch_size) || batchSize);
+          if (!hasMore) break;
         }
-        totals.batches += 1;
-        hasMore = prediction.data.has_more === true;
-        if (hasMore) offset += Math.max(1, Number(prediction.data.batch_size) || 30);
       }
 
       if (hasMore)
