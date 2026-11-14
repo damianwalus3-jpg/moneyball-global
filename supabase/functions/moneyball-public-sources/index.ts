@@ -9,6 +9,7 @@ const cors = {
 };
 const BASE = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const LEAGUE_INDEX = BASE + "/LEAGUE_INDEX.md";
+let publicSourceCache: { key: string; expiresAt: number; body: string } | null = null;
 
 function csvRows(text: string): string[][] {
   const rows: string[][] = [];
@@ -653,6 +654,9 @@ Deno.serve(async (req: Request) => {
     const body = req.method === "POST" ? await req.json().catch(() => ({})) : {};
     const date = new URL(req.url).searchParams.get("date") || String(body?.date || "") || new Date().toISOString().slice(0,10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("Nieprawidłowa data. Użyj YYYY-MM-DD.");
+    if (publicSourceCache && publicSourceCache.key === date && publicSourceCache.expiresAt > Date.now()) {
+      return new Response(publicSourceCache.body, { headers: { ...cors, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=600, s-maxage=600", "X-Moneyball-Source-Cache": "HIT" } });
+    }
     const [om, es, ol, ts, be] = await Promise.allSettled([openMatchday(date), espn(date), openLiga(date), theSportsDb(date), beyondElo(date)]);
     const sources: Record<string, any> = {};
     const all: any[] = [];
@@ -742,7 +746,7 @@ Deno.serve(async (req: Request) => {
         }
       };
     });
-    return new Response(JSON.stringify({
+    const responseBody = JSON.stringify({
       ok: true, date, api_key_required: false,
       source_count: Object.keys(sources).filter(k => sources[k].ok).length,
       raw_fixtures: all.length, european_fixtures: enriched.length, unique_fixtures: enriched.length,
@@ -764,7 +768,9 @@ Deno.serve(async (req: Request) => {
       elo_ratings: { source:"BeyondELO", as_of:eloData?.as_of??null, ratings_count:eloData?.ratings_count??0, items:eloData?.items??[], licence:"CC BY 4.0", attribution:"beyondELO (https://beyondelo.com)" },
       attribution: ["OpenMatchday (informational, non-commercial; attribute source)", "ESPN public scoreboard", "OpenLigaDB (public community football data)", "TheSportsDB public v1 soccer fixtures and season-result history feed", "beyondELO (CC BY 4.0)"],
       note: "Brak rekordu w źródle nie oznacza, że mecz nie istnieje. Puste dane nie są zastępowane fikcyjnymi statystykami. OpenMatchday nie dostarcza xG, składów, kontuzji ani kursów. Elo z beyondELO jest osobnym wskaźnikiem siły klubu, nie zastępuje xG ani potwierdzonych składów."
-    }), { headers: { ...cors, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" } });
+     });
+     publicSourceCache = { key: date, expiresAt: Date.now() + 10 * 60 * 1000, body: responseBody };
+     return new Response(responseBody, { headers: { ...cors, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "public, max-age=600, s-maxage=600", "X-Moneyball-Source-Cache": "MISS" } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 400, headers: { ...cors, "Content-Type": "application/json" } });
   }
