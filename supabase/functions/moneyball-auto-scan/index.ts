@@ -48,7 +48,7 @@ Deno.serve(async(req:Request)=>{
    state={owner_id:ownerId,scan_date:date,scan_run_id:latest.id,next_offset:0,status:"queued",last_started_at:null,last_completed_at:null};
   }
   if(state?.status==="completed")return json({ok:true,skipped:true,reason:"today_analysis_complete",date,scan_run_id:latest.id,last_completed_at:state.last_completed_at,summary:state.last_summary});
-  if(state?.status==="running"&&ageMs(state.last_started_at)<4*60*1000)return json({ok:true,skipped:true,reason:"analysis_batch_in_progress",date,next_offset:state.next_offset});
+  if(state?.status==="running"&&ageMs(state.last_started_at)<118*1000)return json({ok:true,skipped:true,reason:"analysis_batch_in_progress",date,next_offset:state.next_offset});
 
   const offset=Math.max(0,Number(state?.next_offset)||0);
   const startedAt=new Date().toISOString();
