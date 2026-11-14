@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, migration/cloudflare-workers-setup]
   pull_request:
-    branches: [main]
+    branches: [main, migration/cloudflare-workers-setup]
 
 permissions:
   contents: read
