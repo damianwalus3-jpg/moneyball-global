@@ -117,7 +117,7 @@ function parseFotbalFormSection(markdown:string,kickoff:string){
   const games:any[]=[];
   for(const line of body.split(/\\r?\\n/)){
    if(!/^\\s*\\*/.test(line))continue;
-   const plain=line.replace(/\\[([^\\]]+)\\]\\([^)]+\\)/g," $1 ").replace(/\\*\\*/g," ").replace(/\\*/g," ").replace(/\\s+/g," ").trim();
+   const plain=line.replace(/\[([^\]]+)\]\([^)]+\)/g," $1 ").replace(/\\*\\*/g," ").replace(/\\*/g," ").replace(/\\s+/g," ").trim();
    const match=plain.match(/^(\\d{1,2})\\.(\\d{1,2})\\s+([DA])\\s+(.+?)\\s+(\\d{1,2})\\s*[–−-]\\s*(\\d{1,2})\\s+([VEÎ])$/i);
    if(!match)continue;
    const day=Number(match[1]),month=Number(match[2]),location=match[3],opponent=match[4].trim(),first=Number(match[5]),second=Number(match[6]);
