@@ -62,7 +62,7 @@ Deno.serve(async(req:Request)=>{
   const authHeader=req.headers.get("Authorization")||"";const bearer=authHeader.toLowerCase().startsWith("bearer ")?authHeader.slice(7).trim():authHeader.trim();
   const apiKey=req.headers.get("apikey")||SERVICE_KEY;
   if(!bearer)return json({ok:false,error:"Missing scheduled Authorization token"},401);
-  const batchSize=15;
+  const batchSize=20;
   const offsets=[offset,offset+batchSize,offset+2*batchSize];
   const pageResults:any[]=[];
   for(const pageOffset of offsets){
