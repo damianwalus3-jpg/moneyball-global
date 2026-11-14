@@ -6,6 +6,22 @@ const MOVI_KEY = Deno.env.get("MOVIODDS_API_KEY") || "";
 const BASE = "https://moviodds.com";
 const CORS = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-cron-token","Access-Control-Allow-Methods":"GET,POST,OPTIONS"};
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...CORS,"Content-Type":"application/json","Cache-Control":"no-store"}});
+function brusselsDayBounds(date:string){
+ const [year,month,day]=String(date||"").split("-").map(Number);
+ if(!year||!month||!day)throw new Error("Nieprawidłowa data kursów.");
+ const offsetAt=(utcMs:number)=>{
+  const parts=new Intl.DateTimeFormat("en-US",{timeZone:"Europe/Brussels",timeZoneName:"shortOffset"}).formatToParts(new Date(utcMs));
+  const label=parts.find((part)=>part.type==="timeZoneName")?.value||"GMT";
+  const match=/GMT([+-])(\\d{1,2})(?::(\\d{2}))?/.exec(label);
+  if(!match)return 0;
+  return (Number(match[2])*60+Number(match[3]||0))*(match[1]==="-"?-1:1)*60000;
+ };
+ const start=Date.UTC(year,month-1,day),end=Date.UTC(year,month-1,day+1);
+ return {start:new Date(start-offsetAt(start)).toISOString(),end:new Date(end-offsetAt(end)).toISOString()};
+}
+function jwtSubject(token:string){
+ try{const part=token.split(".")[1];if(!part)return "";const payload=JSON.parse(atob(part.replace(/-/g,"+").replace(/_/g,"/").padEnd(Math.ceil(part.length/4)*4,"=")));return String(payload.sub||"");}catch(_){return "";}
+}
 const norm=(v:unknown)=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g,"and").replace(/[^a-z0-9]+/g," ").trim();
 async function db(path:string,method="GET",body?:unknown,prefer="return=representation"){
  const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{method,headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+SERVICE_KEY,"Content-Type":"application/json",Prefer:prefer},body:body===undefined?undefined:JSON.stringify(body)});
@@ -26,7 +42,7 @@ async function movi(path:string){
 }
 function selectionFor(q:any,home:string,away:string):{market:string;selection:string}|null{
  const group=String(q.group_name||"").toLowerCase(),label=String(q.label||"").trim(),side=String(q.side||"").toLowerCase(),line=String(q.line||"").trim();
- if(group==="full time result"||group==="match result"){
+ if(group==="full time result"||group==="fulltime result"||group==="match result"){
   const l=norm(label),h=norm(home),a=norm(away);
   const s=(l==="home"||l===h)?"1":(l==="draw"||l==="the draw"||l==="x")?"X":(l==="away"||l===a)?"2":null;
   return s?{market:"1X2",selection:s}:null;
@@ -45,7 +61,7 @@ function selectionFor(q:any,home:string,away:string):{market:string;selection:st
   return (l==="yes"||l==="no")?{market:"GOALS",selection:"BTTS_"+l.toUpperCase()}:null;
  }
  if(/goal(s)? over\/under|goal line|alternative total goals|match goals/.test(group)){
-  const n=Number(line.replace(",","."));
+  const lineNumber=Number(line.replace(",",".")),handicapNumber=Number(q.handicap),n=Number.isFinite(handicapNumber)?handicapNumber:lineNumber;
   const isOver=side==="over"||side==="o"||norm(label).startsWith("over");
   const isUnder=side==="under"||side==="u"||norm(label).startsWith("under");
   if(Number.isFinite(n)&&(isOver||isUnder))return {market:"GOALS",selection:(isOver?"OVER_":"UNDER_")+String(n)};
@@ -57,12 +73,17 @@ Deno.serve(async(req)=>{
  if(req.method==="GET")return json({ok:true,service:"Moneyball MoviOdds sync",provider:"MoviOdds / bet365",key_configured:!!MOVI_KEY,mode:"REST snapshots",note:"No odds are fabricated; missing provider quotes remain missing."});
  if(req.method!=="POST")return json({error:"POST required"},405);
  try{
-  if(!(await authorized(req.headers.get("x-cron-token")||"")))return json({error:"Unauthorized"},401);
   const body=await req.json().catch(()=>({}));
-  const now=new Date(),from=new Date(now.getTime()-2*3600000).toISOString(),to=new Date(now.getTime()+48*3600000).toISOString();
-  const owner=String(body.owner_id||"");
-  const ownerFilter=owner?"&owner_id=eq."+encodeURIComponent(owner):"";
-  const matches=await db("matches?select=id,owner_id,user_id,home_team,away_team,competition,league,kickoff_at,status&kickoff_at=gte."+encodeURIComponent(from)+"&kickoff_at=lte."+encodeURIComponent(to)+"&order=kickoff_at.asc"+ownerFilter);
+  const cronAuthorized=await authorized(req.headers.get("x-cron-token")||"");
+  const bearer=(req.headers.get("Authorization")||"").replace(/^Bearer\\s+/i,"");
+  const subject=cronAuthorized?"":jwtSubject(bearer);
+  if(!cronAuthorized&&!subject)return json({error:"Unauthorized"},401);
+  if(!cronAuthorized&&body.owner_id&&String(body.owner_id)!==subject)return json({error:"Forbidden owner scope"},403);
+  const owner=cronAuthorized?String(body.owner_id||""):subject;
+  if(!owner)return json({error:"Missing owner scope"},400);
+  const date=String(body.date||new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()));
+  const bounds=brusselsDayBounds(date);
+  const matches=await db("matches?select=id,owner_id,user_id,home_team,away_team,competition,league,country,kickoff_at,status&owner_id=eq."+encodeURIComponent(owner)+"&kickoff_at=gte."+encodeURIComponent(bounds.start)+"&kickoff_at=lt."+encodeURIComponent(bounds.end)+"&status=in.(scheduled,unknown,live)&order=kickoff_at.asc");
   const catalog=await movi("/catalog?sport=soccer");
   const fixtures=Array.isArray(catalog.fixtures)?catalog.fixtures:[];
   const pairs:any[]=[];
