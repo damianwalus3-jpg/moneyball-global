@@ -22,7 +22,7 @@ const prediction = (id: string, match_id: string, probability: number, extra: Pa
     id,
     owner_id: "owner",
     match_id,
-    model_version: "MONEYBALL GLOBAL 3.8",
+    model_version: "MONEYBALL GLOBAL 3.9",
     market: "1X2",
     selection: "1",
     probability,
