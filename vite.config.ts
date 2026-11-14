@@ -5,8 +5,7 @@ import { defineConfig } from "vite";
 import viteReact from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-// Nitro auto-detects the production host (Vercel, Cloudflare, Netlify, etc.).
-// Do not pin a Cloudflare preset: the public Moneyball deployment is on Vercel.
+// Build the production server bundle for Cloudflare Workers via Nitro.
 export default defineConfig({
   plugins: [
     tanstackStart({ server: { entry: "server" } }),
