@@ -46,7 +46,7 @@ function selectionFor(q:any,home:string,away:string):{market:string;selection:st
  const group=String(q.group_name||"").toLowerCase(),label=String(q.label||"").trim(),side=String(q.side||"").toLowerCase(),line=String(q.line||"").trim();
  const period=String(q.period??"").trim().toLowerCase();
  const fullTimePeriods=["","0","ft","full time","fulltime"];
- const nonFullTimeMarket=/(?:^|\\b)(?:1st|first|half|2nd|second|3rd|third|quarter)(?:\\b|$)/i.test(group);
+ const nonFullTimeMarket=/(?:^|\b)(?:1st|first|half|2nd|second|3rd|third|quarter)(?:\b|$)/i.test(group);
  if(!fullTimePeriods.includes(period)||nonFullTimeMarket)return null;
  const quoteTime=Date.parse(String(q.ts||""));
  if(!Number.isFinite(quoteTime)||quoteTime<Date.now()-2*60*60*1000||quoteTime>Date.now()+5*60*1000)return null;
@@ -56,7 +56,7 @@ function selectionFor(q:any,home:string,away:string):{market:string;selection:st
   return s?{market:"1X2",selection:s}:null;
  }
  if(group==="double chance"){
-  const l=norm(label),compact=l.replace(/\\s/g,"");
+  const l=norm(label),compact=l.replace(/\s/g,"");
   let s=["1x","x2","12"].includes(compact)?compact.toUpperCase():null;
   const h=norm(home),a=norm(away),hasHome=!!h&&l.includes(h),hasAway=!!a&&l.includes(a),hasDraw=l.includes("draw");
   if(!s&&hasDraw&&hasHome)s="1X";
@@ -68,7 +68,7 @@ function selectionFor(q:any,home:string,away:string):{market:string;selection:st
   const l=norm(label);
   return (l==="yes"||l==="no")?{market:"GOALS",selection:"BTTS_"+l.toUpperCase()}:null;
  }
- if(/goal(s)? over\\/under|goal line|alternative total goals|match goals/.test(group)){
+ if(/goal(s)? over\/under|goal line|alternative total goals|match goals/.test(group)){
   const lineNumber=Number(line.replace(",",".")),handicapNumber=Number(q.handicap),n=Number.isFinite(handicapNumber)?handicapNumber:lineNumber;
   const isOver=side==="over"||side==="o"||norm(label).startsWith("over");
   const isUnder=side==="under"||side==="u"||norm(label).startsWith("under");
