@@ -37,10 +37,28 @@ async function authorized(token:string){
 async function movi(path:string){
  const headers:Record<string,string>={"Accept":"application/json","Accept-Encoding":"gzip"};
  if(MOVI_KEY)headers["X-API-Key"]=MOVI_KEY;
- const r=await fetch(BASE+path,{headers,signal:AbortSignal.timeout(45000)});
- const raw=await r.text();
- if(!r.ok)throw new Error("MoviOdds HTTP "+r.status+": "+raw.slice(0,200));
- return JSON.parse(raw);
+ let lastError="";
+ for(let attempt=0;attempt<4;attempt++){
+  try{
+   const r=await fetch(BASE+path,{headers,signal:AbortSignal.timeout(45000)});
+   const raw=await r.text();
+   if(r.status===503&&attempt<3){
+    lastError="MoviOdds HTTP 503: "+raw.slice(0,200);
+    await new Promise(resolve=>setTimeout(resolve,1500*(attempt+1)));
+    continue;
+   }
+   if(!r.ok)throw new Error("MoviOdds HTTP "+r.status+": "+raw.slice(0,200));
+   return JSON.parse(raw);
+  }catch(error){
+   lastError=String(error);
+   if(attempt<3&&(lastError.includes("503")||lastError.toLowerCase().includes("timeout")||lastError.toLowerCase().includes("network"))){
+    await new Promise(resolve=>setTimeout(resolve,1500*(attempt+1)));
+    continue;
+   }
+   throw error;
+  }
+ }
+ throw new Error(lastError||"MoviOdds unavailable after retries");
 }
 function selectionFor(q:any,home:string,away:string):{market:string;selection:string}|null{
  const group=String(q.group_name||"").toLowerCase(),label=String(q.label||"").trim(),side=String(q.side||"").toLowerCase(),line=String(q.line||"").trim();
