@@ -279,17 +279,31 @@ function Mecze() {
   const resultBy = useMemo(() => new Map(results.map((result) => [result.match_id, result])), [results]);
   const predictionById = useMemo(() => new Map(preds.map((prediction) => [prediction.id, prediction])), [preds]);
   const latestOdds = useMemo(() => {
-    const byMatch = new Map<string, { snapshot: (typeof odds)[number]; prediction: Prediction }>();
+    const byMatch = new Map<string, { odds: number; bookmaker: string | null; selection: string; captured_at: string }>();
+    const add = (matchId: string, price: number, bookmaker: string | null, selection: string, capturedAt: string) => {
+      if (!Number.isFinite(price) || price <= 1) return;
+      const current = byMatch.get(matchId);
+      if (!current || capturedAt > current.captured_at)
+        byMatch.set(matchId, { odds: price, bookmaker, selection, captured_at: capturedAt });
+    };
+    // Provider quotes are written to predictions by the DB sync trigger, not to odds_snapshots.
+    for (const prediction of preds) {
+      if (!isActivePredictionVersion(prediction.model_version) || prediction.odds == null) continue;
+      const coverage = asObject(prediction.data_coverage);
+      const source = String(coverage["odds_source"] ?? prediction.data_source ?? "");
+      if (!source) continue;
+      const capturedAt = String(coverage["odds_price_timestamp"] ?? coverage["odds_captured_at"] ?? prediction.created_at);
+      add(prediction.match_id, Number(prediction.odds), String(coverage["odds_bookmaker"] ?? prediction.data_source ?? "") || null, prediction.selection, capturedAt);
+    }
+    // Manual snapshots remain supported and take precedence when newer.
     for (const snapshot of odds) {
       if (!snapshot.prediction_id) continue;
       const prediction = predictionById.get(snapshot.prediction_id);
       if (!prediction || !isActivePredictionVersion(prediction.model_version)) continue;
-      const current = byMatch.get(prediction.match_id);
-      if (!current || snapshot.captured_at > current.snapshot.captured_at)
-        byMatch.set(prediction.match_id, { snapshot, prediction });
+      add(prediction.match_id, Number(snapshot.odds), snapshot.bookmaker || null, prediction.selection, snapshot.captured_at);
     }
     return byMatch;
-  }, [odds, predictionById]);
+  }, [preds, odds, predictionById]);
   const predCount = useMemo(() => {
     const counts = new Map<string, { x12: number; dc: number; goals: number; sel: number }>();
     for (const prediction of preds.filter((item) => isActivePredictionVersion(item.model_version))) {
@@ -495,7 +509,7 @@ function Mecze() {
                         </div>
                         {o && (
                           <div className="num text-xs text-muted-foreground">
-                            Kurs {fmtOdds(o.snapshot.odds)}{o.snapshot.bookmaker ? ` (${o.snapshot.bookmaker})` : ""} · {o.prediction.selection}
+                            Kurs {fmtOdds(o.odds)}{o.bookmaker ? ` (${o.bookmaker})` : ""} · {o.selection}
                           </div>
                         )}
                       </div>
