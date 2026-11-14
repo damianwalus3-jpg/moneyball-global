@@ -75,7 +75,20 @@ function Login() {
         setInfo("Jeśli konto istnieje, wysłaliśmy link do zmiany hasła.");
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Wystąpił błąd.");
+      const message = e instanceof Error ? e.message : "Wystąpił błąd.";
+      if (/invalid login credentials|invalid_credentials/i.test(message)) {
+        setError("Nieprawidłowy e-mail lub hasło. Sprawdź dane logowania do właściwego konta MONEYBALL.");
+      } else if (/email not confirmed/i.test(message)) {
+        setError("Adres e-mail nie został jeszcze potwierdzony. Otwórz wiadomość potwierdzającą konto.");
+      } else if (/over_email_send_rate_limit|email rate limit exceeded/i.test(message)) {
+        setError("Limit wysyłania e-maili został osiągnięty. Poczekaj, zanim ponowisz reset hasła.");
+      } else if (/too many requests|rate limit/i.test(message)) {
+        setError("Zbyt wiele prób. Odczekaj kilka minut i spróbuj ponownie.");
+      } else if (/failed to fetch|networkerror|fetch failed/i.test(message)) {
+        setError("Nie udało się połączyć z serwerem logowania. Sprawdź internet i spróbuj ponownie.");
+      } else {
+        setError(message);
+      }
     } finally {
       setBusy(false);
     }

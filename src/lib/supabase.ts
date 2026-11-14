@@ -15,7 +15,11 @@ export function getSupabase(): SupabaseClient | null {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: true,
+        // Recovery links are parsed and verified explicitly by /reset-password.
+        // Do not let the client consume the URL before the recovery route validates it.
+        // The SPA uses implicit recovery tokens so links work across mail-app browser contexts.
+        flowType: "implicit",
+        detectSessionInUrl: false,
         storageKey: "moneyball-auth",
       },
     });
