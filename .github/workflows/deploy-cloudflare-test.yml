@@ -18,9 +18,14 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: moneyball-cloudflare-test-deploy
+  cancel-in-progress: true
+
 jobs:
   deploy-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: cloudflare-test
     steps:
       - name: Checkout migration branch
