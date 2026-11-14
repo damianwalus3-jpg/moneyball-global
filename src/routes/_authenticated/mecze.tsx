@@ -204,6 +204,16 @@ function Mecze() {
       if (sync.data?.error || sync.data?.ok === false)
         throw new Error("Skan terminarza nie powiódł się: " + (sync.data?.error ?? "Nieznany błąd źródła."));
 
+      setPredictionProgress("Pobieram darmowe kursy bet365…");
+      let oddsData: any = null;
+      try {
+        const oddsSync = await sb.functions.invoke("moneyball-movi-odds-sync", { body: { date } });
+        if (!oddsSync.error && oddsSync.data?.ok === true) oddsData = oddsSync.data;
+        else console.warn("MoviOdds sync unavailable; continuing without invented odds:", oddsSync.error ?? oddsSync.data?.error);
+      } catch (oddsError) {
+        console.warn("MoviOdds sync failed; continuing without invented odds:", oddsError);
+      }
+
       const totals = {
         matches: 0, predictions: 0, created: 0, updated: 0, preserved: 0,
         selected: 0, covered: 0, missing: 0, footy_form_matches: 0,
@@ -246,7 +256,7 @@ function Mecze() {
       if (hasMore)
         throw new Error("Skan zatrzymano po " + maxBatches + " partiach. Uruchom go ponownie, aby dokończyć pozostałe mecze.");
 
-      return { sync: sync.data, prediction: totals };
+      return { sync: sync.data, odds: oddsData, prediction: totals };
     } finally {
       setPredictionProgress("");
     }
@@ -258,6 +268,7 @@ function Mecze() {
       "; braki danych: " + (r.prediction?.missing ?? 0) +
       "; forma FootyNomad/GitHub: " + (r.prediction?.footy_form_matches ?? 0) + "/" + (r.prediction?.github_form_matches ?? 0) +
       "; partie: " + (r.prediction?.batches ?? 0) +
+      "; kursy bet365: " + (r.odds ? (r.odds.quotes_saved ?? 0) : "źródło niedostępne") +
       "; kupony pojedyncze i AKO: generator dostępny w zakładce Kupony" +
       "; wyniki: " + (r.sync?.result_sync?.skipped ? "aktualizowane automatycznie co 5 minut" : r.sync?.result_sync?.ok ? "zsynchronizowane" : "wymagają kontroli") + ".",
   });
