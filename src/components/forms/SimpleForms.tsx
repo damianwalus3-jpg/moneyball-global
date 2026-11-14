@@ -168,7 +168,13 @@ export function OddsForm({
     if (!form.bookmaker.trim()) next["bookmaker"] = "Podaj bukmachera.";
     const odd = parseDecimal(form.odds);
     if (odd == null || odd <= 1) next["odds"] = "Kurs musi być większy niż 1,00.";
-    if (!brusselsInputToISO(form.captured)) next["captured"] = "Podaj czas.";
+    const capturedAt = brusselsInputToISO(form.captured);
+    if (!capturedAt) next["captured"] = "Podaj czas.";
+    else {
+      const capturedMs = Date.parse(capturedAt);
+      if (!Number.isFinite(capturedMs) || capturedMs < Date.now() - 2 * 60 * 60 * 1000 || capturedMs > Date.now() + 5 * 60 * 1000)
+        next["captured"] = "Kurs musi być aktualny (maksymalnie 2 godziny wstecz; bez czasu z przyszłości).";
+    }
     setErrors(next);
     if (!Object.keys(next).length) save.mutate(undefined);
   }
