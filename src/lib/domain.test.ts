@@ -205,11 +205,12 @@ describe("bankroll", () => {
       tx("adjustment", -5, "2026-01-05T10:00:00Z"),
     ])).toBe(95);
   });
-  it("uses the latest recorded balance_after when available", () => {
+  it("includes automatic transactions newer than the latest balance_after snapshot", () => {
     expect(bankrollBalance([
       tx("deposit", 100, "2026-01-01T10:00:00Z", 100),
       tx("stake", 10, "2026-01-02T10:00:00Z", 90),
-    ])).toBe(90);
+      tx("return", 25, "2026-01-03T10:00:00Z", null),
+    ])).toBe(115);
   });
 });
 
