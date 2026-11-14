@@ -19,7 +19,7 @@ Polish-language football data and prediction tracking application. This branch i
 ## Features under test
 
 - European fixtures from FootyNomad, enriched with public no-key sources
-- MONEYBALL GLOBAL 3.8 prediction engine with explicit data coverage and missing-data reporting
+- MONEYBALL GLOBAL 3.9 prediction engine with explicit data coverage and missing-data reporting
 - Separate 1X2 and Double Chance predictions, plus goals / BTTS markets
 - Single picks and three-leg coupon generation
 - Match details with model rationale and source coverage
