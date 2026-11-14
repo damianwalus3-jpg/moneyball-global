@@ -223,9 +223,15 @@ Deno.serve(async (request) => {
       const updated = ids.length - inserted;
       // Purge non-European fixtures from this date's disposable feed cache.
       // Historical matches/predictions in the main registry are intentionally untouched.
-      const cachedRows = await db("moneyball_global_fixture_feed?select=external_id,country,competition,home_team,away_team&scan_date=eq." + date);
-      const outsideEurope = (cachedRows || []).filter((f: any) => !isEuropeanFixture(f.country, f.competition, f.home_team, f.away_team));
-      for (const f of outsideEurope) {
+      const cachedRows = await db("moneyball_global_fixture_feed?select=external_id,country,competition,home_team,away_team,kickoff_at&scan_date=eq." + date);
+      const staleRows = (cachedRows || []).filter((f: any) => {
+        if (!f.kickoff_at) return true;
+        const localDate = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
+        }).format(new Date(f.kickoff_at));
+        return localDate !== date || !isEuropeanFixture(f.country, f.competition, f.home_team, f.away_team);
+      });
+      for (const f of staleRows) {
         await db("moneyball_global_fixture_feed?scan_date=eq." + date + "&external_id=eq." + encodeURIComponent(String(f.external_id)), "DELETE");
       }
       await db("moneyball_global_scan_runs?id=eq." + runId, "PATCH", {
@@ -233,7 +239,7 @@ Deno.serve(async (request) => {
         fixtures_count: result.fixtures.length,
         duplicates_removed: 0,
         fetched_at: new Date().toISOString(),
-        notes: "Pobrano " + result.fixtures.length + " europejskich meczów; nowe: " + inserted + "; aktualizacje: " + updated + "; usunięto z cache spoza Europy: " + outsideEurope.length + ".",
+        notes: "Pobrano " + result.fixtures.length + " europejskich meczów; nowe: " + inserted + "; aktualizacje: " + updated + "; usunięto stare/niepasujące rekordy cache: " + staleRows.length + ".",
       });
       return json({
         ok: true, date, source: "FootyNomad", reported_total: result.reportedTotal,
