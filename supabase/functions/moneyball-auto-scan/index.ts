@@ -23,7 +23,7 @@ function ageMs(value:string|null|undefined){const t=value?Date.parse(value):NaN;
 
 Deno.serve(async(req:Request)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
- if(req.method==="GET")return json({ok:true,service:"MONEYBALL automatic daily analysis",batch_size:30,batches_per_run:3,schedule:"every 2 minutes",timezone:"Europe/Brussels"});
+ if(req.method==="GET")return json({ok:true,service:"MONEYBALL automatic daily analysis",batch_size:15,batches_per_run:3,schedule:"every 2 minutes",timezone:"Europe/Brussels"});
  if(req.method!=="POST")return json({ok:false,error:"POST required"},405);
  try{
   if(!(await authorized(req.headers.get("x-cron-token")||"")))return json({ok:false,error:"Unauthorized"},401);
@@ -57,10 +57,11 @@ Deno.serve(async(req:Request)=>{
   const authHeader=req.headers.get("Authorization")||"";const bearer=authHeader.toLowerCase().startsWith("bearer ")?authHeader.slice(7).trim():authHeader.trim();
   const apiKey=req.headers.get("apikey")||SERVICE_KEY;
   if(!bearer)return json({ok:false,error:"Missing scheduled Authorization token"},401);
-  const offsets=[offset,offset+30,offset+60];
+  const batchSize=15;
+  const offsets=[offset,offset+batchSize,offset+2*batchSize];
   const pageResults:any[]=[];
   for(const pageOffset of offsets){
-   const response=await fetch(SUPABASE_URL+"/functions/v1/moneyball-predict",{method:"POST",headers:{apikey:apiKey,Authorization:"Bearer "+bearer,"x-cron-token":req.headers.get("x-cron-token")||"","Content-Type":"application/json"},body:JSON.stringify({owner_id:ownerId,date,offset:pageOffset}),signal:AbortSignal.timeout(115000)});
+   const response=await fetch(SUPABASE_URL+"/functions/v1/moneyball-predict",{method:"POST",headers:{apikey:apiKey,Authorization:"Bearer "+bearer,"x-cron-token":req.headers.get("x-cron-token")||"","Content-Type":"application/json"},body:JSON.stringify({owner_id:ownerId,date,offset:pageOffset,batch_size:batchSize}),signal:AbortSignal.timeout(115000)});
    const raw=await response.text();let result:any;try{result=raw?JSON.parse(raw):null}catch{result={error:raw.slice(0,500)};}
    if(!response.ok||!result?.ok)throw new Error("Predict offset "+pageOffset+" failed ("+response.status+"): "+String(result?.error||raw).slice(0,400));
    pageResults.push(result);
@@ -70,9 +71,9 @@ Deno.serve(async(req:Request)=>{
   const totals={matches:0,predictions:0,created:0,updated:0,preserved:0,selected:0,auto_single_bets:0,covered:0,missing:0,footy_form_matches:0,github_form_matches:0};
   for(const result of pageResults)for(const key of Object.keys(totals) as (keyof typeof totals)[])totals[key]+=Number(result[key]||0);
   const done=pageResults.some((result)=>result.has_more!==true);
-  const nextOffset=done?0:offset+30*pageResults.length;
+  const nextOffset=done?0:offset+batchSize*pageResults.length;
   const completedAt=done?new Date().toISOString():null;
-  await db("moneyball_auto_scan_state?owner_id=eq."+encodeURIComponent(ownerId)+"&scan_date=eq."+encodeURIComponent(date),"PATCH",{next_offset:nextOffset,status:done?"completed":"running",last_started_at:startedAt,last_completed_at:completedAt,last_error:null,last_summary:{...totals,batches:pageResults.length,from_offset:offset,to_offset:offset+30*(pageResults.length-1),done,source_scan_run_id:latest.id},updated_at:new Date().toISOString()},"return=minimal");
+  await db("moneyball_auto_scan_state?owner_id=eq."+encodeURIComponent(ownerId)+"&scan_date=eq."+encodeURIComponent(date),"PATCH",{next_offset:nextOffset,status:done?"completed":"running",last_started_at:startedAt,last_completed_at:completedAt,last_error:null,last_summary:{...totals,batches:pageResults.length,from_offset:offset,to_offset:offset+batchSize*(pageResults.length-1),done,source_scan_run_id:latest.id},updated_at:new Date().toISOString()},"return=minimal");
   return json({ok:true,date,scan_run_id:latest.id,status:done?"completed":"running",from_offset:offset,next_offset:nextOffset,batches:pageResults.length,done,totals});
  }catch(error){
   const message=String(error);
