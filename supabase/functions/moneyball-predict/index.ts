@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-const S=Deno.env.get("SUPABASE_URL")||"https://xwrgfaarmwnguymresjy.supabase.co",K=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||"",SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"",V="MONEYBALL GLOBAL 3.8";
+const S=Deno.env.get("SUPABASE_URL")||"https://xwrgfaarmwnguymresjy.supabase.co",K=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||"",SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"",V="MONEYBALL GLOBAL 3.9";
 let CRON_FALLBACK_TOKEN="",CRON_JWT_TOKEN="";
 const C={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-requested-with, prefer, cache-control, pragma","Access-Control-Allow-Methods":"POST, GET, OPTIONS","Access-Control-Max-Age":"86400","Vary":"Origin"};
 const out=(x:any,n=200)=>new Response(JSON.stringify(x),{status:n,headers:{...C,"Content-Type":"application/json"}});
@@ -238,7 +238,7 @@ async function readPublicSourceForms(date:string,token:string){
 async function readTipsAuditFairMarket(date:string,matches:any[]){
  const byMatch=new Map<string,any>();
  try{
-  const response=await fetch("https://tipsaudit.com/api/v1/predictions",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/3.8 (+https://finalne-typy.vercel.app)"},signal:AbortSignal.timeout(12000)});
+  const response=await fetch("https://tipsaudit.com/api/v1/predictions",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/3.9 (+https://moneyball-global-test.damianwalus3.workers.dev)"},signal:AbortSignal.timeout(12000)});
   if(!response.ok)throw new Error("TipsAudit HTTP "+response.status);
   const payload=await response.json();
   const generatedAt=Date.parse(String(payload?.generated_at||""));
