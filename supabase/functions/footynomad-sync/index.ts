@@ -200,71 +200,18 @@ Deno.serve(async(req)=>{
    settled=0;
    await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"completed",completed_at:new Date().toISOString(),matches_found:combined.length,notes:"FootyNomad "+result.fixtures.length+"; public fixtures "+publicFixtures.length+"; enriched "+enriched+"; public-only "+publicOnly+"; inserted "+inserted+"; updated "+updated+"; settled "+settled+"; matched by fixture "+matchedByFixture+"; promoted "+promotedToPrimary+"; public source status "+JSON.stringify(publicSourceStatus).slice(0,900)});
   }catch(e){await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"partial",completed_at:new Date().toISOString(),notes:"Import częściowy: "+String(e)});throw e;}
-  // No-key market source: moneyball-predict fetches TipsAudit fair odds directly.
+  // Bookmaker odds are fetched separately by moneyball-movi-odds-sync and used only for payout calculations.
   // This removes the optional StrikerAPI dependency; no API key or secret is required.
-  const oddsSync:any={ok:true,source:"TipsAudit",mode:"direct_public_feed",api_key_required:false,note:"Kursy fair i dostępne ceny bukmacherskie są pobierane bezpośrednio przez moneyball-predict."};
+  const oddsSync:any={ok:true,source:"TipsAudit",mode:"direct_public_feed",api_key_required:false,note:"Prognozy są liczone niezależnie; rzeczywiste kursy są pobierane osobnym synchronizatorem."};
   // Scheduled scans own the full server-side pipeline. Manual scans are
   // orchestrated by the browser, which already pages through moneyball-predict.
   // Running both here and in the browser doubled work and caused long scans.
-  let predictionSync:any;
-  let resultSync:any;
-  if (!cronToken) {
-   predictionSync={ok:true,skipped:true,mode:"client_orchestrated",batches:[]};
-   // Results are refreshed by the independent five-minute cron job.
-   resultSync={ok:true,skipped:true,mode:"five_minute_cron"};
-  } else {
-   // Cron-triggered scans must finish predictions even when nobody has the app open.
-   predictionSync={ok:false,error:"not_run",batches:[]};
-   try{
-    const batches:any[]=[];
-    const batchSize=30;
-    let offset=0,hasMore=true;
-    const runBatch=async(batchOffset:number)=>{
-     const predictionResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-predict",{
-      method:"POST",
-      headers:{apikey:KEY,Authorization:"Bearer "+token,"x-cron-token":cronToken,"Content-Type":"application/json",Accept:"application/json"},
-      body:JSON.stringify({date,offset:batchOffset,owner_id:ownerId}),
-     });
-     const predictionText=await predictionResponse.text();
-     let predictionResult:any;
-     try{predictionResult=predictionText?JSON.parse(predictionText):{ok:false,error:"Empty prediction response"};}
-     catch(_){predictionResult={ok:false,error:predictionText.slice(0,500)};}
-     if(!predictionResponse.ok||predictionResult?.ok!==true){
-      throw new Error("Prediction batch offset "+batchOffset+" failed (HTTP "+predictionResponse.status+"): "+String(predictionResult?.error||predictionResult?.message||predictionText).slice(0,700));
-     }
-     return {offset:batchOffset,matches:predictionResult.matches||0,predictions:predictionResult.predictions||0,created:predictionResult.created||0,updated:predictionResult.updated||0,selected:predictionResult.selected||0,covered:predictionResult.covered||0,missing:predictionResult.missing||0,has_more:!!predictionResult.has_more,batch_size:Number(predictionResult.batch_size)||batchSize};
-    };
-    // Run three independent pages concurrently; stable ordering in moneyball-predict
-    // keeps offsets disjoint and avoids the previous 150-second sequential timeout.
-    while(hasMore&&batches.length<50){
-     const remaining=50-batches.length;
-     const offsets=batches.length===0?[offset]:[offset,offset+batchSize,offset+2*batchSize].slice(0,remaining);
-     const group=await Promise.all(offsets.map(runBatch));
-     for(const batch of group){
-      batches.push(batch);
-      hasMore=batch.has_more;
-      offset+=batch.batch_size;
-      if(!hasMore)break;
-     }
-    }
-    if(hasMore)throw new Error("Prediction stopped at safety limit of 50 batches; remaining matches need another run.");
-    predictionSync={ok:true,batches:batches.length,total_matches:batches.reduce((n,x)=>n+x.matches,0),total_predictions:batches.reduce((n,x)=>n+x.predictions,0),created:batches.reduce((n,x)=>n+x.created,0),updated:batches.reduce((n,x)=>n+x.updated,0),selected:batches.reduce((n,x)=>n+x.selected,0),covered:batches.reduce((n,x)=>n+x.covered,0),missing:batches.reduce((n,x)=>n+x.missing,0),details:batches};
-   }catch(e){predictionSync={ok:false,error:String(e),details:predictionSync.batches||[]};}
-
-   // Scheduled result settlement runs after the prediction batches are written.
-   resultSync={ok:false,error:"not_run"};
-   try{
-    const syncResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-results-sync?date="+encodeURIComponent(date),{
-     method:"POST",
-     headers:{apikey:KEY,Authorization:"Bearer "+token,"x-cron-token":cronToken,"Content-Type":"application/json",Accept:"application/json"},
-     body:"{}",
-    });
-    const syncText=await syncResponse.text();
-    try{resultSync=syncText?JSON.parse(syncText):{ok:false,error:"Empty result-sync response"};}catch(_){resultSync={ok:false,error:syncText.slice(0,500)};}
-    if(!syncResponse.ok)resultSync={...resultSync,ok:false,http_status:syncResponse.status};
-   }catch(e){resultSync={ok:false,error:String(e)};}
-  }
-  const pipelineOk=predictionSync.ok&&resultSync.ok!==false;
+   // Fixture import only. Predictions are owned by moneyball-auto-scan (every 2 minutes),
+   // and settlement by moneyball-results-sync (every 5 minutes). This avoids a second
+   // full prediction pass when the hourly fixture refresh runs.
+   const predictionSync:any={ok:true,skipped:true,mode:cronToken?"dedicated_moneyball_auto_scan":"client_orchestrated"};
+   const resultSync:any={ok:true,skipped:true,mode:"dedicated_five_minute_results_cron"};
+const pipelineOk=predictionSync.ok&&resultSync.ok!==false;
   await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{
    status:pipelineOk?"completed":"partial",
    completed_at:new Date().toISOString(),
