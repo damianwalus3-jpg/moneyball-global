@@ -93,7 +93,7 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
   }
  }catch(_){}
  const dateRange=startDate.replace(/-/g,"")+(startDate===endDate?"":"-"+endDate.replace(/-/g,""));
- const espn=await limitedSettled(leagues,12,async league=>{
+ const espn=await limitedSettled(leagues,6,async league=>{
   const url="https://site.api.espn.com/apis/site/v2/sports/soccer/"+league+"/scoreboard?dates="+dateRange;
   const r=await fetch(url,{headers:{"User-Agent":"Mozilla/5.0 MoneyballGlobal/2.0","Accept":"application/json"},signal:AbortSignal.timeout(10000)});
   if(!r.ok)throw new Error("ESPN "+league+" HTTP "+r.status);
@@ -111,7 +111,7 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
  // TheSportsDB public v1 feed: no signup or paid key; one request per date, with the free tier returning a small sample.
  const eventDates:string[]=[];const cursor=new Date(startDate+"T00:00:00Z"),last=new Date(endDate+"T00:00:00Z");
  for(;cursor<=last;cursor.setUTCDate(cursor.getUTCDate()+1))eventDates.push(cursor.toISOString().slice(0,10));
- const sportsDb=await limitedSettled(eventDates,4,async date=>{
+ const sportsDb=await limitedSettled(eventDates,2,async date=>{
   const url="https://www.thesportsdb.com/api/v1/json/123/eventsday.php?d="+date+"&s=Soccer";
   const r=await fetch(url,{headers:{"Accept":"application/json","User-Agent":"MoneyballGlobal/2.0"},signal:AbortSignal.timeout(8000)});
   if(!r.ok)throw new Error("TheSportsDB "+date+" HTTP "+r.status);
@@ -145,7 +145,7 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
     for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++;}else quoted=!quoted;}else if(c===","&&!quoted){row.push(cell);cell="";}else if((c==="\n"||c==="\r")&&!quoted){if(c==="\r"&&text[i+1]==="\n")i++;row.push(cell);cell="";if(row.some(v=>v.trim()))rows.push(row);row=[];}else cell+=c;}
     if(cell.length||row.length){row.push(cell);rows.push(row);}return rows;
    };
-   const feeds=await limitedSettled(folders,8,async folder=>{
+   const feeds=await limitedSettled(folders,4,async folder=>{
     let url="https://raw.githubusercontent.com/oladeeayo/open-matchday/master/data/"+folder+"/results_2627.csv";
     let r=await fetch(url,{headers:{"User-Agent":"MoneyballGlobal/2.0","Accept":"text/csv"},signal:AbortSignal.timeout(8000)});
     if(!r.ok){
@@ -330,7 +330,7 @@ Deno.serve(async(req:Request)=>{
   }catch(_){return new Response(JSON.stringify({ok:false,error:"Unauthorized"}),{status:401,headers:{...cors,"Content-Type":"application/json"}});}
  }
  try{
-  const u=new URL(req.url),requested=u.searchParams.get("date"),span=Math.min(7,Math.max(1,Number(u.searchParams.get("days")||4)));
+  const u=new URL(req.url),requested=u.searchParams.get("date"),span=Math.min(2,Math.max(1,Number(u.searchParams.get("days")||2)));
   const today=new Date(),dates:string[]=[];
   if(requested&&/^\d{4}-\d{2}-\d{2}$/.test(requested))dates.push(requested);
   else for(let i=span-1;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);dates.push(day(d));}
