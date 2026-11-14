@@ -189,20 +189,9 @@ Deno.serve(async(req)=>{
    }
    await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"completed",completed_at:new Date().toISOString(),matches_found:combined.length,notes:"FootyNomad "+result.fixtures.length+"; public fixtures "+publicFixtures.length+"; enriched "+enriched+"; public-only "+publicOnly+"; inserted "+inserted+"; updated "+updated+"; settled "+settled+"; matched by fixture "+matchedByFixture+"; promoted "+promotedToPrimary+"; public source status "+JSON.stringify(publicSourceStatus).slice(0,900)});
   }catch(e){await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"partial",completed_at:new Date().toISOString(),notes:"Import częściowy: "+String(e)});throw e;}
-  // Pull optional free-tier median bookmaker prices before prediction, so the model can consume fresh market context.
-  // The provider function returns a safe skipped response when STRIKER_API_KEY has not been configured.
-  let oddsSync:any={ok:false,skipped:true,error:"not_run"};
-  try{
-   const oddsResponse=await fetch(SUPABASE_URL+"/functions/v1/strikerapi-odds-sync",{
-    method:"POST",
-    headers:{apikey:KEY,Authorization:"Bearer "+token,...(cronToken?{"x-cron-token":cronToken}:{}),"Content-Type":"application/json",Accept:"application/json"},
-    body:JSON.stringify({owner_id:ownerId}),
-   });
-   const oddsText=await oddsResponse.text();
-   try{oddsSync=oddsText?JSON.parse(oddsText):{ok:false,error:"Empty odds-sync response"};}
-   catch(_){oddsSync={ok:false,error:oddsText.slice(0,500)};}
-   if(!oddsResponse.ok)oddsSync={...oddsSync,ok:false,http_status:oddsResponse.status};
-  }catch(e){oddsSync={ok:false,error:String(e)};}
+  // No-key market source: moneyball-predict fetches TipsAudit fair odds directly.
+  // This removes the optional StrikerAPI dependency; no API key or secret is required.
+  const oddsSync:any={ok:true,source:"TipsAudit",mode:"direct_public_feed",api_key_required:false,note:"Kursy fair i dostępne ceny bukmacherskie są pobierane bezpośrednio przez moneyball-predict."};
   // Automatically run the prediction engine for every page of matches after fixture import.
   // The predictor reads a seven-day window and processes 30 matches per request.
   // Continue until has_more is false so no fixtures are silently skipped.
