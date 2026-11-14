@@ -198,11 +198,11 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
       const prices = couponLegs.map((leg) => leg.odds ?? byId.get(leg.prediction_id)?.odds ?? null);
       const validProbability = probabilities.length === coupon.target_legs && probabilities.every((p) => p != null);
       const combinedProbability = validProbability
-        ? Math.round(probabilities.reduce((acc, p) => acc * (Number(p) / 100), 1) * 10000) / 100
+        ? Math.round(probabilities.reduce<number>((acc, p) => acc * (Number(p) / 100), 1) * 10000) / 100
         : null;
       const validOdds = prices.length === coupon.target_legs && prices.every((price) => price != null && Number(price) > 1);
       const combinedOdds = validOdds
-        ? Math.round(prices.reduce((acc, price) => acc * Number(price), 1) * 100) / 100
+        ? Math.round(prices.reduce<number>((acc, price) => acc * Number(price), 1) * 100) / 100
         : null;
       return {
         ...coupon,

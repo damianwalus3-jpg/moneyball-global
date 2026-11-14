@@ -9,6 +9,7 @@ import {
   isValidPick,
   groupHitRates,
   isCouponCandidate,
+  modelHitRate,
   settlePick,
   settleGoalsPick,
   outcomeFromScore,
@@ -224,5 +225,30 @@ describe("GOALS market settlement", () => {
   it("validates every supported goals selection", () => {
     for (const selection of ["BTTS_YES", "BTTS_NO", "OVER_1.5", "UNDER_1.5", "OVER_2.5", "UNDER_2.5", "OVER_3.5", "UNDER_3.5"])
       expect(isValidPick("GOALS", selection)).toBe(true);
+  });
+});
+
+describe("overall model hit rate (Panel)", () => {
+  const preds = [
+    prediction("a", "m1", 60, { verdict: "ODRZUCONY", settlement_status: "won" }),
+    prediction("b", "m2", 80, { verdict: "WYBRANY", settlement_status: "lost" }),
+    prediction("c", "m3", 70, { verdict: "ODRZUCONY", settlement_status: "won" }),
+    prediction("d", "m4", 70, { settlement_status: "pending" }),
+    prediction("e", "m5", 70, { settlement_status: "void" }),
+    prediction("f", "m6", 70, { selection: "1X", settlement_status: "won" }),
+    prediction("g", "m7", 70, { market: "DOUBLE_CHANCE", selection: "X2", verdict: "ODRZUCONY", settlement_status: "won" }),
+    prediction("h", "m8", 70, { market: "DOUBLE_CHANCE", selection: "1", settlement_status: "lost" }),
+  ];
+  it("counts ODRZUCONY picks too: 1X2 = 2 won / 3 settled", () => {
+    const r = modelHitRate(preds, "1X2");
+    expect([r.won, r.settled, r.rate]).toEqual([2, 3, 66.7]);
+  });
+  it("ignores pending, void and invalid picks; DC only 1X/X2/12", () => {
+    const r = modelHitRate(preds, "DOUBLE_CHANCE");
+    expect([r.won, r.settled, r.rate]).toEqual([1, 1, 100]);
+  });
+  it("does not relax coupon rules: ODRZUCONY is still not a candidate", () => {
+    const now = Date.parse("2026-11-10T12:00:00Z");
+    expect(isCouponCandidate(prediction("p", "m1", 90, { verdict: "ODRZUCONY" }), match("m1"), now)).toBe(false);
   });
 });

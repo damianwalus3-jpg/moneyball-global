@@ -1,13 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronRight, Ticket, Trophy } from "lucide-react";
+import { CalendarDays, ChevronRight, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
 import { fmtPct } from "@/lib/format";
-import { dashboardSummaryQuery } from "@/lib/queries";
+import { modelHitRate } from "@/lib/domain";
+import { dashboardSummaryQuery, tableQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_authenticated/panel")({
-  head: () => ({ meta: [{ title: "Panel — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Podsumowanie prognoz, kuponów i bankrolla." }, { property: "og:title", content: "Panel — MONEYBALL" }, { property: "og:description", content: "Podsumowanie prognoz." }] }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(dashboardSummaryQuery()),
+  head: () => ({ meta: [{ title: "Panel — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Podsumowanie prognoz, kuponów i bankrolla." }, { property: "og:title", content: "Panel — MONEYBALL" }, { property: "og:description", content: "Podsumowanie prognoz." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(dashboardSummaryQuery()), context.queryClient.ensureQueryData(tableQuery("predictions"))]),
   pendingComponent: PageLoader,
   errorComponent: DataError,
   component: Panel,
@@ -18,7 +19,7 @@ function DashboardTile({ to, label, value, hint, icon, tone = "default" }: {
   label: string;
   value: string | number;
   hint?: string;
-  icon: typeof Wallet;
+  icon: LucideIcon;
   tone?: "default" | "primary" | "warning";
 }) {
   return (
@@ -37,8 +38,9 @@ function DashboardTile({ to, label, value, hint, icon, tone = "default" }: {
 
 function Panel() {
   const { data: summary } = useSuspenseQuery(dashboardSummaryQuery());
-  const hr1 = summary.hit_rates["1X2"];
-  const hrDc = summary.hit_rates.DOUBLE_CHANCE;
+  const { data: predictions } = useSuspenseQuery(tableQuery("predictions"));
+  const hr1 = modelHitRate(predictions, "1X2");
+  const hrDc = modelHitRate(predictions, "DOUBLE_CHANCE");
   const hrGoals = summary.hit_rates.GOALS;
 
   return (
@@ -47,8 +49,8 @@ function Panel() {
       <p className="mb-3 text-sm text-muted-foreground">Każdy kafelek jest teraz przyciskiem — otwiera odpowiedni widok ze szczegółami.</p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <DashboardTile to="/mecze" label="Mecze dziś" value={summary.matches_today} icon={CalendarDays} />
-        <DashboardTile to="/statystyki" label="Skuteczność 1X2" value={fmtPct(hr1?.rate ?? null)} hint={`${hr1?.won ?? 0}/${hr1?.settled ?? 0} rozliczonych`} icon={Trophy} />
-        <DashboardTile to="/statystyki" label="Skuteczność DC" value={fmtPct(hrDc?.rate ?? null)} hint={`${hrDc?.won ?? 0}/${hrDc?.settled ?? 0} rozliczonych`} icon={Trophy} />
+        <DashboardTile to="/statystyki" label="Skuteczność 1X2" value={fmtPct(hr1.rate)} hint={`${hr1.won}/${hr1.settled} · model ogółem`} icon={Trophy} />
+        <DashboardTile to="/statystyki" label="Skuteczność DC" value={fmtPct(hrDc.rate)} hint={`${hrDc.won}/${hrDc.settled} · model ogółem`} icon={Trophy} />
         <DashboardTile to="/statystyki" label="Skuteczność goli" value={fmtPct(hrGoals?.rate ?? null)} hint={`${hrGoals?.won ?? 0}/${hrGoals?.settled ?? 0} rozliczonych`} icon={Trophy} />
         <DashboardTile to="/kupony" label="Kupony w grze" value={summary.coupons_in_play} icon={Ticket} />
         <DashboardTile to="/kupony" label="Kandydaci >75%" value={summary.candidates} hint="mecze do kuponów" icon={Trophy} />

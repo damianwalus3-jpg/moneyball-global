@@ -17,11 +17,11 @@ import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AuthenticatedBankrollRouteImport } from './routes/_authenticated/bankroll'
 import { Route as AuthenticatedDoubleChanceRouteImport } from './routes/_authenticated/double-chance'
 import { Route as AuthenticatedHistoriaRouteImport } from './routes/_authenticated/historia'
-import { Route as AuthenticatedPrognozyGoleRouteImport } from './routes/_authenticated/prognozy-gole'
 import { Route as AuthenticatedKuponyRouteImport } from './routes/_authenticated/kupony'
 import { Route as AuthenticatedMeczeRouteImport } from './routes/_authenticated/mecze'
 import { Route as AuthenticatedPanelRouteImport } from './routes/_authenticated/panel'
 import { Route as AuthenticatedPrognozy1x2RouteImport } from './routes/_authenticated/prognozy-1x2'
+import { Route as AuthenticatedPrognozyGoleRouteImport } from './routes/_authenticated/prognozy-gole'
 import { Route as AuthenticatedStatystykiRouteImport } from './routes/_authenticated/statystyki'
 import { Route as AuthenticatedUstawieniaRouteImport } from './routes/_authenticated/ustawienia'
 
@@ -60,11 +60,6 @@ const AuthenticatedDoubleChanceRoute =
     path: '/double-chance',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedPrognozyGoleRoute = AuthenticatedPrognozyGoleRouteImport.update({
-  id: '/prognozy-gole',
-  path: '/prognozy-gole',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedHistoriaRoute = AuthenticatedHistoriaRouteImport.update({
   id: '/historia',
   path: '/historia',
@@ -89,6 +84,12 @@ const AuthenticatedPrognozy1x2Route =
   AuthenticatedPrognozy1x2RouteImport.update({
     id: '/prognozy-1x2',
     path: '/prognozy-1x2',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPrognozyGoleRoute =
+  AuthenticatedPrognozyGoleRouteImport.update({
+    id: '/prognozy-gole',
+    path: '/prognozy-gole',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedStatystykiRoute = AuthenticatedStatystykiRouteImport.update({
@@ -291,18 +292,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPanelRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/prognozy-gole': {
-      id: '/_authenticated/prognozy-gole'
-      path: '/prognozy-gole'
-      fullPath: '/prognozy-gole'
-      preLoaderRoute: typeof AuthenticatedPrognozyGoleRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/prognozy-1x2': {
       id: '/_authenticated/prognozy-1x2'
       path: '/prognozy-1x2'
       fullPath: '/prognozy-1x2'
       preLoaderRoute: typeof AuthenticatedPrognozy1x2RouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/prognozy-gole': {
+      id: '/_authenticated/prognozy-gole'
+      path: '/prognozy-gole'
+      fullPath: '/prognozy-gole'
+      preLoaderRoute: typeof AuthenticatedPrognozyGoleRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/statystyki': {

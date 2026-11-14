@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { BarChart3 } from "lucide-react";
 import { useMemo } from "react";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
-import { couponPayout, groupHitRates, hitRate, isActivePredictionVersion, type HitRate } from "@/lib/domain";
+import { couponPayout, groupHitRates, hitRate, isActivePredictionVersion, modelHitRate, type HitRate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { ensureTables, useTable } from "@/lib/queries";
 import type { Market, Prediction } from "@/lib/types";
@@ -107,6 +107,7 @@ function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Predictio
   const rej = preds.filter((prediction) => prediction.verdict === "ODRZUCONY");
   const verifiedSettled = sel.filter((prediction) => prediction.verified && (prediction.settlement_status === "won" || prediction.settlement_status === "lost"));
   const hrSel = hitRate(verifiedSettled.map((prediction) => prediction.settlement_status));
+  const hrModel = type === "GOALS" ? null : modelHitRate(preds, type);
   const byBucket = groupHitRates(verifiedSettled, (p) => bucketOf(p.probability), (prediction) => prediction.settlement_status).sort(
     (a, b) => BUCKETS.findIndex((x) => x.key === a.key) - BUCKETS.findIndex((x) => x.key === b.key),
   );
@@ -120,6 +121,7 @@ function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Predictio
     <section>
       <h2 className="mb-3 text-2xl font-semibold uppercase">{type === "DOUBLE_CHANCE" ? "Double Chance" : type === "GOALS" ? "Gole / BTTS" : "1X2"}</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {hrModel && <StatCard label="Skuteczność modelu" value={fmtPct(hrModel.rate)} hint={`${hrModel.won}/${hrModel.settled} · model ogółem`} tone="primary" />}
         <StatCard label="Skuteczność WYBRANE" value={fmtPct(hrSel.rate)} hint={`${hrSel.won}/${hrSel.settled}`} tone="primary" />
         <StatCard label="Prognozy" value={preds.length} hint={`${sel.length} wybranych · ${rej.length} odrzuconych`} />
         <StatCard label="Zweryfikowane rozliczenia" value={hrSel.settled} />

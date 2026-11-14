@@ -3,13 +3,20 @@ import { toast } from "sonner";
 import { fetchAll, fetchDashboardSummary } from "./db";
 import type { TableName } from "./types";
 
+/** Read-only refresh: results are synced by the backend, the browser only re-reads them. */
+export const LIVE_REFRESH = {
+  staleTime: 15_000,
+  gcTime: 600_000,
+  refetchInterval: 60_000,
+  refetchIntervalInBackground: false,
+  refetchOnWindowFocus: true,
+} as const;
+
 export function tableQuery<K extends TableName>(table: K) {
   return queryOptions({
     queryKey: ["table", table] as const,
     queryFn: () => fetchAll(table),
-    staleTime: 120_000,
-    gcTime: 600_000,
-    refetchOnWindowFocus: false,
+    ...LIVE_REFRESH,
   });
 }
 
@@ -18,9 +25,7 @@ export function dashboardSummaryQuery() {
   return queryOptions({
     queryKey: ["dashboard-summary"] as const,
     queryFn: fetchDashboardSummary,
-    staleTime: 30_000,
-    gcTime: 600_000,
-    refetchOnWindowFocus: false,
+    ...LIVE_REFRESH,
   });
 }
 

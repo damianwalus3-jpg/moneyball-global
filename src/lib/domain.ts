@@ -242,6 +242,22 @@ export function hitRate(statuses: (Settlement | CouponStatus | null | undefined)
   return { ...result, settled, rate: settled ? Math.round((result.won / settled) * 1000) / 10 : null };
 }
 
+/**
+ * Overall model hit rate for one market: every valid pick of the active model
+ * counts, regardless of the coupon verdict (WYBRANY/ODRZUCONY). Only won/lost
+ * enter the rate; pending and void do not.
+ */
+export function modelHitRate(
+  predictions: Pick<Prediction, "market" | "selection" | "settlement_status" | "model_version">[],
+  market: "1X2" | "DOUBLE_CHANCE",
+): HitRate {
+  return hitRate(
+    predictions
+      .filter((p) => p.market === market && isValidPick(market, p.selection) && isActivePredictionVersion(p.model_version))
+      .map((p) => p.settlement_status),
+  );
+}
+
 export function groupHitRates<T>(
   items: T[],
   keyFn: (item: T) => string,

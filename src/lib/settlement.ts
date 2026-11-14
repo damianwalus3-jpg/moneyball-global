@@ -1,5 +1,5 @@
 import { couponStatus, effectiveOdds, outcomeFromScore, settlePick, settleGoalsPick } from "./domain";
-import { updateRow } from "./db";
+import { insertRow, updateRow } from "./db";
 import type { Coupon, CouponLeg, Match, MatchResult, Prediction, Settlement } from "./types";
 
 export interface SettleInput {
