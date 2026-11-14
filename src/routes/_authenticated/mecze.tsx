@@ -292,6 +292,7 @@ function Mecze() {
   const matchDay = (match: Match) => match.kickoff_at ? brusselsDayKey(match.kickoff_at) : match.kickoff_date ?? null;
   const matchSortKey = (match: Match) => match.kickoff_at ?? (match.kickoff_date ? `${match.kickoff_date}T23:59:59Z` : "");
   const filtered = matches
+    .filter((match) => matchDay(match) === today && /nations league/i.test(`${match.competition ?? ""} ${match.league ?? ""}`))
     .filter((match) => {
       const day = matchDay(match);
       const time = match.kickoff_at ? new Date(match.kickoff_at).getTime() : null;
