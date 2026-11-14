@@ -10,7 +10,16 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   plugins: [
     tanstackStart({ server: { entry: "server" } }),
-    nitro(),
+    nitro({
+      preset: "cloudflare_module",
+      cloudflare: {
+        wrangler: {
+          name: "moneyball-global",
+          compatibility_date: "2026-11-14",
+          observability: { enabled: true },
+        },
+      },
+    }),
     viteReact(),
     tailwindcss(),
     tsconfigPaths(),
