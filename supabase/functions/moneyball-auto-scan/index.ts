@@ -42,7 +42,7 @@ Deno.serve(async(req:Request)=>{
   const statePath="moneyball_auto_scan_state?select=owner_id,scan_date,scan_run_id,next_offset,status,last_started_at,last_completed_at,last_error,last_summary&owner_id=eq."+encodeURIComponent(ownerId)+"&scan_date=eq."+encodeURIComponent(date);
   let state=(await db(statePath))?.[0]||null;
   const newScan=!state||String(state.scan_run_id||"")!==String(latest.id);
-  const refreshDue=state?.status==="completed"&&ageMs(state.last_completed_at)>=25*60*1000;
+  const refreshDue=state?.status==="completed"&&ageMs(state.last_completed_at)>=15*60*1000;
   if(newScan||refreshDue){
    await db("moneyball_auto_scan_state?on_conflict=owner_id,scan_date","POST",{owner_id:ownerId,scan_date:date,scan_run_id:latest.id,next_offset:0,status:"queued",last_started_at:null,last_completed_at:null,last_error:null,last_summary:{}}, "resolution=merge-duplicates,return=minimal");
    state={owner_id:ownerId,scan_date:date,scan_run_id:latest.id,next_offset:0,status:"queued",last_started_at:null,last_completed_at:null};
