@@ -387,7 +387,10 @@ function Mecze() {
   const now = Date.now();
   const today = brusselsDayKey(new Date());
   const matchDay = (match: Match) => match.kickoff_at ? brusselsDayKey(match.kickoff_at) : match.kickoff_date ?? null;
-  const matchSortKey = (match: Match) => match.kickoff_at ?? (match.kickoff_date ? `${match.kickoff_date}T23:59:59Z` : "");
+  // Keep every match view chronological: earliest kickoff first, latest last.
+  // Fixtures without a known date are placed after dated fixtures.
+  const matchSortKey = (match: Match) =>
+    match.kickoff_at ?? (match.kickoff_date ? `${match.kickoff_date}T23:59:59Z` : "9999-12-31T23:59:59Z");
   const filtered = matches
     // The match screen is intentionally scoped to the current Brussels calendar day.
     // Historical and future fixtures stay in the database for settlement/audit, but
@@ -401,9 +404,9 @@ function Mecze() {
     })
     .filter((match) => !q || `${match.home_team} ${match.away_team} ${match.competition ?? match.league ?? ""} ${match.country ?? ""}`.toLowerCase().includes(q.toLowerCase()))
     .sort((a, b) =>
-      view === "upcoming"
-        ? matchSortKey(a).localeCompare(matchSortKey(b))
-        : matchSortKey(b).localeCompare(matchSortKey(a)),
+      matchSortKey(a).localeCompare(matchSortKey(b)) ||
+      a.home_team.localeCompare(b.home_team) ||
+      a.away_team.localeCompare(b.away_team),
     );
 
   const groups = new Map<string, Match[]>();
