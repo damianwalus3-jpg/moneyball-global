@@ -420,7 +420,7 @@ async function espn(date: string) {
         const own=isHome?hs:as,opp=isHome?as:hs;
         const opponent=norm((isHome?away:home)?.team?.displayName||(isHome?away:home)?.displayName);
         if(!opponent)continue;
-        rows.push({event_id:String(event?.id||competition?.id||""),team_id:teamId,opponent_id:String((isHome?away:home)?.team?.id||(isHome?away:home)?.id||""),date:matchDate,opponent,result:own>opp?"W":own<opp?"L":"D",goals_for:own,goals_against:opp,source:"ESPN_UEFA_NATIONS_SCHEDULE"});
+        rows.push({event_id:String(event?.id||competition?.id||""),team_id:teamId,opponent_id:String((isHome?away:home)?.team?.id||(isHome?away:home)?.id||""),date:matchDate,opponent,result:own>opp?"W":own<opp?"L":"D",goals_for:own,goals_against:opp,venue_role:isHome?"home":"away",neutral_site:competition?.neutralSite===true,source:"ESPN_UEFA_NATIONS_SCHEDULE"});
       }
       rows.sort((a,b)=>b.date.localeCompare(a.date));
       const last10=rows.slice(0,10),w=last10.filter(x=>x.result==="W").length,d=last10.filter(x=>x.result==="D").length,l=last10.filter(x=>x.result==="L").length;
@@ -466,6 +466,13 @@ async function espn(date: string) {
       item.form.avg_shots_for=mean("shots_for");
       item.form.avg_shots_on_target_for=mean("shots_on_target_for");
       item.form.avg_corners_for=mean("corners_for");
+      item.form.avg_possession_pct=mean("possession_pct");
+      item.form.avg_yellow_cards=mean("yellow_cards");
+      item.form.avg_red_cards=mean("red_cards");
+      item.form.avg_fouls=mean("fouls");
+      item.form.home_matches= (item.form.last10||[]).filter((x:any)=>x.venue_role==="home").length;
+      item.form.away_matches= (item.form.last10||[]).filter((x:any)=>x.venue_role==="away").length;
+      item.form.neutral_matches= (item.form.last10||[]).filter((x:any)=>x.neutral_site===true).length;
     }
     // ESPN's team roster is useful context, but it is not a confirmed matchday squad.
     // Injury endpoints are queried separately; an empty response is reported as unavailable,
