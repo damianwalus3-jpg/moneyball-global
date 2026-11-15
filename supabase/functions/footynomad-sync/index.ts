@@ -131,7 +131,7 @@ Deno.serve(async(req)=>{
    for(let i=0;i<toInsert.length;i+=100){const batch=toInsert.slice(i,i+100);await db("matches?on_conflict=owner_id,source,external_id",token,"POST",batch,"resolution=ignore-duplicates,return=minimal");inserted+=batch.length;}
    const allIds=combined.map((f:any)=>String(f.external_id||"")).filter(Boolean);
    const latestRows=allIds.length?await db("matches?select=id,owner_id,external_id,source,competition,home_team,away_team,kickoff_at,gender&owner_id=eq."+encodeURIComponent(ownerId)+"&kickoff_at=gte."+encodeURIComponent(dayStart)+"&kickoff_at=lt."+encodeURIComponent(nextDate),token):[];
-   const matchBySourceId=new Map((latestRows||[]).map((row:any)=>[String(row.source)+"|"+String(row.external_id),row]));
+   const matchBySourceId=new Map<string,any>((latestRows||[]).map((row:any)=>[String(row.source)+"|"+String(row.external_id),row]));
    const cacheRows:any[]=[];
    for(const f of combined){
     const source=String(f.source||"FootyNomad"),sourceId=String(f.external_id||""),match=matchBySourceId.get(source+"|"+sourceId),data=publicDataByKey.get(source+"|"+sourceId);
