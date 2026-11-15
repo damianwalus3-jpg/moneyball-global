@@ -198,7 +198,9 @@ function formFromPublic(f:any){
  const source=f?.source==="ESPN_UEFA_NATIONS_SCHEDULE"?"ESPN_UEFA_NATIONS_SCHEDULE":f?.source==="ESPN_FORM_LAST5"?"ESPN_FORM_LAST5":[f?.source,f?.home_form?.source,f?.away_form?.source].includes("ESPN_WOMEN_LAST10")?"ESPN_WOMEN_LAST10":"OPENMATCHDAY_LAST10";
  return {w,d,l,matches:games.length,goals_for:gf,goals_against:ga,source,last10:games,avg_shots_for:f?.avg_shots_for==null?null:Number(f.avg_shots_for),avg_shots_on_target_for:f?.avg_shots_on_target_for==null?null:Number(f.avg_shots_on_target_for),avg_corners_for:f?.avg_corners_for==null?null:Number(f.avg_corners_for),avg_possession_pct:f?.avg_possession_pct==null?null:Number(f.avg_possession_pct),avg_yellow_cards:f?.avg_yellow_cards==null?null:Number(f.avg_yellow_cards),avg_red_cards:f?.avg_red_cards==null?null:Number(f.avg_red_cards),avg_fouls:f?.avg_fouls==null?null:Number(f.avg_fouls),home_matches:f?.home_matches==null?null:Number(f.home_matches),away_matches:f?.away_matches==null?null:Number(f.away_matches),neutral_matches:f?.neutral_matches==null?null:Number(f.neutral_matches),xg_last10:Array.isArray(f?.xg_last10)?f.xg_last10:[],elo:f?.elo==null?null:Number(f.elo),rd:f?.rd==null?null:Number(f.rd),hfa:f?.hfa==null?null:Number(f.hfa),elo_as_of:f?.elo_as_of||null};
 }
+let publicSourceFormsCache:{date:string,at:number,value:any}|null=null;
 async function readPublicSourceForms(date:string,token:string){
+ if(publicSourceFormsCache&&publicSourceFormsCache.date===date&&Date.now()-publicSourceFormsCache.at<10*60*1000)return publicSourceFormsCache.value;
  const byPair=new Map<string,any>(),byTeam=new Map<string,any[]>(),eloByTeam=new Map<string,any>();
  try{
   const r=await fetch(S+"/functions/v1/moneyball-public-sources?date="+encodeURIComponent(date),{headers:{apikey:K,Authorization:"Bearer "+token,Accept:"application/json"},signal:AbortSignal.timeout(25000)});
@@ -216,15 +218,22 @@ async function readPublicSourceForms(date:string,token:string){
     // Preserve one-sided form when the opponent has no tracked league results.
     for(const [team,form] of [[f.home_team,h],[f.away_team,a]] as any[]){if(!form)continue;const key=normTeam(team),arr=byTeam.get(key)||[];arr.push({form,country:String(f.country||"").toLowerCase(),competition:String(f.competition||"").toLowerCase(),gender:genderKey});byTeam.set(key,arr);}
    }
-  return {byPair,byTeam,eloByTeam,eloMeta,fixtures:Number(j?.european_fixtures||0),error:null};
+  const result={byPair,byTeam,eloByTeam,eloMeta,fixtures:Number(j?.european_fixtures||0),error:null};
+  publicSourceFormsCache={date,at:Date.now(),value:result};
+  return result;
  }catch(e){console.error("OpenMatchday supplemental form unavailable:",String(e));return {byPair,byTeam,eloByTeam,eloMeta:null,fixtures:0,error:String(e)};}
 }
+let tipsAuditPayloadCache:any=null;let tipsAuditPayloadCacheAt=0;
 async function readTipsAuditFairMarket(date:string,matches:any[]){
  const byMatch=new Map<string,any>();
  try{
-  const response=await fetch("https://tipsaudit.com/api/v1/predictions",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/3.8 (+https://finalne-typy.vercel.app)"},signal:AbortSignal.timeout(12000)});
-  if(!response.ok)throw new Error("TipsAudit HTTP "+response.status);
-  const payload=await response.json();
+  let payload:any=null;
+  if(tipsAuditPayloadCache&&Date.now()-tipsAuditPayloadCacheAt<5*60*1000)payload=tipsAuditPayloadCache;
+  else{
+   const response=await fetch("https://tipsaudit.com/api/v1/predictions",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/3.8 (+https://finalne-typy.vercel.app)"},signal:AbortSignal.timeout(12000)});
+   if(!response.ok)throw new Error("TipsAudit HTTP "+response.status);
+   payload=await response.json();tipsAuditPayloadCache=payload;tipsAuditPayloadCacheAt=Date.now();
+  }
   const generatedAt=Date.parse(String(payload?.generated_at||""));
   if(!Number.isFinite(generatedAt)||Date.now()-generatedAt>90*60*1000||generatedAt>Date.now()+5*60*1000)throw new Error("TipsAudit feed is stale or has an invalid generated_at timestamp");
   const toDay=(value:any)=>{const stamp=Date.parse(String(value||""));return Number.isFinite(stamp)?new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(stamp)):"";};
