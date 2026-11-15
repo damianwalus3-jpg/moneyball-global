@@ -325,6 +325,56 @@ function historyModel(home:string,away:string,kickoff:string,history:any[],footy
   return {p1:+(p1/total*100).toFixed(1),px:+(px/total*100).toFixed(1),p2:+(p2/total*100).toFixed(1),coverage,home_matches:hn,away_matches:an,home_form:Object.keys(hf).length?hf:null,away_form:Object.keys(af).length?af:null,source,footyForm:!!footyForm,publicForm:source==="OPENMATCHDAY_LAST10"||source==="ESPN_WOMEN_LAST10"||source==="ESPN_FORM_LAST5",espnWomenForm:source==="ESPN_WOMEN_LAST10",pitchForm:source==="PITCHAPI_LAST5",method,expected_home_goals:expectedHomeGoals,expected_away_goals:expectedAwayGoals,expected_total_goals:expectedHomeGoals==null||expectedAwayGoals==null?null:+(expectedHomeGoals+expectedAwayGoals).toFixed(2),xg_used:xgUsed,xg_home_matches:xgHomeMatches,xg_away_matches:xgAwayMatches,xg_home_source_counts:xgHomeSourceCounts,xg_away_source_counts:xgAwaySourceCounts,xg_sources:xgSources,calibration_temperature:calibrationTemperature,calibration_method:calibrationMethod,elo_used:eloUsed,elo_home:eloHome,elo_away:eloAway,elo_diff:eloDiff,elo_weight:eloWeight,elo_as_of:eloAsOf};
  return {p1:+(p1/total*100).toFixed(1),px:+(px/total*100).toFixed(1),p2:+(p2/total*100).toFixed(1),coverage:Math.min(75,n*15),home_matches:hn,away_matches:an,home_form:hf||null,away_form:af||null,source,footyForm:!!footyForm,publicForm:source==="OPENMATCHDAY_LAST10",pitchForm:source==="PITCHAPI_LAST5",method};
 }
+const INTERNATIONAL_RESULTS_URL="https://raw.githubusercontent.com/martj42/international_results/master/results.csv";
+let internationalHistoryCache:any=null,internationalHistoryCacheAt=0;
+function parseCsvRows(text:string):string[][]{
+ const rows:string[][]=[];let row:string[]=[],cell="",quoted=false;
+ for(let i=0;i<text.length;i++){const c=text[i];
+  if(c==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++;}else quoted=!quoted;}
+  else if(c===","&&!quoted){row.push(cell);cell="";}
+  else if((c==="\n"||c==="\r")&&!quoted){if(c==="\r"&&text[i+1]==="\n")i++;row.push(cell);cell="";if(row.some(v=>v.trim()))rows.push(row);row=[];}
+  else cell+=c;
+ }
+ if(cell.length||row.length){row.push(cell);rows.push(row);}
+ return rows;
+}
+async function readInternationalTeamForms(targetDate:string){
+ if(internationalHistoryCache&&Date.now()-internationalHistoryCacheAt<6*60*60*1000)return internationalHistoryCache;
+ const forms=new Map<string,any>();
+ try{
+  const response=await fetch(INTERNATIONAL_RESULTS_URL,{headers:{"User-Agent":"MoneyballGlobal/3.9","Accept":"text/csv"},signal:AbortSignal.timeout(25000)});
+  if(!response.ok)throw new Error("International results HTTP "+response.status);
+  const raw=await response.text();
+  if(raw.length<1000||raw.length>12000000)throw new Error("International results file size validation failed");
+  const rows=parseCsvRows(raw),headers=rows[0]?.map(x=>x.trim().toLowerCase())||[];
+  const ix=(name:string)=>headers.indexOf(name);
+  for(const name of ["date","home_team","away_team","home_score","away_score","tournament"])if(ix(name)<0)throw new Error("Missing CSV column "+name);
+  const byTeam=new Map<string,any[]>();
+  for(const row of rows.slice(1)){
+   const date=String(row[ix("date")]||"").slice(0,10);
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date>=targetDate)continue;
+   const age=Date.parse(targetDate+"T00:00:00Z")-Date.parse(date+"T00:00:00Z");
+   if(!Number.isFinite(age)||age<0||age>240*86400000)continue;
+   const home=String(row[ix("home_team")]||"").trim(),away=String(row[ix("away_team")]||"").trim();
+   const hg=Number(row[ix("home_score")]),ag=Number(row[ix("away_score")]),tournament=String(row[ix("tournament")]||"").trim();
+   if(!home||!away||!Number.isInteger(hg)||!Number.isInteger(ag))continue;
+   const add=(team:string,opponent:string,gf:number,ga:number)=>{
+    const key=fixtureTeamKey(team),list=byTeam.get(key)||[];
+    list.push({date,opponent,result:gf>ga?"W":gf<ga?"L":"D",goals_for:gf,goals_against:ga,competition:tournament,source:"INTERNATIONAL_RESULTS_CC0"});
+    byTeam.set(key,list);
+   };
+   add(home,away,hg,ag);add(away,home,ag,hg);
+  }
+  for(const [key,list] of byTeam){
+   const last10=list.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,10);
+   if(last10.length<3)continue;
+   const w=last10.filter(x=>x.result==="W").length,d=last10.filter(x=>x.result==="D").length,l=last10.filter(x=>x.result==="L").length;
+   forms.set(key,{matches:last10.length,w,d,l,points:w*3+d,goals_for:last10.reduce((n,x)=>n+x.goals_for,0),goals_against:last10.reduce((n,x)=>n+x.goals_against,0),last10,source:"INTERNATIONAL_RESULTS_CC0"});
+  }
+  internationalHistoryCache={forms,generated_at:new Date().toISOString(),rows:rows.length-1,teams:forms.size,error:null};
+ }catch(error){internationalHistoryCache={forms,generated_at:null,rows:0,teams:0,error:String(error)};}
+ internationalHistoryCacheAt=Date.now();return internationalHistoryCache;
+}
 async function readGitHubPublicTeamHistory(){
  try{
   const r=await fetch("https://raw.githubusercontent.com/damianwalus3-jpg/moneyball-global-web/main/public-data/team-history.json",{headers:{"Accept":"application/json"},signal:AbortSignal.timeout(18000)});
@@ -458,6 +508,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   return {id:m.id,form};
  });
  const publicForms=await readPublicSourceForms(date,requestToken);
+ const internationalForms=await readInternationalTeamForms(date);
  const githubPublic=await readGitHubPublicTeamHistory();
  const openPlayXg=await readOpenPlayXgData();
  const marketRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI",token);const marketMap=new Map((marketRows||[]).map((x:any)=>[x.match_id,x.provider_data]));
@@ -497,7 +548,8 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   const market:any=marketMap.get(m.id)||tipsAudit.byMatch.get(m.id);let model:any=null,coverage:any={market_odds:false,elo:false,verified_history:false};
   if(market?.market_probabilities){const mp=market.market_probabilities,stamp=Date.parse(String(market.captured_at||market.provider_data?.captured_at||"")),fresh=Number.isFinite(stamp)&&Date.now()-stamp>=0&&Date.now()-stamp<=48*60*60*1000,vals=[Number(mp.home),Number(mp.draw),Number(mp.away)],sum=vals.reduce((a,b)=>a+b,0);if(fresh&&vals.every(x=>Number.isFinite(x)&&x>0)&&sum>0){model={p1:+(vals[0]/sum*100).toFixed(1),px:+(vals[1]/sum*100).toFixed(1),p2:+(vals[2]/sum*100).toFixed(1),coverage:market.market_source==="TIPSAUDIT_FAIR_MARKET"?75:80,market:true,source:market.market_source||"VERIFIED_MARKET_DATA"};coverage={market_odds:true,market_source:market.market_source||"VERIFIED_MARKET_DATA",books:market.books||null,league:market.league||null,market_captured_at:market.captured_at||market.provider_data?.captured_at,fair_odds:market.fair_odds||null,fair_source_url:market.fair_source_url||null,market_reference_best_soft_odds:market.market_reference_best_soft_odds||null,market_reference_bookmaker:market.market_reference_bookmaker||null,market_reference_selection:market.market_reference_selection||null,market_feed_generated_at:market.generated_at||null};}}
   if(!model){
-   const modelKickoff=String(m.kickoff_at||`${matchDate(m)}T00:00:00.000Z`);const isWomen=String(m.gender||"").toLowerCase()==="women";const githubHome=githubTeamForm(String(m.home_team),modelKickoff,githubPublic,openPlayXg,String(m.gender||"unknown")),githubAway=githubTeamForm(String(m.away_team),modelKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));const githubForm={home:githubHome,away:githubAway,source:"KEYLESS_GITHUB_LAST10"};const publicMatchForm=publicFormForMatch(m,publicForms);const knownGender=["men","women"].includes(String(m.gender||"").toLowerCase());const homeElo=knownGender&&!isWomen?findEloRating(String(m.home_team),publicForms.eloByTeam||new Map()):null,awayElo=knownGender&&!isWomen?findEloRating(String(m.away_team),publicForms.eloByTeam||new Map()):null;const xgoalsHome=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.home_team)):null,xgoalsAway=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.away_team)):null;const homeSupplement={...(publicMatchForm?.home||{}),...(githubForm.home||{}),...(xgoalsHome||{})},awaySupplement={...(publicMatchForm?.away||{}),...(githubForm.away||{}),...(xgoalsAway||{})};if(homeElo)Object.assign(homeSupplement,{elo:Number(homeElo.elo),rd:Number(homeElo.rd),hfa:Number(homeElo.hfa),elo_as_of:homeElo.as_of});if(awayElo)Object.assign(awaySupplement,{elo:Number(awayElo.elo),rd:Number(awayElo.rd),hfa:Number(awayElo.hfa),elo_as_of:awayElo.as_of});const fotbalInfoForm=fotbalForms.get(m.id);
+   const modelKickoff=String(m.kickoff_at||`${matchDate(m)}T00:00:00.000Z`);const isWomen=String(m.gender||"").toLowerCase()==="women";const githubHome=githubTeamForm(String(m.home_team),modelKickoff,githubPublic,openPlayXg,String(m.gender||"unknown")),githubAway=githubTeamForm(String(m.away_team),modelKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));const internationalHome=internationalForms.forms.get(fixtureTeamKey(String(m.home_team)))||null,internationalAway=internationalForms.forms.get(fixtureTeamKey(String(m.away_team)))||null;
+   const githubForm={home:githubHome||internationalHome,away:githubAway||internationalAway,source:githubHome||githubAway?"KEYLESS_GITHUB_LAST10":"INTERNATIONAL_RESULTS_CC0"};const publicMatchForm=publicFormForMatch(m,publicForms);const knownGender=["men","women"].includes(String(m.gender||"").toLowerCase());const homeElo=knownGender&&!isWomen?findEloRating(String(m.home_team),publicForms.eloByTeam||new Map()):null,awayElo=knownGender&&!isWomen?findEloRating(String(m.away_team),publicForms.eloByTeam||new Map()):null;const xgoalsHome=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.home_team)):null,xgoalsAway=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.away_team)):null;const homeSupplement={...(publicMatchForm?.home||{}),...(githubForm.home||{}),...(xgoalsHome||{})},awaySupplement={...(publicMatchForm?.away||{}),...(githubForm.away||{}),...(xgoalsAway||{})};if(homeElo)Object.assign(homeSupplement,{elo:Number(homeElo.elo),rd:Number(homeElo.rd),hfa:Number(homeElo.hfa),elo_as_of:homeElo.as_of});if(awayElo)Object.assign(awaySupplement,{elo:Number(awayElo.elo),rd:Number(awayElo.rd),hfa:Number(awayElo.hfa),elo_as_of:awayElo.as_of});const fotbalInfoForm=fotbalForms.get(m.id);
    if(fotbalInfoForm?.home)Object.assign(homeSupplement,fotbalInfoForm.home);
    if(fotbalInfoForm?.away)Object.assign(awaySupplement,fotbalInfoForm.away);
    const supplemental={home:Object.keys(homeSupplement).length?homeSupplement:null,away:Object.keys(awaySupplement).length?awaySupplement:null,source:fotbalInfoForm?"FOTBALINFO_PREMATCH":xgoalsHome||xgoalsAway?"XGOALSPRO_PUBLIC_RESULTS":githubForm.home||githubForm.away?githubForm.source:publicMatchForm?.source||"OPENMATCHDAY_LAST10"};
@@ -519,8 +571,10 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   const displayPublicForm=publicFormForMatch(m,publicForms);
   const displayGithubHome=githubTeamForm(String(m.home_team),displayKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));
   const displayGithubAway=githubTeamForm(String(m.away_team),displayKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));
-  const displayHomeForm=coverage.home_form||displayPublicForm?.home||displayGithubHome||null;
-  const displayAwayForm=coverage.away_form||displayPublicForm?.away||displayGithubAway||null;
+  const displayInternationalHome=internationalForms.forms.get(fixtureTeamKey(String(m.home_team)))||null;
+  const displayInternationalAway=internationalForms.forms.get(fixtureTeamKey(String(m.away_team)))||null;
+  const displayHomeForm=coverage.home_form||displayPublicForm?.home||displayGithubHome||displayInternationalHome||null;
+  const displayAwayForm=coverage.away_form||displayPublicForm?.away||displayGithubAway||displayInternationalAway||null;
   if(displayHomeForm||displayAwayForm){
    coverage={...coverage,home_form:displayHomeForm,away_form:displayAwayForm,
     history_source:displayHomeForm?.source||displayAwayForm?.source||displayPublicForm?.source||"PUBLIC_TEAM_HISTORY",
@@ -556,10 +610,12 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   const goalPublicForm=publicFormForMatch(m,publicForms);
   const goalGithubHome=githubTeamForm(String(m.home_team),goalKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));
   const goalGithubAway=githubTeamForm(String(m.away_team),goalKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));
+  const goalInternationalHome=internationalForms.forms.get(fixtureTeamKey(String(m.home_team)))||null;
+  const goalInternationalAway=internationalForms.forms.get(fixtureTeamKey(String(m.away_team)))||null;
   const goalXgoalsHome=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.home_team)):null,goalXgoalsAway=String(m.gender||"").toLowerCase()==="men"?xgoalsTeamForms.get(normTeam(m.away_team)):null;
   const goalFotbalInfoForm=fotbalForms.get(m.id);
-  const goalHomeSupplement={...(goalPublicForm?.home||{}),...(goalGithubHome||{}),...(goalXgoalsHome||{}),...(goalFotbalInfoForm?.home||{})};
-  const goalAwaySupplement={...(goalPublicForm?.away||{}),...(goalGithubAway||{}),...(goalXgoalsAway||{}),...(goalFotbalInfoForm?.away||{})};
+  const goalHomeSupplement={...(goalPublicForm?.home||{}),...(goalGithubHome||goalInternationalHome||{}),...(goalXgoalsHome||{}),...(goalFotbalInfoForm?.home||{})};
+  const goalAwaySupplement={...(goalPublicForm?.away||{}),...(goalGithubAway||goalInternationalAway||{}),...(goalXgoalsAway||{}),...(goalFotbalInfoForm?.away||{})};
   const goalSupplement={home:Object.keys(goalHomeSupplement).length?goalHomeSupplement:null,away:Object.keys(goalAwaySupplement).length?goalAwaySupplement:null,source:goalXgoalsHome||goalXgoalsAway?"XGOALSPRO_PUBLIC_RESULTS":goalGithubHome||goalGithubAway?"KEYLESS_GITHUB_LAST10":goalPublicForm?.source||"OPENMATCHDAY_LAST10"};
   const goalsModel=model?.expected_home_goals!=null&&model?.expected_away_goals!=null?model:historyModel(m.home_team,m.away_team,goalKickoff,history||[],footyForms.get(m.id)||null,goalSupplement,String(m.gender||"unknown"));
   if(goalsModel&&goalsModel.expected_home_goals!=null&&goalsModel.expected_away_goals!=null&&goalsModel.home_matches>=3&&goalsModel.away_matches>=3){
