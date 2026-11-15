@@ -502,11 +502,14 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  const rawDateMatches=all.filter((m:any)=>matchDate(m)===date&&isEuropeanFixture(m.country,m.competition||m.league,m.home_team,m.away_team));
  const deduped=dedupeFixturesByDate(rawDateMatches,matchDate);const matches=deduped.matches;const duplicatesRemoved=deduped.duplicatesRemoved;
  const historyFields="select=id,home_team,away_team,kickoff_at,gender,match_results(home_score,away_score,verified)";
- const historyTimed=await db("matches?"+historyFields+"&owner_id=eq."+encodeURIComponent(ownerId)+"&kickoff_at=lt."+encodeURIComponent(date+"T23:59:59Z")+"&order=kickoff_at.desc&limit=3000",token).catch((e:any)=>{console.error("Timed history query unavailable:",String(e));return [];});
+ const historySince=new Date(Date.parse(date+"T00:00:00Z")-240*24*60*60*1000).toISOString();
+ const historyTimed=await db("matches?"+historyFields+"&owner_id=eq."+encodeURIComponent(ownerId)+"&kickoff_at=gte."+encodeURIComponent(historySince)+"&kickoff_at=lt."+encodeURIComponent(date+"T23:59:59Z")+"&order=kickoff_at.desc&limit=1500",token).catch((e:any)=>{console.error("Timed history query unavailable:",String(e));return [];});
  const history=historyTimed||[];
- const footyCacheRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FootyNomad",token).catch(()=>[]);
+ const pageMatchIds=matches.map((m:any)=>String(m.id)).filter(Boolean);
+ const pageMatchFilter=pageMatchIds.length?"&match_id=in.("+pageMatchIds.join(",")+")": "&match_id=eq.__none__";
+ const footyCacheRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FootyNomad"+pageMatchFilter,token).catch(()=>[]);
  const footyCacheMap=new Map((footyCacheRows||[]).map((row:any)=>[row.match_id,row.provider_data]));
- const fotbalCacheRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FotbalInfo",token).catch(()=>[]);
+ const fotbalCacheRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FotbalInfo"+pageMatchFilter,token).catch(()=>[]);
  const fotbalCacheMap=new Map((fotbalCacheRows||[]).map((row:any)=>[row.match_id,row.provider_data]));
  const footyForms=new Map<string,any>(),formCandidates:any[]=[];
  for(const m of matches){
@@ -529,7 +532,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   readGitHubPublicTeamHistory(),
   readOpenPlayXgData()
  ]);
- const marketRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI",token);const marketMap=new Map((marketRows||[]).map((x:any)=>[x.match_id,x.provider_data]));
+ const marketRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI"+pageMatchFilter,token);const marketMap=new Map((marketRows||[]).map((x:any)=>[x.match_id,x.provider_data]));
  const providerOddsRows=matches.length?await db("provider_odds?select=match_id,mapped_market,mapped_selection,odds,bookmaker,provider,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&suspended=eq.false&phase=eq.prematch&captured_at=gte."+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+"&mapped_market=not.is.null&mapped_selection=not.is.null&match_id=in.("+matches.map((x:any)=>x.id).join(",")+")&order=captured_at.desc",token).catch(()=>[]):[];
  const providerOddsMap=new Map<string,any>();
  for(const quote of providerOddsRows||[]){const key=String(quote.match_id)+"|"+String(quote.mapped_market)+"|"+String(quote.mapped_selection);if(!providerOddsMap.has(key)&&Number(quote.odds)>1)providerOddsMap.set(key,quote);}
