@@ -515,16 +515,16 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  const historyFields="select=id,home_team,away_team,kickoff_at,gender,match_results(home_score,away_score,verified)";
  const historySince=new Date(Date.parse(date+"T00:00:00Z")-240*24*60*60*1000).toISOString();
  const pageMatchIds=matches.map((m:any)=>String(m.id)).filter(Boolean);
- const pageMatchFilter=pageMatchIds.length?"&match_id=in.("+pageMatchIds.join(",")+")": "&match_id=eq.__none__";
+ const pageMatchFilter=pageMatchIds.length?"&match_id=in.("+pageMatchIds.join(",")+")":"";
  // These reads do not depend on one another. Run them together to avoid paying
  // the sum of several network round-trips for every analysis batch.
  const providerOddsQuery=matches.length?db("provider_odds?select=match_id,mapped_market,mapped_selection,odds,bookmaker,provider,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&suspended=eq.false&phase=eq.prematch&captured_at=gte."+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+"&mapped_market=not.is.null&mapped_selection=not.is.null&match_id=in.("+matches.map((x:any)=>x.id).join(",")+")&order=captured_at.desc",token).catch(()=>[]):Promise.resolve([]);
  const [historyTimed,footyCacheRows,fotbalCacheRows,publicForms,marketRows,providerOddsRows,tipsAudit]=await Promise.all([
   db("matches?"+historyFields+"&owner_id=eq."+encodeURIComponent(ownerId)+"&kickoff_at=gte."+encodeURIComponent(historySince)+"&kickoff_at=lt."+encodeURIComponent(date+"T23:59:59Z")+"&order=kickoff_at.desc&limit=1500",token).catch((e:any)=>{console.error("Timed history query unavailable:",String(e));return [];}),
-  db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FootyNomad"+pageMatchFilter,token).catch(()=>[]),
-  db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FotbalInfo"+pageMatchFilter,token).catch(()=>[]),
+  pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FootyNomad"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
+  pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FotbalInfo"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
   readPublicSourceForms(date,requestToken),
-  db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI"+pageMatchFilter,token),
+  pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI"+pageMatchFilter,token):Promise.resolve([]),
   providerOddsQuery,
   readTipsAuditFairMarket(date,matches),
  ]);
