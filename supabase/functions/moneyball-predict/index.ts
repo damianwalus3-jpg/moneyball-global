@@ -565,11 +565,21 @@ const history=historyTimed||[];
   if(cached?.source==="FOTBALINFO_PREMATCH"&&age>=0&&age<6*60*60*1000&&cached.home&&cached.away)fotbalForms.set(m.id,cached);
   else fotbalCandidates.push(m);
  }
- // Avoid live per-match FotbalInfo scraping during the scoring pass. Cached FotbalInfo
- // data remains usable; missing entries fall back to shared public history or the
- // explicitly labelled low-confidence baseline instead of blocking the whole batch.
- const fotbalResults:any[]=[];
- for(const item of fotbalResults)if(item.status==="fulfilled"&&item.value.form)fotbalForms.set(item.value.id,item.value.form);
+ // Fetch a small, bounded number of missing FotbalInfo forms per batch.
+ // Keep concurrency low and cache successful responses so later scans do not repeat requests.
+ const fotbalResults=await mapLimit(fotbalCandidates.slice(0,2),2,async (item:any)=>{
+  const form=await readFotbalInfoForm(item);
+  return {id:item.id,form};
+ });
+ const fotbalCacheWrites:any[]=[];
+ for(const result of fotbalResults){
+  if(result.status!=="fulfilled"||!result.value?.form)continue;
+  fotbalForms.set(result.value.id,result.value.form);
+  fotbalCacheWrites.push({owner_id:ownerId,match_id:result.value.id,source:"FotbalInfo",provider_data:result.value.form,captured_at:result.value.form.fetched_at||new Date().toISOString()});
+ }
+ if(fotbalCacheWrites.length){
+  await db("match_market_data?on_conflict=owner_id,match_id,source",token,"POST",fotbalCacheWrites,"resolution=merge-duplicates,return=minimal").catch((e:any)=>console.error("FotbalInfo cache write failed:",String(e)));
+ }
 
  const rows:any[]=[];let covered=0,missing=0;
  for(const m of matches){
