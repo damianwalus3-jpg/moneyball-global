@@ -582,6 +582,17 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
     away_history_matches:Number(displayAwayForm?.matches||displayAwayForm?.last10?.length||0),
     recent_form_sources:[...new Set([displayHomeForm?.source,displayAwayForm?.source].filter(Boolean))]};
   }
+  coverage={...coverage,
+   home_squad:Array.isArray(displayPublicForm?.home_squad)?displayPublicForm.home_squad:[],
+   away_squad:Array.isArray(displayPublicForm?.away_squad)?displayPublicForm.away_squad:[],
+   home_roster_available:!!displayPublicForm?.home_roster_available,
+   away_roster_available:!!displayPublicForm?.away_roster_available,
+   home_injuries_available:!!displayPublicForm?.home_injuries_available,
+   away_injuries_available:!!displayPublicForm?.away_injuries_available,
+   home_injury_count:displayPublicForm?.home_injury_count??null,
+   away_injury_count:displayPublicForm?.away_injury_count??null,
+   squad_note:displayPublicForm?.squad_note||"Brak potwierdzonej informacji o składzie meczowym."
+  };
   const bothTeamsCovered=!!(model.market||(model.history&&model.home_matches>=3&&model.away_matches>=3));const dataCovered=bothTeamsCovered;if(dataCovered)covered++;else missing++;
   const preds:any[]=[];
   if(hasModel){const opts=[["1",model.p1],["X",model.px],["2",model.p2]];const best=opts.sort((x:any,y:any)=>y[1]-x[1])[0];preds.push({market:"1X2",selection:best[0],probability:best[1]});for(const [sel,val] of [["1X",model.p1+model.px],["X2",model.px+model.p2],["12",model.p1+model.p2]])preds.push({market:"DOUBLE_CHANCE",selection:sel,probability:+val.toFixed(1)});}
