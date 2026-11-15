@@ -482,9 +482,9 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  }
  const date=String(body.date||new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()));
  const requestedOffset=Number.isFinite(Number(body.offset))?Math.max(0,Math.floor(Number(body.offset))):0;
- const analysisOffset=Math.min(requestedOffset,3000);
- const requestedBatchSize=Number.isFinite(Number(body.batch_size))?Math.floor(Number(body.batch_size)):5;
- const batchSize=Math.max(1,Math.min(8,requestedBatchSize));
+ const analysisOffset=Math.min(requestedOffset,10000);
+ const requestedBatchSize=Number.isFinite(Number(body.batch_size))?Math.floor(Number(body.batch_size)):10;
+ const batchSize=Math.max(1,Math.min(10,requestedBatchSize));
  // Query only the exact Europe/Brussels calendar day. This avoids earlier UTC-day
  // fixtures consuming pagination slots before today's local fixtures.
  const nextDateObj=new Date(date+"T12:00:00Z");nextDateObj.setUTCDate(nextDateObj.getUTCDate()+1);
@@ -519,15 +519,10 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   const cached=readCachedFootyForm(footyCacheMap.get(m.id),String(m.home_team),String(m.away_team));
   if(cached)footyForms.set(m.id,cached);else formCandidates.push(m);
  }
- const formResults=await limitedSettled(formCandidates.slice(0,24),6,async(m:any)=>{
-  const form=await readFootyNomadForm(String(m.external_id),String(m.home_team),String(m.away_team));
-  if(form){
-   const capturedAt=new Date().toISOString();
-   const provider_data={footy_nomad_form:{home_name:m.home_team,away_name:m.away_team,home:form.home,away:form.away,fetched_at:capturedAt}};
-   await db("match_market_data?on_conflict=owner_id,match_id,source",token,"POST",{owner_id:ownerId,match_id:m.id,source:"FootyNomad",provider_data,captured_at:capturedAt},"resolution=merge-duplicates,return=minimal").catch((e:any)=>console.error("FootyNomad cache write failed:",String(e)));
-  }
-  return {id:m.id,form};
- });
+ // Do not scrape a separate FootyNomad page for every fixture inside the prediction request.
+ // Use already cached FootyNomad form plus shared public datasets; this avoids dozens of
+ // concurrent third-party requests and keeps Edge execution below the worker resource limit.
+ const formResults:any[]=[];
  const [publicForms,internationalForms,githubPublic,openPlayXg]=await Promise.all([
   readPublicSourceForms(date,requestToken),
   readInternationalTeamForms(date),
@@ -550,7 +545,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   if(preliminary.expected_home_goals!=null&&preliminary.expected_away_goals!=null)continue;
   for(const team of [String(m.home_team),String(m.away_team)]){const key=normTeam(team),previous=xgoalsCandidates.get(key);if(!previous||kickoff<previous.kickoff)xgoalsCandidates.set(key,{team,country:String(m.country||"France"),kickoff});}
  }
- const xgoalsResults=await limitedSettled([...xgoalsCandidates.values()].slice(0,8),2,async(item)=>({key:normTeam(item.team),form:await readXgoalsTeamForm(item.team,item.country,item.kickoff)}));
+ const xgoalsResults=await limitedSettled([...xgoalsCandidates.values()].slice(0,4),2,async(item)=>({key:normTeam(item.team),form:await readXgoalsTeamForm(item.team,item.country,item.kickoff)}));
  for(const item of xgoalsResults)if(item.status==="fulfilled"&&item.value.form)xgoalsTeamForms.set(item.value.key,item.value.form);
  const fotbalForms=new Map<string,any>(),fotbalCandidates:any[]=[];
  for(const m of matches){
@@ -559,11 +554,10 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   if(cached?.source==="FOTBALINFO_PREMATCH"&&age>=0&&age<6*60*60*1000&&cached.home&&cached.away)fotbalForms.set(m.id,cached);
   else fotbalCandidates.push(m);
  }
- const fotbalResults=await limitedSettled(fotbalCandidates.slice(0,24),6,async(m:any)=>{
-  const form=await readFotbalInfoForm(m);
-  if(form)await db("match_market_data?on_conflict=owner_id,match_id,source",token,"POST",{owner_id:ownerId,match_id:m.id,source:"FotbalInfo",provider_data:form,captured_at:form.fetched_at},"resolution=merge-duplicates,return=minimal").catch((e:any)=>console.error("FotbalInfo cache write failed:",String(e)));
-  return {id:m.id,form};
- });
+ // Avoid live per-match FotbalInfo scraping during the scoring pass. Cached FotbalInfo
+ // data remains usable; missing entries fall back to shared public history or the
+ // explicitly labelled low-confidence baseline instead of blocking the whole batch.
+ const fotbalResults:any[]=[];
  for(const item of fotbalResults)if(item.status==="fulfilled"&&item.value.form)fotbalForms.set(item.value.id,item.value.form);
  const tipsAudit=await readTipsAuditFairMarket(date,matches);
  const rows:any[]=[];let covered=0,missing=0;
