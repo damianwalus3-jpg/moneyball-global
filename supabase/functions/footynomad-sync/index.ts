@@ -51,7 +51,8 @@ Deno.serve(async(req)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
  try{
   let date=new URL(req.url).searchParams.get("date")||new Date().toISOString().slice(0,10);
-  if(req.method==="POST"){const b=await req.json();date=b.date||date;}
+  let skipResultSync=false;
+  if(req.method==="POST"){const b=await req.json();date=b.date||date;skipResultSync=b.skip_result_sync===true;}
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw new Error("Nieprawidłowa data skanu.");
   const result=await readFixtures(date);
   if(req.method==="GET")return new Response(JSON.stringify(result),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
@@ -149,7 +150,7 @@ Deno.serve(async(req)=>{
     const candidates=(matchByFixture.get(fixtureBaseKey(f))||[]).filter((x:any)=>genderCompatible(x,f)).sort((a:any,b:any)=>fixturePriority(b)-fixturePriority(a));
     const row=candidates[0] as any;
     if(!row)return;
-    if(f.status==="finished"&&Number.isInteger(f.home_score)&&Number.isInteger(f.away_score)){
+    if(!skipResultSync&&f.status==="finished"&&Number.isInteger(f.home_score)&&Number.isInteger(f.away_score)){
      const outcome=f.home_score>f.away_score?"1":f.home_score<f.away_score?"2":"X";
      const oldResults=await db("match_results?select=id&owner_id=eq."+encodeURIComponent(ownerId)+"&match_id=eq."+row.id,token);
      const finishedAt=new Date().toISOString();
@@ -164,8 +165,8 @@ Deno.serve(async(req)=>{
   // Run the same verified result settlement pipeline used by the scheduled synchronizer.
   // This ensures match results, predictions, coupon legs and coupon statuses stay consistent
   // after a manual fixture scan, including finished matches returned by the fixture source.
-  let resultSync:any={ok:false,error:"not_run"};
-  try{
+  let resultSync:any={ok:false,skipped:skipResultSync};
+  if(!skipResultSync)try{
    const syncResponse=await fetch(SUPABASE_URL+"/functions/v1/moneyball-results-sync?date="+encodeURIComponent(date),{
     method:"POST",
     headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json",Accept:"application/json"},
