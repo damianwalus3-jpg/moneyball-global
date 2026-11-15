@@ -3,17 +3,17 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { CalendarDays, ChevronRight, ScanLine, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { isActivePredictionVersion } from "@/lib/domain";
 import { fmtOdds } from "@/lib/format";
-import { ensureTables, useTable } from "@/lib/queries";
+import { dashboardSelectedPicksQuery, dashboardSummaryQuery } from "@/lib/queries";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
 import { fmtPct } from "@/lib/format";
-import { dashboardSummaryQuery } from "@/lib/queries";
-import { brusselsDayKey } from "@/lib/time";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => ({ meta: [{ title: "Panel — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Podsumowanie prognoz, kuponów i bankrolla." }, { property: "og:title", content: "Panel — MONEYBALL" }, { property: "og:description", content: "Podsumowanie prognoz." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
-  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(dashboardSummaryQuery()), ensureTables(context.queryClient, ["matches", "predictions", "match_results"])]),
+  loader: ({ context }) => Promise.all([
+    context.queryClient.ensureQueryData(dashboardSummaryQuery()),
+    context.queryClient.ensureQueryData(dashboardSelectedPicksQuery()),
+  ]),
   pendingComponent: PageLoader,
   errorComponent: DataError,
   component: Panel,
@@ -43,17 +43,30 @@ function DashboardTile({ to, label, value, hint, icon, tone = "default" }: {
 
 function Panel() {
   const { data: summary } = useSuspenseQuery(dashboardSummaryQuery());
-  const matches = useTable("matches");
-  const predictions = useTable("predictions");
-  const results = useTable("match_results");
-  const matchById = new Map(matches.map((match) => [match.id, match]));
-  const resultByMatch = new Map(results.map((result) => [result.match_id, result]));
-  const today = brusselsDayKey(new Date());
-  const selectedPicks = predictions
-    .filter((prediction) => prediction.verdict === "WYBRANY" && isActivePredictionVersion(prediction.model_version))
-    .map((prediction) => ({ prediction, match: matchById.get(prediction.match_id), result: resultByMatch.get(prediction.match_id) }))
-    .filter((item) => item.match && (item.match.kickoff_at ? brusselsDayKey(item.match.kickoff_at) : item.match.kickoff_date) === today)
-    .sort((a, b) => (a.match!.kickoff_at ?? a.match!.kickoff_date ?? "").localeCompare(b.match!.kickoff_at ?? b.match!.kickoff_date ?? ""));
+  const { data: selectedRows } = useSuspenseQuery(dashboardSelectedPicksQuery());
+  const selectedPicks = selectedRows.map((row) => ({
+    prediction: {
+      id: row.prediction_id,
+      market: row.market,
+      selection: row.selection,
+      probability: row.probability,
+      odds: row.odds,
+      settlement_status: row.settlement_status,
+    },
+    match: {
+      id: row.match_id,
+      home_team: row.home_team,
+      away_team: row.away_team,
+      competition: row.competition,
+      league: row.league,
+      kickoff_at: row.kickoff_at,
+      kickoff_date: row.kickoff_date,
+      status: row.match_status,
+    },
+    result: row.home_score != null && row.away_score != null
+      ? { home_score: row.home_score, away_score: row.away_score }
+      : undefined,
+  }));
   const hr1 = summary.hit_rates["1X2"] ?? { rate: null, won: 0, settled: 0 };
   const hrDc = summary.hit_rates["DOUBLE_CHANCE"] ?? { rate: null, won: 0, settled: 0 };
   const hrGoals = summary.hit_rates.GOALS;
