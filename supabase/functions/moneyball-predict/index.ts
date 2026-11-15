@@ -556,8 +556,28 @@ const history=historyTimed||[];
  if(!matches.length)return out({ok:true,date,total:0,matches:0,offset:analysisOffset,batch_size:batchSize,has_more:all.length===batchSize,predictions:0,created:0,updated:0,preserved:0,covered:0,missing:0,selected:0,message:all.length===batchSize?"Ta strona nie zawiera europejskich meczów; skan przechodzi do następnej partii.":"Brak kolejnych meczów w bazie."});
  // Add a no-key public score-history fallback for teams missing recent verified results.
  const xgoalsTeamForms=new Map<string,any>();
- const footyForms=new Map<string,any>();
- for(const m of matches){const cached=readCachedFootyForm(footyCacheMap.get(m.id),String(m.home_team),String(m.away_team));if(cached)footyForms.set(m.id,cached);}
+ const footyForms=new Map<string,any>(),footyCandidates:any[]=[];
+ for(const m of matches){
+  const cached=readCachedFootyForm(footyCacheMap.get(m.id),String(m.home_team),String(m.away_team));
+  if(cached)footyForms.set(m.id,cached);
+  else if(["scheduled","unknown"].includes(String(m.status||""))&&m.kickoff_at&&new Date(m.kickoff_at).getTime()>Date.now()&&m.source==="FootyNomad"&&/^\d+$/.test(String(m.external_id||"")))footyCandidates.push(m);
+ }
+ // FootyNomad is the primary fixture source; fetch only two missing form pages per batch
+ // and cache validated W/D/L records. This prevents a burst of hundreds of page requests.
+ const footyResults=await Promise.all(footyCandidates.slice(0,2).map(async (item:any)=>{
+  const form=await readFootyNomadForm(String(item.external_id),String(item.home_team),String(item.away_team));
+  return {id:item.id,form,item};
+ }));
+ const footyCacheWrites:any[]=[];
+ for(const result of footyResults){
+  if(!result.form)continue;
+  const providerData={...result.form,home_name:String(result.item.home_team),away_name:String(result.item.away_team),fetched_at:new Date().toISOString()};
+  footyForms.set(result.id,{home:result.form.home,away:result.form.away,source:"FOOTYNOMAD_LAST5"});
+  footyCacheWrites.push({owner_id:ownerId,match_id:result.id,source:"FootyNomad",provider_data:providerData,captured_at:providerData.fetched_at});
+ }
+ if(footyCacheWrites.length){
+  await db("match_market_data?on_conflict=owner_id,match_id,source",token,"POST",footyCacheWrites,"resolution=merge-duplicates,return=minimal").catch((e:any)=>console.error("FootyNomad form cache write failed:",String(e)));
+ }
  const fotbalForms=new Map<string,any>(),fotbalCandidates:any[]=[];
  for(const m of matches){
   if(!["scheduled","unknown"].includes(String(m.status||""))||!m.kickoff_at||new Date(m.kickoff_at).getTime()<=Date.now())continue;
