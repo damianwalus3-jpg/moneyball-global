@@ -22,7 +22,7 @@ async function db(path:string,method="GET",body?:unknown){
  if(!SERVICE_KEY)throw new Error("SUPABASE_SERVICE_ROLE_KEY missing");
  const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{method,headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+SERVICE_KEY,"Content-Type":"application/json",Prefer:"return=representation"},body:body===undefined?undefined:JSON.stringify(body)});
  const raw=await r.text();let data:any;try{data=raw?JSON.parse(raw):null;}catch{data=raw;}
- if(!r.ok)throw new Error("Supabase "+r.status+": "+(data?.message||raw));return data;
+ if(!r.ok)throw new Error("Supabase "+r.status+" at "+path+": "+(data?.message||data?.details||data?.hint||raw||"empty response"));return data;
 }
 async function readDay(date:string){
  const r=await fetch("https://footynomad.com/fixtures/"+date,{headers:{"User-Agent":"Mozilla/5.0 (compatible; MoneyballGlobal/2.0)","Accept":"text/html"}});
