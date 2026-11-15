@@ -16,6 +16,7 @@ function isEuropeanFixture(country: unknown, competition: unknown, home?: unknow
  return false;
 }
 
+async function runLimited<T>(items:T[],limit:number,fn:(item:T)=>Promise<void>){let cursor=0;const workers=Array.from({length:Math.min(limit,items.length)},async()=>{while(true){const i=cursor++;if(i>=items.length)return;await fn(items[i]);}});await Promise.all(workers);}
 function textOf(s:string){return s.replace(/<[^>]*>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&nbsp;/g," ").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/\s+/g," ").trim();}
 async function readFixtures(date:string){
  const up=await fetch("https://footynomad.com/fixtures/"+date,{headers:{"User-Agent":"Mozilla/5.0"}});
@@ -106,7 +107,7 @@ Deno.serve(async(req)=>{
    const toInsert:any[]=[];
    const publicDataByKey=new Map<string,any>();
    const seenSourceIds=new Set<string>();
-   for(const f of combined){
+   await runLimited(combined,12,async(f:any)=>{
     const source=String(f.source||"FootyNomad"),sourceId=String(f.external_id||"");
     if(!sourceId)continue;
     const key=source+"|"+sourceId;
@@ -130,7 +131,7 @@ Deno.serve(async(req)=>{
      continue;
     }
     toInsert.push(row);
-   }
+   });
    for(let i=0;i<toInsert.length;i+=100){
     const batch=toInsert.slice(i,i+100);
     const insertedRows=await db("matches?on_conflict=owner_id,source,external_id",token,"POST",batch,"resolution=ignore-duplicates,return=representation");
@@ -141,7 +142,7 @@ Deno.serve(async(req)=>{
    const allSources=[...new Set(combined.map((f:any)=>String(f.source||"FootyNomad")))];
    const latestRows=allIds.length?await db("matches?select=id,owner_id,external_id,source,competition,home_team,away_team,kickoff_at,gender&owner_id=eq."+encodeURIComponent(ownerId)+"&kickoff_at=gte."+encodeURIComponent(dayStart)+"&kickoff_at=lt."+encodeURIComponent(nextDate),token):[];
    const matchBySourceId=new Map((latestRows||[]).map((row:any)=>[String(row.source)+"|"+String(row.external_id),row]));
-   for(const f of combined){
+   await runLimited(combined,12,async(f:any)=>{
     const source=String(f.source||"FootyNomad"),sourceId=String(f.external_id||""),match=matchBySourceId.get(source+"|"+sourceId);
     const data=publicDataByKey.get(source+"|"+sourceId);
     if(!match||!data)continue;
@@ -152,10 +153,10 @@ Deno.serve(async(req)=>{
     const cacheSource=validForm(homeForm)&&validForm(awayForm)?"FootyNomad":"MONEYBALL_PUBLIC_AGGREGATOR";
     if(cacheSource==="FootyNomad")provider_data.footy_nomad_form={home_name:f.home_team,away_name:f.away_team,home:homeForm,away:awayForm,fetched_at:capturedAt};
     await db("match_market_data?on_conflict=owner_id,match_id,source",token,"POST",{owner_id:ownerId,match_id:match.id,source:cacheSource,provider_data,captured_at:capturedAt},"resolution=merge-duplicates,return=minimal").catch((e:any)=>console.error("Public data cache write failed:",String(e)));
-   }
+   });
    const matchByFixture=new Map<string,any[]>();
    for(const x of latestRows||[]){const k=fixtureBaseKey(x),arr=matchByFixture.get(k)||[];arr.push(x);matchByFixture.set(k,arr);}
-   for(const f of combined){
+   await runLimited(combined,8,async(f:any)=>{
     const candidates=(matchByFixture.get(fixtureBaseKey(f))||[]).filter((x:any)=>genderCompatible(x,f)).sort((a:any,b:any)=>fixturePriority(b)-fixturePriority(a));
     const row=candidates[0] as any;
     if(!row)continue;
@@ -168,7 +169,7 @@ Deno.serve(async(req)=>{
      const ps=await db("predictions?select=id,market,selection&owner_id=eq."+encodeURIComponent(ownerId)+"&match_id=eq."+row.id,token);
      for(const p of ps||[]){const won=p.market==="1X2"?p.selection===outcome:(p.selection==="1X"?outcome!=="2":p.selection==="X2"?outcome!=="1":outcome!=="X");await db("predictions?id=eq."+p.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{settlement_status:won?"won":"lost",verified:true});settled++;}
     }
-   }
+   });
    await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"completed",completed_at:new Date().toISOString(),matches_found:combined.length,notes:"FootyNomad "+result.fixtures.length+"; public fixtures "+publicFixtures.length+"; enriched "+enriched+"; public-only "+publicOnly+"; inserted "+inserted+"; updated "+updated+"; settled "+settled+"; matched by fixture "+matchedByFixture+"; promoted "+promotedToPrimary+"; public source status "+JSON.stringify(publicSourceStatus).slice(0,900)});
   }catch(e){await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"partial",completed_at:new Date().toISOString(),notes:"Import częściowy: "+String(e)});throw e;}
   // Run the same verified result settlement pipeline used by the scheduled synchronizer.
