@@ -461,18 +461,18 @@ async function espn(date: string) {
         game.red_cards=teamStats.redCards??null;
         game.fouls=teamStats.foulsCommitted??null;
       }
-      const games=(item.form.last10||[]).slice(0,5);
+      const games=((item.form as any).last10||[]).slice(0,5);
       const mean=(key:string)=>{const values=games.map((x:any)=>x[key]).filter((x:any)=>x!==null&&x!==undefined&&Number.isFinite(Number(x)));return values.length?+(values.reduce((s:number,v:any)=>s+Number(v),0)/values.length).toFixed(1):null;};
-      item.form.avg_shots_for=mean("shots_for");
-      item.form.avg_shots_on_target_for=mean("shots_on_target_for");
-      item.form.avg_corners_for=mean("corners_for");
-      item.form.avg_possession_pct=mean("possession_pct");
-      item.form.avg_yellow_cards=mean("yellow_cards");
-      item.form.avg_red_cards=mean("red_cards");
-      item.form.avg_fouls=mean("fouls");
-      item.form.home_matches= (item.form.last10||[]).filter((x:any)=>x.venue_role==="home").length;
-      item.form.away_matches= (item.form.last10||[]).filter((x:any)=>x.venue_role==="away").length;
-      item.form.neutral_matches= (item.form.last10||[]).filter((x:any)=>x.neutral_site===true).length;
+      (item.form as any).avg_shots_for=mean("shots_for");
+      (item.form as any).avg_shots_on_target_for=mean("shots_on_target_for");
+      (item.form as any).avg_corners_for=mean("corners_for");
+      (item.form as any).avg_possession_pct=mean("possession_pct");
+      (item.form as any).avg_yellow_cards=mean("yellow_cards");
+      (item.form as any).avg_red_cards=mean("red_cards");
+      (item.form as any).avg_fouls=mean("fouls");
+      (item.form as any).home_matches= ((item.form as any).last10||[]).filter((x:any)=>x.venue_role==="home").length;
+      (item.form as any).away_matches= ((item.form as any).last10||[]).filter((x:any)=>x.venue_role==="away").length;
+      (item.form as any).neutral_matches= ((item.form as any).last10||[]).filter((x:any)=>x.neutral_site===true).length;
     }
     // ESPN's team roster is useful context, but it is not a confirmed matchday squad.
     // Injury endpoints are queried separately; an empty response is reported as unavailable,
