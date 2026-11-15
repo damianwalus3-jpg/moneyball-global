@@ -22,7 +22,7 @@ jobs:
       - name: Install Deno
         uses: denoland/setup-deno@v2
       - name: Type-check Supabase Edge Functions
-        run: deno check --no-lock supabase/functions/*/index.ts
+        run: deno check --node-modules-dir=auto --no-lock supabase/functions/*/index.ts
       - name: Run tests
         run: bun run test
       - name: Type-check
