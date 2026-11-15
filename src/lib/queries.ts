@@ -26,6 +26,8 @@ export function dashboardSummaryQuery() {
     queryKey: ["dashboard-summary"] as const,
     queryFn: fetchDashboardSummary,
     ...LIVE_REFRESH,
+    staleTime: 5_000,
+    refetchInterval: 20_000,
   });
 }
 
