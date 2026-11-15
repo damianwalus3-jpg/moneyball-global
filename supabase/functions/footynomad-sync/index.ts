@@ -109,9 +109,9 @@ Deno.serve(async(req)=>{
    const seenSourceIds=new Set<string>();
    await runLimited(combined,12,async(f:any)=>{
     const source=String(f.source||"FootyNomad"),sourceId=String(f.external_id||"");
-    if(!sourceId)continue;
+    if(!sourceId)return;
     const key=source+"|"+sourceId;
-    if(seenSourceIds.has(key))continue;
+    if(seenSourceIds.has(key))return;
     seenSourceIds.add(key);
     const fixtureCandidates=(existingByFixture.get(fixtureBaseKey(f))||[]).filter((x:any)=>genderCompatible(x,f)).sort((a:any,b:any)=>fixturePriority(b)-fixturePriority(a));
     const byFixture=fixtureCandidates[0];
@@ -128,7 +128,7 @@ Deno.serve(async(req)=>{
       await db("matches?id=eq."+existing.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",patch);
       updated++;
      }
-     continue;
+     return;
     }
     toInsert.push(row);
    });
@@ -145,7 +145,7 @@ Deno.serve(async(req)=>{
    await runLimited(combined,12,async(f:any)=>{
     const source=String(f.source||"FootyNomad"),sourceId=String(f.external_id||""),match=matchBySourceId.get(source+"|"+sourceId);
     const data=publicDataByKey.get(source+"|"+sourceId);
-    if(!match||!data)continue;
+    if(!match||!data)return;
     const homeForm=data.home_form,awayForm=data.away_form;
     const validForm=(v:any)=>v&&Number.isFinite(Number(v.w))&&Number.isFinite(Number(v.d))&&Number.isFinite(Number(v.l))&&Number(v.w)+Number(v.d)+Number(v.l)===5;
     const capturedAt=new Date().toISOString();
@@ -159,7 +159,7 @@ Deno.serve(async(req)=>{
    await runLimited(combined,8,async(f:any)=>{
     const candidates=(matchByFixture.get(fixtureBaseKey(f))||[]).filter((x:any)=>genderCompatible(x,f)).sort((a:any,b:any)=>fixturePriority(b)-fixturePriority(a));
     const row=candidates[0] as any;
-    if(!row)continue;
+    if(!row)return;
     if(f.status==="finished"&&Number.isInteger(f.home_score)&&Number.isInteger(f.away_score)){
      const outcome=f.home_score>f.away_score?"1":f.home_score<f.away_score?"2":"X";
      const oldResults=await db("match_results?select=id&owner_id=eq."+encodeURIComponent(ownerId)+"&match_id=eq."+row.id,token);
