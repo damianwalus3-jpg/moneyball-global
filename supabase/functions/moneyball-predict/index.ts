@@ -21,10 +21,9 @@ const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
 function normTeam(v:any){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\b(fc|cf|sc|ac|afc|club)\b/g," ").replace(/\b(wfc|women|w)\b/g," women ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");}
 function fixtureGender(m:any){
  const explicit=String(m?.gender||"").toLowerCase();if(explicit==="women"||explicit==="men")return explicit;
- const label=[m?.competition,m?.league,m?.home_team,m?.away_team].map(x=>String(x||"")).join(" ").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase();
- if(/\\b(women|womens|woman|frauen|femenina|femenino|feminin|female|damallsvenskan|wsl|liga[- ]?f)\\b/.test(label))return "women";
- if(/\\b(u(?:15|16|17|18|19|20|21|23)|under[- ]?(?:15|16|17|18|19|20|21|23)|reserves?|academy|youth|b team|ii|iii)\\b/.test(label))return "unknown";
- // European senior club fixtures without a women's marker are men's by default.
+ const label=[m?.competition,m?.league,m?.home_team,m?.away_team].map(x=>String(x||"")).join(" ").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+ if(/\b(women|womens|woman|frauen|femenina|femenino|feminin|female|damallsvenskan|wsl|liga[- ]?f)\b/.test(label))return "women";
+ if(/\b(u(?:15|16|17|18|19|20|21|23)|under[- ]?(?:15|16|17|18|19|20|21|23)|reserves?|academy|youth|b team|ii|iii)\b/.test(label))return "unknown";
  return "men";
 }
 function fixtureTeamKey(v:any){const key=normTeam(v);const aliases:Record<string,string>={"turkiye":"turkey","republic of ireland":"ireland","czech republic":"czechia","north macedonia":"north macedonia","korea republic":"south korea","united states of america":"united states","usa":"united states","ivory coast":"cote d ivoire","cote d ivoire":"cote d ivoire"};return aliases[key]||key;}
