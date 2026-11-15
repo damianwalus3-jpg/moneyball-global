@@ -25,6 +25,7 @@ export function dashboardSummaryQuery() {
   return queryOptions({
     queryKey: ["dashboard-summary"] as const,
     queryFn: fetchDashboardSummary,
+    retry: false,
     ...LIVE_REFRESH,
     staleTime: 10_000,
     refetchInterval: 30_000,
@@ -35,9 +36,10 @@ export function dashboardSelectedPicksQuery() {
   return queryOptions({
     queryKey: ["dashboard-selected-picks"] as const,
     queryFn: fetchDashboardSelectedPicks,
+    retry: false,
     ...LIVE_REFRESH,
-    staleTime: 3_000,
-    refetchInterval: 15_000,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
   });
 }
 
