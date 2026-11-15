@@ -507,7 +507,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  };
  const fromUtc=brusselsMidnightUtc(date);
  const toUtc=brusselsMidnightUtc(nextDate);
- const all=await db("matches?select=id,owner_id,scan_run_id,external_id,source,competition,league,country,gender,home_team,away_team,kickoff_at,kickoff_date,status&owner_id=eq."+encodeURIComponent(ownerId)+"&or=(and(kickoff_at.gte."+encodeURIComponent(fromUtc)+",kickoff_at.lt."+encodeURIComponent(toUtc)+"),and(kickoff_at.is.null,kickoff_date.eq."+date+"))&order=kickoff_at.asc&limit="+batchSize+"&offset="+analysisOffset,token);
+ const all=await db("matches?select=id,owner_id,scan_run_id,external_id,source,competition,league,country,gender,home_team,away_team,kickoff_at,kickoff_date,status&owner_id=eq."+encodeURIComponent(ownerId)+"&or=(and(kickoff_at.gte."+encodeURIComponent(fromUtc)+",kickoff_at.lt."+encodeURIComponent(toUtc)+"),and(kickoff_at.is.null,kickoff_date.eq."+date+"))&order=kickoff_at.asc,id.asc&limit="+batchSize+"&offset="+analysisOffset,token);
  const dateFromExternalId=(m:any)=>/:(\\d{4}-\\d{2}-\\d{2}):/.exec(String(m.external_id||""))?.[1]||null;
  const matchDate=(m:any)=>m.kickoff_at?new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(m.kickoff_at)):(String(m.kickoff_date||"").slice(0,10)||dateFromExternalId(m));
  const rawDateMatches=all.filter((m:any)=>matchDate(m)===date&&isEuropeanFixture(m.country,m.competition||m.league,m.home_team,m.away_team));
