@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { Loader2, LogIn } from "lucide-react";
 import { useState } from "react";
 
@@ -13,7 +13,7 @@ import { Brand } from "@/components/app/AppShell";
 import { Field } from "@/components/app/ui-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getSupabase, requireSupabase } from "@/lib/supabase";
+import { requireSupabase } from "@/lib/supabase";
 
 type Mode = "login" | "signup" | "forgot";
 
@@ -22,12 +22,6 @@ export const Route = createFileRoute("/login")({
   validateSearch: (s: Record<string, unknown>): { redirect?: string | undefined } => ({
     redirect: typeof s["redirect"] === "string" && s["redirect"].startsWith("/") && !s["redirect"].startsWith("//") ? s["redirect"] : undefined,
   }),
-  beforeLoad: async () => {
-    const sb = getSupabase();
-    if (!sb) throw redirect({ to: "/setup" });
-    const { data } = await sb.auth.getSession();
-    if (data.session) throw redirect({ to: "/panel" });
-  },
   head: () => ({
     meta: [
       { title: "Logowanie — MONEYBALL GLOBAL 2.0" },
