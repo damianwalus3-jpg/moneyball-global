@@ -467,6 +467,39 @@ async function espn(date: string) {
       item.form.avg_shots_on_target_for=mean("shots_on_target_for");
       item.form.avg_corners_for=mean("corners_for");
     }
+    // ESPN's team roster is useful context, but it is not a confirmed matchday squad.
+    // Injury endpoints are queried separately; an empty response is reported as unavailable,
+    // never interpreted as proof that a team has no injured players.
+    const rosterResults=await mapLimit([...teams.entries()],8,async([teamId,teamName])=>{
+      const [roster,injuries]=await Promise.all([
+        safeJson("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/teams/"+encodeURIComponent(teamId)+"/roster?season="+season).catch(()=>null),
+        safeJson("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/teams/"+encodeURIComponent(teamId)+"/injuries?season="+season).catch(()=>null),
+      ]);
+      const athletes=Array.isArray(roster?.athletes)?roster.athletes:[];
+      const players=athletes.map((player:any)=>({
+        id:String(player?.id||""),
+        name:norm(player?.displayName||player?.fullName),
+        position:norm(player?.position?.displayName||player?.position?.name),
+        jersey:player?.jersey==null?null:String(player.jersey),
+        age:player?.age==null?null:Number(player.age),
+      })).filter((player:any)=>player.name);
+      const injuryItems=Array.isArray(injuries?.injuries)?injuries.injuries:Array.isArray(injuries?.items)?injuries.items:[];
+      return {teamId,teamName,players,roster_available:players.length>0,injuries_available:injuryItems.length>0,injury_count:injuryItems.length};
+    });
+    const rosterByTeam=new Map(rosterResults.map((item:any)=>[item.teamId,item]));
+    for(const fixture of nationsFixtures){
+      const homeRoster:any=rosterByTeam.get(fixture.home_team_id);
+      const awayRoster:any=rosterByTeam.get(fixture.away_team_id);
+      fixture.home_squad=homeRoster?.players||[];
+      fixture.away_squad=awayRoster?.players||[];
+      fixture.home_roster_available=!!homeRoster?.roster_available;
+      fixture.away_roster_available=!!awayRoster?.roster_available;
+      fixture.home_injuries_available=!!homeRoster?.injuries_available;
+      fixture.away_injuries_available=!!awayRoster?.injuries_available;
+      fixture.home_injury_count=homeRoster?.injury_count??null;
+      fixture.away_injury_count=awayRoster?.injury_count??null;
+      fixture.squad_note="Publiczny roster ESPN; nie jest potwierdzonym składem meczowym.";
+    }
     const formByTeam=new Map<string,any>();
     for(const item of schedules)if(item.form)formByTeam.set(norm(item.teamName).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim(),item.form);
     const key=(value:string)=>norm(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
