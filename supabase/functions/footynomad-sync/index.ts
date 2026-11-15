@@ -60,7 +60,7 @@ Deno.serve(async(req)=>{
   let publicSourceStatus:any={ok:false,error:"not_called"};
   let publicFixtures:any[]=[];
   try{
-   const pr=await fetch("https://gzgeklcukrclgwbsmbsp.supabase.co/functions/v1/moneyball-public-sources?date="+date,{headers:{"Accept":"application/json"}});
+   const pr=await fetch("https://gzgeklcukrclgwbsmbsp.supabase.co/functions/v1/moneyball-public-sources?date="+date,{headers:{"Accept":"application/json","apikey":KEY,"Authorization":req.headers.get("Authorization")||""},signal:AbortSignal.timeout(18000)});
    const pt=await pr.text();
    if(!pr.ok)throw new Error("Public sources HTTP "+pr.status+": "+pt.slice(0,300));
    const pj=JSON.parse(pt);publicFixtures=Array.isArray(pj.fixtures)?pj.fixtures.filter((f:any)=>isEuropeanFixture(f.country,f.league||f.competition,f.home_team||f.home,f.away_team||f.away)):[];
