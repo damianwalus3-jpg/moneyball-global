@@ -19,7 +19,7 @@ function isEuropeanFixture(country: unknown, competition: unknown, home?: unknow
 async function db(p:string,t:string,m="GET",b?:any,prefer="return=representation"){const r=await fetch(S+"/rest/v1/"+p,{method:m,headers:{apikey:K,Authorization:"Bearer "+(t===SERVICE_KEY?CRON_JWT_TOKEN:t),...(t===SERVICE_KEY?{"x-cron-token":CRON_FALLBACK_TOKEN}:{}),"Content-Type":"application/json",Prefer:prefer},body:b===undefined?undefined:JSON.stringify(b)});const s=await r.text();let j:any;try{j=s?JSON.parse(s):null}catch{j=s}if(!r.ok)throw Error(j?.message||j?.details||"DB HTTP "+r.status);return j;}
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
 function normTeam(v:any){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\b(fc|cf|sc|ac|afc|club)\b/g," ").replace(/\b(wfc|women|w)\b/g," women ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");}
-function fixtureTeamKey(v:any){const key=normTeam(v);const aliases:Record<string,string>={"turkiye":"turkey"};return aliases[key]||key;}
+function fixtureTeamKey(v:any){const key=normTeam(v);const aliases:Record<string,string>={"turkiye":"turkey","republic of ireland":"ireland","czech republic":"czechia","north macedonia":"north macedonia","korea republic":"south korea","united states of america":"united states","usa":"united states","ivory coast":"cote d ivoire","cote d ivoire":"cote d ivoire"};return aliases[key]||key;}
 function dedupeFixturesByDate(fixtures:any[],getDate:(m:any)=>string|null){
  const kept:any[]=[];
  const identity=(m:any)=>{const d=getDate(m),h=fixtureTeamKey(m.home_team),a=fixtureTeamKey(m.away_team);return d&&h&&a?d+"|"+h+">"+a:null;};
@@ -371,7 +371,7 @@ async function readInternationalTeamForms(targetDate:string){
    const w=last10.filter(x=>x.result==="W").length,d=last10.filter(x=>x.result==="D").length,l=last10.filter(x=>x.result==="L").length;
    forms.set(key,{matches:last10.length,w,d,l,points:w*3+d,goals_for:last10.reduce((n,x)=>n+x.goals_for,0),goals_against:last10.reduce((n,x)=>n+x.goals_against,0),last10,source:"INTERNATIONAL_RESULTS_CC0"});
   }
-  internationalHistoryCache={forms,generated_at:new Date().toISOString(),rows:rows.length-1,teams:forms.size,error:null};
+  const sourceDates=rows.slice(1).map(row=>String(row[ix("date")]||"").slice(0,10)).filter(x=>/^\\d{4}-\\d{2}-\\d{2}$/.test(x)).sort();const latestDate=sourceDates[sourceDates.length-1]||null;for(const form of forms.values()){form.source_url=INTERNATIONAL_RESULTS_URL;form.source_as_of=latestDate;}internationalHistoryCache={forms,generated_at:new Date().toISOString(),source_as_of:latestDate,source_url:INTERNATIONAL_RESULTS_URL,rows:rows.length-1,teams:forms.size,error:null};
  }catch(error){internationalHistoryCache={forms,generated_at:null,rows:0,teams:0,error:String(error)};}
  internationalHistoryCacheAt=Date.now();return internationalHistoryCache;
 }
