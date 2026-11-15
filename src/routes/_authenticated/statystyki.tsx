@@ -12,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/statystyki")({
     meta: [
       { title: "Statystyki — MONEYBALL GLOBAL" },
       { name: "description", content: "Skuteczność 1X2, Double Chance i Gole / BTTS osobno, według lig, przedziałów prawdopodobieństwa i kuponów." },
-      { property: "og:title", content: "Statystyki — MONEYBALL GLOBAL 2.0" },
+      { property: "og:title", content: "Statystyki — MONEYBALL GLOBAL" },
       { property: "og:description", content: "Skuteczność prognoz i kuponów." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -90,7 +90,7 @@ function Statystyki() {
           <StatCard label="Rozliczone typy" value={settledSinglePicks.length} />
           <StatCard label="Wygrane" value={settledSinglePicks.filter((p) => p.settlement_status === "won").length} />
           <StatCard label="Przegrane" value={settledSinglePicks.filter((p) => p.settlement_status === "lost").length} />
-          <StatCard label="Zysk / strata" value={fmtMoney(singlePickProfit)} tone={singlePickProfit < 0 ? "danger" : "primary"} />
+          <StatCard label="Zysk / strata" value={knownSingleProfitRows.length ? fmtMoney(singlePickProfit) : "brak danych"} tone={singlePickProfit < 0 ? "danger" : "primary"} hint={singleProfitIncomplete ? `wyliczono ${knownSingleProfitRows.length}/${settledSinglePicks.length}; brak kursu lub rozliczenia finansowego` : "na podstawie zapisanych stawek i kursów"} />
         </div>
       </section>
       <div className="grid gap-6">
