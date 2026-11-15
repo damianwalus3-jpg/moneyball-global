@@ -5,9 +5,9 @@ import type { TableName } from "./types";
 
 /** Read-only refresh: results are synced by the backend, the browser only re-reads them. */
 export const LIVE_REFRESH = {
-  staleTime: 8_000,
+  staleTime: 15_000,
   gcTime: 600_000,
-  refetchInterval: 30_000,
+  refetchInterval: 60_000,
   refetchIntervalInBackground: false,
   refetchOnWindowFocus: true,
 } as const;
@@ -26,8 +26,8 @@ export function dashboardSummaryQuery() {
     queryKey: ["dashboard-summary"] as const,
     queryFn: fetchDashboardSummary,
     ...LIVE_REFRESH,
-    staleTime: 3_000,
-    refetchInterval: 15_000,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
   });
 }
 
