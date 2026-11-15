@@ -154,7 +154,7 @@ function Mecze() {
   const odds = useTable("odds_snapshots");
   const couponLegs = useTable("coupon_legs");
   const coupons = useTable("coupons");
-  const [view, setView] = useState<View>("upcoming");
+  const [view, setView] = useState<View>("all");
   const [q, setQ] = useState("");
   const [editMatch, setEditMatch] = useState<Match | null>(null);
   const [matchOpen, setMatchOpen] = useState(false);
@@ -292,12 +292,13 @@ function Mecze() {
   const matchDay = (match: Match) => match.kickoff_at ? brusselsDayKey(match.kickoff_at) : match.kickoff_date ?? null;
   const matchSortKey = (match: Match) => match.kickoff_at ?? (match.kickoff_date ? `${match.kickoff_date}T23:59:59Z` : "");
   const filtered = matches
-    .filter((match) => matchDay(match) === today && /nations league/i.test(`${match.competition ?? ""} ${match.league ?? ""}`))
+    .filter((match) => /nations league/i.test(`${match.competition ?? ""} ${match.league ?? ""}`))
     .filter((match) => {
       const day = matchDay(match);
       const time = match.kickoff_at ? new Date(match.kickoff_at).getTime() : null;
-      if (view === "upcoming") return time != null ? time >= now - 2 * 3600_000 : !!day && day >= today;
-      if (view === "past") return time != null ? time < now : !!day && day < today;
+      const isFinished = match.status === "finished" || resultBy.has(match.id);
+      if (view === "upcoming") return !isFinished && !["postponed", "cancelled"].includes(match.status) && (time != null ? time >= now - 2 * 3600_000 : !!day && day >= today);
+      if (view === "past") return isFinished || (time != null ? time < now : !!day && day < today);
       return true;
     })
     .filter((match) => !q || `${match.home_team} ${match.away_team} ${match.competition ?? match.league ?? ""} ${match.country ?? ""}`.toLowerCase().includes(q.toLowerCase()))
