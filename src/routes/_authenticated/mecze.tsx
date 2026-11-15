@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CalendarDays, ChevronDown, ChevronUp, CircleDollarSign, FileUp, Flag, Pencil, Plus, ScanLine } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -495,8 +495,8 @@ function Mecze() {
                   const o = latestOdds.get(m.id);
                   const started = m.status === "live" || m.status === "finished" || (m.kickoff_at ? new Date(m.kickoff_at).getTime() < now : false);
                   return (
-                    <>
-                    <div key={m.id} className="surface-card flex flex-wrap items-center gap-3 p-3">
+                    <Fragment key={m.id}>
+                    <div className="surface-card flex flex-wrap items-center gap-3 p-3">
                       <div className="num w-12 text-center text-sm font-semibold text-primary">{m.kickoff_at ? fmtTime(m.kickoff_at) : "Godzina nieznana"}</div>
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-medium">
@@ -718,7 +718,7 @@ function Mecze() {
                         })()}
                       </div>
                     )}
-                    </>
+                    </Fragment>
                   );
                 })}
               </div>
