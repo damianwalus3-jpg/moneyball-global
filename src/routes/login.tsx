@@ -68,12 +68,9 @@ function Login() {
         if (data.session) router.history.push("/panel");
         else setInfo("Sprawdź skrzynkę e-mail i potwierdź konto, a potem zaloguj się.");
       } else {
-        // Preserve the app base path when hosted below a GitHub Pages project URL.
-        const appBase = window.location.pathname.startsWith("/moneyball-global-web/")
-          ? "/moneyball-global-web/"
-          : import.meta.env.BASE_URL;
-        const redirectPath = `${appBase.replace(/\/?$/, "/")}reset-password`;
-        const redirectTo = new URL(redirectPath, window.location.origin).toString();
+        // Always return password-recovery links to the production Worker.
+        // This exact URL must also be present in Supabase Auth > URL Configuration > Redirect URLs.
+        const redirectTo = "https://moneyball-global.damianwalus3.workers.dev/reset-password";
         const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo });
         if (error) throw new Error(error.message);
         setInfo("Jeśli konto istnieje, wysłaliśmy link do zmiany hasła.");
