@@ -292,13 +292,15 @@ function Mecze() {
   const matchDay = (match: Match) => match.kickoff_at ? brusselsDayKey(match.kickoff_at) : match.kickoff_date ?? null;
   const matchSortKey = (match: Match) => match.kickoff_at ?? (match.kickoff_date ? `${match.kickoff_date}T23:59:59Z` : "");
   const filtered = matches
+    // The match screen is intentionally scoped to the current Brussels calendar day.
+    // Historical and future fixtures stay in the database for settlement/audit, but
+    // must never leak into today's scan/list.
+    .filter((match) => matchDay(match) === today)
     .filter((match) => /nations league/i.test(`${match.competition ?? ""} ${match.league ?? ""}`))
     .filter((match) => {
-      const day = matchDay(match);
-      const time = match.kickoff_at ? new Date(match.kickoff_at).getTime() : null;
       const isFinished = match.status === "finished" || resultBy.has(match.id);
-      if (view === "upcoming") return !isFinished && !["postponed", "cancelled"].includes(match.status) && (time != null ? time >= now - 2 * 3600_000 : !!day && day >= today);
-      if (view === "past") return isFinished || (time != null ? time < now : !!day && day < today);
+      if (view === "upcoming") return !isFinished && !["postponed", "cancelled"].includes(match.status);
+      if (view === "past") return isFinished;
       return true;
     })
     .filter((match) => !q || `${match.home_team} ${match.away_team} ${match.competition ?? match.league ?? ""} ${match.country ?? ""}`.toLowerCase().includes(q.toLowerCase()))
