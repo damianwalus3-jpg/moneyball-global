@@ -535,7 +535,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  for(const quote of providerOddsRows||[]){const key=String(quote.match_id)+"|"+String(quote.mapped_market)+"|"+String(quote.mapped_selection);if(!providerOddsMap.has(key)&&Number(quote.odds)>1)providerOddsMap.set(key,quote);}
  const americanToDecimal=(value:any)=>{const n=Number(value);if(!Number.isFinite(n)||n===0)return null;return +(n>0?1+n/100:1+100/Math.abs(n)).toFixed(3);};
 
- if(!matches.length)return out({ok:true,date,total:0,created:0,updated:0,selected:0,message:"Brak zaplanowanych meczów w bazie."});
+ if(!matches.length)return out({ok:true,date,total:0,matches:0,offset:analysisOffset,batch_size:batchSize,has_more:all.length===batchSize,predictions:0,created:0,updated:0,preserved:0,covered:0,missing:0,selected:0,message:all.length===batchSize?"Ta strona nie zawiera europejskich meczów; skan przechodzi do następnej partii.":"Brak kolejnych meczów w bazie."});
  // Add a no-key public score-history fallback for teams missing recent verified results.
  const xgoalsTeamForms=new Map<string,any>(),xgoalsCandidates=new Map<string,{team:string,country:string,kickoff:string}>();
  for(const m of matches){
