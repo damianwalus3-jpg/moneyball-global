@@ -253,7 +253,16 @@ function Mecze() {
       while (hasMore && totals.batches < maxBatches) {
         setPredictionProgress("Analiza partii " + (totals.batches + 1) + " · od meczu " + (offset + 1) + "…");
         const prediction = await sb.functions.invoke("moneyball-predict", { body: { date, offset } });
-        if (prediction.error) throw new Error("Prognozowanie partii " + (totals.batches + 1) + " nie powiodło się: " + prediction.error.message);
+        if (prediction.error) {
+          let detail = prediction.error.message;
+          try {
+            const context = (prediction.error as any).context;
+            const payload = context && typeof context.json === "function" ? await context.clone().json() : null;
+            if (payload?.error) detail = String(payload.error);
+            else if (payload?.message) detail = String(payload.message);
+          } catch { /* keep the SDK message when the response has no JSON body */ }
+          throw new Error("Prognozowanie partii " + (totals.batches + 1) + " nie powiodło się: " + detail);
+        }
         if (!prediction.data || prediction.data.ok === false)
           throw new Error("Prognozowanie partii " + (totals.batches + 1) + " nie powiodło się: " + (prediction.data?.error ?? "Nieznany błąd silnika."));
 
