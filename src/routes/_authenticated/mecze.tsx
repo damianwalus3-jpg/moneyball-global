@@ -643,7 +643,15 @@ function Mecze() {
                                       <div className="mt-3 grid gap-3">
                                         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
                                           <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{rejected ? "Dlaczego typ odrzucono" : "Dlaczego model wybrał ten typ"}</div>
-                                          <p className="text-sm leading-relaxed">{rejected && p.rationale?.toLowerCase().includes("brak wymaganych danych") ? reason : reason}</p>
+                                          <p className="text-sm leading-relaxed">{reason}</p>
+                                          {rejected && p.rejection_reason && (
+                                            <div className="mt-2 rounded-md border border-amber-500/25 bg-amber-500/5 p-2">
+                                              <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">Rzeczywisty powód odrzucenia</div>
+                                              <p className="mt-1 text-xs leading-relaxed">{p.rejection_reason}</p>
+                                            </div>
+                                          )}
+                                          {p.data_source && <p className="mt-2 text-[11px] text-muted-foreground">Źródło prognozy / kursu: {p.data_source}</p>}
+                                          {coverage["odds_captured_at"] && <p className="mt-1 text-[11px] text-muted-foreground">Kurs pobrano: {new Date(String(coverage["odds_captured_at"])).toLocaleString("pl-BE")}</p>}
                                           {p.market === "GOALS" && coverage["expected_total_goals"] != null && coverage["expected_home_goals"] != null && coverage["expected_away_goals"] != null && Number.isFinite(Number(coverage["expected_total_goals"])) && (
                                             <div className="mt-2 flex flex-wrap gap-2 text-xs">
                                               <Badge variant="outline">Oczekiwane gole: {Number(coverage["expected_total_goals"]).toFixed(2)}</Badge>
