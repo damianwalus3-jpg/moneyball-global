@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { CalendarDays, ChevronRight, Ticket, Trophy, type LucideIcon } from "lucide-react";
+import { CalendarDays, ChevronRight, ScanLine, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { isActivePredictionVersion } from "@/lib/domain";
 import { fmtOdds } from "@/lib/format";
 import { ensureTables, useTable } from "@/lib/queries";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
 import { fmtPct } from "@/lib/format";
 import { dashboardSummaryQuery } from "@/lib/queries";
+import { brusselsDayKey } from "@/lib/time";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => ({ meta: [{ title: "Panel — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Podsumowanie prognoz, kuponów i bankrolla." }, { property: "og:title", content: "Panel — MONEYBALL" }, { property: "og:description", content: "Podsumowanie prognoz." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -46,10 +48,11 @@ function Panel() {
   const results = useTable("match_results");
   const matchById = new Map(matches.map((match) => [match.id, match]));
   const resultByMatch = new Map(results.map((result) => [result.match_id, result]));
+  const today = brusselsDayKey(new Date());
   const selectedPicks = predictions
     .filter((prediction) => prediction.verdict === "WYBRANY" && isActivePredictionVersion(prediction.model_version))
     .map((prediction) => ({ prediction, match: matchById.get(prediction.match_id), result: resultByMatch.get(prediction.match_id) }))
-    .filter((item) => item.match)
+    .filter((item) => item.match && (item.match.kickoff_at ? brusselsDayKey(item.match.kickoff_at) : item.match.kickoff_date) === today)
     .sort((a, b) => (a.match!.kickoff_at ?? a.match!.kickoff_date ?? "").localeCompare(b.match!.kickoff_at ?? b.match!.kickoff_date ?? ""));
   const hr1 = summary.hit_rates["1X2"] ?? { rate: null, won: 0, settled: 0 };
   const hrDc = summary.hit_rates["DOUBLE_CHANCE"] ?? { rate: null, won: 0, settled: 0 };
@@ -57,11 +60,21 @@ function Panel() {
 
   return (
     <div>
-      <PageHeader eyebrow="Europe/Brussels" title="Panel" />
+      <PageHeader
+        eyebrow="Europe/Brussels · dzisiejszy przegląd"
+        title="Panel"
+        description="Najważniejsze informacje o dzisiejszych meczach, prognozach i kuponach."
+        actions={
+          <>
+            <Button asChild><Link to="/mecze"><ScanLine /> Terminarz i skan</Link></Button>
+            <Button variant="outline" asChild><Link to="/kupony"><Ticket /> Kupony</Link></Button>
+          </>
+        }
+      />
       <section className="mb-5 rounded-xl border border-primary/25 bg-card p-3 sm:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="font-display text-lg font-bold uppercase">Wybrane typy</h2>
+            <h2 className="font-display text-lg font-bold uppercase">Dzisiejsze wybrane typy</h2>
             <p className="text-xs text-muted-foreground">Zatwierdzone typy aktywnego modelu · stawka analityczna 5 € na singiel</p>
           </div>
           <Badge variant="success">{selectedPicks.length} wybranych</Badge>
@@ -96,7 +109,7 @@ function Panel() {
             })}
           </div>
         ) : (
-          <p className="rounded-lg bg-secondary/30 p-3 text-sm text-muted-foreground">Nie ma jeszcze zatwierdzonych typów. Uruchom skan i analizę, aby je wygenerować.</p>
+          <p className="rounded-lg bg-secondary/30 p-3 text-sm text-muted-foreground">Nie ma jeszcze zatwierdzonych typów na dziś. Otwórz terminarz i uruchom skan oraz analizę.</p>
         )}
         <div className="mt-3 flex justify-end">
           <Link to="/kupony" className="text-sm font-semibold text-primary">Przejdź do kuponów i singli <ChevronRight className="inline size-4" /></Link>
