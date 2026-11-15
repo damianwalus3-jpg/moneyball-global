@@ -260,7 +260,12 @@ async function reconcileRescheduledMatches(ownerId:string|null=null){
  const candidates=(stale||[]).filter((m:any)=>String(m.source||"").toLowerCase()==="footynomad"&&m.external_id&&isEuropeanFixture(m.country,m.league,m.home_team,m.away_team)&&futureById.has(String(m.external_id)));
  if(!candidates.length)return {updated:0,errors:readErrors};
  const ids=candidates.map((m:any)=>m.id);
- const existing=await db("match_results?select=match_id&match_id=in.("+ids.join(",")+")");
+ const existing:any[]=[];
+ for(let offset=0;offset<ids.length;offset+=100){
+  const chunk=ids.slice(offset,offset+100);
+  const rows=await db("match_results?select=match_id&match_id=in.("+chunk.join(",")+")");
+  existing.push(...(rows||[]));
+ }
  const settled=new Set((existing||[]).map((r:any)=>String(r.match_id)));
  let updated=0;
  for(const m of candidates){
@@ -311,7 +316,14 @@ Deno.serve(async(req:Request)=>{
      const rawMatches=await db("matches?"+matchFields+"&kickoff_at=gte."+encodeURIComponent(start.toISOString())+"&kickoff_at=lt."+encodeURIComponent(end.toISOString())+ownerFilter);
      const rawDateOnly=await db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=eq."+encodeURIComponent(date)+ownerFilter);
      const matches=[...(rawMatches||[]).filter((m:any)=>m.kickoff_at&&day(new Date(m.kickoff_at))===date),...(rawDateOnly||[]).filter((m:any)=>String(m.kickoff_date||"").slice(0,10)===date)].filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team));
-    const existingResults=matches.length?await db("match_results?select=match_id,home_score,away_score,verified&match_id=in.("+matches.map((m:any)=>m.id).join(",")+")"):[];
+    const existingResults:any[]=[];
+    // Bound every IN query to avoid PostgREST gateway URL limits on large match days.
+    for(let offset=0;offset<matches.length;offset+=100){
+     const ids=matches.slice(offset,offset+100).map((m:any)=>m.id);
+     if(!ids.length)continue;
+     const rows=await db("match_results?select=match_id,home_score,away_score,verified&match_id=in.("+ids.join(",")+")");
+     existingResults.push(...(rows||[]));
+    }
     const existingResultByMatch=new Map<string,any>((existingResults||[]).map((r:any)=>[r.match_id,r]));
     const map=new Map(matches.filter((m:any)=>m.external_id&&String(m.source||"").toLowerCase()==="footynomad").map((m:any)=>[String(m.external_id),m]));
     const normTeam=(v:string)=>String(v||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim().replace(/\\s+/g," ");
