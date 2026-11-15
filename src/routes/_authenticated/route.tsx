@@ -11,9 +11,19 @@ export const Route = createFileRoute("/_authenticated")({
   beforeLoad: async ({ location }) => {
     const sb = getSupabase();
     if (!sb) throw redirect({ to: "/setup" });
-    const { data } = await sb.auth.getSession();
-    if (!data.session) throw redirect({ to: "/login", search: { redirect: location.href } });
-    return { userEmail: data.session.user.email ?? null };
+    // Bound session lookup so Auth outages cannot leave the router pending forever.
+    let session: Awaited<ReturnType<typeof sb.auth.getSession>>["data"]["session"] = null;
+    try {
+      const result = await Promise.race([
+        sb.auth.getSession(),
+        new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("AUTH_TIMEOUT")), 8_000)),
+      ]);
+      session = result.data.session;
+    } catch {
+      throw redirect({ to: "/login", search: { redirect: location.href } });
+    }
+    if (!session) throw redirect({ to: "/login", search: { redirect: location.href } });
+    return { userEmail: session.user.email ?? null };
   },
   pendingComponent: PageLoader,
   component: AuthenticatedLayout,
