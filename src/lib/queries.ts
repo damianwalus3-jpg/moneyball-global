@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchAll, fetchDashboardSummary } from "./db";
+import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary } from "./db";
 import type { TableName } from "./types";
 
 /** Read-only refresh: results are synced by the backend, the browser only re-reads them. */
@@ -25,6 +25,16 @@ export function dashboardSummaryQuery() {
   return queryOptions({
     queryKey: ["dashboard-summary"] as const,
     queryFn: fetchDashboardSummary,
+    ...LIVE_REFRESH,
+    staleTime: 3_000,
+    refetchInterval: 15_000,
+  });
+}
+
+export function dashboardSelectedPicksQuery() {
+  return queryOptions({
+    queryKey: ["dashboard-selected-picks"] as const,
+    queryFn: fetchDashboardSelectedPicks,
     ...LIVE_REFRESH,
     staleTime: 3_000,
     refetchInterval: 15_000,
