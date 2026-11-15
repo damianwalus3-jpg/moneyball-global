@@ -105,55 +105,44 @@ Deno.serve(async(req)=>{
    const existingByFixture=new Map<string,any[]>();
    for(const x of existingRows||[]){const k=fixtureBaseKey(x),arr=existingByFixture.get(k)||[];arr.push(x);existingByFixture.set(k,arr);}
    const toInsert:any[]=[];
+   const toUpdate:any[]=[];
    const publicDataByKey=new Map<string,any>();
    const seenSourceIds=new Set<string>();
-   await runLimited(combined,12,async(f:any)=>{
+   for(const f of combined){
     const source=String(f.source||"FootyNomad"),sourceId=String(f.external_id||"");
     if(!sourceId)return;
     const key=source+"|"+sourceId;
     if(seenSourceIds.has(key))return;
     seenSourceIds.add(key);
     const fixtureCandidates=(existingByFixture.get(fixtureBaseKey(f))||[]).filter((x:any)=>genderCompatible(x,f)).sort((a:any,b:any)=>fixturePriority(b)-fixturePriority(a));
-    const byFixture=fixtureCandidates[0];
-    const exact=existingBySourceId.get(key);
-    const existing=exact||byFixture;
+    const byFixture=fixtureCandidates[0],exact=existingBySourceId.get(key),existing=exact||byFixture;
     if(!exact&&byFixture)matchedByFixture++;
     const noteData={integration:"MONEYBALL_PUBLIC_AGGREGATOR",sources:(f as any).public_data?.sources||[source],home_form:(f as any).home_form||(f as any).public_data?.home_form||null,away_form:(f as any).away_form||(f as any).public_data?.away_form||null,public_data:(f as any).public_data||null};
     publicDataByKey.set(key,noteData);
     const row={owner_id:ownerId,scan_run_id:run.id,external_id:sourceId,source,competition:f.competition||f.league||null,country:f.country||null,gender:f.gender||"unknown",home_team:f.home_team,away_team:f.away_team,kickoff_at:f.kickoff_at||null,status:f.status||"scheduled"};
     if(existing){
-     if(source==="FootyNomad"||String(existing.source)===source){
-      const patch:any={scan_run_id:run.id,kickoff_at:row.kickoff_at,status:row.status,competition:row.competition,gender:row.gender,country:row.country};
-      if(source==="FootyNomad"&&String(existing.source)!=="FootyNomad"){patch.source=source;patch.external_id=sourceId;promotedToPrimary++;}
-      await db("matches?id=eq."+existing.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",patch);
-      updated++;
-     }
-     return;
+     if(source==="FootyNomad"||String(existing.source)===source){toUpdate.push({...row,id:existing.id});if(source==="FootyNomad"&&String(existing.source)!=="FootyNomad")promotedToPrimary++;updated++;}
+     continue;
     }
     toInsert.push(row);
-   });
-   for(let i=0;i<toInsert.length;i+=100){
-    const batch=toInsert.slice(i,i+100);
-    const insertedRows=await db("matches?on_conflict=owner_id,source,external_id",token,"POST",batch,"resolution=ignore-duplicates,return=representation");
-    inserted+=Array.isArray(insertedRows)?insertedRows.length:0;
    }
-   // Refresh IDs for newly inserted fixtures before settling completed results.
+   for(let i=0;i<toUpdate.length;i+=100)await db("matches?on_conflict=id",token,"POST",toUpdate.slice(i,i+100),"resolution=merge-duplicates,return=minimal");
+   for(let i=0;i<toInsert.length;i+=100){const batch=toInsert.slice(i,i+100);await db("matches?on_conflict=owner_id,source,external_id",token,"POST",batch,"resolution=ignore-duplicates,return=minimal");inserted+=batch.length;}
    const allIds=combined.map((f:any)=>String(f.external_id||"")).filter(Boolean);
-   const allSources=[...new Set(combined.map((f:any)=>String(f.source||"FootyNomad")))];
    const latestRows=allIds.length?await db("matches?select=id,owner_id,external_id,source,competition,home_team,away_team,kickoff_at,gender&owner_id=eq."+encodeURIComponent(ownerId)+"&kickoff_at=gte."+encodeURIComponent(dayStart)+"&kickoff_at=lt."+encodeURIComponent(nextDate),token):[];
    const matchBySourceId=new Map((latestRows||[]).map((row:any)=>[String(row.source)+"|"+String(row.external_id),row]));
-   await runLimited(combined,12,async(f:any)=>{
-    const source=String(f.source||"FootyNomad"),sourceId=String(f.external_id||""),match=matchBySourceId.get(source+"|"+sourceId);
-    const data=publicDataByKey.get(source+"|"+sourceId);
-    if(!match||!data)return;
+   const cacheRows:any[]=[];
+   for(const f of combined){
+    const source=String(f.source||"FootyNomad"),sourceId=String(f.external_id||""),match=matchBySourceId.get(source+"|"+sourceId),data=publicDataByKey.get(source+"|"+sourceId);
+    if(!match||!data)continue;
     const homeForm=data.home_form,awayForm=data.away_form;
     const validForm=(v:any)=>v&&Number.isFinite(Number(v.w))&&Number.isFinite(Number(v.d))&&Number.isFinite(Number(v.l))&&Number(v.w)+Number(v.d)+Number(v.l)===5;
-    const capturedAt=new Date().toISOString();
-    const provider_data:any={footynomad_sync:data};
+    const capturedAt=new Date().toISOString(),provider_data:any={footynomad_sync:data};
     const cacheSource=validForm(homeForm)&&validForm(awayForm)?"FootyNomad":"MONEYBALL_PUBLIC_AGGREGATOR";
     if(cacheSource==="FootyNomad")provider_data.footy_nomad_form={home_name:f.home_team,away_name:f.away_team,home:homeForm,away:awayForm,fetched_at:capturedAt};
-    await db("match_market_data?on_conflict=owner_id,match_id,source",token,"POST",{owner_id:ownerId,match_id:match.id,source:cacheSource,provider_data,captured_at:capturedAt},"resolution=merge-duplicates,return=minimal").catch((e:any)=>console.error("Public data cache write failed:",String(e)));
-   });
+    cacheRows.push({owner_id:ownerId,match_id:match.id,source:cacheSource,provider_data,captured_at:capturedAt});
+   }
+   for(let i=0;i<cacheRows.length;i+=100)await db("match_market_data?on_conflict=owner_id,match_id,source",token,"POST",cacheRows.slice(i,i+100),"resolution=merge-duplicates,return=minimal").catch((e:any)=>console.error("Public data cache batch write failed:",String(e)));
    const matchByFixture=new Map<string,any[]>();
    for(const x of latestRows||[]){const k=fixtureBaseKey(x),arr=matchByFixture.get(k)||[];arr.push(x);matchByFixture.set(k,arr);}
    await runLimited(combined,8,async(f:any)=>{
