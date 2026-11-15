@@ -248,7 +248,7 @@ function Mecze() {
       };
       let offset = 0;
       let hasMore = true;
-      let batchSize = 5;
+      let batchSize = 10;
       const maxBatches = 600;
 
       while (hasMore && totals.batches < maxBatches) {
