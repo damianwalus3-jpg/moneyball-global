@@ -281,7 +281,7 @@ async function openMatchday(date: string) {
 }
 const ESPN_LEAGUES = [
   "eng.1","eng.2","esp.1","esp.2","ita.1","ita.2","ger.1","ger.2","fra.1","fra.2",
-  "bel.1","ned.1","por.1","sco.1","uefa.champions","uefa.europa","uefa.europa.conf",
+  "bel.1","ned.1","por.1","sco.1","uefa.nations","uefa.champions","uefa.europa","uefa.europa.conf",
   "swe.1","nor.1","den.1","aut.1","sui.1","tur.1","gre.1",
   "eng.w.1","eng.w.promotion.relegation","eng.w.fa","eng.w.league_cup",
   "esp.w.1","fra.w.1","ned.w.1","ned.w.knvb_cup",
@@ -371,11 +371,14 @@ async function espn(date: string) {
       return {
         external_id: "espn:" + norm(e.id),
         source: "ESPN",
+        league_code: leagueCode,
         competition: leagueName || norm(c?.notes?.[0]?.headline || e?.name),
         country: norm(c?.venue?.address?.country) || country,
         gender: isWomen ? "women" : "unknown",
         home_team: norm(home?.team?.displayName),
         away_team: norm(away?.team?.displayName),
+        home_team_id: String(home?.team?.id || home?.id || ""),
+        away_team_id: String(away?.team?.id || away?.id || ""),
         kickoff_at: e?.date || c?.date || null,
         status: statusFromEspn(e),
         home_score: home?.score == null ? null : Number(home.score),
@@ -387,6 +390,50 @@ async function espn(date: string) {
   });
   const fixtures = results.flatMap(x => Array.isArray(x) ? x : []);
   const failures = results.filter(x => x instanceof Error) as Error[];
+  // ESPN exposes the men's UEFA Nations League as a dedicated public league.
+  // Pull each participating national team's completed season schedule so national
+  // teams are not left without form merely because club-history datasets do not cover them.
+  const nationsFixtures=fixtures.filter((x:any)=>x.league_code==="uefa.nations");
+  if(nationsFixtures.length){
+    const teams=new Map<string,string>();
+    for(const fixture of nationsFixtures){
+      if(fixture.home_team_id)teams.set(fixture.home_team_id,fixture.home_team);
+      if(fixture.away_team_id)teams.set(fixture.away_team_id,fixture.away_team);
+    }
+    const season=Number(date.slice(0,4));
+    const schedules=await mapLimit([...teams.entries()],8,async ([teamId,teamName])=>{
+      const data=await safeJson("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/teams/"+encodeURIComponent(teamId)+"/schedule?season="+season);
+      const rows:any[]=[];
+      for(const event of Array.isArray(data?.events)?data.events:[]){
+        const competition=event?.competitions?.[0]||{};
+        const competitors=Array.isArray(competition?.competitors)?competition.competitors:[];
+        const home=competitors.find((x:any)=>x.homeAway==="home")||competitors[0];
+        const away=competitors.find((x:any)=>x.homeAway==="away")||competitors[1];
+        const matchDate=String(event?.date||competition?.date||"").slice(0,10);
+        const state=competition?.status?.type?.state||event?.status?.type?.state||"";
+        const completed=competition?.status?.type?.completed===true||event?.status?.type?.completed===true||state==="post";
+        if(!completed||!matchDate||matchDate>=date||!home||!away)continue;
+        const hs=Number(home?.score?.value??home?.score?.displayValue??home?.score);
+        const as=Number(away?.score?.value??away?.score?.displayValue??away?.score);
+        if(!Number.isInteger(hs)||!Number.isInteger(as))continue;
+        const isHome=String(home?.team?.id||home?.id||"")===teamId;
+        const own=isHome?hs:as,opp=isHome?as:hs;
+        const opponent=norm((isHome?away:home)?.team?.displayName||(isHome?away:home)?.displayName);
+        if(!opponent)continue;
+        rows.push({date:matchDate,opponent,result:own>opp?"W":own<opp?"L":"D",goals_for:own,goals_against:opp,source:"ESPN_UEFA_NATIONS_SCHEDULE"});
+      }
+      rows.sort((a,b)=>b.date.localeCompare(a.date));
+      const last10=rows.slice(0,10),w=last10.filter(x=>x.result==="W").length,d=last10.filter(x=>x.result==="D").length,l=last10.filter(x=>x.result==="L").length;
+      return {teamId,teamName,form:last10.length?{matches:last10.length,w,d,l,points:w*3+d,goals_for:last10.reduce((s,x)=>s+x.goals_for,0),goals_against:last10.reduce((s,x)=>s+x.goals_against,0),last10,source:"ESPN_UEFA_NATIONS_SCHEDULE"}:null};
+    });
+    const formByTeam=new Map<string,any>();
+    for(const item of schedules)if(item.form)formByTeam.set(norm(item.teamName).normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim(),item.form);
+    const key=(value:string)=>norm(value).normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+    for(const fixture of nationsFixtures){
+      fixture.home_form=formByTeam.get(key(fixture.home_team))||fixture.home_form||null;
+      fixture.away_form=formByTeam.get(key(fixture.away_team))||fixture.away_form||null;
+    }
+  }
   const womenFixtures=fixtures.filter((x:any)=>x.gender==="women");
   let womenHistory:any={forms:new Map(),teams:0,matches:0,errors:0,dates:0,leagues:0};
   if(womenFixtures.length){
