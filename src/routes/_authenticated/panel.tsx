@@ -118,11 +118,11 @@ function Panel() {
       <p className="mb-3 text-sm text-muted-foreground">Najważniejsze typy są na górze, a niżej znajdziesz statystyki i pozostałe sekcje.</p>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <DashboardTile to="/mecze" label="Mecze dziś" value={summary.matches_today} icon={CalendarDays} />
-        <DashboardTile to="/statystyki" label="Skuteczność 1X2" value={fmtPct(hr1.rate)} hint={`${hr1.won}/${hr1.settled} · model ogółem`} icon={Trophy} />
-        <DashboardTile to="/statystyki" label="Skuteczność DC" value={fmtPct(hrDc.rate)} hint={`${hrDc.won}/${hrDc.settled} · model ogółem`} icon={Trophy} />
-        <DashboardTile to="/statystyki" label="Skuteczność goli" value={fmtPct(hrGoals?.rate ?? null)} hint={`${hrGoals?.won ?? 0}/${hrGoals?.settled ?? 0} rozliczonych`} icon={Trophy} />
+        <DashboardTile to="/statystyki" label="Skuteczność 1X2" value={fmtPct(hr1.rate)} hint={`${hr1.won}/${hr1.settled} · historia modelu`} icon={Trophy} />
+        <DashboardTile to="/statystyki" label="Skuteczność DC" value={fmtPct(hrDc.rate)} hint={`${hrDc.won}/${hrDc.settled} · historia modelu`} icon={Trophy} />
+        <DashboardTile to="/statystyki" label="Skuteczność goli" value={fmtPct(hrGoals?.rate ?? null)} hint={`${hrGoals?.won ?? 0}/${hrGoals?.settled ?? 0} · historia modelu`} icon={Trophy} />
         <DashboardTile to="/kupony" label="Kupony w grze" value={summary.coupons_in_play} icon={Ticket} />
-        <DashboardTile to="/kupony" label="Kandydaci >75%" value={summary.candidates} hint="mecze do kuponów" icon={Trophy} />
+        <DashboardTile to="/kupony" label="Kandydaci >75%" value={summary.candidates} hint="dzisiejsze mecze · powyżej 75%" icon={Trophy} />
         <DashboardTile to="/historia" label="Do rozliczenia" value={summary.to_settle} hint="wyniki i rozliczenia" icon={CalendarDays} tone={summary.to_settle ? "warning" : "default"} />
       </div>
       {summary.matches_today === 0 && (
