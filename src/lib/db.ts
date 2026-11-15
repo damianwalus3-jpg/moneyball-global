@@ -16,6 +16,13 @@ export interface DashboardSummary {
   hit_rates: Partial<Record<"1X2" | "DOUBLE_CHANCE" | "GOALS", DashboardMarketStats>>;
 }
 
+function withRequestTimeout<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(label + ": brak odpowiedzi serwera po " + Math.round(ms / 1000) + " s. Sprawdź połączenie z bazą i spróbuj ponownie.")), ms);
+    promise.then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 interface PgError {
   code?: string;
   message?: string;
@@ -53,13 +60,13 @@ export function ownerColumn() {
 }
 
 export async function currentUserId(): Promise<string> {
-  const { data, error } = await requireSupabase().auth.getUser();
+  const { data, error } = await withRequestTimeout(requireSupabase().auth.getUser(), "Weryfikacja sesji", 8_000);
   if (error || !data.user?.id) throw new Error("Sesja wygasła. Zaloguj się ponownie.");
   return data.user.id;
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
-  const { data, error } = await requireSupabase().rpc("moneyball_dashboard_summary");
+  const { data, error } = await withRequestTimeout(requireSupabase().rpc("moneyball_dashboard_summary"), "Pobieranie podsumowania panelu");
   if (error) throw new Error(humanizeError(error));
   return data as DashboardSummary;
 }
@@ -85,7 +92,7 @@ export interface DashboardSelectedPick {
 
 /** Small, date-scoped dashboard read; never downloads the user's full prediction history. */
 export async function fetchDashboardSelectedPicks(): Promise<DashboardSelectedPick[]> {
-  const { data, error } = await requireSupabase().rpc("moneyball_dashboard_selected_picks");
+  const { data, error } = await withRequestTimeout(requireSupabase().rpc("moneyball_dashboard_selected_picks"), "Pobieranie wybranych typów");
   if (error) throw new Error(humanizeError(error));
   return (data ?? []) as DashboardSelectedPick[];
 }
