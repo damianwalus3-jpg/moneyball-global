@@ -16,10 +16,10 @@ export interface DashboardSummary {
   hit_rates: Partial<Record<"1X2" | "DOUBLE_CHANCE" | "GOALS", DashboardMarketStats>>;
 }
 
-function withRequestTimeout<T>(promise: Promise<T>, label: string, ms = 10_000): Promise<T> {
+function withRequestTimeout<T>(request: PromiseLike<T>, label: string, ms = 10_000): Promise<T> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(label + ": brak odpowiedzi serwera po " + Math.round(ms / 1000) + " s. Sprawdź połączenie z bazą i spróbuj ponownie.")), ms);
-    promise.then(resolve, reject).finally(() => clearTimeout(timer));
+    Promise.resolve(request).then(resolve, reject).finally(() => clearTimeout(timer));
   });
 }
 
