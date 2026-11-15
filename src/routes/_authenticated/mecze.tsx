@@ -333,8 +333,7 @@ function Mecze() {
     // Historical and future fixtures stay in the database for settlement/audit, but
     // must never leak into today's scan/list.
     .filter((match) => matchDay(match) === today)
-    .filter((match) => /nations league/i.test(`${match.competition ?? ""} ${match.league ?? ""}`))
-    .filter((match) => {
+        .filter((match) => {
       const isFinished = match.status === "finished" || resultBy.has(match.id);
       if (view === "upcoming") return !isFinished && !["postponed", "cancelled"].includes(match.status);
       if (view === "past") return isFinished;
