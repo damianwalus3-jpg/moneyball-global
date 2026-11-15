@@ -39,7 +39,7 @@ function Panel() {
   // Dashboard sections load independently: a slow summary RPC must not hide the whole panel.
   const summaryQuery = useQuery(dashboardSummaryQuery());
   const selectedQuery = useQuery(dashboardSelectedPicksQuery());
-  const summary = summaryQuery.data ?? { matches_today: 0, bankroll: null, coupons_in_play: 0, candidates: 0, to_settle: 0, hit_rates: {} };
+  const summary = summaryQuery.data ?? { matches_today: 0, bankroll: null, coupons_in_play: 0, candidates: 0, to_settle: 0, hit_rates: { "1X2": { won: 0, settled: 0, rate: null }, DOUBLE_CHANCE: { won: 0, settled: 0, rate: null }, GOALS: { won: 0, settled: 0, rate: null } } };
   const selectedRows = selectedQuery.data ?? [];
   const selectedPicks = selectedRows.map((row) => ({
     prediction: {
