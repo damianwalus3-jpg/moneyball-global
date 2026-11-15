@@ -1,6 +1,13 @@
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import { Loader2, LogIn } from "lucide-react";
 import { useState } from "react";
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error("Serwer logowania nie odpowiedział w ciągu 25 sekund. Spróbuj ponownie za chwilę.")), ms);
+    promise.then(resolve, reject).finally(() => window.clearTimeout(timer));
+  });
+}
 import { toast } from "sonner";
 import { Brand } from "@/components/app/AppShell";
 import { Field } from "@/components/app/ui-bits";
@@ -54,7 +61,7 @@ function Login() {
     try {
       const sb = requireSupabase();
       if (mode === "login") {
-        const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
+        const { error } = await withTimeout(sb.auth.signInWithPassword({ email: email.trim(), password }), 25_000);
         if (error) throw new Error(error.message === "Invalid login credentials" ? "Nieprawidłowy e-mail lub hasło." : error.message);
         toast.success("Zalogowano");
         router.history.push(search.redirect ?? "/panel");
@@ -76,7 +83,10 @@ function Login() {
         setInfo("Jeśli konto istnieje, wysłaliśmy link do zmiany hasła.");
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Wystąpił błąd.");
+      const message = e instanceof Error ? e.message : "Wystąpił błąd.";
+      setError(/\b504\b|gateway timeout|upstream timed out/i.test(message)
+        ? "Serwer logowania Supabase chwilowo nie odpowiada (504). To nie oznacza błędnego hasła. Spróbuj ponownie za chwilę."
+        : message);
     } finally {
       setBusy(false);
     }
