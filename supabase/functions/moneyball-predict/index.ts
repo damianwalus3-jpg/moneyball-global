@@ -567,10 +567,10 @@ const history=historyTimed||[];
  }
  // Fetch a small, bounded number of missing FotbalInfo forms per batch.
  // Keep concurrency low and cache successful responses so later scans do not repeat requests.
- const fotbalResults=await mapLimit(fotbalCandidates.slice(0,2),2,async (item:any)=>{
+ const fotbalResults=await Promise.all(fotbalCandidates.slice(0,2).map(async (item:any)=>{
   const form=await readFotbalInfoForm(item);
-  return {id:item.id,form};
- });
+  return {status:"fulfilled",value:{id:item.id,form}};
+ }).catch((error:any)=>({status:"rejected",reason:error}))));
  const fotbalCacheWrites:any[]=[];
  for(const result of fotbalResults){
   if(result.status!=="fulfilled"||!result.value?.form)continue;
