@@ -248,20 +248,42 @@ function Mecze() {
       };
       let offset = 0;
       let hasMore = true;
-      const maxBatches = 100;
+      let batchSize = 5;
+      const maxBatches = 600;
 
       while (hasMore && totals.batches < maxBatches) {
         setPredictionProgress("Analiza partii " + (totals.batches + 1) + " · od meczu " + (offset + 1) + "…");
-        const prediction = await sb.functions.invoke("moneyball-predict", { body: { date, offset } });
-        if (prediction.error) {
-          let detail = prediction.error.message;
+        let prediction: any = null;
+        let lastDetail = "";
+        for (let attempt = 0; attempt < 4; attempt++) {
+          prediction = await sb.functions.invoke("moneyball-predict", { body: { date, offset, batch_size: batchSize } });
+          if (!prediction.error) break;
+          const context = (prediction.error as any).context;
+          const status = Number(context?.status ?? (prediction.error as any).status ?? 0);
+          lastDetail = String(prediction.error.message || "Nieznany błąd Edge Function");
           try {
-            const context = (prediction.error as any).context;
-            const payload = context && typeof context.json === "function" ? await context.clone().json() : null;
-            if (payload?.error) detail = String(payload.error);
-            else if (payload?.message) detail = String(payload.message);
-          } catch { /* keep the SDK message when the response has no JSON body */ }
-          throw new Error("Prognozowanie partii " + (totals.batches + 1) + " nie powiodło się: " + detail);
+            if (context && typeof context.clone === "function") {
+              const responseCopy = context.clone();
+              const raw = await responseCopy.text();
+              if (raw) {
+                try {
+                  const payload = JSON.parse(raw);
+                  lastDetail = String(payload.error ?? payload.message ?? raw);
+                } catch { lastDetail = raw.slice(0, 1200); }
+              }
+            }
+          } catch { /* retain the SDK error if the response body cannot be read */ }
+          const retryable = status === 546 || status === 502 || status === 503 || status === 504 ||
+            /546|non-2xx|timeout|timed out|worker exceeded/i.test(lastDetail);
+          if (retryable && batchSize > 1 && attempt < 3) {
+            batchSize = Math.max(1, Math.floor(batchSize / 2));
+            setPredictionProgress("Limit zasobów · zmniejszam partię do " + batchSize + " meczów i ponawiam…");
+            continue;
+          }
+          break;
+        }
+        if (prediction?.error) {
+          throw new Error("Prognozowanie partii " + (totals.batches + 1) + " (od meczu " + (offset + 1) + ", partia " + batchSize + ") nie powiodło się: " + lastDetail);
         }
         if (!prediction.data || prediction.data.ok === false)
           throw new Error("Prognozowanie partii " + (totals.batches + 1) + " nie powiodło się: " + (prediction.data?.error ?? "Nieznany błąd silnika."));
@@ -274,7 +296,7 @@ function Mecze() {
         }
         totals.batches += 1;
         hasMore = prediction.data.has_more === true;
-        if (hasMore) offset += Math.max(1, Number(prediction.data.batch_size) || 30);
+        if (hasMore) offset += Math.max(1, Number(prediction.data.batch_size) || batchSize);
       }
 
       if (hasMore)
