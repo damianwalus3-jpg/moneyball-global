@@ -512,6 +512,22 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   if(fotbalInfoContext?.home&&fotbalInfoContext?.away){
    coverage={...coverage,home_form:fotbalInfoContext.home,away_form:fotbalInfoContext.away,history_source:"FOTBALINFO_PREMATCH",home_history_matches:fotbalInfoContext.home.matches,away_history_matches:fotbalInfoContext.away.matches,fotbalinfo_form:true};
   }
+  // Keep recent team form visible even when 1X2 probabilities come from a market feed.
+  // Market odds are not a substitute for team history; fetch the same public form sources
+  // for the detail panel and record their provenance in data_coverage.
+  const displayKickoff=String(m.kickoff_at||`${matchDate(m)}T00:00:00.000Z`);
+  const displayPublicForm=publicFormForMatch(m,publicForms);
+  const displayGithubHome=githubTeamForm(String(m.home_team),displayKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));
+  const displayGithubAway=githubTeamForm(String(m.away_team),displayKickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));
+  const displayHomeForm=coverage.home_form||displayPublicForm?.home||displayGithubHome||null;
+  const displayAwayForm=coverage.away_form||displayPublicForm?.away||displayGithubAway||null;
+  if(displayHomeForm||displayAwayForm){
+   coverage={...coverage,home_form:displayHomeForm,away_form:displayAwayForm,
+    history_source:displayHomeForm?.source||displayAwayForm?.source||displayPublicForm?.source||"PUBLIC_TEAM_HISTORY",
+    home_history_matches:Number(displayHomeForm?.matches||displayHomeForm?.last10?.length||0),
+    away_history_matches:Number(displayAwayForm?.matches||displayAwayForm?.last10?.length||0),
+    recent_form_sources:[...new Set([displayHomeForm?.source,displayAwayForm?.source].filter(Boolean))]};
+  }
   const bothTeamsCovered=!!(model.market||(model.history&&model.home_matches>=3&&model.away_matches>=3));const dataCovered=bothTeamsCovered;if(dataCovered)covered++;else missing++;
   const preds:any[]=[];
   if(hasModel){const opts=[["1",model.p1],["X",model.px],["2",model.p2]];const best=opts.sort((x:any,y:any)=>y[1]-x[1])[0];preds.push({market:"1X2",selection:best[0],probability:best[1]});for(const [sel,val] of [["1X",model.p1+model.px],["X2",model.px+model.p2],["12",model.p1+model.p2]])preds.push({market:"DOUBLE_CHANCE",selection:sel,probability:+val.toFixed(1)});}
