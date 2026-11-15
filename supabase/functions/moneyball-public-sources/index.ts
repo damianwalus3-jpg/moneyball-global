@@ -420,12 +420,53 @@ async function espn(date: string) {
         const own=isHome?hs:as,opp=isHome?as:hs;
         const opponent=norm((isHome?away:home)?.team?.displayName||(isHome?away:home)?.displayName);
         if(!opponent)continue;
-        rows.push({date:matchDate,opponent,result:own>opp?"W":own<opp?"L":"D",goals_for:own,goals_against:opp,source:"ESPN_UEFA_NATIONS_SCHEDULE"});
+        rows.push({event_id:String(event?.id||competition?.id||""),team_id:teamId,opponent_id:String((isHome?away:home)?.team?.id||(isHome?away:home)?.id||""),date:matchDate,opponent,result:own>opp?"W":own<opp?"L":"D",goals_for:own,goals_against:opp,source:"ESPN_UEFA_NATIONS_SCHEDULE"});
       }
       rows.sort((a,b)=>b.date.localeCompare(a.date));
       const last10=rows.slice(0,10),w=last10.filter(x=>x.result==="W").length,d=last10.filter(x=>x.result==="D").length,l=last10.filter(x=>x.result==="L").length;
       return {teamId,teamName,form:last10.length?{matches:last10.length,w,d,l,points:w*3+d,goals_for:last10.reduce((s,x)=>s+x.goals_for,0),goals_against:last10.reduce((s,x)=>s+x.goals_against,0),last10,source:"ESPN_UEFA_NATIONS_SCHEDULE"}:null};
     });
+    // Enrich the most recent five national-team fixtures with ESPN match statistics.
+    // Only values actually returned by the match summary are retained; missing stats stay null.
+    const recentEventIds=[...new Set(schedules.flatMap((item:any)=>(item.form?.last10||[]).slice(0,5).map((x:any)=>x.event_id).filter(Boolean)))];
+    const summaries=await mapLimit(recentEventIds,6,async(eventId:string)=>{
+      const data=await safeJson("https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/summary?event="+encodeURIComponent(eventId));
+      const teams=Array.isArray(data?.boxscore?.teams)?data.boxscore.teams:[];
+      const stats=new Map<string,any>();
+      for(const entry of teams){
+        const id=String(entry?.team?.id||"");if(!id)continue;
+        const values:Record<string,number|null>={};
+        for(const stat of Array.isArray(entry?.statistics)?entry.statistics:[]){
+          const key=String(stat?.name||"");const value=Number(stat?.displayValue);
+          if(["totalShots","shotsOnTarget","wonCorners","possessionPct","yellowCards","redCards","foulsCommitted"].includes(key))
+            values[key]=Number.isFinite(value)?value:null;
+        }
+        stats.set(id,values);
+      }
+      return {eventId,stats};
+    });
+    const statsByEvent=new Map(summaries.map((item:any)=>[item.eventId,item.stats]));
+    for(const item of schedules){
+      if(!item.form)continue;
+      for(const game of item.form.last10||[]){
+        if(!game.event_id)continue;
+        const stats:any=statsByEvent.get(game.event_id);
+        const teamStats=stats?.get(item.teamId);
+        if(!teamStats)continue;
+        game.shots_for=teamStats.totalShots??null;
+        game.shots_on_target_for=teamStats.shotsOnTarget??null;
+        game.corners_for=teamStats.wonCorners??null;
+        game.possession_pct=teamStats.possessionPct??null;
+        game.yellow_cards=teamStats.yellowCards??null;
+        game.red_cards=teamStats.redCards??null;
+        game.fouls=teamStats.foulsCommitted??null;
+      }
+      const games=(item.form.last10||[]).slice(0,5);
+      const mean=(key:string)=>{const values=games.map((x:any)=>x[key]).filter((x:any)=>x!==null&&x!==undefined&&Number.isFinite(Number(x)));return values.length?+(values.reduce((s:number,v:any)=>s+Number(v),0)/values.length).toFixed(1):null;};
+      item.form.avg_shots_for=mean("shots_for");
+      item.form.avg_shots_on_target_for=mean("shots_on_target_for");
+      item.form.avg_corners_for=mean("corners_for");
+    }
     const formByTeam=new Map<string,any>();
     for(const item of schedules)if(item.form)formByTeam.set(norm(item.teamName).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim(),item.form);
     const key=(value:string)=>norm(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
