@@ -46,7 +46,7 @@ const TIME_ZONE_BY_COUNTRY: Record<string,string> = {
   AUT:"Europe/Vienna", SUI:"Europe/Zurich", CHE:"Europe/Zurich", CZE:"Europe/Prague",
   SVK:"Europe/Bratislava", SVN:"Europe/Ljubljana", CRO:"Europe/Zagreb", SRB:"Europe/Belgrade",
   HUN:"Europe/Budapest", NOR:"Europe/Oslo", SWE:"Europe/Stockholm", DEN:"Europe/Copenhagen",
-  DNK:"Europe/Copenhagen", ROU:"Europe/Bucharest", BUL:"Europe/Sofia", GRE:"Europe/Athens",
+  DNK:"Europe/Copenhagen",
   GRC:"Europe/Athens", ALB:"Europe/Tirane", BIH:"Europe/Sarajevo", MNE:"Europe/Podgorica",
   MKD:"Europe/Skopje", KOS:"Europe/Belgrade", MLT:"Europe/Malta", LUX:"Europe/Luxembourg",
 };
@@ -196,7 +196,7 @@ async function openMatchday(date: string) {
       status: "scheduled",
     })).filter(x => x.home_team && x.away_team);
   });
-  const fixtures = results.flatMap(x => Array.isArray(x) ? x : []);
+  const fixtures: any[] = results.flatMap(x => Array.isArray(x) ? x : []);
   // Cup fixtures often have no recent cup-only results. Build a country-wide
   // club history from every available non-cup competition in the same country.
   // This improves form coverage without inventing scores or using another club's data.
@@ -779,7 +779,7 @@ Deno.serve(async (req: Request) => {
     }
     const eloData=be.status==="fulfilled"?be.value:null;
     sources["BeyondELO"]=be.status==="fulfilled"
-      ? {ok:true,ratings_count:eloData.ratings_count,raw_count:eloData.raw_count,as_of:eloData.as_of,stale:eloData.stale,licence:"CC BY 4.0"}
+      ? {ok:true,ratings_count:eloData?.ratings_count??0,raw_count:eloData?.raw_count??0,as_of:eloData?.as_of??null,stale:eloData?.stale??true,licence:"CC BY 4.0"}
       : {ok:false,error:String(be.reason)};
     const eloByKey=new Map<string,any>();
     for(const rating of (eloData?.items||[])){
