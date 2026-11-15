@@ -52,6 +52,8 @@ type TeamForm = {
   w?: number; d?: number; l?: number; matches?: number; goals_for?: number; goals_against?: number;
   last5?: RecentGame[]; last10?: RecentGame[]; source?: string;
   avg_shots_for?: number | null; avg_shots_on_target_for?: number | null; avg_corners_for?: number | null;
+  avg_possession_pct?: number | null; avg_yellow_cards?: number | null; avg_red_cards?: number | null; avg_fouls?: number | null;
+  home_matches?: number | null; away_matches?: number | null; neutral_matches?: number | null;
   xg_last10?: { xg_for?: number; xg_against?: number }[];
 };
 
@@ -151,6 +153,12 @@ function RecentFormCard({ title, form }: { title: string; form: TeamForm | null 
           <p>Średnio zdobyte / stracone gole: {averageGoals(form, "goals_for") ?? "—"} / {averageGoals(form, "goals_against") ?? "—"}</p>
           {(form.avg_shots_for != null || form.avg_shots_on_target_for != null || form.avg_corners_for != null) && (
             <p>Śr. strzały / celne / rożne: {form.avg_shots_for ?? "—"} / {form.avg_shots_on_target_for ?? "—"} / {form.avg_corners_for ?? "—"}</p>
+          )}
+          {(form.avg_possession_pct != null || form.avg_yellow_cards != null || form.avg_red_cards != null || form.avg_fouls != null) && (
+            <p>Śr. posiadanie piłki / żółte / czerwone / faule: {form.avg_possession_pct != null ? form.avg_possession_pct + "%" : "—"} / {form.avg_yellow_cards ?? "—"} / {form.avg_red_cards ?? "—"} / {form.avg_fouls ?? "—"}</p>
+          )}
+          {(form.home_matches != null || form.away_matches != null || form.neutral_matches != null) && (
+            <p>Mecze w serii: dom {form.home_matches ?? "—"} · wyjazd {form.away_matches ?? "—"} · neutralne {form.neutral_matches ?? "—"}</p>
           )}
           {Array.isArray(form.xg_last10) && form.xg_last10.length > 0 && (
             <p>Śr. xG / xGA: {(form.xg_last10.reduce((sum, game) => sum + Number(game.xg_for ?? 0), 0) / form.xg_last10.length).toFixed(2)} / {(form.xg_last10.reduce((sum, game) => sum + Number(game.xg_against ?? 0), 0) / form.xg_last10.length).toFixed(2)} ({form.xg_last10.length} meczów)</p>
