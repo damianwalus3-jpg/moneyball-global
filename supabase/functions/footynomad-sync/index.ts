@@ -110,9 +110,9 @@ Deno.serve(async(req)=>{
    const seenSourceIds=new Set<string>();
    for(const f of combined){
     const source=String(f.source||"FootyNomad"),sourceId=String(f.external_id||"");
-    if(!sourceId)return;
+    if(!sourceId)continue;
     const key=source+"|"+sourceId;
-    if(seenSourceIds.has(key))return;
+    if(seenSourceIds.has(key))continue;
     seenSourceIds.add(key);
     const fixtureCandidates=(existingByFixture.get(fixtureBaseKey(f))||[]).filter((x:any)=>genderCompatible(x,f)).sort((a:any,b:any)=>fixturePriority(b)-fixturePriority(a));
     const byFixture=fixtureCandidates[0],exact=existingBySourceId.get(key),existing=exact||byFixture;
