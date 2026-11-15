@@ -24,6 +24,10 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Install Deno
+        uses: denoland/setup-deno@v2
+      - name: Type-check Supabase Edge Functions
+        run: deno check --no-lock supabase/functions/*/index.ts
 
       - name: Run tests
         run: bun run test
