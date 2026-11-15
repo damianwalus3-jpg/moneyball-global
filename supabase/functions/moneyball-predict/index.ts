@@ -515,10 +515,12 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   }
   return {id:m.id,form};
  });
- const publicForms=await readPublicSourceForms(date,requestToken);
- const internationalForms=await readInternationalTeamForms(date);
- const githubPublic=await readGitHubPublicTeamHistory();
- const openPlayXg=await readOpenPlayXgData();
+ const [publicForms,internationalForms,githubPublic,openPlayXg]=await Promise.all([
+  readPublicSourceForms(date,requestToken),
+  readInternationalTeamForms(date),
+  readGitHubPublicTeamHistory(),
+  readOpenPlayXgData()
+ ]);
  const marketRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI",token);const marketMap=new Map((marketRows||[]).map((x:any)=>[x.match_id,x.provider_data]));
  const providerOddsRows=matches.length?await db("provider_odds?select=match_id,mapped_market,mapped_selection,odds,bookmaker,provider,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&suspended=eq.false&phase=eq.prematch&captured_at=gte."+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+"&mapped_market=not.is.null&mapped_selection=not.is.null&match_id=in.("+matches.map((x:any)=>x.id).join(",")+")&order=captured_at.desc",token).catch(()=>[]):[];
  const providerOddsMap=new Map<string,any>();
