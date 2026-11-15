@@ -637,6 +637,8 @@ function Mecze() {
                                     const coverage = asObject(p.data_coverage);
                                     const homeForm = asTeamForm(coverage["home_form"]);
                                     const awayForm = asTeamForm(coverage["away_form"]);
+                                    const homeSquad = Array.isArray(coverage["home_squad"]) ? coverage["home_squad"] as Record<string, unknown>[] : [];
+                                    const awaySquad = Array.isArray(coverage["away_squad"]) ? coverage["away_squad"] as Record<string, unknown>[] : [];
                                     const reason = readableReason(p, homeForm, awayForm, coverage);
                                     const rejected = p.verdict === "ODRZUCONY";
                                     return (
@@ -668,6 +670,35 @@ function Mecze() {
                                           <div className="grid gap-2 md:grid-cols-2">
                                             <RecentFormCard title={m.home_team} form={homeForm} />
                                             <RecentFormCard title={m.away_team} form={awayForm} />
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <div className="mb-2 text-sm font-semibold">Dostępność kadry i kontuzje</div>
+                                          <p className="mb-2 text-[11px] text-muted-foreground">{String(coverage["squad_note"] || "Dane kadrowe pochodzą z publicznego rosteru ESPN i nie potwierdzają składu meczowego.")}</p>
+                                          <div className="grid gap-2 md:grid-cols-2">
+                                            {([[m.home_team, homeSquad, "home"], [m.away_team, awaySquad, "away"]] as const).map(([team, squad, side]) => (
+                                              <div key={side} className="rounded-lg border border-border bg-secondary/20 p-3">
+                                                <div className="mb-2 flex items-center justify-between gap-2">
+                                                  <span className="text-sm font-semibold">{team}</span>
+                                                  <Badge variant="outline">{squad.length ? squad.length + " zawodników" : "Brak kadry"}</Badge>
+                                                </div>
+                                                {squad.length ? (
+                                                  <div className="grid gap-1">
+                                                    {squad.map((player, index) => (
+                                                      <div key={String(player.id || index)} className="flex justify-between gap-2 text-xs">
+                                                        <span className="min-w-0 truncate">{String(player.name || "Nieznany zawodnik")}</span>
+                                                        <span className="shrink-0 text-muted-foreground">{String(player.position || "")}{player.jersey ? " · #" + String(player.jersey) : ""}</span>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                ) : <p className="text-xs text-muted-foreground">Źródło nie zwróciło listy kadry.</p>}
+                                                <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
+                                                  {coverage[side + "_injuries_available"] === true
+                                                    ? "Raport urazów dostępny: " + String(coverage[side + "_injury_count"] ?? "—")
+                                                    : "Brak publicznego raportu kontuzji — nie oznacza to braku kontuzjowanych zawodników."}
+                                                </p>
+                                              </div>
+                                            ))}
                                           </div>
                                         </div>
                                       </div>
