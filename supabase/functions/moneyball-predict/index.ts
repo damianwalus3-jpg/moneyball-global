@@ -122,7 +122,14 @@ function parseFotbalFormSection(markdown:string,kickoff:string){
  return sections.map((section:string)=>{
   const body=section.split("Victorii–egaluri–înfrângeri")[0];
   const games:any[]=[];
-  for(const line of body.split(/\\r?\\n/)){
+  for(const line of body.split(/\\r?\\function isTopTwoTierLeague(competition: unknown): boolean {
+ const comp=String(competition??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+ if(!comp)return false;
+ if(/\\b(u(?:17|18|19|20|21|23)|under ?(?:17|18|19|20|21|23)|youth|junior(?:s)?|academy|juvenil|jugend|reserve|reserves|b team)\\b/.test(comp))return false;
+ if(/\\b(?:3|4|5|6|7|8|9|iii|iv|v|vi)\\s*(?:\\.\\s*)?(?:liga|league|division|div|bundesliga|serie|snl|hnl|federal|federation)\\b|\\b(?:third|fourth|fifth|regional|regionalliga|oberliga|national league north|national league south|non league|non-league)\\b/.test(comp))return false;
+ return /\\b(?:premier league|premiership|championship|super league|superliga|super lig|pro league|jupiler pro league|challenger pro league|bundesliga|2 bundesliga|ligue 1|ligue 2|serie a|serie b|la liga|laliga|segunda division|segunda liga|eredivisie|keuken kampioen divisie|primeira liga|ekstraklasa|1 liga|2 liga|liga i|liga ii|liga 1|liga 2|prva liga|hnl|1 hnl|2 hnl|first league|second league|first division|second division|division 1|division 2|div 1|div 2|1st division|2nd division|1st league|2nd league|a lyga|virsliga|meistriliiga|veikkausliiga|ykkosliiga|allsvenskan|superettan|eliteserien|obos ligaen|premier division|league of ireland premier|league of ireland first|scottish championship)\\b/.test(comp);
+}
+n/)){
    if(!/^\\s*\\*/.test(line))continue;
    const plain=line.replace(/\[([^\]]+)\]\([^)]+\)/g," $1 ").replace(/\*\*/g," ").replace(/\*/g," ").replace(/\s+/g," ").trim();
    const match=plain.match(/^(\\d{1,2})\\.(\\d{1,2})\\s+([DA])\\s+(.+?)\\s+(\\d{1,2})\\s*[–−-]\\s*(\\d{1,2})\\s+([VEÎ])$/i);
@@ -517,7 +524,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  const all=await db("matches?select=id,owner_id,scan_run_id,external_id,source,competition,league,country,gender,home_team,away_team,kickoff_at,kickoff_date,status&owner_id=eq."+encodeURIComponent(ownerId)+"&or=(and(kickoff_at.gte."+encodeURIComponent(fromUtc)+",kickoff_at.lt."+encodeURIComponent(toUtc)+"),and(kickoff_at.is.null,kickoff_date.eq."+date+"))&order=kickoff_at.asc,id.asc&limit="+batchSize+"&offset="+analysisOffset,token);
  const dateFromExternalId=(m:any)=>/:(\\d{4}-\\d{2}-\\d{2}):/.exec(String(m.external_id||""))?.[1]||null;
  const matchDate=(m:any)=>m.kickoff_at?new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(m.kickoff_at)):(String(m.kickoff_date||"").slice(0,10)||dateFromExternalId(m));
- const rawDateMatches=all.filter((m:any)=>matchDate(m)===date&&isEuropeanFixture(m.country,m.competition||m.league,m.home_team,m.away_team));
+ const rawDateMatches=all.filter((m:any)=>matchDate(m)===date&&isEuropeanFixture(m.country,m.competition||m.league,m.home_team,m.away_team)&&isTopTwoTierLeague(m.competition||m.league));
  const deduped=dedupeFixturesByDate(rawDateMatches,matchDate);const matches=deduped.matches;const duplicatesRemoved=deduped.duplicatesRemoved;
  const historyFields="select=id,home_team,away_team,kickoff_at,gender,match_results(home_score,away_score,verified)";
  const historySince=new Date(Date.parse(date+"T00:00:00Z")-240*24*60*60*1000).toISOString();
