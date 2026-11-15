@@ -483,11 +483,19 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  const date=String(body.date||new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()));
  const requestedOffset=Number.isFinite(Number(body.offset))?Math.max(0,Math.floor(Number(body.offset))):0;
  const analysisOffset=Math.min(requestedOffset,3000);
- // Query a wide UTC window, then apply the exact Europe/Brussels calendar-day filter below.
- const beforeDate=new Date(date+"T12:00:00Z");beforeDate.setUTCDate(beforeDate.getUTCDate()-1);
- const afterDate=new Date(date+"T12:00:00Z");afterDate.setUTCDate(afterDate.getUTCDate()+2);
- const fromUtc=beforeDate.toISOString().slice(0,10)+"T00:00:00Z";
- const toUtc=afterDate.toISOString().slice(0,10)+"T00:00:00Z";
+ // Query only the exact Europe/Brussels calendar day. This avoids earlier UTC-day
+ // fixtures consuming pagination slots before today's local fixtures.
+ const nextDateObj=new Date(date+"T12:00:00Z");nextDateObj.setUTCDate(nextDateObj.getUTCDate()+1);
+ const nextDate=nextDateObj.toISOString().slice(0,10);
+ const brusselsMidnightUtc=(day:string)=>{
+  const utcMidnight=new Date(day+"T00:00:00.000Z");
+  const parts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"}).formatToParts(utcMidnight);
+  const values=Object.fromEntries(parts.map((part:any)=>[part.type,part.value]));
+  const localClockAsUtc=Date.UTC(Number(values.year),Number(values.month)-1,Number(values.day),Number(values.hour),Number(values.minute),Number(values.second));
+  return new Date(utcMidnight.getTime()-(localClockAsUtc-utcMidnight.getTime())).toISOString();
+ };
+ const fromUtc=brusselsMidnightUtc(date);
+ const toUtc=brusselsMidnightUtc(nextDate);
  const all=await db("matches?select=id,owner_id,scan_run_id,external_id,source,competition,league,country,gender,home_team,away_team,kickoff_at,kickoff_date,status&owner_id=eq."+encodeURIComponent(ownerId)+"&or=(and(kickoff_at.gte."+encodeURIComponent(fromUtc)+",kickoff_at.lt."+encodeURIComponent(toUtc)+"),and(kickoff_at.is.null,kickoff_date.eq."+date+"))&order=kickoff_at.asc&limit=150&offset="+analysisOffset,token);
  const dateFromExternalId=(m:any)=>/:(\\d{4}-\\d{2}-\\d{2}):/.exec(String(m.external_id||""))?.[1]||null;
  const matchDate=(m:any)=>m.kickoff_at?new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(m.kickoff_at)):(String(m.kickoff_date||"").slice(0,10)||dateFromExternalId(m));
