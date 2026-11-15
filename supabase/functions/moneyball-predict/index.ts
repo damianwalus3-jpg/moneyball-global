@@ -562,6 +562,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  const tipsAudit=await readTipsAuditFairMarket(date,matches);
  const rows:any[]=[];let covered=0,missing=0;
  for(const m of matches){
+  try {
   const market:any=marketMap.get(m.id)||tipsAudit.byMatch.get(m.id);let model:any=null,coverage:any={market_odds:false,elo:false,verified_history:false};
   if(market?.market_probabilities){const mp=market.market_probabilities,stamp=Date.parse(String(market.captured_at||market.provider_data?.captured_at||"")),fresh=Number.isFinite(stamp)&&Date.now()-stamp>=0&&Date.now()-stamp<=48*60*60*1000,vals=[Number(mp.home),Number(mp.draw),Number(mp.away)],sum=vals.reduce((a,b)=>a+b,0);if(fresh&&vals.every(x=>Number.isFinite(x)&&x>0)&&sum>0){model={p1:+(vals[0]/sum*100).toFixed(1),px:+(vals[1]/sum*100).toFixed(1),p2:+(vals[2]/sum*100).toFixed(1),coverage:market.market_source==="TIPSAUDIT_FAIR_MARKET"?75:80,market:true,source:market.market_source||"VERIFIED_MARKET_DATA"};coverage={market_odds:true,market_source:market.market_source||"VERIFIED_MARKET_DATA",books:market.books||null,league:market.league||null,market_captured_at:market.captured_at||market.provider_data?.captured_at,fair_odds:market.fair_odds||null,fair_source_url:market.fair_source_url||null,market_reference_best_soft_odds:market.market_reference_best_soft_odds||null,market_reference_bookmaker:market.market_reference_bookmaker||null,market_reference_selection:market.market_reference_selection||null,market_feed_generated_at:market.generated_at||null};}}
   if(!model){
@@ -667,6 +668,15 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    for(const selection of ["OVER_1.5","UNDER_1.5","OVER_2.5","UNDER_2.5","OVER_3.5","UNDER_3.5","BTTS_YES","BTTS_NO"]){
     rows.push({owner_id:ownerId,match_id:m.id,scan_run_id:m.scan_run_id||null,model_version:V,market:"GOALS",selection,prediction_type:null,pick:selection,probability:null,odds:null,confidence:null,verdict:"ODRZUCONY",selection_status:"ODRZUCONY",rejection_reason:reason,rationale:"Prognoza nie została wyliczona — brak wymaganych danych wejściowych. Nie generujemy sztucznych prawdopodobieństw.",data_source:"GOALS_DATA_INSUFFICIENT",data_coverage:missingCoverage,note:JSON.stringify({source:"GOALS_DATA_INSUFFICIENT",coverage:missingCoverage}),settlement_status:"pending",result_status:"pending",verified:false});
    }
+  }
+  } catch(matchError) {
+   // Isolate a bad fixture: do not let one provider/data exception abort the rest of the page.
+   const failure=String(matchError||"Nieznany błąd analizy").slice(0,300);
+   const coverage={baseline_only:true,match_analysis_error:failure,reason:"Nie udało się pobrać pełnych danych tego meczu. Zapisano jawny typ awaryjny ODRZUCONY; bez udawania potwierdzonej analizy."};
+   const base={owner_id:ownerId,match_id:m.id,scan_run_id:m.scan_run_id||null,model_version:V,odds:null,confidence:null,verdict:"ODRZUCONY",selection_status:"ODRZUCONY",rejection_reason:"Analiza szczegółowa przerwana dla tego meczu: "+failure,rationale:"Typ awaryjny. Brak wystarczających danych do wiarygodnej prognozy; nie traktować jako zakładu.",data_source:"MATCH_LEVEL_FALLBACK",data_coverage:coverage,note:JSON.stringify({source:"MATCH_LEVEL_FALLBACK",coverage}),settlement_status:"pending",result_status:"pending",verified:false};
+   rows.push({...base,market:"1X2",selection:"1",pick:"1",prediction_type:"1X2",probability:43,group_name:"MAIN"});
+   for(const [selection,probability] of [["1X",71],["X2",57],["12",72]] as [string,number][])rows.push({...base,market:"DOUBLE_CHANCE",selection,pick:selection,prediction_type:"DC",probability,group_name:"MEGA"});
+   for(const selection of ["OVER_1.5","UNDER_1.5","OVER_2.5","UNDER_2.5","OVER_3.5","UNDER_3.5","BTTS_YES","BTTS_NO"])rows.push({...base,market:"GOALS",selection,pick:selection,prediction_type:null,probability:null,group_name:"GOALS"});
   }
  }
  // Normalize every market row to identical keys for PostgREST bulk upserts.
