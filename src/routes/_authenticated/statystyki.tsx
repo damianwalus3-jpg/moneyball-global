@@ -10,7 +10,7 @@ import type { Market, Prediction } from "@/lib/types";
 export const Route = createFileRoute("/_authenticated/statystyki")({
   head: () => ({
     meta: [
-      { title: "Statystyki — MONEYBALL GLOBAL 2.0" },
+      { title: "Statystyki — MONEYBALL GLOBAL" },
       { name: "description", content: "Skuteczność 1X2, Double Chance i Gole / BTTS osobno, według lig, przedziałów prawdopodobieństwa i kuponów." },
       { property: "og:title", content: "Statystyki — MONEYBALL GLOBAL 2.0" },
       { property: "og:description", content: "Skuteczność prognoz i kuponów." },
@@ -43,7 +43,18 @@ function Statystyki() {
   const legs = useTable("coupon_legs");
   const activePreds = preds.filter((prediction) => isActivePredictionVersion(prediction.model_version));
   const settledSinglePicks = activePreds.filter((p) => p.verdict === "WYBRANY" && p.verified && (p.settlement_status === "won" || p.settlement_status === "lost" || p.settlement_status === "void"));
-  const singlePickProfit = settledSinglePicks.reduce((sum, p) => sum + Number(p.profit_loss ?? (p.settlement_status === "lost" ? -(p.stake ?? 5) : 0)), 0);
+  const singlePickProfitRows = settledSinglePicks.map((p) => {
+    if (p.profit_loss != null && Number.isFinite(Number(p.profit_loss))) return Number(p.profit_loss);
+    const stake = p.stake != null && Number.isFinite(Number(p.stake)) ? Number(p.stake) : 5;
+    if (p.settlement_status === "lost") return -stake;
+    if (p.settlement_status === "void") return 0;
+    if (p.settlement_status === "won" && p.odds != null && Number.isFinite(Number(p.odds)) && Number(p.odds) > 1)
+      return stake * (Number(p.odds) - 1);
+    return null;
+  });
+  const knownSingleProfitRows = singlePickProfitRows.filter((value): value is number => value != null);
+  const singlePickProfit = knownSingleProfitRows.reduce((sum, value) => sum + value, 0);
+  const singleProfitIncomplete = knownSingleProfitRows.length !== settledSinglePicks.length;
   const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
 
   const settledCoupons = coupons.filter((c) => c.status === "won" || c.status === "lost" || c.status === "void");
