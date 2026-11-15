@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "moneyball-global",
+  "compatibility_date": "2026-11-14",
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "moneyball-global-db",
+      "database_id": "8447edd3-df6e-45b6-b8b6-0dba21e6ed14",
+      "migrations_dir": "cloudflare/migrations"
+    }
+  ]
+}
