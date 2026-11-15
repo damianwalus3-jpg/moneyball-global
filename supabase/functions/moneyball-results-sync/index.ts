@@ -312,7 +312,7 @@ Deno.serve(async(req:Request)=>{
      const rawDateOnly=await db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=eq."+encodeURIComponent(date)+ownerFilter);
      const matches=[...(rawMatches||[]).filter((m:any)=>m.kickoff_at&&day(new Date(m.kickoff_at))===date),...(rawDateOnly||[]).filter((m:any)=>String(m.kickoff_date||"").slice(0,10)===date)].filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team));
     const existingResults=matches.length?await db("match_results?select=match_id,home_score,away_score,verified&match_id=in.("+matches.map((m:any)=>m.id).join(",")+")"):[];
-    const existingResultByMatch=new Map((existingResults||[]).map((r:any)=>[r.match_id,r]));
+    const existingResultByMatch=new Map<string,any>((existingResults||[]).map((r:any)=>[r.match_id,r]));
     const map=new Map(matches.filter((m:any)=>m.external_id&&String(m.source||"").toLowerCase()==="footynomad").map((m:any)=>[String(m.external_id),m]));
     const normTeam=(v:string)=>String(v||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim().replace(/\\s+/g," ");
     const genderOf=(m:any)=>["men","women"].includes(String(m?.gender||"").toLowerCase())?String(m.gender).toLowerCase():"unknown";
