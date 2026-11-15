@@ -48,7 +48,12 @@ export const Route = createFileRoute("/_authenticated/mecze")({
 type View = "upcoming" | "past" | "all" | "scans";
 
 type RecentGame = { date?: string; result?: string; opponent?: string; goals_for?: number; goals_against?: number };
-type TeamForm = { w?: number; d?: number; l?: number; matches?: number; goals_for?: number; goals_against?: number; last5?: RecentGame[]; last10?: RecentGame[] };
+type TeamForm = {
+  w?: number; d?: number; l?: number; matches?: number; goals_for?: number; goals_against?: number;
+  last5?: RecentGame[]; last10?: RecentGame[]; source?: string;
+  avg_shots_for?: number | null; avg_shots_on_target_for?: number | null; avg_corners_for?: number | null;
+  xg_last10?: { xg_for?: number; xg_against?: number }[];
+};
 
 function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -141,7 +146,31 @@ function RecentFormCard({ title, form }: { title: string; form: TeamForm | null 
           ))}
         </div>
       ) : <p className="text-xs text-muted-foreground">Brak potwierdzonych ostatnich wyników.</p>}
-      {form && <p className="mt-2 text-[11px] text-muted-foreground">Średnio zdobyte / stracone w pokazanej serii: {averageGoals(form, "goals_for") ?? "—"} / {averageGoals(form, "goals_against") ?? "—"}</p>}
+      {form && (
+        <div className="mt-2 grid gap-1 text-[11px] text-muted-foreground">
+          <p>Średnio zdobyte / stracone gole: {averageGoals(form, "goals_for") ?? "—"} / {averageGoals(form, "goals_against") ?? "—"}</p>
+          {(form.avg_shots_for != null || form.avg_shots_on_target_for != null || form.avg_corners_for != null) && (
+            <p>Śr. strzały / celne / rożne: {form.avg_shots_for ?? "—"} / {form.avg_shots_on_target_for ?? "—"} / {form.avg_corners_for ?? "—"}</p>
+          )}
+          {Array.isArray(form.xg_last10) && form.xg_last10.length > 0 && (
+            <p>Śr. xG / xGA: {(form.xg_last10.reduce((sum, game) => sum + Number(game.xg_for ?? 0), 0) / form.xg_last10.length).toFixed(2)} / {(form.xg_last10.reduce((sum, game) => sum + Number(game.xg_against ?? 0), 0) / form.xg_last10.length).toFixed(2)} ({form.xg_last10.length} meczów)</p>
+          )}
+          {form.source && <p>Źródło formy: {({
+            ESPN_UEFA_NATIONS_SCHEDULE: "ESPN · UEFA Nations League",
+            FOOTYNOMAD_LAST5: "FootyNomad",
+            FOOTYNOMAD_LAST5_CACHE: "FootyNomad · pamięć podręczna",
+            FOTBALINFO_PREMATCH: "FotbalInfo",
+            XGOALSPRO_PUBLIC_RESULTS: "xGoalsPro",
+            KEYLESS_GITHUB_LAST10: "OpenMatchday / OpenFootball",
+            STATSBOMB_OPEN_DATA: "StatsBomb Open Data",
+            AMERICAN_SOCCER_ANALYSIS: "American Soccer Analysis",
+            ESPN_WOMEN_LAST10: "ESPN · rozgrywki kobiece",
+            ESPN_FORM_LAST5: "ESPN · forma W/D/L",
+            OPENMATCHDAY_LAST10: "OpenMatchday",
+            VERIFIED_MATCH_HISTORY: "Wyniki zweryfikowane w bazie",
+          } as Record<string, string>)[form.source] ?? form.source}</p>}
+        </div>
+      )}
     </div>
   );
 }
