@@ -427,8 +427,8 @@ async function espn(date: string) {
       return {teamId,teamName,form:last10.length?{matches:last10.length,w,d,l,points:w*3+d,goals_for:last10.reduce((s,x)=>s+x.goals_for,0),goals_against:last10.reduce((s,x)=>s+x.goals_against,0),last10,source:"ESPN_UEFA_NATIONS_SCHEDULE"}:null};
     });
     const formByTeam=new Map<string,any>();
-    for(const item of schedules)if(item.form)formByTeam.set(norm(item.teamName).normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim(),item.form);
-    const key=(value:string)=>norm(value).normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+    for(const item of schedules)if(item.form)formByTeam.set(norm(item.teamName).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim(),item.form);
+    const key=(value:string)=>norm(value).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
     for(const fixture of nationsFixtures){
       fixture.home_form=formByTeam.get(key(fixture.home_team))||fixture.home_form||null;
       fixture.away_form=formByTeam.get(key(fixture.away_team))||fixture.away_form||null;
