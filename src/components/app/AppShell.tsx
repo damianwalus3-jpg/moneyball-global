@@ -117,9 +117,10 @@ export function AppShell({ email, children }: { email: string | null; children: 
             <Link
               key={n.to}
               to={n.to}
+              aria-current={isActive(n.to) ? "page" : undefined}
               className={cn(
-                "flex flex-col items-center gap-1 py-2.5 text-[11px] text-muted-foreground",
-                isActive(n.to) && "text-primary",
+                "flex min-h-12 flex-col items-center justify-center gap-1 px-1 py-2.5 text-[11px] text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+                isActive(n.to) && "font-semibold text-primary",
               )}
             >
               <n.icon className="size-5" />
@@ -128,8 +129,10 @@ export function AppShell({ email, children }: { email: string | null; children: 
           ))}
           <button
             onClick={() => setMoreOpen(true)}
+            aria-label="Otwórz pozostałe sekcje nawigacji"
+            aria-expanded={moreOpen}
             className={cn(
-              "flex flex-col items-center gap-1 py-2.5 text-[11px] text-muted-foreground",
+              "flex min-h-12 flex-col items-center justify-center gap-1 px-1 py-2.5 text-[11px] text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
               moreActive && "text-primary",
             )}
           >
