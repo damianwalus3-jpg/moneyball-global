@@ -11,7 +11,8 @@ export const getRouter = () => {
     context: { queryClient },
     scrollRestoration: true,
     // Lets Query own freshness; set caching defaults on the QueryClient, not the router.
-    defaultPreloadStaleTime: 0,
+    // Keep intent-prefetched routes warm long enough for the next tap.
+    defaultPreloadStaleTime: 30_000,
   });
 
   return router;
