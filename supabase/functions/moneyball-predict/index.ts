@@ -543,7 +543,7 @@ const internationalForms=internationalHistoryResult.status==="fulfilled"&&intern
  ?internationalHistoryResult.value:{forms:new Map(),generated_at:null,rows:0,teams:0,error:internationalHistoryResult.status==="rejected"?String(internationalHistoryResult.reason):"International history unavailable"};
 const history=historyTimed||[];
  const footyCacheMap=new Map((footyCacheRows||[]).map((row:any)=>[row.match_id,row.provider_data]));
- const fotbalCacheMap=new Map((fotbalCacheRows||[]).map((row:any)=>[row.match_id,row.provider_data]));
+ const fotbalCacheMap=new Map<string,any>((fotbalCacheRows||[]).map((row:any)=>[row.match_id,row.provider_data]));
  const marketMap=new Map((marketRows||[]).map((x:any)=>[x.match_id,x.provider_data]));
  const providerOddsMap=new Map<string,any>();
  for(const quote of (providerOddsRows||[])){
