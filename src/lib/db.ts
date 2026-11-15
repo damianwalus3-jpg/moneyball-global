@@ -64,6 +64,32 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   return data as DashboardSummary;
 }
 
+export interface DashboardSelectedPick {
+  prediction_id: string;
+  market: string;
+  selection: string;
+  probability: number | null;
+  odds: number | null;
+  settlement_status: string;
+  match_id: string;
+  home_team: string;
+  away_team: string;
+  competition: string | null;
+  league: string | null;
+  kickoff_at: string | null;
+  kickoff_date: string | null;
+  match_status: string;
+  home_score: number | null;
+  away_score: number | null;
+}
+
+/** Small, date-scoped dashboard read; never downloads the user's full prediction history. */
+export async function fetchDashboardSelectedPicks(): Promise<DashboardSelectedPick[]> {
+  const { data, error } = await requireSupabase().rpc("moneyball_dashboard_selected_picks");
+  if (error) throw new Error(humanizeError(error));
+  return (data ?? []) as DashboardSelectedPick[];
+}
+
 function clean(row: Record<string, unknown>) {
   return Object.fromEntries(Object.entries(row).filter(([, value]) => value !== undefined));
 }
