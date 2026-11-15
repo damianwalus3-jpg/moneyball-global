@@ -1,21 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, ChevronRight, ScanLine, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fmtOdds } from "@/lib/format";
 import { dashboardSelectedPicksQuery, dashboardSummaryQuery } from "@/lib/queries";
-import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
+import { EmptyState, NoGuarantee, PageHeader, StatCard } from "@/components/app/ui-bits";
 import { fmtPct } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => ({ meta: [{ title: "Panel — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Podsumowanie prognoz, kuponów i bankrolla." }, { property: "og:title", content: "Panel — MONEYBALL" }, { property: "og:description", content: "Podsumowanie prognoz." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
-  loader: ({ context }) => Promise.all([
-    context.queryClient.ensureQueryData(dashboardSummaryQuery()),
-    context.queryClient.ensureQueryData(dashboardSelectedPicksQuery()),
-  ]),
-  pendingComponent: PageLoader,
-  errorComponent: DataError,
   component: Panel,
 });
 
@@ -42,8 +36,11 @@ function DashboardTile({ to, label, value, hint, icon, tone = "default" }: {
 }
 
 function Panel() {
-  const { data: summary } = useSuspenseQuery(dashboardSummaryQuery());
-  const { data: selectedRows } = useSuspenseQuery(dashboardSelectedPicksQuery());
+  // Dashboard sections load independently: a slow summary RPC must not hide the whole panel.
+  const summaryQuery = useQuery(dashboardSummaryQuery());
+  const selectedQuery = useQuery(dashboardSelectedPicksQuery());
+  const summary = summaryQuery.data ?? { matches_today: 0, bankroll: null, coupons_in_play: 0, candidates: 0, to_settle: 0, hit_rates: {} };
+  const selectedRows = selectedQuery.data ?? [];
   const selectedPicks = selectedRows.map((row) => ({
     prediction: {
       id: row.prediction_id,
@@ -84,6 +81,13 @@ function Panel() {
           </>
         }
       />
+      {summaryQuery.isError && (
+        <div className="mb-4 rounded-xl border border-destructive/40 bg-card p-3 text-sm">
+          <p className="font-semibold text-destructive">Nie udało się pobrać statystyk panelu</p>
+          <p className="mt-1 text-muted-foreground">Panel jest dostępny, ale podsumowanie z bazy wymaga ponowienia. {summaryQuery.error instanceof Error ? summaryQuery.error.message : ""}</p>
+          <Button className="mt-2" size="sm" variant="outline" onClick={() => void summaryQuery.refetch()}>Ponów statystyki</Button>
+        </div>
+      )}
       <section className="mb-5 rounded-xl border border-primary/25 bg-card p-3 sm:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -92,7 +96,14 @@ function Panel() {
           </div>
           <Badge variant="success">{selectedPicks.length} wybranych</Badge>
         </div>
-        {selectedPicks.length ? (
+        {selectedQuery.isLoading ? (
+          <p className="rounded-lg bg-secondary/30 p-3 text-sm text-muted-foreground">Wczytywanie dzisiejszych typów…</p>
+        ) : selectedQuery.isError ? (
+          <div className="rounded-lg bg-secondary/30 p-3 text-sm">
+            <p className="text-destructive">Nie udało się pobrać wybranych typów.</p>
+            <Button className="mt-2" size="sm" variant="outline" onClick={() => void selectedQuery.refetch()}>Ponów typy</Button>
+          </div>
+        ) : selectedPicks.length ? (
           <div className="grid gap-2">
             {selectedPicks.map(({ prediction, match, result }) => {
               if (!match) return null;
