@@ -234,11 +234,15 @@ function Mecze() {
     if (sessionError || !sessionData.session?.access_token)
       throw new Error("Sesja logowania wygasła. Zaloguj się ponownie.");
     setPredictionProgress("Pobieram europejski terminarz…");
-    const sync = await sb.functions.invoke("footynomad-sync", { body: { date, skip_result_sync: true } });
-    if (sync.error) throw new Error("Wyszukiwanie meczów nie powiodło się: " + sync.error.message);
-    if (sync.data?.error || sync.data?.ok === false)
-      throw new Error("Wyszukiwanie meczów nie powiodło się: " + (sync.data?.error ?? "Nieznany błąd źródła."));
-    return sync.data;
+    try {
+      const sync = await sb.functions.invoke("footynomad-sync", { body: { date, skip_result_sync: true } });
+      if (sync.error) throw new Error("Wyszukiwanie meczów nie powiodło się: " + sync.error.message);
+      if (sync.data?.error || sync.data?.ok === false)
+        throw new Error("Wyszukiwanie meczów nie powiodło się: " + (sync.data?.error ?? "Nieznany błąd źródła."));
+      return sync.data;
+    } finally {
+      setPredictionProgress("");
+    }
   }, {
     success: (r) => "Znaleziono " + (r.combined_count ?? r.total_found ?? 0) +
       " europejskich meczów. Zapisano: " + (r.inserted ?? 0) + ", zaktualizowano: " + (r.updated ?? 0) +
@@ -326,11 +330,15 @@ function Mecze() {
     if (sessionError || !sessionData.session?.access_token)
       throw new Error("Sesja logowania wygasła. Zaloguj się ponownie.");
     setPredictionProgress("Pobieram wyniki i rozliczam typy…");
-    const response = await sb.functions.invoke("moneyball-results-sync?date=" + encodeURIComponent(date), { body: {} });
-    if (response.error) throw new Error("Aktualizacja wyników nie powiodła się: " + response.error.message);
-    if (!response.data || response.data.ok === false)
-      throw new Error("Aktualizacja wyników wymaga kontroli: " + (response.data?.error ?? (response.data?.errors || []).join("; ") ?? "Nieznany błąd."));
-    return response.data;
+    try {
+      const response = await sb.functions.invoke("moneyball-results-sync?date=" + encodeURIComponent(date), { body: {} });
+      if (response.error) throw new Error("Aktualizacja wyników nie powiodła się: " + response.error.message);
+      if (!response.data || response.data.ok === false)
+        throw new Error("Aktualizacja wyników wymaga kontroli: " + (response.data?.error ?? (response.data?.errors || []).join("; ") ?? "Nieznany błąd."));
+      return response.data;
+    } finally {
+      setPredictionProgress("");
+    }
   }, {
     success: (r) => "Wyniki zaktualizowane. Pobrano: " + (r.fixtures_fetched ?? 0) +
       "; dopasowano: " + (r.matches_matched ?? 0) + "; rozliczono wyników: " + (r.results_saved ?? 0) +
