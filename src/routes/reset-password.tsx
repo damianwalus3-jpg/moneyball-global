@@ -96,12 +96,22 @@ function ResetPassword() {
         }
 
         if (code) {
-          const { error } = await sb.auth.exchangeCodeForSession(code);
-          if (error) throw error;
-          // Recovery code exchange emits PASSWORD_RECOVERY. Do not accept a
-          // normal signed-in session as proof that a reset link was used.
-          // A one-time code delivered by the recovery email is proof
-          // of the recovery flow after successful exchange.
+          // Supabase may already have consumed the PKCE code during client
+          // initialization because detectSessionInUrl is enabled globally.
+          // Try the explicit exchange first; if it reports an already-used
+          // code, accept only when that exchange has already established a
+          // session for this reset-password callback.
+          const { error: exchangeError } = await sb.auth.exchangeCodeForSession(code);
+          if (exchangeError) {
+            const { data: existing, error: sessionError } = await sb.auth.getSession();
+            if (sessionError) throw sessionError;
+            if (!existing.session) throw exchangeError;
+          }
+          const { data: verified, error: verifyError } = await sb.auth.getSession();
+          if (verifyError) throw verifyError;
+          if (!verified.session) {
+            throw new Error("Nie udało się potwierdzić sesji resetowania hasła.");
+          }
           acceptRecovery();
           return;
         }
