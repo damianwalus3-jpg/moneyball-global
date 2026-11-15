@@ -685,9 +685,9 @@ function Mecze() {
                                                 {squad.length ? (
                                                   <div className="grid gap-1">
                                                     {squad.map((player, index) => (
-                                                      <div key={String(player.id || index)} className="flex justify-between gap-2 text-xs">
-                                                        <span className="min-w-0 truncate">{String(player.name || "Nieznany zawodnik")}</span>
-                                                        <span className="shrink-0 text-muted-foreground">{String(player.position || "")}{player.jersey ? " · #" + String(player.jersey) : ""}</span>
+                                                      <div key={String(player["id"] || index)} className="flex justify-between gap-2 text-xs">
+                                                        <span className="min-w-0 truncate">{String(player["name"] || "Nieznany zawodnik")}</span>
+                                                        <span className="shrink-0 text-muted-foreground">{String(player["position"] || "")}{player["jersey"] ? " · #" + String(player["jersey"]) : ""}</span>
                                                       </div>
                                                     ))}
                                                   </div>
