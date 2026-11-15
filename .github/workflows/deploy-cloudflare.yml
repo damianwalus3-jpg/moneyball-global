@@ -80,7 +80,7 @@ jobs:
             console.error("D1 database was found but Cloudflare did not return its database UUID.");
             process.exit(1);
           }
-          coreOutput("d1_database_id", database.uuid);
+          await coreOutput("d1_database_id", database.uuid);
           console.log("Cloudflare API token: valid");
           console.log("D1 permission: confirmed by successful database listing");
           console.log(`Production D1 database found: ${database.name}`);
