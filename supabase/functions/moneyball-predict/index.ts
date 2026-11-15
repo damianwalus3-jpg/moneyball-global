@@ -523,12 +523,14 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  // Use already cached FootyNomad form plus shared public datasets; this avoids dozens of
  // concurrent third-party requests and keeps Edge execution below the worker resource limit.
  const formResults:any[]=[];
- const [publicForms,internationalForms,githubPublic,openPlayXg]=await Promise.all([
-  readPublicSourceForms(date,requestToken),
-  readInternationalTeamForms(date),
-  readGitHubPublicTeamHistory(),
-  readOpenPlayXgData()
- ]);
+ // Keep the scoring request CPU-bounded: the 12 MB international CSV and the
+ // large GitHub/OpenPlay archives are refreshed outside the per-match scoring pass.
+ // This request uses verified DB history, cached provider forms and the compact
+ // public-sources endpoint; missing history is explicitly marked as baseline.
+ const publicForms=await readPublicSourceForms(date,requestToken);
+ const internationalForms={forms:new Map<string,any>()};
+ const githubPublic={teams:{},coverage:{competitions_with_results:0,openfootball_league_matches_read:0,openfootball_league_files_loaded:0},generated_at:null};
+ const openPlayXg={teams:{},coverage:null,openplay_generated_at:null,statsbomb_generated_at:null,asa_generated_at:null};
  const marketRows=await db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI"+pageMatchFilter,token);const marketMap=new Map((marketRows||[]).map((x:any)=>[x.match_id,x.provider_data]));
  const providerOddsRows=matches.length?await db("provider_odds?select=match_id,mapped_market,mapped_selection,odds,bookmaker,provider,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&suspended=eq.false&phase=eq.prematch&captured_at=gte."+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+"&mapped_market=not.is.null&mapped_selection=not.is.null&match_id=in.("+matches.map((x:any)=>x.id).join(",")+")&order=captured_at.desc",token).catch(()=>[]):[];
  const providerOddsMap=new Map<string,any>();
@@ -537,16 +539,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
 
  if(!matches.length)return out({ok:true,date,total:0,matches:0,offset:analysisOffset,batch_size:batchSize,has_more:all.length===batchSize,predictions:0,created:0,updated:0,preserved:0,covered:0,missing:0,selected:0,message:all.length===batchSize?"Ta strona nie zawiera europejskich meczów; skan przechodzi do następnej partii.":"Brak kolejnych meczów w bazie."});
  // Add a no-key public score-history fallback for teams missing recent verified results.
- const xgoalsTeamForms=new Map<string,any>(),xgoalsCandidates=new Map<string,{team:string,country:string,kickoff:string}>();
- for(const m of matches){
-  if(String(m.gender||"").toLowerCase()!=="men"||!m.kickoff_at||!["scheduled","unknown"].includes(String(m.status||""))||new Date(m.kickoff_at).getTime()<=Date.now())continue;
-  const kickoff=String(m.kickoff_at),pub=publicFormForMatch(m,publicForms),gh=githubTeamForm(String(m.home_team),kickoff,githubPublic,openPlayXg,String(m.gender||"unknown")),ga=githubTeamForm(String(m.away_team),kickoff,githubPublic,openPlayXg,String(m.gender||"unknown"));
-  const preliminary=historyModel(m.home_team,m.away_team,kickoff,history||[],footyForms.get(m.id)||null,{home:{...(pub?.home||{}),...(gh||{})},away:{...(pub?.away||{}),...(ga||{})}},String(m.gender||"unknown"));
-  if(preliminary.expected_home_goals!=null&&preliminary.expected_away_goals!=null)continue;
-  for(const team of [String(m.home_team),String(m.away_team)]){const key=normTeam(team),previous=xgoalsCandidates.get(key);if(!previous||kickoff<previous.kickoff)xgoalsCandidates.set(key,{team,country:String(m.country||"France"),kickoff});}
- }
- const xgoalsResults=await limitedSettled([...xgoalsCandidates.values()].slice(0,4),2,async(item)=>({key:normTeam(item.team),form:await readXgoalsTeamForm(item.team,item.country,item.kickoff)}));
- for(const item of xgoalsResults)if(item.status==="fulfilled"&&item.value.form)xgoalsTeamForms.set(item.value.key,item.value.form);
+ const xgoalsTeamForms=new Map<string,any>();
  const fotbalForms=new Map<string,any>(),fotbalCandidates:any[]=[];
  for(const m of matches){
   if(!["scheduled","unknown"].includes(String(m.status||""))||!m.kickoff_at||new Date(m.kickoff_at).getTime()<=Date.now())continue;
@@ -723,5 +716,5 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   await db("predictions?on_conflict=owner_id,match_id,model_version,market,selection",token,"POST",insertRows.slice(i,i+50),"resolution=merge-duplicates,return=minimal");
  }
  const couponCreated=false,couponLegs=0;
- return out({ok:true,date,model:V,provider:"Keyless OpenMatchday + OpenFootball + OpenPlay historical xG + StatsBomb Open Data xG + BeyondELO Elo + verified results + FootyNomad + TipsAudit fair-market probabilities + fresh market probabilities",tipsaudit:{ok:tipsAudit.ok,matched:tipsAudit.matched,generated_at:tipsAudit.generated_at,error:tipsAudit.error||null},matches:matches.length,offset:analysisOffset,batch_size:batchSize,has_more:all.length===batchSize,fixtures_before_deduplication:rawDateMatches.length,duplicates_removed:duplicatesRemoved,predictions:rows.length,created,updated,preserved,covered,missing,footy_form_candidates:formCandidates.length,footy_form_matches:footyForms.size,openmatchday_fixtures:publicForms.fixtures,openmatchday_error:publicForms.error||null,github_public_teams:Object.keys(githubPublic.teams||{}).length,github_public_competitions:githubPublic.coverage?.competitions_with_results||0,github_openfootball_matches:githubPublic.coverage?.openfootball_league_matches_read||0,github_openfootball_files:githubPublic.coverage?.openfootball_league_files_loaded||0,github_public_generated_at:githubPublic.generated_at||null,github_public_error:githubPublic.error||null,github_form_matches:new Set(rows.filter((x:any)=>String(x.note).includes("KEYLESS_GITHUB_LAST10_FORM")).map((x:any)=>x.match_id)).size,selected:rows.filter(x=>x.verdict==="WYBRANY").length,couponCreated,couponLegs,limitations:["Model korzysta z publicznych baz OpenMatchday, OpenFootball, OpenPlay, StatsBomb Open Data i American Soccer Analysis (ASA). ASA obejmuje wybrane ligi Ameryki Północnej: MLS, NWSL i rozgrywki USL; nie jest globalnym źródłem xG.","Publiczne bazy wyników nie zapewniają xG, potwierdzonych składów ani kontuzji dla wszystkich rozgrywek. Rating Elo jest dostępny tylko dla części klubów UEFA i nie zastępuje xG. Brakujące dane pozostają puste; nie są symulowane. Kursy rynkowe są używane wyłącznie, gdy zapis ma maksymalnie 48 godzin.","Dane publiczne odświeżane przez GitHub Actions zgodnie z harmonogramem poszczególnych źródeł.","Kupony tworzy użytkownik przyciskiem generatora; skan nie zapisuje automatycznie kuponów."]});
+ return out({ok:true,date,model:V,provider:"Verified database history + cached FootyNomad/FotbalInfo + compact OpenMatchday public sources + fresh market probabilities",tipsaudit:{ok:tipsAudit.ok,matched:tipsAudit.matched,generated_at:tipsAudit.generated_at,error:tipsAudit.error||null},matches:matches.length,offset:analysisOffset,batch_size:batchSize,has_more:all.length===batchSize,fixtures_before_deduplication:rawDateMatches.length,duplicates_removed:duplicatesRemoved,predictions:rows.length,created,updated,preserved,covered,missing,footy_form_candidates:formCandidates.length,footy_form_matches:footyForms.size,openmatchday_fixtures:publicForms.fixtures,openmatchday_error:publicForms.error||null,github_public_teams:Object.keys(githubPublic.teams||{}).length,github_public_competitions:githubPublic.coverage?.competitions_with_results||0,github_openfootball_matches:githubPublic.coverage?.openfootball_league_matches_read||0,github_openfootball_files:githubPublic.coverage?.openfootball_league_files_loaded||0,github_public_generated_at:githubPublic.generated_at||null,github_public_error:githubPublic.error||null,github_form_matches:new Set(rows.filter((x:any)=>String(x.note).includes("KEYLESS_GITHUB_LAST10_FORM")).map((x:any)=>x.match_id)).size,selected:rows.filter(x=>x.verdict==="WYBRANY").length,couponCreated,couponLegs,limitations:["W trakcie skanowania używane są zweryfikowana historia bazy, zapisane cache FootyNomad/FotbalInfo i kompaktowe źródła OpenMatchday. Duże archiwa historyczne CSV/JSON nie są parsowane ponownie w każdej partii, aby uniknąć limitu CPU Edge Function.","Nie wszystkie ligi mają świeże xG, potwierdzone składy i kontuzje. Brakujące dane pozostają jawnie oznaczone; model bazowy jest ODRZUCONY i nie trafia do kuponów. Kursy rynkowe są używane wyłącznie, gdy zapis ma maksymalnie 48 godzin.","Dane publiczne odświeżane przez GitHub Actions zgodnie z harmonogramem poszczególnych źródeł.","Kupony tworzy użytkownik przyciskiem generatora; skan nie zapisuje automatycznie kuponów."]});
 }catch(e){return out({ok:false,error:String(e)},400)}});
