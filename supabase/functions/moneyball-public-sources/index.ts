@@ -374,7 +374,7 @@ async function espn(date: string) {
         league_code: leagueCode,
         competition: leagueName || norm(c?.notes?.[0]?.headline || e?.name),
         country: norm(c?.venue?.address?.country) || country,
-        gender: isWomen ? "women" : "unknown",
+        gender: isWomen ? "women" : leagueCode === "uefa.nations" ? "men" : "unknown",
         home_team: norm(home?.team?.displayName),
         away_team: norm(away?.team?.displayName),
         home_team_id: String(home?.team?.id || home?.id || ""),
