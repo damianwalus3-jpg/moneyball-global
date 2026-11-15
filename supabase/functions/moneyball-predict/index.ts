@@ -570,7 +570,7 @@ const history=historyTimed||[];
  const fotbalResults=await Promise.all(fotbalCandidates.slice(0,2).map(async (item:any)=>{
   const form=await readFotbalInfoForm(item);
   return {status:"fulfilled",value:{id:item.id,form}};
- }).catch((error:any)=>({status:"rejected",reason:error}))));
+ }));
  const fotbalCacheWrites:any[]=[];
  for(const result of fotbalResults){
   if(result.status!=="fulfilled"||!result.value?.form)continue;
