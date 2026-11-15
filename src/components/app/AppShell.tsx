@@ -84,6 +84,8 @@ export function AppShell({ email, children }: { email: string | null; children: 
             <Link
               key={n.to}
               to={n.to}
+              preload="intent"
+              preloadDelay={100}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent",
                 isActive(n.to) && "bg-sidebar-accent font-semibold text-primary",
@@ -117,6 +119,8 @@ export function AppShell({ email, children }: { email: string | null; children: 
             <Link
               key={n.to}
               to={n.to}
+              preload="intent"
+              preloadDelay={100}
               aria-current={isActive(n.to) ? "page" : undefined}
               className={cn(
                 "flex min-h-12 flex-col items-center justify-center gap-1 px-1 py-2.5 text-[11px] text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
@@ -152,6 +156,8 @@ export function AppShell({ email, children }: { email: string | null; children: 
               <Link
                 key={n.to}
                 to={n.to}
+              preload="intent"
+              preloadDelay={100}
                 onClick={() => setMoreOpen(false)}
                 className={cn(
                   "flex items-center gap-3 rounded-lg border border-border px-3 py-3 text-sm",
