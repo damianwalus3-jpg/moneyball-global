@@ -130,7 +130,7 @@ export async function fetchCouponPageData(): Promise<CouponPageData> {
   const uid = await currentUserId();
   const sb = requireSupabase();
   const day = brusselsDayKey(new Date());
-  const [year, month, date] = day.split("-").map(Number);
+  const [year = 1970, month = 1, date = 1] = day.split("-").map(Number);
   const next = new Date(Date.UTC(year, month - 1, date + 1)).toISOString().slice(0, 10);
   const from = brusselsInputToISO(day + "T00:00");
   const to = brusselsInputToISO(next + "T00:00");
