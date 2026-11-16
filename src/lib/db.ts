@@ -162,7 +162,7 @@ const READ_COLUMNS: Record<TableName, readonly string[]> = {
 
 const PAGE = 250;
 const MAX_PARALLEL_PAGES = 3;
-const RAW_CACHE_MS = 15_000;
+const RAW_CACHE_MS = 45_000;
 const inFlightTableReads = new Map<string, Promise<unknown>>();
 const rawTableCache = new Map<string, { expiresAt: number; rows: unknown[] }>();
 
