@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState, Field, NoGuarantee, PageHeader, PageLoader, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { cancelCoupon, saveCouponBatch } from "@/lib/coupons";
-import { buildCouponBatch, buildSingleCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, isKickoffToday, MARKET_LABELS } from "@/lib/domain";
+import { buildCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, isKickoffToday, MARKET_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -46,7 +46,7 @@ function Kupony() {
   const resultByMatch = useMemo(() => new Map(results.map((result) => [result.match_id, result])), [results]);
 
   const [couponCount, setCouponCount] = useState("2");
-  const [couponSize, setCouponSize] = useState<1 | 3>(3);
+  const couponSize = 3 as const;
   const recordStake = true;
   const [couponType, setCouponType] = useState<CouponType>("TEST");
   const [namePrefix, setNamePrefix] = useState("MONEYBALL");
@@ -87,10 +87,10 @@ function Kupony() {
       couponType,
       scanRunId: [...scans].sort((a, b) => b.started_at.localeCompare(a.started_at))[0]?.id ?? null,
       stake: stakeValue,
-      targetLegs: couponSize,
+      targetLegs: 3,
       recordStake,
     }),
-    { success: (count) => `Zapisano ${count} ${couponSize === 1 ? "pojedynczych kuponów" : "kuponów po 3 zdarzenia"}`, onDone: () => setGenerated([]) },
+    { success: (count) => `Zapisano ${count} kuponów po 3 zdarzenia`, onDone: () => setGenerated([]) },
   );
 
   const removeCoupon = useAction(async (coupon: Coupon) => {
@@ -130,9 +130,7 @@ function Kupony() {
   const settledRoi = settledStake > 0 && settledNet != null ? Math.round((settledNet / settledStake) * 1000) / 10 : null;
 
   function buildBatch() {
-    return couponSize === 1
-      ? buildSingleCouponBatch(candidates, requestedCount)
-      : buildCouponBatch(candidates, requestedCount);
+    return buildCouponBatch(candidates, requestedCount);
   }
   function generate() {
     setGenerated(buildBatch());
@@ -149,17 +147,15 @@ function Kupony() {
   const saveDisabled =
     saveBatch.isPending ||
     candidates.length < couponSize ||
-    preview.some((coupon) => coupon.length !== couponSize) ||
+    preview.some((coupon) => coupon.length !== 3) ||
     (couponType !== "TEST" && previewMissingOdds);
 
   return (
     <div>
       <PageHeader
-        eyebrow={couponSize === 1 ? "Dzisiejsze mecze · pojedyncze typy · prawdopodobieństwo >75%" : "Dzisiejsze mecze · dokładnie 3 różne spotkania · prawdopodobieństwo >75%"}
+        eyebrow="Dzisiejsze mecze · dokładnie 3 różne spotkania · prawdopodobieństwo >75%"
         title="Kupony"
-        description={couponSize === 1
-          ? "Każdy kupon zawiera jeden typ. W partii nie powtarzamy tego samego meczu."
-          : "Każdy kupon zawiera trzy różne mecze. W jednej wygenerowanej partii żaden mecz nie powtarza się w kolejnym kuponie."}
+        description="Każdy kupon zawiera trzy różne mecze. W jednej wygenerowanej partii żaden mecz nie powtarza się w kolejnym kuponie."
       />
       <section className="mb-5">
         <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">Wynik kuponów · rozliczone</h2>
@@ -188,15 +184,6 @@ function Kupony() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Liczba kuponów">
             <Input inputMode="numeric" className="num" value={couponCount} onChange={(event) => { setCouponCount(event.target.value); setGenerated([]); }} />
-          </Field>
-          <Field label="Rodzaj kuponu">
-            <Select value={String(couponSize)} onValueChange={(value) => { setCouponSize(value === "1" ? 1 : 3); setGenerated([]); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">Pojedynczy · 1 mecz</SelectItem>
-                <SelectItem value="3">AKO · 3 mecze</SelectItem>
-              </SelectContent>
-            </Select>
           </Field>
           <Field label="Typ kuponu">
             <Select value={couponType} onValueChange={(value) => { setCouponType(value as CouponType); setGenerated([]); }}>
@@ -230,7 +217,7 @@ function Kupony() {
         </div>
         {preview.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
-            Wybierz „Generuj kupony”, aby zobaczyć podgląd, albo od razu „GENERUJ I ZAPISZ KUPONY”. Potrzeba minimum {couponSize} różnych dzisiejszych meczów z WYBRANY i prawdopodobieństwem ściśle powyżej 75%.
+            Wybierz „Generuj kupony”, aby zobaczyć podgląd, albo od razu „GENERUJ I ZAPISZ KUPONY”. Potrzeba minimum 3 różnych dzisiejszych meczów z WYBRANY i prawdopodobieństwem ściśle powyżej 75%.
           </p>
         ) : (
           <>
