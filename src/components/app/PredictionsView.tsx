@@ -35,6 +35,7 @@ function coverageLabel(coverage?: Record<string, unknown> | null) {
     "model " + (model ? sourceLabel(model) : "źródło nieopisane"),
     "historia " + (coverage["verified_history"] ? "✓" : "—"),
     xgLabel,
+    ...(coverage["xgoals_public_results"] ? ["xGoalsPro · wyniki W/D/L (nie xG)"] : []),
     "Elo " + (coverage["elo_used"] ? "✓" : "—"),
     "FootyNomad " + (coverage["footynomad_last5"] ? "✓" : "—"),
     "GitHub " + (coverage["keyless_github_last10"] ? "✓" : "—"),
