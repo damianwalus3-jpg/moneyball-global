@@ -608,3 +608,19 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Edge Functions ponownie wdrożone i ACTIVE: `footynomad-sync v80`, `moneyball-free-feed v37`, `moneyball-predict v233`.
 - Aktualny dzienny feed cache nadal zawiera tylko Northern Ireland Championship (2 fixtures); brak znanych false-positive tier 3/4.
 - Nadal niepotwierdzone: GitHub Actions Vitest/TypeScript/build oraz produkcyjny Cloudflare Worker frontend. Nie zamykać issue #76 bez potwierdzenia tych kroków.
+
+
+## Krytyczna naprawa filtra lig — pusta alternatywa regex — 2026-11-17
+- Po ręcznym wywołaniu produkcyjnego `moneyball-free-feed` wersja 37 wykryto, że do cache trafiały France `National 2` i `UEFA Nations League`. Kontrola kodu ujawniła wadliwą alternatywę `liga ii||vysshaya liga` w regex allowlisty trzech Edge Functions. Pusta alternatywa `||` dopasowywała pusty ciąg, więc mogła przepuszczać dowolną nazwę rozgrywek. To był bezpośredni root cause błędnych importów i części prognoz.
+- Naprawiono regex do `liga ii|vysshaya liga` w:
+  - frontend `src/lib/domain.ts`: commit `36b0e98fda1f2cbbb108e9a04a5546f31c28f700`
+  - FootyNomad sync: commit `f4a4be26346be2b2d0bcd2b38e41a58e1cd847cc`
+  - free feed: commit `c6361a527177432fc38e03307433a80028ccb09a`
+  - prediction engine: commit `282144050b838841a346d45a7efaed6c3bffebe0`
+- Dodano jawne wykluczenie rozgrywek międzynarodowych (UEFA, Nations/Champions/Europa/Conference League, World Cup, international) oraz francuskich National 2–5. Testy regresyjne: commit `0d144d16f670cb647d263c8c876d11d007057bb4`.
+- Edge Functions po naprawie wdrożone i ACTIVE: `footynomad-sync v81`, `moneyball-free-feed v38`, `moneyball-predict v234`.
+- Produkcyjny test funkcji free-feed po wdrożeniu v38: HTTP 200; `date=2026-11-17`; `reported_total=2`, `fixtures_count=2`, `inserted=0`, `updated=2`. Ponowny odczyt cache: tylko Northern Ireland Championship (2 fixtures); `bad_cache_rows=0`. France National 2 i 8 UEFA Nations League usunięto przez poprawiony filtr purge.
+- Rozszerzona macierz SQL canonical scope: **51 przypadków, 0 rozbieżności**, w tym World UEFA Nations League = false, France National 2/3 = false, France Ligue 2 = true.
+- Audyt predykcji dla dzisiejszych meczów spoza scope: France National 2 (16 wierszy), Scotland Lowland League (84), UEFA Nations League (96); łącznie **196 historycznych prognoz**. Wszystkie mają verdict `ODRZUCONY`, status pending i **0 powiązanych coupon_legs**. Nie kasowano rekordów ani historii; pozostają odrzucone i są wykluczane z bieżącego scope.
+- Dwa kwalifikujące się spotkania Northern Ireland Championship mają już prognozy MONEYBALL GLOBAL 3.8 dla 1X2, osobnego Double Chance i GOALS; wszystkie zostały oznaczone ODRZUCONY, 0 WYBRANY. Harmonogram predykcji zwrócił `skipped=cooldown`, `next_scan_at=2026-11-17T07:00:00Z` (08:00 Europe/Brussels); nie omijać blokady cooldown. Następny zaplanowany skan użyje wersji v234.
+- Nadal niepotwierdzone: frontend Vitest/TypeScript/build i Cloudflare Worker deployment. Nie zamykać issue #76 bez potwierdzenia CI i produkcyjnego UI.
