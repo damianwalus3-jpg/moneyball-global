@@ -18,7 +18,6 @@ const WOMEN: Record<string, string[]> = {
   eng: ["eng.w.1", "eng.w.fa", "eng.w.league_cup", "eng.w.promotion.relegation"],
   esp: ["esp.w.1"], fra: ["fra.w.1"], ned: ["ned.w.1", "ned.w.knvb_cup"],
 };
-const UEFA = ["uefa.nations", "uefa.champions", "uefa.europa", "uefa.europa.conf", "uefa.w.nations", "uefa.w.europa"];
 
 function normalize(value: unknown): string {
   return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -49,14 +48,14 @@ export function selectEspnLeagues(fixtures: EspnLeagueNeed[]): string[] {
     const prefix = COUNTRY_PREFIX[country];
     if (!prefix) continue;
     if (isWomen) {
-      const women'sCompetitions = WOMEN[prefix] ?? [];
+      const womensCompetitions = WOMEN[prefix] ?? [];
       const cupCode = /\b(fa cup)\b/.test(competition) ? prefix + ".w.fa"
         : /\b(league cup)\b/.test(competition) ? prefix + ".w.league_cup"
         : /\b(promotion|relegation)\b/.test(competition) ? prefix + ".w.promotion.relegation"
         : /\b(knvb cup)\b/.test(competition) ? prefix + ".w.knvb_cup"
         : null;
-      const leagueCode = women'sCompetitions.find((code) => code.endsWith(".1"));
-      if (cupCode && women'sCompetitions.includes(cupCode)) selected.add(cupCode);
+      const leagueCode = womensCompetitions.find((code) => code.endsWith(".1"));
+      if (cupCode && womensCompetitions.includes(cupCode)) selected.add(cupCode);
       else if (leagueCode) selected.add(leagueCode);
       continue;
     }
