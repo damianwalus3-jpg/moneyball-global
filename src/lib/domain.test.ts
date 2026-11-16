@@ -101,6 +101,7 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Estonia", "Esiliiga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Finland", "Ykkosliiga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Portugal", "Liga Portugal 2")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Israel", "Liga Leumit")).toBe(true);
     expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Liqa")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "Vysshaya Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "Pervaya Liga")).toBe(true);
