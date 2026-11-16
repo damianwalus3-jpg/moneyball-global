@@ -353,16 +353,62 @@ export async function fetchResultsPage(args: {
 }
 
 /** Only predictions belonging to the match currently being settled. */
-export async function fetchPredictionsForMatch(matchId: string): Promise<TableRows["predictions"][]> {
-  if (!matchId) return [];
+export interface MatchSettlementContext {
+  predictions: TableRows["predictions"][];
+  legs: TableRows["coupon_legs"][];
+  coupons: TableRows["coupons"][];
+  existingResult: TableRows["match_results"] | undefined;
+}
+
+/** Load only records that can be affected by settling this one match. */
+export async function fetchMatchSettlementContext(matchId: string): Promise<MatchSettlementContext> {
   const uid = await currentUserId();
-  const { data, error } = await withRequestTimeout(
-    requireSupabase().from("predictions").select(READ_COLUMNS.predictions.join(","))
-      .eq(OWNER_COLUMN, uid).eq("match_id", matchId).order("created_at", { ascending: true }),
-    "Pobieranie prognoz wybranego meczu",
+  const sb = requireSupabase();
+  const [predictionsResult, resultResult] = await Promise.all([
+    withRequestTimeout(
+      sb.from("predictions").select(READ_COLUMNS.predictions.join(","))
+        .eq(OWNER_COLUMN, uid).eq("match_id", matchId).order("created_at", { ascending: true }),
+      "Pobieranie prognoz wybranego meczu",
+    ),
+    withRequestTimeout(
+      sb.from("match_results").select(READ_COLUMNS.match_results.join(","))
+        .eq(OWNER_COLUMN, uid).eq("match_id", matchId).order("created_at", { ascending: false }).limit(1),
+      "Pobieranie wyniku wybranego meczu",
+    ),
+  ]);
+  if (predictionsResult.error) throw new Error(humanizeError(predictionsResult.error, "predictions"));
+  if (resultResult.error) throw new Error(humanizeError(resultResult.error, "match_results"));
+  const predictions = (predictionsResult.data ?? []) as unknown as TableRows["predictions"][];
+  const predictionIds = predictions.map((row) => row.id);
+  const legs = predictionIds.length === 0 ? [] : await fetchInChunks<TableRows["coupon_legs"]>(
+    predictionIds, 100, async (chunk) => {
+      const { data, error } = await withRequestTimeout(
+        sb.from("coupon_legs").select(READ_COLUMNS.coupon_legs.join(","))
+          .eq(OWNER_COLUMN, uid).in("prediction_id", chunk),
+        "Pobieranie nóg kuponów powiązanych z meczem",
+      );
+      if (error) throw new Error(humanizeError(error, "coupon_legs"));
+      return (data ?? []) as unknown as TableRows["coupon_legs"][];
+    },
   );
-  if (error) throw new Error(humanizeError(error, "predictions"));
-  return (data ?? []) as unknown as TableRows["predictions"][];
+  const couponIds = [...new Set(legs.map((leg) => leg.coupon_id))];
+  const coupons = couponIds.length === 0 ? [] : await fetchInChunks<TableRows["coupons"]>(
+    couponIds, 100, async (chunk) => {
+      const { data, error } = await withRequestTimeout(
+        sb.from("coupons").select(READ_COLUMNS.coupons.join(","))
+          .eq(OWNER_COLUMN, uid).in("id", chunk),
+        "Pobieranie kuponów powiązanych z meczem",
+      );
+      if (error) throw new Error(humanizeError(error, "coupons"));
+      return (data ?? []) as unknown as TableRows["coupons"][];
+    },
+  );
+  return {
+    predictions,
+    legs,
+    coupons,
+    existingResult: ((resultResult.data ?? [])[0] ?? undefined) as unknown as TableRows["match_results"] | undefined,
+  };
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
