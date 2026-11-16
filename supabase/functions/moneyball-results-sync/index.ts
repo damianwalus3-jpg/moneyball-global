@@ -157,7 +157,7 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
  }catch(e){console.log("[moneyball-results-sync] OpenMatchday error",String(e));}
  console.log("[moneyball-results-sync] OpenMatchday",JSON.stringify({durationMs:Date.now()-openMatchdayStarted,feeds:out.filter((x:any)=>x.source==="OpenMatchday").length}));
  const openLigaStarted=Date.now();
- const hasGermanDue=due.some((m:any)=>/^(germany|deu|ger)$/i.test(String(m.country||"").trim())||/\\b(1\\.? bundesliga|2\\.? bundesliga|bundesliga)\\b/i.test(String(m.league||"")));
+ const hasGermanDue=due.some((m:any)=>/^(germany|deu|ger)$/i.test(String(m.country||"").trim())||/\b(1\.? bundesliga|2\.? bundesliga|bundesliga)\b/i.test(String(m.league||"")));
  if(hasGermanDue){
   const year=Number(startDate.slice(0,4));
   for(const league of ["bl1","bl2"]){
