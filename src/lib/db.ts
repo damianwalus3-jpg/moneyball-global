@@ -269,6 +269,46 @@ export async function fetchMatchPageData(): Promise<MatchPageData> {
   return { matches, scans: (scansResult.data ?? []) as unknown as TableRows["scan_runs"][], predictions, results, odds, couponLegs, coupons };
 }
 
+export interface PredictionPageCursor {
+  created_at: string;
+  id: string;
+}
+
+export interface PredictionPageResult {
+  rows: TableRows["predictions"][];
+  has_more: boolean;
+  next_cursor: PredictionPageCursor | null;
+  total_count: number;
+  pending_count: number;
+  won: number;
+  settled: number;
+}
+
+/** Server-side, owner-scoped cursor page. Counts and hit-rate stats are
+ * calculated over the complete selected scope, not only the loaded page. */
+export async function fetchPredictionsPage(args: {
+  market: TableRows["predictions"]["market"];
+  modelScope: "current" | "all";
+  verdict: "all" | "WYBRANY" | "ODRZUCONY";
+  search: string;
+  cursor: PredictionPageCursor | null;
+}): Promise<PredictionPageResult> {
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().rpc("moneyball_predictions_page", {
+      p_market: args.market,
+      p_model_scope: args.modelScope,
+      p_verdict: args.verdict,
+      p_search: args.search,
+      p_before_created_at: args.cursor?.created_at ?? null,
+      p_before_id: args.cursor?.id ?? null,
+      p_page_size: 50,
+    }),
+    "Pobieranie strony prognoz",
+  );
+  if (error) throw new Error(humanizeError(error));
+  return data as PredictionPageResult;
+}
+
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const { data, error } = await withRequestTimeout(requireSupabase().rpc("moneyball_dashboard_summary"), "Pobieranie podsumowania panelu");
   if (error) throw new Error(humanizeError(error));
