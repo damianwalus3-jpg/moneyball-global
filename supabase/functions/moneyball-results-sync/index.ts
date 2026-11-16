@@ -280,9 +280,13 @@ async function processFixture(f:any,m:any,source="FootyNomad",externalId?:string
 }
 
 async function reconcileRescheduledMatches(ownerId:string|null=null){
+ // This seven-day HTML lookup is ancillary; keep it off the five-minute results-sync hot path.
+ // The database lease is atomic across overlapping invocations and permits one check per 15 minutes.
+ const claim=await db("rpc/moneyball_claim_reschedule_sync","POST",{});
+ if(claim!==true)return {updated:0,errors:[],skipped:true};
  const today=day(new Date()),cursor=new Date(today+"T12:00:00Z"),futureDates:string[]=[];
  for(let i=1;i<=7;i++){cursor.setUTCDate(cursor.getUTCDate()+1);futureDates.push(day(cursor));}
- const reads=await limitedSettled(futureDates,3,readDay);
+ const reads=await limitedSettled(futureDates,4,readDay);
  const futureById=new Map<string,any>();
  const readErrors:string[]=[];
  for(let i=0;i<reads.length;i++){
@@ -382,8 +386,9 @@ Deno.serve(async(req:Request)=>{
   else for(let i=span-1;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);dates.push(day(d));}
   let fetched=0,matched=0,matchedById=0,matchedByNames=0,resultsSaved=0,predictionsSettled=0,couponLegsSettled=0,voided=0,alternateFetched=0,alternateMatched=0,rescheduledMatches=0;const errors:string[]=[],rescheduleErrors:string[]=[];
   const rescheduleStarted=Date.now();
-  try{const reconciled=await reconcileRescheduledMatches(ownerId);rescheduledMatches=reconciled.updated;rescheduleErrors.push(...reconciled.errors);}catch(e){rescheduleErrors.push(String(e));}
-  console.log("[moneyball-results-sync] reschedule reconciliation",JSON.stringify({updated:rescheduledMatches,errors:rescheduleErrors.length,durationMs:Date.now()-rescheduleStarted}));
+  let reconciledSkipped=false;
+  try{const reconciled=await reconcileRescheduledMatches(ownerId);rescheduledMatches=reconciled.updated;reconciledSkipped=reconciled.skipped===true;rescheduleErrors.push(...reconciled.errors);}catch(e){rescheduleErrors.push(String(e));}
+  console.log("[moneyball-results-sync] reschedule reconciliation",JSON.stringify({updated:rescheduledMatches,skipped:reconciledSkipped,errors:rescheduleErrors.length,durationMs:Date.now()-rescheduleStarted}));
   const allAlternateFeeds=await readAlternateResults(dates[0],dates[dates.length-1]).catch(e=>{errors.push("Źródła zapasowe: "+String(e));return [] as ScoreFeed[];});
   for(const date of dates){
    try{
