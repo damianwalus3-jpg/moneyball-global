@@ -406,6 +406,78 @@ export async function fetchPredictionsForMatch(matchId: string): Promise<TableRo
   return (data ?? []) as unknown as TableRows["predictions"][];
 }
 
+export interface MatchSettlementContext {
+  predictions: TableRows["predictions"][];
+  legs: TableRows["coupon_legs"][];
+  coupons: TableRows["coupons"][];
+  existingResult: TableRows["match_results"] | undefined;
+}
+
+/** Load only records that can be affected by settling this one match. */
+export async function fetchMatchSettlementContext(matchId: string): Promise<MatchSettlementContext> {
+  const uid = await currentUserId();
+  const sb = requireSupabase();
+  const [predictionsResult, resultResult] = await Promise.all([
+    withRequestTimeout(
+      sb.from("predictions").select(READ_COLUMNS.predictions.join(","))
+        .eq(OWNER_COLUMN, uid).eq("match_id", matchId).order("created_at", { ascending: true }),
+      "Pobieranie prognoz wybranego meczu",
+    ),
+    withRequestTimeout(
+      sb.from("match_results").select(READ_COLUMNS.match_results.join(","))
+        .eq(OWNER_COLUMN, uid).eq("match_id", matchId).order("created_at", { ascending: false }).limit(1),
+      "Pobieranie wyniku wybranego meczu",
+    ),
+  ]);
+  if (predictionsResult.error) throw new Error(humanizeError(predictionsResult.error, "predictions"));
+  if (resultResult.error) throw new Error(humanizeError(resultResult.error, "match_results"));
+  const predictions = (predictionsResult.data ?? []) as unknown as TableRows["predictions"][];
+  const predictionIds = predictions.map((row) => row.id);
+
+  // Discover affected coupons from this match, then load every leg in each AKO.
+  // Coupon status and combined odds must be calculated from the complete coupon.
+  const matchLegs = predictionIds.length === 0 ? [] : await fetchInChunks<TableRows["coupon_legs"]>(
+    predictionIds, 100, async (chunk) => {
+      const { data, error } = await withRequestTimeout(
+        sb.from("coupon_legs").select(READ_COLUMNS.coupon_legs.join(","))
+          .eq(OWNER_COLUMN, uid).in("prediction_id", chunk),
+        "Wyszukiwanie kuponów powiązanych z meczem",
+      );
+      if (error) throw new Error(humanizeError(error, "coupon_legs"));
+      return (data ?? []) as unknown as TableRows["coupon_legs"][];
+    },
+  );
+  const couponIds = [...new Set(matchLegs.map((leg) => leg.coupon_id))];
+  const [legs, coupons] = couponIds.length === 0
+    ? [[], []] as [TableRows["coupon_legs"][], TableRows["coupons"][]]
+    : await Promise.all([
+      fetchInChunks<TableRows["coupon_legs"]>(couponIds, 100, async (chunk) => {
+        const { data, error } = await withRequestTimeout(
+          sb.from("coupon_legs").select(READ_COLUMNS.coupon_legs.join(","))
+            .eq(OWNER_COLUMN, uid).in("coupon_id", chunk),
+          "Pobieranie wszystkich nóg powiązanych kuponów",
+        );
+        if (error) throw new Error(humanizeError(error, "coupon_legs"));
+        return (data ?? []) as unknown as TableRows["coupon_legs"][];
+      }),
+      fetchInChunks<TableRows["coupons"]>(couponIds, 100, async (chunk) => {
+        const { data, error } = await withRequestTimeout(
+          sb.from("coupons").select(READ_COLUMNS.coupons.join(","))
+            .eq(OWNER_COLUMN, uid).in("id", chunk),
+          "Pobieranie kuponów powiązanych z meczem",
+        );
+        if (error) throw new Error(humanizeError(error, "coupons"));
+        return (data ?? []) as unknown as TableRows["coupons"][];
+      }),
+    ]);
+  return {
+    predictions,
+    legs,
+    coupons,
+    existingResult: ((resultResult.data ?? [])[0] ?? undefined) as unknown as TableRows["match_results"] | undefined,
+  };
+}
+
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const { data, error } = await withRequestTimeout(requireSupabase().rpc("moneyball_dashboard_summary"), "Pobieranie podsumowania panelu");
   if (error) throw new Error(humanizeError(error));
