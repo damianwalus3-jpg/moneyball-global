@@ -35,16 +35,16 @@ function isExcludedSeniorTeam(value: unknown): boolean {
 }
 
 function isTopTwoTierLeague(competition: unknown, country?: unknown): boolean {
-  const scopeCountry = String(country ?? "").toLowerCase().trim();
+  const scopeCountry = String(country ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
   const scopeLabel = String(competition ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  if ((scopeCountry === "scotland" && /\b(lowland league|highland league)\b/.test(scopeLabel))
-    || (scopeCountry === "turkey" && /\b2 lig\b/.test(scopeLabel))
-    || (["denmark", "norway", "belarus"].includes(scopeCountry) && /\b2 division\b/.test(scopeLabel))
-    || (scopeCountry === "sweden" && /\bdivision [12]\b/.test(scopeLabel))
-    || (scopeCountry === "albania" && /\b2nd division\b/.test(scopeLabel))
-    || (scopeCountry === "croatia" && /\bsecond nl\b/.test(scopeLabel))
-    || (scopeCountry === "estonia" && /\besiliiga b\b/.test(scopeLabel))
-    || (scopeCountry === "greece" && /\bfootball league\b/.test(scopeLabel))) return false;
+  if ((["scotland", "sco"].includes(scopeCountry) && /\b(lowland league|highland league)\b/.test(scopeLabel))
+    || (["turkey", "turkiye", "tur"].includes(scopeCountry) && /\b2 lig\b/.test(scopeLabel))
+    || (["denmark", "dnk", "norway", "nor", "belarus", "blr"].includes(scopeCountry) && /\b2 division\b/.test(scopeLabel))
+    || (["sweden", "swe"].includes(scopeCountry) && /\bdivision [12]\b/.test(scopeLabel))
+    || (["albania", "alb"].includes(scopeCountry) && /\b2nd division\b/.test(scopeLabel))
+    || (["croatia", "cro"].includes(scopeCountry) && /\bsecond nl\b/.test(scopeLabel))
+    || (["estonia", "est"].includes(scopeCountry) && /\besiliiga b\b/.test(scopeLabel))
+    || (["greece", "gre", "grc"].includes(scopeCountry) && /\bfootball league\b/.test(scopeLabel))) return false;
   const comp = String(competition ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   if (!comp) return false;
   if (/\bserie c\b|\blega pro\b|\bserie c1\b|\bserie c2\b/.test(comp)) return false;
