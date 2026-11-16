@@ -137,7 +137,7 @@ function Historia() {
                         <span className="flex-1" />
                         {p.verdict === "WYBRANY" ? (
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Stawka {fmtMoney(p.stake ?? 5)} · kurs {fmtOdds(p.odds)} · możliwy zwrot {fmtMoney(p.potential_return ?? (p.odds != null ? 5 * Number(p.odds) : null))}</span>
+                            <span className="text-xs text-muted-foreground">Stawka {fmtMoney(p.stake ?? 4)} · kurs {fmtOdds(p.odds)} · możliwy zwrot {fmtMoney(p.potential_return ?? (p.odds != null ? 4 * Number(p.odds) : null))}</span>
                             <SettlementBadge status={p.settlement_status} />
                             {p.verified && <span className={p.profit_loss != null && p.profit_loss > 0 ? "text-xs font-semibold text-success" : p.profit_loss != null && p.profit_loss < 0 ? "text-xs font-semibold text-destructive" : "text-xs text-muted-foreground"}>Wynik {fmtMoney(p.profit_loss)}</span>}
                           </div>
