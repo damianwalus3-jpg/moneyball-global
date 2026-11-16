@@ -72,6 +72,10 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
  console.log("[moneyball-results-sync] discovery",JSON.stringify({timedMatches:timedMatches.length,dateOnlyMatches:dateOnlyMatches.length,durationMs:Date.now()-discoveryStarted}));
  const unresolved=[...(timedMatches||[]),...(dateOnlyMatches||[])],todayKey=day(new Date());
  const due=unresolved.filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team)&&((m.kickoff_at&&new Date(m.kickoff_at).getTime()<Date.now())||(!m.kickoff_at&&m.kickoff_date&&String(m.kickoff_date)<=todayKey))&& !["finished","postponed","cancelled"].includes(String(m.status||"").toLowerCase()));
+ if(!due.length){
+  console.log("[moneyball-results-sync] alternate sources skipped",JSON.stringify({reason:"no_due_unresolved_matches",durationMs:Date.now()-alternateStarted}));
+  return [];
+ }
  const leagues=selectEspnLeagues(due);
  const dateRange=startDate.replace(/-/g,"")+(startDate===endDate?"":"-"+endDate.replace(/-/g,""));
  const espnStarted=Date.now();
@@ -94,8 +98,7 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
  }}
  console.log("[moneyball-results-sync] ESPN selection",JSON.stringify({dueFixtures:due.length,leagues,successfulLeagues:espn.filter((x:any)=>x.status==="fulfilled").length,events:espnEvents,failures:espnFailures,durationMs:Date.now()-espnStarted}));
  // TheSportsDB public v1 feed: no signup or paid key; one request per date, with the free tier returning a small sample.
- const eventDates:string[]=[];const cursor=new Date(startDate+"T00:00:00Z"),last=new Date(endDate+"T00:00:00Z");
- for(;cursor<=last;cursor.setUTCDate(cursor.getUTCDate()+1))eventDates.push(cursor.toISOString().slice(0,10));
+ const eventDates=[...new Set(due.map((m:any)=>m.kickoff_at?day(new Date(m.kickoff_at)):String(m.kickoff_date||"").slice(0,10)).filter((date:string)=>date>=startDate&&date<=endDate))].sort();
  const sportsDbStarted=Date.now();
  const sportsDb=await limitedSettled(eventDates,4,async date=>{
   const url="https://www.thesportsdb.com/api/v1/json/123/eventsday.php?d="+date+"&s=Soccer";
@@ -154,20 +157,23 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
  }catch(e){console.log("[moneyball-results-sync] OpenMatchday error",String(e));}
  console.log("[moneyball-results-sync] OpenMatchday",JSON.stringify({durationMs:Date.now()-openMatchdayStarted,feeds:out.filter((x:any)=>x.source==="OpenMatchday").length}));
  const openLigaStarted=Date.now();
- const year=Number(startDate.slice(0,4));
- for(const league of ["bl1","bl2"]){
-  const url="https://api.openligadb.de/getmatchdata/"+league+"/"+year;
-  try{
-   const r=await fetch(url,{headers:{"Accept":"application/json","User-Agent":"MoneyballGlobal/2.0"},signal:AbortSignal.timeout(12000)});
-   if(!r.ok)continue;const arr=await r.json();
-   for(const e of arr||[]){
-    const dt=e.matchDateTimeUTC||e.matchDateTime;if(!dt||day(new Date(dt))<startDate||day(new Date(dt))>endDate)continue;
-    const final=e.matchResults?.find((z:any)=>z.resultTypeKind==="After90Minutes")||e.matchResults?.find((z:any)=>z.resultOrderID===2);
-    out.push({source:"OpenLigaDB",external_id:String(e.matchID),home:e.team1?.teamName||"",away:e.team2?.teamName||"",home_score:e.matchIsFinished&&final?Number(final.pointsTeam1):null,away_score:e.matchIsFinished&&final?Number(final.pointsTeam2):null,status:e.matchIsFinished?"finished":"scheduled",date:dt,url,raw:e});
-   }
-  }catch(_){}
+ const hasGermanDue=due.some((m:any)=>/^(germany|deu|ger)$/i.test(String(m.country||"").trim())||/\\b(1\\.? bundesliga|2\\.? bundesliga|bundesliga)\\b/i.test(String(m.league||"")));
+ if(hasGermanDue){
+  const year=Number(startDate.slice(0,4));
+  for(const league of ["bl1","bl2"]){
+   const url="https://api.openligadb.de/getmatchdata/"+league+"/"+year;
+   try{
+    const r=await fetch(url,{headers:{"Accept":"application/json","User-Agent":"MoneyballGlobal/2.0"},signal:AbortSignal.timeout(8000)});
+    if(!r.ok)continue;const arr=await r.json();
+    for(const e of arr||[]){
+     const dt=e.matchDateTimeUTC||e.matchDateTime;if(!dt||day(new Date(dt))<startDate||day(new Date(dt))>endDate)continue;
+     const final=e.matchResults?.find((z:any)=>z.resultTypeKind==="After90Minutes")||e.matchResults?.find((z:any)=>z.resultOrderID===2);
+     out.push({source:"OpenLigaDB",external_id:String(e.matchID),home:e.team1?.teamName||"",away:e.team2?.teamName||"",home_score:e.matchIsFinished&&final?Number(final.pointsTeam1):null,away_score:e.matchIsFinished&&final?Number(final.pointsTeam2):null,status:e.matchIsFinished?"finished":"scheduled",date:dt,url,raw:e});
+    }
+   }catch(_){}
+  }
  }
- console.log("[moneyball-results-sync] OpenLigaDB",JSON.stringify({durationMs:Date.now()-openLigaStarted,feeds:out.filter((x:any)=>x.source==="OpenLigaDB").length}));
+ console.log("[moneyball-results-sync] OpenLigaDB",JSON.stringify({durationMs:Date.now()-openLigaStarted,feeds:out.filter((x:any)=>x.source==="OpenLigaDB").length,skipped:!hasGermanDue}));
  console.log("[moneyball-results-sync] alternate total",JSON.stringify({feeds:out.length,durationMs:Date.now()-alternateStarted}));
  return out;
 }
