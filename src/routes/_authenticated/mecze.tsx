@@ -203,11 +203,11 @@ function Mecze() {
   const [predictionProgress, setPredictionProgress] = useState("");
   const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
   const [singleBetPrediction, setSingleBetPrediction] = useState<Prediction | null>(null);
-  const singleBetStake = "5";
+  const singleBetStake = "4";
 
   const saveSingleBet = useAction(async () => {
     const prediction = singleBetPrediction;
-    const stake = 5;
+    const stake = 4;
     if (!prediction || prediction.verdict !== "WYBRANY") throw new Error("Wybierz zatwierdzony typ.");
     if (prediction.odds == null || Number(prediction.odds) <= 1) throw new Error("Brak potwierdzonego kursu — nie zapisuję zakładu bez kursu.");
     if (stake == null || stake <= 0) throw new Error("Podaj stawkę większą od zera.");
@@ -220,7 +220,7 @@ function Mecze() {
       stake,
       targetLegs: 1,
     });
-  }, { success: "Zapisano pojedynczy typ ze stałą stawką 5 €", onDone: () => setSingleBetPrediction(null) });
+  }, { success: "Zapisano pojedynczy typ ze stałą stawką 4 €", onDone: () => setSingleBetPrediction(null) });
 
   const delScan = useAction((id: string) => deleteRow("scan_runs", id), {
     success: "Usunięto skan",
