@@ -624,3 +624,12 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Audyt predykcji dla dzisiejszych meczów spoza scope: France National 2 (16 wierszy), Scotland Lowland League (84), UEFA Nations League (96); łącznie **196 historycznych prognoz**. Wszystkie mają verdict `ODRZUCONY`, status pending i **0 powiązanych coupon_legs**. Nie kasowano rekordów ani historii; pozostają odrzucone i są wykluczane z bieżącego scope.
 - Dwa kwalifikujące się spotkania Northern Ireland Championship mają już prognozy MONEYBALL GLOBAL 3.8 dla 1X2, osobnego Double Chance i GOALS; wszystkie zostały oznaczone ODRZUCONY, 0 WYBRANY. Harmonogram predykcji zwrócił `skipped=cooldown`, `next_scan_at=2026-11-17T07:00:00Z` (08:00 Europe/Brussels); nie omijać blokady cooldown. Następny zaplanowany skan użyje wersji v234.
 - Nadal niepotwierdzone: frontend Vitest/TypeScript/build i Cloudflare Worker deployment. Nie zamykać issue #76 bez potwierdzenia CI i produkcyjnego UI.
+
+
+## Potwierdzenie filtrów dashboardu i aktualny stan prediction scheduler — 2026-11-17
+- SQL RPC `moneyball_dashboard_summary()` i `moneyball_dashboard_selected_picks()` nadal zawierają wywołania `moneyball_is_european_top_two_league`; out-of-scope predictions nie powinny trafiać do głównego panelu/wybranych typów.
+- Frontend `src/routes/_authenticated/mecze.tsx` filtruje mecze przez `isEligibleEuropeanMatch` i deduplikuje listę; aktualna gałąź main używa poprawionego `domain.ts`.
+- **Korekta stanu cron #11:** aktualny odczyt produkcyjny `cron.job` pokazuje `moneyball-global-auto-predict-sequential` jako `active=true`, harmonogram `* * * * *`. Wcześniejsza notatka o `active=false` jest nieaktualna. Job używa `moneyball_claim_prediction_scan` z lease i cooldown; nie wyłączać ani nie omijać blokady bez nowego audytu.
+- Ręczne wywołanie scheduled prediction endpointu z aktualną wersją v234 zwróciło HTTP 200 i `skipped=true, reason=cooldown, next_scan_at=2026-11-17T07:00:00Z` (08:00 Europe/Brussels). Nie wymuszać skanu przed tym terminem.
+- Obecne dwa kwalifikujące się mecze Northern Ireland Championship mają prognozy 1X2, DOUBLE_CHANCE i GOALS; wszystkie 26 typów są ODRZUCONY, 0 WYBRANY. Nie ma podstaw do tworzenia kuponu.
+- Dla dzisiejszych niekwalifikujących się meczów wykryto 196 istniejących wierszy prognoz (France National 2, Scotland Lowland League, UEFA Nations League); wszystkie są ODRZUCONY/pending i nie mają żadnych coupon_legs. Zachować je bez kasowania; aktualne RPC i filtry scope mają je wykluczać z głównego widoku.
