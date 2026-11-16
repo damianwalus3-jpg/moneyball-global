@@ -630,3 +630,40 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - `useAction` resets result pages after result sync/settlement to refresh only the first page, instead of refetching every loaded page.
 - This wave still requires GitHub CI, TypeScript, production build and Cloudflare deployment before release.
 - History and Statistics still need their own safe full-history refactors; do not mark all menu screens optimized.
+
+
+## Results and match-settlement scoped reads — 2026-11-16 (PR #66)
+
+### Root cause
+- Results route previously used `useTable` for complete `matches`, `predictions` and `match_results` tables, then filtered to a rolling window of 72h before + 24h ahead in the browser.
+- SettleMatchDialog previously loaded complete `coupon_legs`, `coupons` and `match_results` tables just to settle one selected match.
+- Settlement requires every leg of any affected AKO coupon; loading only the current match's leg would corrupt coupon status/odds. The new query discovers affected coupon IDs from the selected match, then fetches all legs for those coupons and only those coupons.
+
+### Database and read-only validation
+- Added owner-scoped `moneyball_results_page` SECURITY INVOKER RPC, using `auth.uid()`, validating filter/cursor/page size (max 50), returning 30-row cursor pages plus full-scope counters.
+- Live Supabase function is updated from migration `20261116185000_moneyball_results_server_pagination.sql`; same migration is present in the PR.
+- Rolling 96h sample: 972 matches with active-model picks, 6,616 picks, 26 selected picks, 262 matches with verified results, 0 finished matches missing a verified result in this window at test time.
+- First/second page each returned 30 rows with 0 duplicate match IDs.
+- First page included 345 predictions and every prediction object includes the required `note` field.
+- Filters at test time: FINAL 13 matches, rejected 972, JACKPOT 0. Page size request 100 correctly capped to 50.
+- Full RPC EXPLAIN ANALYZE about 71 ms, 13,237 shared cache hits, no temp spill.
+- Tests used authenticated, read-only transactions; no match, prediction, result, coupon, leg, bankroll or transaction rows were changed.
+
+### Frontend changes in PR #66
+- `Wyniki` uses infinite cursor pages and only queries the existing rolling window; search/filtering is server-side, search debounced 250 ms.
+- First results page is preloaded in the route loader; page cache retained for 10 minutes.
+- Summary counters come from full filtered DB scope, not just loaded pages.
+- Settlement dialog loads predictions and latest result only for the chosen match.
+- It discovers coupons containing those predictions, then loads all legs for every affected coupon plus the coupon records. This is required for correct combined odds/status and full-coupon settlement.
+- Mutation cache invalidation includes result pages and match settlement context.
+- PR: https://github.com/damianwalus3-jpg/moneyball-global/pull/66
+- PR branch had CI #800 SUCCESS at earlier checkpoint SHA `339d0036`; later changes still need a fresh green run before merge.
+- Vercel commit status reported a deployment rate limit (24h). This is a Vercel integration status, not the Cloudflare production deployment; production must remain on Cloudflare Worker and not be declared updated by Vercel.
+- Do not merge/deploy until latest PR head CI passes. Cloudflare production deploy follows merge to main.
+- Authenticated menu performance remains unmeasured; public shell timing is not an authenticated UI benchmark.
+
+### Remaining performance/safety targets
+1. Await fresh CI for latest PR #66 head, review diff, then merge and verify Cloudflare deploy.
+2. History and Statistics still need separate audit. Do not remove full historical coverage or truncate data to speed those views.
+3. `settlement.ts` still reads/reconciles the bankroll transaction ledger when a coupon is settled/corrected; this currently preserves global balance_after consistency but is a potential cost as ledger grows. Replace only with an atomic/verified server-side ledger operation and parity tests; never simply stop recalculating historical balances.
+4. Validate real coupon settlement on a controlled test record only if an isolated, reversible test fixture is available; never settle real user coupons manually.
