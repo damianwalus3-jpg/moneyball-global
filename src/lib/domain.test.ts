@@ -18,6 +18,7 @@ import {
   isKickoffToday,
   isEuropeanTopTwoLeague,
   isEligibleEuropeanMatch,
+  dedupeEuropeanMatches,
   stakeBalances,
   settlePick,
   settleGoalsPick,
@@ -234,6 +235,22 @@ describe("coupon candidates", () => {
     expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), competition: "Frauen Bundesliga" }, now)).toBe(false);
     expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), gender: "women" }, now)).toBe(false);
   });
+  it("deduplicates provider ID variants for the same Brussels-day fixture", () => {
+    const base = {
+      owner_id: "owner", scan_run_id: null, source: "FootyNomad", competition: "Liga E Pare",
+      country: "Kosovo", gender: "men" as const, home_team: "Trepça Mitrovicë", away_team: "2 Korriku",
+      kickoff_at: "2026-11-16T12:00:00.000Z", kickoff_date: "2026-11-16", status: "finished" as const,
+      created_at: "2026-11-15T01:00:00.000Z",
+    };
+    const oldRow = { ...base, id: "old", external_id: "1572681-trep-a-mitrovic-vs-2-korriku", updated_at: "2026-11-16T16:35:00.000Z" } as Match;
+    const canonicalRow = { ...base, id: "canonical", external_id: "1572681", updated_at: "2026-11-16T22:25:00.000Z" } as Match;
+    const other = { ...base, id: "other", home_team: "Prishtina", external_id: "other", kickoff_at: "2026-11-16T14:00:00.000Z" } as Match;
+    const result = dedupeEuropeanMatches([oldRow, canonicalRow, other]);
+    expect(result).toHaveLength(2);
+    expect(result.map((match) => match.id)).toContain("canonical");
+    expect(result.map((match) => match.id)).not.toContain("old");
+  });
+
   it("rejects reserve and B teams even when the fixture feed labels them as men's", () => {
     expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), home_team: "UCSA", away_team: "Polissya II" }, now)).toBe(false);
     expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), away_team: "Celta de Vigo II" }, now)).toBe(false);
