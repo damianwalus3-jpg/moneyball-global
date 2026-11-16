@@ -1,6 +1,6 @@
 import { queryOptions, useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun } from "./db";
+import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun, fetchCouponPageData } from "./db";
 import type { TableName, TableRows } from "./types";
 
 /** Small live summaries refresh frequently; large table reads use a slower cadence. */
@@ -65,6 +65,18 @@ export function tableQuery<K extends TableName>(table: K) {
     queryKey: ["table", table] as const,
     queryFn: () => fetchAll(table),
     ...refresh,
+  });
+}
+
+export function couponPageDataQuery() {
+  return queryOptions({
+    queryKey: ["coupon-page-data"] as const,
+    queryFn: fetchCouponPageData,
+    retry: false,
+    staleTime: 30_000,
+    gcTime: 600_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   });
 }
 
