@@ -19,7 +19,7 @@ function isEuropeanFixture(country: unknown, competition: unknown, home?: unknow
 function isTopTwoTierLeague(competition: unknown): boolean {
  const comp=String(competition??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
  if(!comp)return false;
- if(/\b(u(?:17|18|19|20|21|23)|under ?(?:17|18|19|20|21|23)|youth|junior(?:s)?|academy|juvenil|jugend|reserve|reserves|b team)\b/.test(comp))return false;
+ if(/\b(u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23)|youth|junior(?:s)?|academy|juvenil|jugend|reserve|reserves|b team|cup|copa|trophy|play-?offs?)\b/.test(comp))return false;
  if(/\b(?:3|4|5|6|7|8|9|iii|iv|v|vi)\s*(?:\.\s*)?(?:liga|league|division|div|bundesliga|serie|snl|hnl|federal|federation)\b|\b(?:third|fourth|fifth|regional|regionalliga|oberliga|national league north|national league south|non league|non-league)\b/.test(comp))return false;
  return /\b(?:premier league|premiership|championship|super league|superliga|super lig|pro league|jupiler pro league|challenger pro league|bundesliga|2 bundesliga|ligue 1|ligue 2|serie a|serie b|la liga|laliga|segunda division|segunda liga|eredivisie|keuken kampioen divisie|primeira liga|ekstraklasa|1 lig|2 lig|1 liga|2 liga|liga i|liga ii|liga 1|liga 2|prva liga|persha liga|druha liga|hnl|1 hnl|2 hnl|first league|second league|first division|second division|division 1|division 2|div 1|div 2|1st division|2nd division|1st league|2nd league|a lyga|virsliga|meistriliiga|veikkausliiga|ykkosliiga|allsvenskan|superettan|eliteserien|obos ligaen|premier division|league of ireland premier|league of ireland first|scottish championship)\b/.test(comp);
 }
@@ -28,10 +28,17 @@ async function db(p:string,t:string,m="GET",b?:any,prefer="return=representation
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
 function normTeam(v:any){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\b(fc|cf|sc|ac|afc|club)\b/g," ").replace(/\b(wfc|women|w)\b/g," women ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");}
 function fixtureGender(m:any){
- const explicit=String(m?.gender||"").toLowerCase();if(explicit==="women"||explicit==="men")return explicit;
- const label=[m?.competition,m?.league,m?.home_team,m?.away_team].map(x=>String(x||"")).join(" ").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
- if(/\b(women|womens|woman|frauen|femenina|femenino|feminin|female|damallsvenskan|wsl|liga[- ]?f)\b/.test(label))return "women";
- if(/\b(u(?:15|16|17|18|19|20|21|23)|under[- ]?(?:15|16|17|18|19|20|21|23)|reserves?|academy|youth|b team|ii|iii)\b/.test(label))return "unknown";
+ const normalize=(v:any)=>String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+ const competition=normalize(m?.competition||m?.league),home=normalize(m?.home_team),away=normalize(m?.away_team);
+ const label=[competition,home,away].join(" ");
+ if(/\b(women|womens|woman|frauen|femenina|femenino|feminin|female|damallsvenskan|wsl|liga f)\b/.test(label))return "women";
+ if(/\b(u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend)\b/.test(label))return "unknown";
+ // Reserve sides are excluded even when the feed incorrectly labels the fixture as men's.
+ const reserveTeam=(team:string)=>/\b(reserves?|academy|youth|b team)\b/.test(team)||/(^| )(ii|iii|b)$/.test(team);
+ if(reserveTeam(home)||reserveTeam(away))return "unknown";
+ const explicit=String(m?.gender||"").toLowerCase();
+ if(explicit==="women")return "women";
+ if(explicit==="men")return "men";
  return "men";
 }
 function fixtureTeamKey(v:any){const key=normTeam(v);const aliases:Record<string,string>={"turkiye":"turkey","republic of ireland":"ireland","czech republic":"czechia","north macedonia":"north macedonia","korea republic":"south korea","united states of america":"united states","usa":"united states","ivory coast":"cote d ivoire","cote d ivoire":"cote d ivoire"};return aliases[key]||key;}
