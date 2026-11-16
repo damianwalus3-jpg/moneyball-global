@@ -303,8 +303,19 @@ function historyModel(home:string,away:string,kickoff:string,history:any[],footy
   const freshXg=(rows:any[])=>rows.filter((x:any)=>{const stamp=Date.parse(String(x.date||"")+"T00:00:00Z");return Number.isFinite(stamp)&&Number.isFinite(xgCutoff)&&stamp<xgCutoff&&xgCutoff-stamp<=240*24*60*60*1000&&x.xg_for!=null&&x.xg_against!=null&&Number.isFinite(Number(x.xg_for))&&Number.isFinite(Number(x.xg_against));});
   const externalHomeXg=freshXg(Array.isArray(hf?.xg_last10)?hf.xg_last10:[]);
   const externalAwayXg=freshXg(Array.isArray(af?.xg_last10)?af.xg_last10:[]);
-  const hxgRows=externalHomeXg.length?externalHomeXg:freshXg(hs.rows);
-  const axgRows=externalAwayXg.length?externalAwayXg:freshXg(as.rows);
+  // Merge public xG feeds with local verified history instead of discarding
+  // the local sample whenever an external source returns even one row.
+  // Deduplicate same-date/same-xG observations and retain the latest ten.
+  const mergeXg=(...groups:any[][])=>{
+   const unique=new Map<string,any>();
+   for(const row of groups.flat().sort((a:any,b:any)=>Date.parse(String(b.date||""))-Date.parse(String(a.date||"")))){
+    const key=String(row.date||"").slice(0,10)+"|"+Number(row.xg_for).toFixed(3)+"|"+Number(row.xg_against).toFixed(3);
+    if(!unique.has(key))unique.set(key,row);
+   }
+   return [...unique.values()].slice(0,10);
+  };
+  const hxgRows=mergeXg(externalHomeXg,freshXg(hs.rows));
+  const axgRows=mergeXg(externalAwayXg,freshXg(as.rows));
   const hxg=hxgRows.length,axg=axgRows.length,useXg=hxg>=3&&axg>=3; xgUsed=useXg; xgHomeMatches=hxg; xgAwayMatches=axg; const countSources=(rows:any[])=>rows.reduce((acc:Record<string,number>,row:any)=>{const source=String(row.source||"historical_xg").toLowerCase();acc[source]=(acc[source]||0)+1;return acc;},{});xgHomeSourceCounts=countSources(hxgRows);xgAwaySourceCounts=countSources(axgRows); const homeAttack=useXg?0.65*avg(hxgRows,"xg_for")+0.35*avg(hs.rows,"gf"):avg(hs.rows,"gf"),homeDefence=useXg?0.65*avg(hxgRows,"xg_against")+0.35*avg(hs.rows,"ga"):avg(hs.rows,"ga"),awayAttack=useXg?0.65*avg(axgRows,"xg_for")+0.35*avg(as.rows,"gf"):avg(as.rows,"gf"),awayDefence=useXg?0.65*avg(axgRows,"xg_against")+0.35*avg(as.rows,"ga"):avg(as.rows,"ga"),lh=clamp(((homeAttack+awayDefence)/2)*1.06,0.15,3.6),la=clamp(((awayAttack+homeDefence)/2)*0.94,0.15,3.6),hp=Array.from({length:9},(_,i)=>poisson(lh,i)),ap=Array.from({length:9},(_,i)=>poisson(la,i));
   p1=0;px=0;p2=0;for(let i=0;i<9;i++)for(let j=0;j<9;j++){const q=hp[i]*ap[j];if(i>j)p1+=q;else if(i===j)px+=q;else p2+=q;}const sum=p1+px+p2;p1/=sum;px/=sum;p2/=sum;expectedHomeGoals=+lh.toFixed(2);expectedAwayGoals=+la.toFixed(2);
   method=useXg?"Model Poissona: 65% średnie xG i xGA z ostatnich 10 meczów + 35% rzeczywiste gole, z korektą przewagi gospodarzy.":"Model Poissona na podstawie średnich goli strzelonych i straconych z ostatnich maksymalnie 10 spotkań, z niewielką korektą przewagi gospodarzy.";
