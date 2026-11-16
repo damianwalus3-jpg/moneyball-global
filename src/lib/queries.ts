@@ -5,9 +5,9 @@ import type { TableName } from "./types";
 
 /** Read-only refresh: results are synced by the backend, the browser only re-reads them. */
 export const LIVE_REFRESH = {
-  staleTime: 60_000,
+  staleTime: 15_000,
   gcTime: 600_000,
-  refetchInterval: 120_000,
+  refetchInterval: 30_000,
   refetchIntervalInBackground: false,
   refetchOnWindowFocus: true,
 } as const;
@@ -26,9 +26,9 @@ export function couponFinanceQuery() {
     queryKey: ["coupon-finance-summary"] as const,
     queryFn: fetchCouponFinanceSummary,
     retry: false,
-    staleTime: 60_000,
+    staleTime: 15_000,
     gcTime: 600_000,
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });
