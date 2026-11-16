@@ -544,3 +544,16 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Cron `moneyball-global-free-footynomad` pozostaje aktywny co 15 minut. Następny cykliczny przebieg powinien odtworzyć cache na podstawie poprawionej funkcji v34; po nim ponownie sprawdzić cache.
 - Status frontendu Cloudflare: niepotwierdzony. Workflow `.github/workflows/deploy-cloudflare.yml` uruchamia walidację Deno, testy Vitest, TypeScript, build Cloudflare i deploy przy push do main. Dostępny GitHub combined status pokazuje jedynie niezwiązany Vercel build-rate-limit failure; nie jest to wynik Cloudflare. Nie oznaczać frontendu jako wdrożonego, dopóki run workflow i Worker nie zostaną zweryfikowane.
 - Nie zamykać issue #76. Pozostaje: potwierdzić zielony CI/Cloudflare deploy najnowszego main, test produkcyjnego Workera i porównać kompletną dzienną listę FootyNomad z cache/matches/predictions dla wszystkich krajów. Nie powtarzać już zastosowanych migracji ani deployów Edge v77/v34/v230 bez nowej regresji.
+
+
+## Finalizacja aliasów kodów krajów i aktualny stan wdrożeń — 2026-11-17
+- Rozszerzono country-aware wykluczenia o kody federacji/krajów i wariant `Türkiye`, aby identyczny filtr działał przy pełnej nazwie, transliteracji i kodzie:
+  - frontend `src/lib/domain.ts`: commit `7111c6ada7a3213f1c9a1784a2fbddb1527d9981`, następnie dodanie `turkiye` do zbioru państw `17aaf82719e325f3c12d2978d61361c3519fbffc`
+  - FootyNomad sync: `2b57158a4721502b9e34259e539cf4ac633e791e`
+  - free feed/cache purge: `71b6f50b166433cd9d6039f85a2fc8a156e0b3ea`
+  - prediction engine: `c3a82b7f0598ccbbfb0ea0676f9c83a27b9c0615`
+  - testy kodów kraju i pozytywnego `Türkiye 1. Lig`: `842c6cf45f3e317e7b072326d5cd7e6fd18b6568`, `8eadb9eaa4ba8896e27182c8d97eb9696c2a1a64`.
+- Ponownie wdrożone Edge Functions po zmianie kodów kraju: `footynomad-sync v78`, `moneyball-free-feed v35`, `moneyball-predict v231`; wszystkie ACTIVE.
+- Produkcyjny SQL zweryfikował dodatkowe warianty: Türkiye 1. Lig = true; Türkiye/TUR 2. Lig = false; SCO Lowland League = false; DNK 2. Division = false; SWE Division 1 = false.
+- Dzienny cache po czyszczeniu nadal zawiera tylko Northern Ireland Championship (2 fixtures); siedem Lowland League usuniętych wpisów nie wróciło w ostatnim odczycie. Główne rekordy matches pozostają zachowane.
+- Frontend test suite i Cloudflare Worker deployment nadal wymagają potwierdzenia z GitHub Actions. Ostatni znany status check to Vercel build-rate-limit i nie może być interpretowany jako wynik Cloudflare. Nie zamykać issue #76 ani nie deklarować pełnego wdrożenia UI.
