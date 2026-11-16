@@ -1,6 +1,7 @@
 import { requireSupabase } from "./supabase";
 import { COLUMNS, OWNER_COLUMN } from "./schema";
 import type { TableName, TableRows } from "./types";
+import { brusselsDayKey, brusselsInputToISO } from "./time";
 
 export interface DashboardMarketStats {
   won: number;
@@ -128,7 +129,6 @@ export interface CouponPageData {
 export async function fetchCouponPageData(): Promise<CouponPageData> {
   const uid = await currentUserId();
   const sb = requireSupabase();
-  const { brusselsDayKey, brusselsInputToISO } = await import("./time");
   const day = brusselsDayKey(new Date());
   const [year, month, date] = day.split("-").map(Number);
   const next = new Date(Date.UTC(year, month - 1, date + 1)).toISOString().slice(0, 10);
