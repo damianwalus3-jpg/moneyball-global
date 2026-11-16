@@ -4,17 +4,27 @@ function isExcludedSeniorTeam(value: unknown): boolean {
 }
 
 function isTopTwoTierLeague(competition: unknown, country?: unknown): boolean {
- const comp=String(competition??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
- const c=String(country??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().trim();
+  const scopeCountry = String(country ?? "").toLowerCase().trim();
+  const scopeLabel = String(competition ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if ((scopeCountry === "scotland" && /\b(lowland league|highland league)\b/.test(scopeLabel))
+    || (scopeCountry === "turkey" && /\b2 lig\b/.test(scopeLabel))
+    || (["denmark", "norway", "belarus"].includes(scopeCountry) && /\b2 division\b/.test(scopeLabel))
+    || (scopeCountry === "sweden" && /\bdivision [12]\b/.test(scopeLabel))
+    || (scopeCountry === "albania" && /\b2nd division\b/.test(scopeLabel))
+    || (scopeCountry === "croatia" && /\bsecond nl\b/.test(scopeLabel))
+    || (scopeCountry === "estonia" && /\besiliiga b\b/.test(scopeLabel))
+    || (scopeCountry === "greece" && /\bfootball league\b/.test(scopeLabel))) return false;
+ const comp=String(competition??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+ const c=String(country??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
  if(!comp)return false;
- if ((c === "scotland" && /\\b(lowland league|highland league)\\b/.test(comp))
-  || (c === "turkey" && /\\b2 lig\\b/.test(comp))
-  || (["denmark","norway","belarus"].includes(c) && /\\b2 division\\b/.test(comp))
-  || (c === "sweden" && /\\bdivision [12]\\b/.test(comp))
-  || (c === "albania" && /\\b2nd division\\b/.test(comp))
-  || (c === "croatia" && /\\bsecond nl\\b/.test(comp))
-  || (c === "estonia" && /\\besiliiga b\\b/.test(comp))
-  || (c === "greece" && /\\bfootball league\\b/.test(comp))) return false;
+ if ((c === "scotland" && /\b(lowland league|highland league)\b/.test(comp))
+  || (c === "turkey" && /\b2 lig\b/.test(comp))
+  || (["denmark","norway","belarus"].includes(c) && /\b2 division\b/.test(comp))
+  || (c === "sweden" && /\bdivision [12]\b/.test(comp))
+  || (c === "albania" && /\b2nd division\b/.test(comp))
+  || (c === "croatia" && /\bsecond nl\b/.test(comp))
+  || (c === "estonia" && /\besiliiga b\b/.test(comp))
+  || (c === "greece" && /\bfootball league\b/.test(comp))) return false;
   if (/\bserie c\b|\blega pro\b|\bserie c1\b|\bserie c2\b/.test(comp)) return false;
  if (/\bleague one\b|\bleague two\b|\bleague three\b/.test(comp)) return false;
  if(/\b(premier league 2|pl2|professional development league|u(?:17|18|19|20|21|23)|under ?(?:17|18|19|20|21|23)|youth|junior(?:s)?|academy|juvenil|jugend|reserve|reserves|b team)\b/.test(comp))return false;
