@@ -749,4 +749,7 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - The full match list is now fetched only when the user opens the manual prediction form; the form shows a loading message while that deferred list is fetched.
 - Coupon-leg checks remain fail-safe: edit/delete controls are unavailable until the coupon-link table has loaded successfully, and delete still refuses any prediction linked to a coupon.
 - Prediction pagination, market filters, historical calculations, and all saved records remain unchanged. No database migration or data write is required.
-- This change is on a review branch and is not production until CI and Cloudflare Main deployment pass.
+- PR #75 merged to main as `ea82a03b4e0601150c8529726bc365d8eba46d41`. Corrected CI run #823 passed all steps (tests, TypeScript and build): https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/43945359085.
+- Cloudflare Main deploy run #410 passed all steps: https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/43945533638.
+- Deployed production Worker version: `aac45b87-2a60-47a8-8c4b-c376e125b476` at https://moneyball-global.damianwalus3.workers.dev.
+- No database migration or data writes were made.
