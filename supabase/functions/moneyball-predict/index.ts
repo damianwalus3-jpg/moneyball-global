@@ -744,6 +744,12 @@ const history=historyTimed||[];
   if(!Object.prototype.hasOwnProperty.call(r,"rejection_reason"))r.rejection_reason=null;
   if(!Object.prototype.hasOwnProperty.call(r,"result_status"))r.result_status="pending";
   if(!Object.prototype.hasOwnProperty.call(r,"group_name"))r.group_name=r.market==="GOALS"?"GOALS":r.market==="DOUBLE_CHANCE"?"MEGA":"MAIN";
+  // Fixed analytical stake for every newly selected single prediction.
+  // Existing verified history is preserved below; pending model rows are refreshed to €4.
+  if(r.verdict==="WYBRANY"){
+   r.stake=4.00;
+   r.potential_return=r.odds!=null&&Number(r.odds)>1?Math.round(4*Number(r.odds)*100)/100:null;
+  }
  }
  const matchIds=matches.map((m:any)=>String(m.id)).filter(Boolean);
  const old=matchIds.length?await db("predictions?select=id,owner_id,match_id,market,selection,settlement_status,verified,note&owner_id=eq."+encodeURIComponent(ownerId)+"&model_version=eq."+encodeURIComponent(V)+"&match_id=in.("+matchIds.join(",")+")",token):[];
