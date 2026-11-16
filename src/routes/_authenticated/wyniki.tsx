@@ -13,6 +13,7 @@ import { getSupabase } from "@/lib/supabase";
 import type { Prediction } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/wyniki")({
+  loader: ({ context }) => context.queryClient.ensureInfiniteQueryData(resultsPagesQuery({ filter: "all", search: "" })),
   head: () => ({ meta: [{ title: "Wyniki · MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Chronologiczna historia wyników meczów i rozliczeń typów." }] }),
   pendingComponent: PageLoader,
   errorComponent: DataError,
