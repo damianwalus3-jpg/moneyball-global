@@ -201,7 +201,10 @@ function Mecze() {
   const [editScan, setEditScan] = useState<ScanRun | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const [predictionProgress, setPredictionProgress] = useState("");
-  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(null);
+  const [expandedMatchId, setExpandedMatchId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return new URLSearchParams(window.location.search).get("match");
+  });
   const [singleBetPrediction, setSingleBetPrediction] = useState<Prediction | null>(null);
   const singleBetStake = "4";
 
@@ -650,10 +653,10 @@ function Mecze() {
                                   {p.verdict === "WYBRANY" && (
                                     <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 p-2 text-xs">
                                       <div className="flex flex-wrap gap-x-3 gap-y-1">
-                                        <span>Stawka pojedyncza: <strong>5,00 €</strong></span>
+                                        <span>Stawka pojedyncza: <strong>4,00 €</strong></span>
                                         <span>Kurs: <strong>{fmtOdds(p.odds)}</strong></span>
-                                        <span>Możliwy zwrot: <strong>{p.odds != null ? fmtMoney(5 * Number(p.odds)) : "brak kursu"}</strong></span>
-                                        <span>Możliwy zysk: <strong>{p.odds != null ? fmtMoney(5 * (Number(p.odds) - 1)) : "—"}</strong></span>
+                                        <span>Możliwy zwrot: <strong>{p.odds != null ? fmtMoney(4 * Number(p.odds)) : "brak kursu"}</strong></span>
+                                        <span>Możliwy zysk: <strong>{p.odds != null ? fmtMoney(4 * (Number(p.odds) - 1)) : "—"}</strong></span>
                                         {p.verified && <span>Wynik: <strong>{fmtMoney(p.profit_loss)}</strong></span>}
                                       </div>
                                     </div>
