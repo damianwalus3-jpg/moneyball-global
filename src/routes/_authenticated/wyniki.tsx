@@ -7,14 +7,14 @@ import { Input } from "@/components/ui/input";
 import { DataError, EmptyState, PageHeader, PageLoader, SelectionBadge, SettlementBadge, TypeBadge } from "@/components/app/ui-bits";
 import { isActivePredictionVersion } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
-import { ensureTables, useAction, useTable } from "@/lib/queries";
+import { resultsPageDataQuery, useAction, useResultsPageData } from "@/lib/queries";
 import { brusselsDayKey, fmtTime } from "@/lib/time";
 import { getSupabase } from "@/lib/supabase";
 import type { Prediction } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/wyniki")({
   head: () => ({ meta: [{ title: "Wyniki · MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Chronologiczna historia wyników meczów i rozliczeń typów." }] }),
-  loader: ({ context }) => ensureTables(context.queryClient, ["matches", "predictions", "match_results"]),
+  loader: ({ context }) => context.queryClient.ensureQueryData(resultsPageDataQuery()),
   pendingComponent: PageLoader,
   errorComponent: DataError,
   component: Wyniki,
@@ -30,9 +30,7 @@ function profitFor(p: Prediction): number | null {
   return null;
 }
 function Wyniki() {
-  const matches = useTable("matches");
-  const predictions = useTable("predictions");
-  const results = useTable("match_results");
+  const { matches, predictions, results } = useResultsPageData();
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const resultBy = useMemo(() => new Map(results.map(r => [r.match_id, r])), [results]);
