@@ -108,3 +108,5 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 
 - Potwierdzenie CI/Cloudflare dla commita dokumentacji `fcdf22f2d81b086634214085e8a18c84c908c859`: Moneyball CI run #727 / ID `43904503133` SUCCESS; Cloudflare deploy run #330 / ID `43904503189` SUCCESS.
 - Automatyczny tick cron #11 o 16:10 UTC utworzył request Edge Function; pg_net response ID `2588` zwrócił HTTP 200 i `scheduled=true, skipped=true, reason=cooldown`, co potwierdza, że aktywny harmonogram nie dubluje skanu w okresie cooldown. W tym samym cyklu działał osobno results-sync (request `2589`, HTTP 200).
+
+- Dodatkowy test pełnego ponownego skanu po wymuszeniu końca cooldown (request `2591`): HTTP 200, ponownie 8 meczów / 96 predykcji, 0 nowych duplikatów; 33 pending rekordy odświeżone, 63 settled/preserved zachowane, 0 nowych rekordów. Stan wrócił do `completed` i zaplanował kolejny pełny rescan na 16:27:02 UTC. Potwierdza to idempotencję przy powtarzaniu pełnego skanu.
