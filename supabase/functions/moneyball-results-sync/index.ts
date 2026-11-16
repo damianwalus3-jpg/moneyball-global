@@ -55,10 +55,13 @@ function editDistance(a:string,b:string){const prev=Array.from({length:b.length+
 function similarTeam(a:string,b:string){const x=teamKey(a),y=teamKey(b);if(!x||!y)return false;if(x===y||x.includes(y)||y.includes(x))return true;const A=new Set(x.split(" ")),B=new Set(y.split(" "));const overlap=[...A].filter(t=>B.has(t)&&t.length>2).length;if(overlap>=2&&overlap/Math.max(1,Math.min(A.size,B.size))>=0.7)return true;const max=Math.max(x.length,y.length);return Math.min(x.length,y.length)>=8&&max>0&&editDistance(x,y)/max<=0.16;}
 async function limitedSettled<T,R>(items:T[],limit:number,fn:(item:T)=>Promise<R>):Promise<PromiseSettledResult<R>[]>{const out:any[]=new Array(items.length);let cursor=0;const workers=Array.from({length:Math.min(limit,items.length)},async()=>{while(true){const i=cursor++;if(i>=items.length)return;try{out[i]={status:"fulfilled",value:await fn(items[i])};}catch(reason){out[i]={status:"rejected",reason};}}});await Promise.all(workers);return out;}
 async function readAlternateResults(startDate:string,endDate:string):Promise<ScoreFeed[]>{
+ const alternateStarted=Date.now();
  const out:ScoreFeed[]=[];
  const matchFields="select=id,external_id,home_team,away_team,owner_id,country,league,gender,kickoff_at,kickoff_date,status";
+ const discoveryStarted=Date.now();
  const timedMatches=await db("matches?"+matchFields+"&kickoff_at=gte."+encodeURIComponent(startDate+"T00:00:00Z")+"&kickoff_at=lt."+encodeURIComponent(endDate+"T23:59:59Z")).catch(()=>[]);
  const dateOnlyMatches=await db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=gte."+encodeURIComponent(startDate)+"&kickoff_date=lte."+encodeURIComponent(endDate)).catch(()=>[]);
+ console.log("[moneyball-results-sync] discovery",JSON.stringify({timedMatches:timedMatches.length,dateOnlyMatches:dateOnlyMatches.length,durationMs:Date.now()-discoveryStarted}));
  const unresolved=[...(timedMatches||[]),...(dateOnlyMatches||[])],todayKey=day(new Date());
  const due=unresolved.filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team)&&((m.kickoff_at&&new Date(m.kickoff_at).getTime()<Date.now())||(!m.kickoff_at&&m.kickoff_date&&String(m.kickoff_date)<=todayKey))&& !["finished","postponed","cancelled"].includes(String(m.status||"").toLowerCase()));
  const leagues=selectEspnLeagues(due);
@@ -85,6 +88,7 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
  // TheSportsDB public v1 feed: no signup or paid key; one request per date, with the free tier returning a small sample.
  const eventDates:string[]=[];const cursor=new Date(startDate+"T00:00:00Z"),last=new Date(endDate+"T00:00:00Z");
  for(;cursor<=last;cursor.setUTCDate(cursor.getUTCDate()+1))eventDates.push(cursor.toISOString().slice(0,10));
+ const sportsDbStarted=Date.now();
  const sportsDb=await limitedSettled(eventDates,4,async date=>{
   const url="https://www.thesportsdb.com/api/v1/json/123/eventsday.php?d="+date+"&s=Soccer";
   const r=await fetch(url,{headers:{"Accept":"application/json","User-Agent":"MoneyballGlobal/2.0"},signal:AbortSignal.timeout(8000)});
@@ -98,7 +102,9 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
   });
  });
  for(const x of sportsDb){if(x.status==="fulfilled")out.push(...x.value);}
+ console.log("[moneyball-results-sync] TheSportsDB",JSON.stringify({dates:eventDates,successful:sportsDb.filter((x:any)=>x.status==="fulfilled").length,events:sportsDb.reduce((n:number,x:any)=>n+(x.status==="fulfilled"?x.value.length:0),0),durationMs:Date.now()-sportsDbStarted}));
  // OpenMatchday publishes public results CSVs for dozens of competitions; query only leagues containing overdue fixtures.
+ const openMatchdayStarted=Date.now();
  try{
   const ir=await fetch("https://raw.githubusercontent.com/oladeeayo/open-matchday/master/LEAGUE_INDEX.md",{headers:{"User-Agent":"MoneyballGlobal/2.0","Accept":"text/plain"},signal:AbortSignal.timeout(8000)});
   if(ir.ok){
@@ -137,7 +143,9 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
    });
    for(const f of feeds){if(f.status==="fulfilled")out.push(...f.value);}
   }
- }catch(_){}
+ }catch(e){console.log("[moneyball-results-sync] OpenMatchday error",String(e));}
+ console.log("[moneyball-results-sync] OpenMatchday",JSON.stringify({durationMs:Date.now()-openMatchdayStarted,feeds:out.filter((x:any)=>x.source==="OpenMatchday").length}));
+ const openLigaStarted=Date.now();
  const year=Number(startDate.slice(0,4));
  for(const league of ["bl1","bl2"]){
   const url="https://api.openligadb.de/getmatchdata/"+league+"/"+year;
@@ -151,6 +159,8 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
    }
   }catch(_){}
  }
+ console.log("[moneyball-results-sync] OpenLigaDB",JSON.stringify({durationMs:Date.now()-openLigaStarted,feeds:out.filter((x:any)=>x.source==="OpenLigaDB").length}));
+ console.log("[moneyball-results-sync] alternate total",JSON.stringify({feeds:out.length,durationMs:Date.now()-alternateStarted}));
  return out;
 }
 function matchFeedToDb(feed:ScoreFeed,matches:any[]){
@@ -374,7 +384,9 @@ Deno.serve(async(req:Request)=>{
      const key=normTeam(m.home_team)+"|"+normTeam(m.away_team);
      const arr=byTeams.get(key)||[];arr.push(m);byTeams.set(key,arr);
     }
+    const footyNomadStarted=Date.now();
     const fixtures=await readDay(date);fetched+=fixtures.length;
+    console.log("[moneyball-results-sync] FootyNomad",JSON.stringify({date,fixtures:fixtures.length,durationMs:Date.now()-footyNomadStarted}));
     const alternateFeeds=allAlternateFeeds.filter(feed=>day(new Date(feed.date))===date);alternateFetched+=alternateFeeds.length;
     const alternateByMatch=new Map<string,ScoreFeed[]>();
     for(const feed of alternateFeeds){const fm=matchFeedToDb(feed,matches);if(!fm)continue;alternateMatched++;const arr=alternateByMatch.get(fm.id)||[];arr.push(feed);alternateByMatch.set(fm.id,arr);await saveSourceObservation(fm,feed);}
@@ -450,8 +462,11 @@ Deno.serve(async(req:Request)=>{
     }
    }catch(e){errors.push(date+": "+String(e));}
   }
+  const financeStarted=Date.now();
   const financialReconciliation=await reconcileAllSettledCoupons(ownerId).catch(e=>({checked:0,failed:1,errors:[String(e)]}));
+  console.log("[moneyball-results-sync] financial reconciliation",JSON.stringify({...financialReconciliation,durationMs:Date.now()-financeStarted}));
   if(financialReconciliation.failed)errors.push(...financialReconciliation.errors.map(e=>"Rozliczenie finansowe: "+e));
+  console.log("[moneyball-results-sync] request summary",JSON.stringify({dates,fixturesFetched:fetched,matchesMatched:matched,resultsSaved,predictionsSettled,couponLegsSettled,alternateResultsFetched:alternateFetched,alternateResultsMatched:alternateMatched,errors:errors.length}));
   return new Response(JSON.stringify({ok:errors.length===0,financial_reconciliation:financialReconciliation,dates,fixtures_fetched:fetched,matches_matched:matched,matched_by_external_id:matchedById,matched_by_team_names:matchedByNames,results_saved:resultsSaved,predictions_settled:predictionsSettled,coupon_legs_settled:couponLegsSettled,voided,rescheduled_matches:rescheduledMatches,reschedule_errors:rescheduleErrors,alternate_results_fetched:alternateFetched,alternate_results_matched:alternateMatched,errors}),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
  }catch(e){return new Response(JSON.stringify({ok:false,error:String(e)}),{status:500,headers:{...cors,"Content-Type":"application/json"}});}
 });
