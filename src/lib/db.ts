@@ -309,6 +309,82 @@ export async function fetchPredictionsPage(args: {
   return data as PredictionPageResult;
 }
 
+export interface ResultsPageData {
+  matches: TableRows["matches"][];
+  predictions: TableRows["predictions"][];
+  results: TableRows["match_results"][];
+}
+
+/** The results screen only shows a rolling 96-hour window. Query that window
+ * directly instead of downloading the user's entire fixture and prediction history. */
+export async function fetchResultsPageData(): Promise<ResultsPageData> {
+  const uid = await currentUserId();
+  const sb = requireSupabase();
+  const now = Date.now();
+  const from = new Date(now - 72 * 60 * 60 * 1000).toISOString();
+  const to = new Date(now + 24 * 60 * 60 * 1000).toISOString();
+  const { data: matchRows, error: matchesError } = await withRequestTimeout(
+    sb.from("matches").select(READ_COLUMNS.matches.join(","))
+      .eq(OWNER_COLUMN, uid).gte("kickoff_at", from).lte("kickoff_at", to),
+    "Pobieranie meczów z ostatnich 72 godzin i najbliższych 24 godzin",
+  );
+  if (matchesError) throw new Error(humanizeError(matchesError, "matches"));
+  const matches = (matchRows ?? []) as unknown as TableRows["matches"][];
+  const matchIds = matches.map((match) => match.id);
+  const [predictions, results] = await Promise.all([
+    fetchInChunks<TableRows["predictions"]>(matchIds, 100, async (chunk) => {
+      const { data, error } = await withRequestTimeout(
+        sb.from("predictions").select(READ_COLUMNS.predictions.join(","))
+          .eq(OWNER_COLUMN, uid).in("match_id", chunk),
+        "Pobieranie prognoz dla wyników z bieżącego okresu",
+      );
+      if (error) throw new Error(humanizeError(error, "predictions"));
+      return (data ?? []) as unknown as TableRows["predictions"][];
+    }),
+    fetchInChunks<TableRows["match_results"]>(matchIds, 100, async (chunk) => {
+      const { data, error } = await withRequestTimeout(
+        sb.from("match_results").select(READ_COLUMNS.match_results.join(","))
+          .eq(OWNER_COLUMN, uid).in("match_id", chunk),
+        "Pobieranie wyników z bieżącego okresu",
+      );
+      if (error) throw new Error(humanizeError(error, "match_results"));
+      return (data ?? []) as unknown as TableRows["match_results"][];
+    }),
+  ]);
+  return {
+    matches: matches.map((row) => ({
+      ...row,
+      competition: row.competition ?? row.league ?? null,
+      league: row.league ?? row.competition ?? null,
+    })),
+    predictions: predictions.map((row) => ({
+      ...row,
+      prediction_type: row.market === "DOUBLE_CHANCE" ? "DC" : row.market === "GOALS" ? "GOALS" : "1X2",
+      pick: row.selection,
+      selection_status: row.verdict,
+      result_status: row.settlement_status,
+      rejection_reason: row.rationale,
+      notes: row.note,
+      data_coverage: row.data_coverage ?? null,
+      scan_run_id: row.scan_run_id ?? null,
+    })),
+    results,
+  };
+}
+
+/** Only predictions belonging to the match currently being settled. */
+export async function fetchPredictionsForMatch(matchId: string): Promise<TableRows["predictions"][]> {
+  if (!matchId) return [];
+  const uid = await currentUserId();
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().from("predictions").select(READ_COLUMNS.predictions.join(","))
+      .eq(OWNER_COLUMN, uid).eq("match_id", matchId).order("created_at", { ascending: true }),
+    "Pobieranie prognoz wybranego meczu",
+  );
+  if (error) throw new Error(humanizeError(error, "predictions"));
+  return (data ?? []) as unknown as TableRows["predictions"][];
+}
+
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const { data, error } = await withRequestTimeout(requireSupabase().rpc("moneyball_dashboard_summary"), "Pobieranie podsumowania panelu");
   if (error) throw new Error(humanizeError(error));
