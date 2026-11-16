@@ -249,6 +249,7 @@ async function fetchRawAllUncached<K extends TableName>(table: K, uid: string): 
         }
         pageSize = Math.max(50, Math.floor(pageSize / 2));
       }
+      if (!pageRows) throw new Error("Pobieranie tabeli " + table + " nie zwróciło strony danych.");
       rangeRows.push(...pageRows);
       if (pageRows.length < pageSize) break;
       const nextId = (pageRows[pageRows.length - 1] as { id?: unknown })?.id;
