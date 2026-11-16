@@ -3,9 +3,18 @@ function isExcludedSeniorTeam(value: unknown): boolean {
  return /\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico)\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
 }
 
-function isTopTwoTierLeague(competition: unknown): boolean {
- const comp=String(competition??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+function isTopTwoTierLeague(competition: unknown, country?: unknown): boolean {
+ const comp=String(competition??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+ const c=String(country??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().trim();
  if(!comp)return false;
+ if ((c === "scotland" && /\\b(lowland league|highland league)\\b/.test(comp))
+  || (c === "turkey" && /\\b2 lig\\b/.test(comp))
+  || (["denmark","norway","belarus"].includes(c) && /\\b2 division\\b/.test(comp))
+  || (c === "sweden" && /\\bdivision [12]\\b/.test(comp))
+  || (c === "albania" && /\\b2nd division\\b/.test(comp))
+  || (c === "croatia" && /\\bsecond nl\\b/.test(comp))
+  || (c === "estonia" && /\\besiliiga b\\b/.test(comp))
+  || (c === "greece" && /\\bfootball league\\b/.test(comp))) return false;
   if (/\bserie c\b|\blega pro\b|\bserie c1\b|\bserie c2\b/.test(comp)) return false;
  if (/\bleague one\b|\bleague two\b|\bleague three\b/.test(comp)) return false;
  if(/\b(premier league 2|pl2|professional development league|u(?:17|18|19|20|21|23)|under ?(?:17|18|19|20|21|23)|youth|junior(?:s)?|academy|juvenil|jugend|reserve|reserves|b team)\b/.test(comp))return false;
@@ -46,7 +55,7 @@ async function readFixtures(date:string){
   const league=textOf((summary.match(/href=["']\/league\/[^"']+["'][^>]*>([\s\S]*?)<\/a>/i)||[])[1]||"");
   const cs=html.lastIndexOf('<h2 class="section-title',m.index),ce=cs>=0?html.indexOf("</h2>",cs):-1;
   const country=cs>=0&&ce>cs?textOf(html.slice(cs,ce)).replace(/\s+\d+$/,"").trim():null;
-  if(!isEuropeanFixture(country,league,home,away)||!isTopTwoTierLeague(league))continue;
+  if(!isEuropeanFixture(country,league,home,away)||!isTopTwoTierLeague(league,country))continue;
     if (isExcludedSeniorTeam(home) || isExcludedSeniorTeam(away)) continue;
   const cls=(attrs.match(/class=["']([^"']+)/i)||[])[1]||"",status=cls.includes("ticket-live")?"live":cls.includes("ticket-ft")?"finished":cls.includes("ticket-pst")?"postponed":cls.includes("ticket-canc")?"cancelled":"scheduled";
   const hs=(body.match(/class=["'][^"']*ticket-hs[^"']*["'][^>]*>([0-9]+)</i)||[])[1],as=(body.match(/class=["'][^"']*ticket-as[^"']*["'][^>]*>([0-9]+)</i)||[])[1];
@@ -81,7 +90,7 @@ Deno.serve(async(req)=>{
    const pr=await fetch("https://gzgeklcukrclgwbsmbsp.supabase.co/functions/v1/moneyball-public-sources?date="+date,{headers:{"Accept":"application/json","apikey":KEY,"Authorization":req.headers.get("Authorization")||""},signal:AbortSignal.timeout(18000)});
    const pt=await pr.text();
    if(!pr.ok)throw new Error("Public sources HTTP "+pr.status+": "+pt.slice(0,300));
-   const pj=JSON.parse(pt);publicFixtures=Array.isArray(pj.fixtures)?pj.fixtures.filter((f:any)=>isEuropeanFixture(f.country,f.league||f.competition,f.home_team||f.home,f.away_team||f.away)&&isTopTwoTierLeague(f.league||f.competition)&&(!f.gender||String(f.gender).toLowerCase()==="men")&&!isExcludedSeniorTeam(f.home_team||f.home)&&!isExcludedSeniorTeam(f.away_team||f.away)):[];
+   const pj=JSON.parse(pt);publicFixtures=Array.isArray(pj.fixtures)?pj.fixtures.filter((f:any)=>isEuropeanFixture(f.country,f.league||f.competition,f.home_team||f.home,f.away_team||f.away)&&isTopTwoTierLeague(f.league||f.competition,f.country)&&(!f.gender||String(f.gender).toLowerCase()==="men")&&!isExcludedSeniorTeam(f.home_team||f.home)&&!isExcludedSeniorTeam(f.away_team||f.away)):[];
    publicSourceStatus={ok:true,source_count:pj.source_count,raw_fixtures:pj.raw_fixtures,unique_fixtures:pj.unique_fixtures,sources:pj.sources};
   }catch(e){publicSourceStatus={ok:false,error:String(e)};}
   const normTeam=(v:any)=>{const key=String(v||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();return ({"turkiye":"turkey"} as Record<string,string>)[key]||key;};
