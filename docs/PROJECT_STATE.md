@@ -713,12 +713,14 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Next: monitor logs after this deployment for recurrence of prediction timeouts and obtain a real authenticated Statistics / Results / History / menu timing measurement. Public root latency is not a substitute for authenticated measurements.
 
 
-## CSV scan import deduplication — 2026-11-16
+## CSV import duplicate lookup — pending PR #73 (2026-11-16)
 
-- Remaining code search found `src/lib/scan-import-service.ts` still calling `fetchAll("predictions")` during every CSV scan import just to detect duplicates.
-- Replaced that full-history read with `fetchExistingPredictionKeysForMatches`: it receives only match IDs present in the import, deduplicates IDs, reads only the four identity columns (`match_id, model_version, market, selection`), scopes by the current owner, and batches 100 match IDs per request using the existing bounded chunk loader.
-- Duplicate identity semantics are unchanged: same match + model version + market + selection is skipped; different model versions remain distinct; existing predictions are never overwritten.
-- New predictions are still inserted in the existing 500-row batches; match reuse and scan-run status handling are unchanged.
-- No existing data, coupon, bankroll or transaction rows were modified.
-- This removes the last known explicit `fetchAll("predictions")` call from the CSV import service; still review all code paths and measure authenticated UI.
-- Await exact-head CI before merge/deploy.
+- Main still uses the previous full-history duplicate lookup in `src/lib/scan-import-service.ts`; this change is not live yet.
+- PR #73 replaces it with owner-scoped lookup restricted to match IDs in the CSV import and the composite identity `match_id + model_version + market + selection`. Existing predictions are skipped, never overwritten or deleted.
+- The latest PR code also keyset-pages each 100-match batch by UUID in pages of 1,000 rows, preventing PostgREST's response cap from silently omitting duplicates. This pagination hardening was added after the first CI run.
+- New predictions remain inserted in existing batches of 500; match reuse and scan-run status handling are unchanged. No database migration is required.
+- Earlier CI run #815 passed the first implementation, but it predates the UUID-pagination hardening. The current PR head must receive a fresh CI run before merge.
+- Cloudflare Workers Builds PR check is failing immediately without logs or annotations. This is separate from the repository's main-branch GitHub Actions deploy workflow, which successfully built and deployed commit `54c5cd31cc63a98665dd586cd40f38aa89f493d0` to the production Worker.
+- Production is `https://moneyball-global.damianwalus3.workers.dev`; the test Worker is separate and must not be treated as production.
+- Do not alter historical predictions, match results, coupons, coupon legs, bankroll balances or transactions during this optimization.
+- After merge, verify the main-branch CI/deploy workflow and confirm the production Worker version before marking the change live.

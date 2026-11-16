@@ -270,6 +270,44 @@ export async function fetchMatchPageData(): Promise<MatchPageData> {
   return { matches, scans: (scansResult.data ?? []) as unknown as TableRows["scan_runs"][], predictions, results, odds, couponLegs, coupons };
 }
 
+/** Return existing prediction identity keys only for the imported match IDs.
+ * This keeps CSV deduplication exact without downloading the complete history. */
+export async function fetchExistingPredictionKeysForMatches(matchIds: string[]): Promise<string[]> {
+  const uniqueIds = [...new Set(matchIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return [];
+  const uid = await currentUserId();
+  const sb = requireSupabase();
+  return fetchInChunks<string>(uniqueIds, 100, async (chunk) => {
+    const keys: string[] = [];
+    let cursor: string | null = null;
+    // PostgREST may cap a response at 1,000 rows. Keyset-page each match-ID
+    // batch so importing a match with many historical model versions cannot
+    // silently miss duplicate keys.
+    while (true) {
+      let query = sb.from("predictions")
+        .select("id,match_id,model_version,market,selection")
+        .eq(OWNER_COLUMN, uid)
+        .in("match_id", chunk)
+        .order("id", { ascending: true })
+        .limit(1_000);
+      if (cursor) query = query.gt("id", cursor);
+      const { data, error } = await withRequestTimeout(
+        query,
+        "Sprawdzanie duplikatów prognoz importu",
+      );
+      if (error) throw new Error(humanizeError(error, "predictions"));
+      const page = data ?? [];
+      keys.push(...page.map((row) =>
+        [row.match_id, row.model_version, row.market, row.selection].join("|"),
+      ));
+      if (page.length < 1_000) break;
+      cursor = page[page.length - 1]?.id ?? null;
+      if (!cursor) throw new Error("Nie udało się kontynuować stronicowania duplikatów prognoz.");
+    }
+    return keys;
+  });
+}
+
 export interface PredictionPageCursor {
   created_at: string;
   id: string;

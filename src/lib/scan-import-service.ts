@@ -1,4 +1,4 @@
-import { fetchAll, insertRow, insertRows, updateRow } from "./db";
+import { fetchExistingPredictionKeysForMatches, insertRow, insertRows, updateRow } from "./db";
 import { matchKey, type ParsedScan } from "./scan-import";
 import { brusselsDayKey } from "./time";
 import type { Match } from "./types";
@@ -68,11 +68,9 @@ export async function importScan(parsed: ParsedScan, existingMatches: Match[], s
       matchIdByKey.set(key, match.id);
     }
 
-    const existingPredictions = await fetchAll("predictions");
+    const importedMatchIds = [...new Set(matchIdByKey.values())];
     const existingPredictionKeys = new Set(
-      existingPredictions.map((prediction) =>
-        [prediction.match_id, prediction.model_version, prediction.market, prediction.selection].join("|"),
-      ),
+      await fetchExistingPredictionKeysForMatches(importedMatchIds),
     );
 
     const predictionsToInsert: Record<string, unknown>[] = [];
