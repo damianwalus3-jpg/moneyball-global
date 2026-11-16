@@ -55,6 +55,9 @@ function Statystyki() {
   const knownSingleProfitRows = singlePickProfitRows.filter((value): value is number => value != null);
   const singlePickProfit = knownSingleProfitRows.reduce((sum, value) => sum + value, 0);
   const singleProfitIncomplete = knownSingleProfitRows.length !== settledSinglePicks.length;
+  const singleStakeSum = settledSinglePicks.reduce((sum, p) => sum + (Number(p.stake ?? 4) || 0), 0);
+  const singlePayoutSum = singleStakeSum + singlePickProfit;
+  const singleRoi = singleStakeSum > 0 && !singleProfitIncomplete ? Math.round((singlePickProfit / singleStakeSum) * 1000) / 10 : null;
   const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
 
   const settledCoupons = coupons.filter((c) => c.status === "won" || c.status === "lost" || c.status === "void");
@@ -86,11 +89,12 @@ function Statystyki() {
 
       <section className="mb-6">
         <h2 className="mb-3 text-2xl font-semibold uppercase">Pojedyncze typy · stawka analityczna 4 € każdy</h2>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <StatCard label="Rozliczone typy" value={settledSinglePicks.length} />
-          <StatCard label="Wygrane" value={settledSinglePicks.filter((p) => p.settlement_status === "won").length} />
-          <StatCard label="Przegrane" value={settledSinglePicks.filter((p) => p.settlement_status === "lost").length} />
-          <StatCard label="Zysk / strata" value={knownSingleProfitRows.length ? fmtMoney(singlePickProfit) : "brak danych"} tone={singlePickProfit < 0 ? "danger" : "primary"} hint={singleProfitIncomplete ? `wyliczono ${knownSingleProfitRows.length}/${settledSinglePicks.length}; brak kursu lub rozliczenia finansowego` : "na podstawie zapisanych stawek i kursów"} />
+          <StatCard label="Postawiono" value={settledSinglePicks.length ? fmtMoney(singleStakeSum) : "brak danych"} />
+          <StatCard label="Zwroty brutto" value={knownSingleProfitRows.length ? fmtMoney(singlePayoutSum) : "brak danych"} />
+          <StatCard label="Zysk / strata netto" value={knownSingleProfitRows.length ? fmtMoney(singlePickProfit) : "brak danych"} tone={singlePickProfit < 0 ? "danger" : "primary"} hint={singleProfitIncomplete ? `wyliczono ${knownSingleProfitRows.length}/${settledSinglePicks.length}; brak kursu lub rozliczenia finansowego` : "po odjęciu wszystkich stawek"} />
+          <StatCard label="ROI" value={fmtPct(singleRoi)} hint="zysk netto / stawki" />
         </div>
       </section>
       <div className="grid gap-6">
