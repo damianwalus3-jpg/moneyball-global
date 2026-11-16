@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
 import { CalendarDays, ChevronRight, ScanLine, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,7 +41,6 @@ function Panel() {
   const selectedQuery = useQuery(dashboardSelectedPicksQuery());
   const summary = summaryQuery.data ?? { matches_today: 0, bankroll: null, coupons_in_play: 0, candidates: 0, to_settle: 0, hit_rates: { "1X2": { won: 0, settled: 0, rate: null }, DOUBLE_CHANCE: { won: 0, settled: 0, rate: null }, GOALS: { won: 0, settled: 0, rate: null } } };
   const selectedRows = selectedQuery.data ?? [];
-  const [expandedPickId, setExpandedPickId] = useState<string | null>(null);
   const selectedPicks = selectedRows.map((row) => ({
     prediction: {
       id: row.prediction_id,
@@ -134,37 +132,10 @@ function Panel() {
                     <Badge variant={settlement === "WYGRANY" ? "success" : settlement === "PRZEGRANY" ? "danger" : settlement === "ZWROT" ? "muted" : "warning"}>{settlement}</Badge>
                   </div>
                   <div className="w-full border-t border-border pt-2">
-                    <button
-                      type="button"
-                      aria-expanded={expandedPickId === prediction.id}
-                      onClick={() => setExpandedPickId((current) => current === prediction.id ? null : prediction.id)}
-                      className="inline-flex min-h-9 items-center gap-2 text-sm font-semibold text-primary underline-offset-4 hover:underline"
-                    >
-                      {expandedPickId === prediction.id ? "Ukryj uzasadnienie" : "Prognoza i dlaczego taki typ?"}
-                      <ChevronRight className={`size-4 transition-transform ${expandedPickId === prediction.id ? "rotate-90" : ""}`} />
-                    </button>
-                    {expandedPickId === prediction.id && (
-                      <div className="mt-2 grid gap-2 rounded-lg border border-primary/20 bg-background/70 p-3 text-sm">
-                        <div className="font-semibold">Prognoza: {market} · {prediction.selection}</div>
-                        <p className="text-muted-foreground">
-                          {prediction.rationale?.trim() || "Model zapisał wybór tego rynku, ale nie zapisał osobnego opisu uzasadnienia dla tej prognozy."}
-                        </p>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          <span>Prawdopodobieństwo modelu: {prediction.probability == null ? "brak danych" : Number(prediction.probability).toFixed(1) + "%"}</span>
-                          <span>Kurs: {fmtOdds(prediction.odds)}</span>
-                          {prediction.confidence && <span>Pewność: {prediction.confidence}</span>}
-                        </div>
-                        {prediction.data_coverage && (
-                          <p className="text-xs text-muted-foreground">
-                            Dane wykorzystane przez model: {Object.entries(prediction.data_coverage)
-                              .filter(([, value]) => value != null && typeof value !== "object")
-                              .slice(0, 5)
-                              .map(([key, value]) => key.replaceAll("_", " ") + ": " + String(value))
-                              .join(" · ") || "szczegółowe wskaźniki nie zostały zapisane"}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                    <p className="text-xs font-semibold text-primary">Dlaczego model wybrał ten typ?</p>
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                      {prediction.rationale?.trim() || "Model wskazał ten wariant na podstawie dostępnych danych przedmeczowych. Szczegółowe uzasadnienie nie zostało zapisane."}
+                    </p>
                   </div>
                 </div>
               );
