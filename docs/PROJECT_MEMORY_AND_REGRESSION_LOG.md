@@ -103,5 +103,8 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Test paginacji: strona 1 (limit 3) i strona 2 (limit 3) zwróciły rozłączne ID; obie raportują `has_more=true`. Test blokady: pierwsze claim `claimed=true`, drugie równoległe claim `claimed=false, reason=lease_active`.
 - Cron #11 zaktualizowany i włączony: `moneyball-global-auto-predict-sequential`, co minutę, bez OFFSET. Lease blokuje nakładanie wywołań; ukończony skan odczekuje 15 min, po czym rozpoczyna pełny rescan, aby uwzględnić późno dodane fixtures. Po nieudanym wywołaniu lease wygasa i ten sam kursor jest ponawiany.
 - Kod funkcji zapisany w GitHub: commit `c200d9fe93db8fa59038846505da35acc7617fe9`; poprawka składni i deploy commit `1e5a635b650548b4b5694484babb417da015b047`. Produkcyjna wersja Edge Function: 213.
-- Migracja zapisana do repo: `supabase/migrations/20261116161500_add_cursor_leased_prediction_scheduler.sql` (commit do potwierdzenia po zapisie).
+- Migracja zapisana do repo: `supabase/migrations/20261116161500_add_cursor_leased_prediction_scheduler.sql` (commit `9b09b3238b423dd6d62443b754718161b49dc64c`).
 - Uwaga: odpowiedź pg_cron/pg_net z kodem 200 sama w sobie nie potwierdza sukcesu funkcji. Należy kontrolować `net._http_response`, `moneyball_prediction_scan_state` oraz logi Edge Function. Pełna automatyzacja jest wdrożona, ale monitorować następne uruchomienie crona i kolejne 15-minutowe reskany.
+
+- Potwierdzenie CI/Cloudflare dla commita dokumentacji `fcdf22f2d81b086634214085e8a18c84c908c859`: Moneyball CI run #727 / ID `43904503133` SUCCESS; Cloudflare deploy run #330 / ID `43904503189` SUCCESS.
+- Automatyczny tick cron #11 o 16:10 UTC utworzył request Edge Function; pg_net response ID `2588` zwrócił HTTP 200 i `scheduled=true, skipped=true, reason=cooldown`, co potwierdza, że aktywny harmonogram nie dubluje skanu w okresie cooldown. W tym samym cyklu działał osobno results-sync (request `2589`, HTTP 200).
