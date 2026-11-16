@@ -88,6 +88,9 @@ export interface DashboardSelectedPick {
   match_status: string;
   home_score: number | null;
   away_score: number | null;
+  rationale: string | null;
+  confidence: string | null;
+  data_coverage: Record<string, unknown> | null;
 }
 
 /** Small, date-scoped dashboard read; never downloads the user's full prediction history. */
