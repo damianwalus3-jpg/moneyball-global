@@ -318,7 +318,25 @@ export function probabilityQuality(
   };
 }
 
-export interface HitRate {
+
+export function probabilityQualityBySelection(
+  predictions: Pick<Prediction, "probability" | "settlement_status" | "verified" | "selection">[],
+): (ProbabilityQualitySummary & { selection: Selection })[] {
+  const groups = new Map<Selection, typeof predictions>();
+  for (const prediction of predictions) {
+    if (prediction.selection === "—" || !isValidPick(
+      prediction.selection === "1" || prediction.selection === "X" || prediction.selection === "2" ? "1X2"
+        : prediction.selection === "1X" || prediction.selection === "X2" || prediction.selection === "12" ? "DOUBLE_CHANCE" : "GOALS",
+      prediction.selection,
+    )) continue;
+    const selection = prediction.selection;
+    if (!groups.has(selection)) groups.set(selection, []);
+    groups.get(selection)!.push(prediction);
+  }
+  return [...groups.entries()].map(([selection, rows]) => ({ selection, ...probabilityQuality(rows) }))
+    .sort((a, b) => a.selection.localeCompare(b.selection));
+}
+\nexport interface HitRate {
   total: number;
   won: number;
   lost: number;
