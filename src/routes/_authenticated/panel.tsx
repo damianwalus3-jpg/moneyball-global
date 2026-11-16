@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { CalendarDays, ChevronRight, ScanLine, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,55 @@ function DashboardTile({ to, label, value, hint, icon, tone = "default" }: {
         Zobacz szczegóły <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
       </span>
     </Link>
+  );
+}
+
+
+type FinancePeriodKey = "day" | "week" | "month" | "all";
+function FinanceDashboard({ finance, loading, error, retry }: {
+  finance?: import("@/lib/db").CouponFinanceSummary;
+  loading: boolean; error: boolean; retry: () => void;
+}) {
+  const [periodKey, setPeriodKey] = useState<FinancePeriodKey>("week");
+  const period = finance?.[periodKey];
+  const typeLabels: Record<string,string> = { MAIN: "MAIN", MEGA: "MEGA", EXTRA: "EXTRA", TEST: "TEST" };
+  const types = Object.entries(finance?.by_type ?? {}).sort(([a],[b]) => (["MAIN","MEGA","EXTRA","TEST"].indexOf(a) - ["MAIN","MEGA","EXTRA","TEST"].indexOf(b)));
+  return (
+    <section className="mb-5 rounded-2xl border border-primary/25 bg-card p-3 shadow-card sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div><h2 className="font-display text-lg font-bold">PODSUMOWANIE MONEYBALL</h2><p className="text-xs text-muted-foreground">Wirtualna symulacja · stawka 4 € · Europe/Brussels</p></div>
+        <Badge variant="success">LIVE FINANSE</Badge>
+      </div>
+      <div className="mb-3 grid grid-cols-4 gap-1 rounded-xl bg-secondary/40 p-1">
+        {([["day","Dzisiaj"],["week","Tydzień"],["month","Miesiąc"],["all","Cała historia"]] as [FinancePeriodKey,string][]).map(([key,label]) =>
+          <Button key={key} size="sm" variant={periodKey===key ? "default" : "ghost"} className="px-1 text-xs" onClick={()=>setPeriodKey(key)}>{label}</Button>
+        )}
+      </div>
+      {loading ? <p className="rounded-lg bg-secondary/30 p-3 text-sm text-muted-foreground">Ładowanie rozliczeń…</p> :
+       error ? <div className="rounded-lg bg-secondary/30 p-3 text-sm"><p className="text-destructive">Nie udało się pobrać finansów.</p><Button className="mt-2" size="sm" variant="outline" onClick={retry}>Ponów</Button></div> :
+       period ? <>
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-border bg-secondary/25 p-3"><div className="text-xs text-muted-foreground">Zysk / strata netto</div><div className={`num mt-1 text-2xl font-extrabold ${period.net == null ? "" : period.net >= 0 ? "text-success" : "text-destructive"}`}>{period.net == null ? "BRAK DANYCH" : (period.net>0?"+":"")+fmtMoney(period.net)}</div><div className="text-xs text-muted-foreground">{period.count} rozliczonych kuponów</div></div>
+          <div className="rounded-xl border border-border bg-secondary/25 p-3"><div className="text-xs text-muted-foreground">Zwrot brutto</div><div className="num mt-1 text-2xl font-bold">{fmtMoney(period.payout)}</div><div className="text-xs text-muted-foreground">Stawki: {fmtMoney(period.stake)}</div></div>
+        </div>
+        {period.incomplete>0 && <p className="mb-3 rounded-lg border border-warning/30 bg-warning/10 p-2 text-xs text-warning">Niepełne dane finansowe: {period.incomplete}. Wynik netto jest ukryty, aby nie zaniżać ani nie zawyżać symulacji.</p>}
+        <div className="mb-2 flex items-center justify-between"><h3 className="font-display font-bold">WYNIKI SEKCJI</h3><span className="text-xs text-muted-foreground">wszystkie rozliczone</span></div>
+        <div className="grid grid-cols-2 gap-2">
+          {types.map(([key,value]) => <div key={key} className="rounded-lg border border-border bg-secondary/20 p-3">
+            <div className="flex justify-between gap-2 text-sm font-semibold"><span>{typeLabels[key] ?? key}</span><span className="text-muted-foreground">{value.won}/{value.count} wygrane</span></div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{width:`${value.count ? Math.min(100,value.won/value.count*100) : 0}%`}} /></div>
+            <div className={`num mt-2 text-right font-bold ${value.net == null ? "" : value.net>=0 ? "text-success" : "text-destructive"}`}>{value.net==null ? "—" : (value.net>0?"+":"")+fmtMoney(value.net)}</div>
+            <div className="text-right text-xs text-muted-foreground">{value.lost} przegrane · {value.void} zwroty · stawki {fmtMoney(value.stake)}</div>
+            {value.incomplete>0 && <div className="text-xs text-warning">Brak danych: {value.incomplete}</div>}
+          </div>)}
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-2"><h3 className="font-display font-bold">OSTATNIE ROZLICZENIA</h3><Link to="/kupony" className="text-xs font-semibold text-primary">Pełna historia <ChevronRight className="inline size-3"/></Link></div>
+        <div className="mt-2 grid gap-2">{finance?.history.slice(0,8).map(coupon=><div key={coupon.id} className="flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+          <div className="min-w-0 flex-1"><div className="truncate font-semibold">{coupon.name}</div><div className="text-xs text-muted-foreground">{coupon.coupon_type} · {fmtDateTime(coupon.settled_at)}</div></div>
+          <div className={`num font-bold ${coupon.net==null ? "" : coupon.net>=0 ? "text-success" : "text-destructive"}`}>{coupon.net==null ? "—" : (coupon.net>0?"+":"")+fmtMoney(coupon.net)}</div>
+        </div>)}</div>
+       </> : null}
+    </section>
   );
 }
 
@@ -93,64 +143,7 @@ function Panel() {
           <Button className="mt-2" size="sm" variant="outline" onClick={() => void summaryQuery.refetch()}>Ponów statystyki</Button>
         </div>
       )}
-      <section className="mb-5 rounded-xl border border-border bg-card p-3 sm:p-4">
-        <div className="mb-3">
-          <h2 className="font-display text-lg font-bold uppercase">Wynik finansowy kuponów</h2>
-          <p className="text-xs text-muted-foreground">Rzeczywiste rozliczenia · stawki i zwroty · czas Europe/Brussels</p>
-        </div>
-        {financeQuery.isLoading ? (
-          <p className="rounded-lg bg-secondary/30 p-3 text-sm text-muted-foreground">Ładowanie historii finansowej…</p>
-        ) : financeQuery.isError ? (
-          <div className="rounded-lg bg-secondary/30 p-3 text-sm">
-            <p className="text-destructive">Nie udało się pobrać wyniku finansowego kuponów.</p>
-            <Button className="mt-2" size="sm" variant="outline" onClick={() => void financeQuery.refetch()}>Ponów</Button>
-          </div>
-        ) : financeQuery.data ? (
-          <>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {([
-                ["Dzisiaj", financeQuery.data.day],
-                ["Ten tydzień", financeQuery.data.week],
-                ["Ten miesiąc", financeQuery.data.month],
-              ] as const).map(([label, period]) => (
-                <div key={label} className="rounded-lg border border-border bg-secondary/20 p-3">
-                  <div className="text-xs font-semibold uppercase text-muted-foreground">{label}</div>
-                  <div className={`num mt-1 text-xl font-bold ${period.net == null ? "" : period.net > 0 ? "text-success" : period.net < 0 ? "text-destructive" : ""}`}>
-                    {period.net == null ? "—" : (period.net > 0 ? "+" : "") + fmtMoney(period.net)}
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{period.count} rozliczonych · stawki {fmtMoney(period.stake)}</div>
-                  <div className="text-xs text-muted-foreground">Zwroty {fmtMoney(period.payout)}</div>
-                  {period.incomplete > 0 && <div className="mt-1 text-xs text-amber-500">Brak danych finansowych: {period.incomplete}</div>}
-                </div>
-              ))}
-            </div>
-            <div className="mt-4">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-bold uppercase">Ostatnio rozliczone kupony</h3>
-                <Link to="/kupony" className="text-xs font-semibold text-primary">Pełna historia <ChevronRight className="inline size-3" /></Link>
-              </div>
-              {financeQuery.data.history.length ? (
-                <div className="grid gap-2">
-                  {financeQuery.data.history.slice(0, 8).map((coupon) => (
-                    <div key={coupon.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate font-medium">{coupon.name}</div>
-                        <div className="text-xs text-muted-foreground">{fmtDateTime(coupon.settled_at)} · {coupon.status === "won" ? "Wygrany" : coupon.status === "lost" ? "Przegrany" : "Zwrot"}</div>
-                      </div>
-                      <div className="text-right text-xs text-muted-foreground">Stawka {coupon.stake == null ? "—" : fmtMoney(coupon.stake)}</div>
-                      <div className={`num min-w-20 text-right font-semibold ${coupon.net == null ? "" : coupon.net > 0 ? "text-success" : coupon.net < 0 ? "text-destructive" : ""}`}>
-                        {coupon.net == null ? "brak danych" : (coupon.net > 0 ? "+" : "") + fmtMoney(coupon.net)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="rounded-lg bg-secondary/30 p-3 text-sm text-muted-foreground">Historia pojawi się po pierwszym rozliczeniu kuponu.</p>
-              )}
-            </div>
-          </>
-        ) : null}
-      </section>
+      <FinanceDashboard finance={financeQuery.data} loading={financeQuery.isLoading} error={financeQuery.isError} retry={() => void financeQuery.refetch()} />
       <section className="mb-5 rounded-xl border border-primary/25 bg-card p-3 sm:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
