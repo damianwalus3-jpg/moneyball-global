@@ -490,27 +490,15 @@ export interface StatisticsPageData {
  * historical fixture/model version. Keep the exact league rule in the domain
  * layer and fetch active-model predictions only for eligible match IDs. */
 export async function fetchStatisticsPageData(): Promise<StatisticsPageData> {
+  // Use the shared keyset-paginated table loader here: direct PostgREST selects
+  // are capped at 1,000 rows and would silently truncate the 2,596-match universe.
+  const [matches, coupons, legs] = await Promise.all([
+    fetchAll("matches"),
+    fetchAll("coupons"),
+    fetchAll("coupon_legs"),
+  ]);
   const uid = await currentUserId();
   const sb = requireSupabase();
-  const [matchesResult, couponsResult, legsResult] = await Promise.all([
-    withRequestTimeout(
-      sb.from("matches").select(READ_COLUMNS.matches.join(",")).eq(OWNER_COLUMN, uid),
-      "Pobieranie meczów do statystyk",
-    ),
-    withRequestTimeout(
-      sb.from("coupons").select(READ_COLUMNS.coupons.join(",")).eq(OWNER_COLUMN, uid),
-      "Pobieranie kuponów do statystyk",
-    ),
-    withRequestTimeout(
-      sb.from("coupon_legs").select(READ_COLUMNS.coupon_legs.join(",")).eq(OWNER_COLUMN, uid),
-      "Pobieranie nóg kuponów do statystyk",
-    ),
-  ]);
-  if (matchesResult.error) throw new Error(humanizeError(matchesResult.error, "matches"));
-  if (couponsResult.error) throw new Error(humanizeError(couponsResult.error, "coupons"));
-  if (legsResult.error) throw new Error(humanizeError(legsResult.error, "coupon_legs"));
-
-  const matches = (matchesResult.data ?? []) as unknown as TableRows["matches"][];
   const eligibleMatchIds = matches
     .filter((match) => isEuropeanTopTwoLeague(match.country, match.competition ?? match.league))
     .map((match) => match.id);
@@ -527,12 +515,7 @@ export async function fetchStatisticsPageData(): Promise<StatisticsPageData> {
       return (data ?? []) as unknown as TableRows["predictions"][];
     },
   );
-  return {
-    matches,
-    predictions,
-    coupons: (couponsResult.data ?? []) as unknown as TableRows["coupons"][],
-    legs: (legsResult.data ?? []) as unknown as TableRows["coupon_legs"][],
-  };
+  return { matches, predictions, coupons, legs };
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
