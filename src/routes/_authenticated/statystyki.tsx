@@ -104,7 +104,7 @@ function Statystyki() {
 
         <section>
           <h2 className="mb-3 text-2xl font-semibold uppercase">Kupony</h2>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <StatCard label="Skuteczność kuponów" value={fmtPct(chr.rate)} hint={`${chr.won}/${chr.settled}`} tone="primary" />
             <StatCard label="Postawiono (rozliczone)" value={staked.length ? fmtMoney(stakeSum) : "brak danych"} />
             <StatCard label="Zwrot brutto" value={staked.length && !couponPayoutIncomplete ? fmtMoney(payoutSum) : "brak danych"} />
