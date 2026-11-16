@@ -9,6 +9,7 @@ import {
   isValidPick,
   groupHitRates,
   isCouponCandidate,
+  isEligibleCouponPrediction,
   hasFreshConfirmedOdds,
   modelHitRate,
   probabilityQuality,
@@ -217,6 +218,16 @@ describe("coupon candidates", () => {
   it("rejects started and cancelled matches", () => {
     expect(isCouponCandidate(prediction("p", "m1", 90), match("m1", "2026-11-10T11:00:00Z"), now)).toBe(false);
     expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), status: "cancelled" }, now)).toBe(false);
+  });
+});
+
+describe("coupon persistence eligibility", () => {
+  it("accepts only pending WYBRANY predictions strictly above 75%", () => {
+    expect(isEligibleCouponPrediction(prediction("a", "m1", 75.1))).toBe(true);
+    expect(isEligibleCouponPrediction(prediction("b", "m2", 75))).toBe(false);
+    expect(isEligibleCouponPrediction(prediction("c", "m3", 90, { verdict: "ODRZUCONY" }))).toBe(false);
+    expect(isEligibleCouponPrediction(prediction("d", "m4", 90, { settlement_status: "won" }))).toBe(false);
+    expect(isEligibleCouponPrediction(prediction("e", "m5", 90, { probability: null }))).toBe(false);
   });
 });
 
