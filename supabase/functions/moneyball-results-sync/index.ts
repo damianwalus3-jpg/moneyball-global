@@ -34,7 +34,7 @@ async function dbUpsert(path:string,body:unknown,onConflict:string){
 }
 
 async function readDay(date:string){
- const r=await fetch("https://footynomad.com/fixtures/"+date,{headers:{"User-Agent":"Mozilla/5.0 (compatible; MoneyballGlobal/2.0)","Accept":"text/html"}});
+ const r=await fetch("https://footynomad.com/fixtures/"+date,{headers:{"User-Agent":"Mozilla/5.0 (compatible; MoneyballGlobal/2.0)","Accept":"text/html"},signal:AbortSignal.timeout(8000)});
  if(!r.ok)throw new Error("FootyNomad "+date+" HTTP "+r.status);
  const html=await r.text(),re=/<a\b([^>]*\bhref=["'](?:https?:\/\/footynomad\.com)?\/fixture\/[^"']+["'][^>]*)>([\s\S]*?)<\/a>/gi;
  const out:any[]=[];let m:RegExpExecArray|null;
