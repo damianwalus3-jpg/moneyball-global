@@ -109,10 +109,13 @@ function Kupony() {
   };
   const settledCoupons = coupons.filter((coupon) => ["won", "lost", "void"].includes(coupon.status));
   const settledStake = settledCoupons.reduce((sum, coupon) => sum + Number(coupon.stake ?? 0), 0);
-  const settledReturn = settledCoupons.reduce((sum, coupon) => sum + (couponPayout(coupon.stake, legs.filter((leg) => leg.coupon_id === coupon.id)) ?? 0), 0);
-  const settledNet = Math.round((settledReturn - settledStake) * 100) / 100;
+  const payoutRows = settledCoupons.map((coupon) => couponPayout(coupon.stake, legs.filter((leg) => leg.coupon_id === coupon.id)));
+  const knownPayouts = payoutRows.filter((value): value is number => value != null);
+  const payoutIncomplete = knownPayouts.length !== settledCoupons.length;
+  const settledReturn = knownPayouts.reduce((sum, value) => sum + value, 0);
+  const settledNet = payoutIncomplete ? null : Math.round((settledReturn - settledStake) * 100) / 100;
   const pendingStake = coupons.filter((coupon) => coupon.status === "pending").reduce((sum, coupon) => sum + Number(coupon.stake ?? 0), 0);
-  const settledRoi = settledStake > 0 ? Math.round((settledNet / settledStake) * 1000) / 10 : null;
+  const settledRoi = settledStake > 0 && settledNet != null ? Math.round((settledNet / settledStake) * 1000) / 10 : null;
 
   function buildBatch() {
     return couponSize === 1
@@ -151,8 +154,8 @@ function Kupony() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard label="Rozliczone" value={settledCoupons.length} hint={`${counts.won} wygrane · ${counts.lost} przegrane · ${counts.void} zwroty`} />
           <StatCard label="Postawiono" value={settledCoupons.length ? fmtMoney(settledStake) : "—"} />
-          <StatCard label="Zwrot brutto" value={settledCoupons.length ? fmtMoney(settledReturn) : "—"} />
-          <StatCard label="Zysk / strata netto" value={settledCoupons.length ? fmtMoney(settledNet) : "—"} tone={settledNet < 0 ? "danger" : "primary"} />
+          <StatCard label="Zwrot brutto" value={settledCoupons.length && !payoutIncomplete ? fmtMoney(settledReturn) : "—"} hint={payoutIncomplete ? "Brak kursu dla części rozliczonych kuponów" : undefined} />
+          <StatCard label="Zysk / strata netto" value={settledNet != null ? fmtMoney(settledNet) : "—"} hint={payoutIncomplete ? "Niepełne dane kursowe — wynik nie jest zgadywany" : undefined} tone={settledNet != null && settledNet < 0 ? "danger" : "primary"} />
           <StatCard label="ROI" value={fmtPct(settledRoi)} hint="netto / postawione" />
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
