@@ -175,6 +175,20 @@ export function isFinishedStatus(status: string | null | undefined) {
   return status === "finished" || status === "cancelled" || status === "postponed";
 }
 
+/** A coupon price must have a source timestamp, be unsuspended, prematch and at most six hours old. */
+export function hasFreshConfirmedOdds(prediction: Prediction, nowMs: number): boolean {
+  const odds = Number(prediction.odds);
+  const coverage = prediction.data_coverage;
+  if (prediction.odds == null || !Number.isFinite(odds) || odds <= 1 || !coverage) return false;
+  const source = String(coverage["odds_source"] ?? "");
+  const capturedAt = Date.parse(String(coverage["odds_captured_at"] ?? ""));
+  const ageMs = nowMs - capturedAt;
+  if (!source || !Number.isFinite(capturedAt) || ageMs < 0 || ageMs > 6 * 60 * 60 * 1000) return false;
+  if (coverage["odds_suspended"] === true || String(coverage["odds_phase"] ?? "prematch").toLowerCase() !== "prematch") return false;
+  const status = String(coverage["odds_status"] ?? "");
+  return status !== "STALE" && status !== "SUSPENDED" && status !== "MISSING";
+}
+
 export function isCouponCandidate(prediction: Prediction, match: Match | undefined, nowMs: number): boolean {
   if (!match) return false;
   if (!isEuropeanTopTwoLeague(match.country, match.competition ?? match.league)) return false;
