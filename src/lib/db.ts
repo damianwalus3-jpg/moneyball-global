@@ -97,6 +97,22 @@ export async function currentUserId(): Promise<string> {
   return request;
 }
 
+export async function fetchLatestScanRun(): Promise<TableRows["scan_runs"] | null> {
+  const uid = await currentUserId();
+  const { data, error } = await withRequestTimeout(
+    requireSupabase()
+      .from("scan_runs")
+      .select(READ_COLUMNS.scan_runs.join(","))
+      .eq(OWNER_COLUMN, uid)
+      .order("started_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    "Pobieranie ostatniego skanu",
+  );
+  if (error) throw new Error(humanizeError(error, "scan_runs"));
+  return (data ?? null) as TableRows["scan_runs"] | null;
+}
+
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const { data, error } = await withRequestTimeout(requireSupabase().rpc("moneyball_dashboard_summary"), "Pobieranie podsumowania panelu");
   if (error) throw new Error(humanizeError(error));
