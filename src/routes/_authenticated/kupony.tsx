@@ -293,7 +293,16 @@ function Kupony() {
             const couponLegs = legs.filter((leg) => leg.coupon_id === coupon.id);
             const payoutLegs = couponLegs.map((leg) => ({ ...leg, odds: leg.odds ?? predictionById.get(leg.prediction_id)?.odds ?? null }));
             const payout = couponPayout(coupon.stake, payoutLegs);
-            const net = payout == null || coupon.stake == null ? null : Math.round((payout - Number(coupon.stake)) * 100) / 100;
+            const settledNet = payout == null || coupon.stake == null ? null : Math.round((payout - Number(coupon.stake)) * 100) / 100;
+            const potentialOdds = effectiveOdds(payoutLegs.map((leg) => ({ odds: leg.odds, status: "pending" as const })));
+            const potentialReturn = coupon.stake != null && potentialOdds != null && payoutLegs.length === coupon.target_legs
+              ? Math.round(Number(coupon.stake) * potentialOdds * 100) / 100
+              : null;
+            const potentialNet = potentialReturn == null || coupon.stake == null
+              ? null
+              : Math.round((potentialReturn - Number(coupon.stake)) * 100) / 100;
+            const displayNet = coupon.status === "pending" ? potentialNet : settledNet;
+            const netLabel = coupon.status === "pending" ? "Możliwy zysk" : "Zysk / strata";
             return (
               <div key={coupon.id} className="surface-card p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -331,11 +340,17 @@ function Kupony() {
                     <p className="text-xs text-amber-300">Brak potwierdzonych kursów — kupon służy do testowania skuteczności, nie jest potwierdzonym kuponem bukmacherskim.</p>
                   )}
                 </div>
-                <div className="num mt-3 grid grid-cols-4 gap-2 border-t border-border pt-3 text-sm">
+                <div className="num mt-3 grid grid-cols-2 gap-2 border-t border-border pt-3 text-sm sm:grid-cols-4">
                   <div><div className="eyebrow">Stawka</div>{fmtMoney(coupon.stake)}</div>
                   <div><div className="eyebrow">Kurs</div>{fmtOdds(coupon.combined_odds)}</div>
-                  <div><div className="eyebrow">Zwrot brutto</div>{fmtMoney(payout)}</div>
-                <div><div className="eyebrow">Zysk / strata</div><span className={net == null ? "" : net > 0 ? "text-success" : net < 0 ? "text-destructive" : ""}>{fmtMoney(net)}</span></div>
+                  <div><div className="eyebrow">{coupon.status === "pending" ? "Możliwy zwrot" : "Zwrot brutto"}</div>{fmtMoney(coupon.status === "pending" ? potentialReturn : payout)}</div>
+                  <div className="rounded-md border border-border bg-secondary/40 p-2">
+                    <div className="eyebrow">{netLabel}</div>
+                    <div className={`mt-1 inline-flex min-h-8 items-center rounded-md border px-2 font-bold ${displayNet == null ? "border-amber-500/40 bg-amber-500/10 text-amber-300" : displayNet > 0 ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" : displayNet < 0 ? "border-red-500/40 bg-red-500/10 text-red-400" : "border-border text-muted-foreground"}`}>
+                      {displayNet == null ? "Brak kursu / danych" : <>{displayNet > 0 ? "+" : ""}{fmtMoney(displayNet)}</>}
+                    </div>
+                    {coupon.status === "pending" && <div className="mt-1 text-[10px] text-muted-foreground">Szacunek — nie wynik rozliczony</div>}
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
                   {coupon.status === "pending" && (
