@@ -26,6 +26,7 @@ async function db(path:string,method="GET",body?:unknown){
  if(!r.ok)throw new Error("Supabase "+r.status+" at "+path+": "+(data?.message||data?.details||data?.hint||raw||"empty response"));return data;
 }
 async function dbUpsert(path:string,body:unknown,onConflict:string){
+ if(!SERVICE_KEY)throw new Error("SUPABASE_SERVICE_ROLE_KEY missing");
  const r=await fetch(SUPABASE_URL+"/rest/v1/"+path+"?on_conflict="+onConflict,{method:"POST",headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+SERVICE_KEY,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(body)});
  const raw=await r.text();let data:any;try{data=raw?JSON.parse(raw):null;}catch{data=raw;}
  if(!r.ok)throw new Error("Supabase upsert "+r.status+" at "+path+": "+(data?.message||data?.details||data?.hint||raw||"empty response"));
@@ -415,8 +416,7 @@ Deno.serve(async(req:Request)=>{
      try{await dbUpsert("match_result_sources",observationBatch,"match_id,source,external_match_id");}
      catch(e){
       const fallback=await limitedSettled(observationBatch,5,async row=>dbUpsert("match_result_sources",row,"match_id,source,external_match_id"));
-      const failed=fallback.filter((x:any)=>x.status==="rejected");
-      for(const x of failed)errors.push("Zapis obserwacji źródła: "+String(x.reason));
+      for(const x of fallback){if(x.status==="rejected")errors.push("Zapis obserwacji źródła: "+String(x.reason));}
      }
     }
     console.log("[moneyball-results-sync] alternate observation persistence",JSON.stringify({feeds:alternateFeeds.length,matched:alternateMatched,upsertRows:observationBatch.length,durationMs:Date.now()-alternateObservationStarted}));
