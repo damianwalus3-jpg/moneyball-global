@@ -24,6 +24,7 @@ import { Route as AuthenticatedPrognozy1x2RouteImport } from './routes/_authenti
 import { Route as AuthenticatedPrognozyGoleRouteImport } from './routes/_authenticated/prognozy-gole'
 import { Route as AuthenticatedStatystykiRouteImport } from './routes/_authenticated/statystyki'
 import { Route as AuthenticatedUstawieniaRouteImport } from './routes/_authenticated/ustawienia'
+import { Route as AuthenticatedWynikiRouteImport } from './routes/_authenticated/wyniki'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -102,6 +103,11 @@ const AuthenticatedUstawieniaRoute = AuthenticatedUstawieniaRouteImport.update({
   path: '/ustawienia',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedWynikiRoute = AuthenticatedWynikiRouteImport.update({
+  id: '/wyniki',
+  path: '/wyniki',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/prognozy-gole': typeof AuthenticatedPrognozyGoleRoute
   '/statystyki': typeof AuthenticatedStatystykiRoute
   '/ustawienia': typeof AuthenticatedUstawieniaRoute
+  '/wyniki': typeof AuthenticatedWynikiRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -152,6 +159,7 @@ export interface FileRoutesById {
   '/_authenticated/prognozy-gole': typeof AuthenticatedPrognozyGoleRoute
   '/_authenticated/statystyki': typeof AuthenticatedStatystykiRoute
   '/_authenticated/ustawienia': typeof AuthenticatedUstawieniaRoute
+  '/_authenticated/wyniki': typeof AuthenticatedWynikiRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -170,6 +178,7 @@ export interface FileRouteTypes {
     | '/prognozy-gole'
     | '/statystyki'
     | '/ustawienia'
+    | '/wyniki'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
     | '/_authenticated/prognozy-gole'
     | '/_authenticated/statystyki'
     | '/_authenticated/ustawienia'
+    | '/_authenticated/wyniki'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -320,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUstawieniaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/wyniki': {
+      id: '/_authenticated/wyniki'
+      path: '/wyniki'
+      fullPath: '/wyniki'
+      preLoaderRoute: typeof AuthenticatedWynikiRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -334,6 +351,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPrognozyGoleRoute: typeof AuthenticatedPrognozyGoleRoute
   AuthenticatedStatystykiRoute: typeof AuthenticatedStatystykiRoute
   AuthenticatedUstawieniaRoute: typeof AuthenticatedUstawieniaRoute
+  AuthenticatedWynikiRoute: typeof AuthenticatedWynikiRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -347,6 +365,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPrognozyGoleRoute: AuthenticatedPrognozyGoleRoute,
   AuthenticatedStatystykiRoute: AuthenticatedStatystykiRoute,
   AuthenticatedUstawieniaRoute: AuthenticatedUstawieniaRoute,
+  AuthenticatedWynikiRoute: AuthenticatedWynikiRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
