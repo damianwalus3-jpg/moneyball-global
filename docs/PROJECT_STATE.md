@@ -736,4 +736,7 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Removed the redundant whole-table reads from the History route loader.
 - Changed the first history page prefetch to background/non-blocking. The History component already owns explicit loading and error states, so the page shell can render immediately while the first page loads.
 - No settlement logic, coupon data, match results, bankroll, or historical records are modified. The selected-match dialog continues to fetch and validate its own complete affected-coupon context before allowing settlement.
-- This is a targeted navigation-latency fix; it is not yet considered production until CI, build, and Cloudflare Main deployment succeed.
+- Validation completed: PR #74 merged as `0658b2db5183d12578d2a80d38e16b103907fce1`; main CI run #820 passed (https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/43944242435); Cloudflare Main deploy run #408 passed (https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/43944242470).
+- Deployed production Worker version: `4413a358-877a-40a7-bf72-622a93f16f6f` at https://moneyball-global.damianwalus3.workers.dev.
+- The Vercel status check reported its separate build-rate-limit failure; it is not the production host and did not block the successful Cloudflare deployment.
+- This is a targeted reduction of History navigation's blocking work. Actual authenticated navigation latency still requires a signed-in browser measurement; do not claim the entire menu issue is solved.
