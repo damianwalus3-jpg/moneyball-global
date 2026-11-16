@@ -49,6 +49,7 @@ async function readFixtures(date:string){
   const cls=(attrs.match(/class=["']([^"']+)/i)||[])[1]||"",status=cls.includes("ticket-live")?"live":cls.includes("ticket-ft")?"finished":cls.includes("ticket-pst")?"postponed":cls.includes("ticket-canc")?"cancelled":"scheduled";
   const hs=(body.match(/class=["'][^"']*ticket-hs[^"']*["'][^>]*>([0-9]+)</i)||[])[1],as=(body.match(/class=["'][^"']*ticket-as[^"']*["'][^>]*>([0-9]+)</i)||[])[1];
   const gender=/\bW\b|Women|female|girls/i.test(home+" "+away+" "+league)?"women":"men";
+  if(gender!=='men')continue;
   fixtures.push({external_id:id,source:"FootyNomad",date,competition:league||null,country,gender,home_team:home,away_team:away,kickoff_at:time?new Date(time).toISOString():null,status,home_score:hs==null?null:Number(hs),away_score:as==null?null:Number(as)});
  }
  const total=fixtures.length;
