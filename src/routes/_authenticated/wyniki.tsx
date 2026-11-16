@@ -91,6 +91,6 @@ function Wyniki() {
           </div>)}</div>
         </article>)}</div>
       </section>)}</div>}
-    {pageQuery.hasNextPage && <div className="mt-4 flex justify-center"><Button variant="outline" onClick={() => pageQuery.fetchNextPage()} disabled={pageQuery.isFetchingNextPage}>{pageQuery.isFetchingNextPage ? "Wczytywanie…" : "Wczytaj kolejne 30 meczów"}</Button></div>}
+    {pageQuery.hasNextPage && <div className="mt-4 flex justify-center"><Button variant="outline" onClick={() => pageQuery.fetchNextPage()} disabled={pageQuery.isFetching}>{pageQuery.isFetchingNextPage ? "Wczytywanie…" : "Wczytaj kolejne 30 meczów"}</Button></div>}
   </div>;
 }
