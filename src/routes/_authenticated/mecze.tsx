@@ -13,7 +13,7 @@ import { OddsForm, ScanRunForm } from "@/components/forms/SimpleForms";
 import { deleteRow } from "@/lib/db";
 import { saveCouponBatch } from "@/lib/coupons";
 import { isActivePredictionVersion, MATCH_STATUS_LABELS } from "@/lib/domain";
-import { fmtMoney, fmtOdds, matchLabel, parseDecimal } from "@/lib/format";
+import { fmtMoney, fmtOdds, matchLabel } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { brusselsDayKey, fmtDateTime, fmtDayLong, fmtTime } from "@/lib/time";
 import { getSupabase } from "@/lib/supabase";
@@ -206,7 +206,6 @@ function Mecze() {
     return new URLSearchParams(window.location.search).get("match");
   });
   const [singleBetPrediction, setSingleBetPrediction] = useState<Prediction | null>(null);
-  const singleBetStake = "4";
 
   const saveSingleBet = useAction(async () => {
     const prediction = singleBetPrediction;
