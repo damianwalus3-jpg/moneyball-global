@@ -92,7 +92,7 @@ function Panel() {
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="font-display text-lg font-bold uppercase">Dzisiejsze wybrane typy</h2>
-            <p className="text-xs text-muted-foreground">Zatwierdzone typy aktywnego modelu · stawka analityczna 5 € na singiel</p>
+            <p className="text-xs text-muted-foreground">Zatwierdzone typy aktywnego modelu · stawka analityczna 4 € na singiel</p>
           </div>
           <Badge variant="success">{selectedPicks.length} wybranych</Badge>
         </div>
