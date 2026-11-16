@@ -45,7 +45,7 @@ function Statystyki() {
   const settledSinglePicks = activePreds.filter((p) => p.verdict === "WYBRANY" && p.verified && (p.settlement_status === "won" || p.settlement_status === "lost" || p.settlement_status === "void"));
   const singlePickProfitRows = settledSinglePicks.map((p) => {
     if (p.profit_loss != null && Number.isFinite(Number(p.profit_loss))) return Number(p.profit_loss);
-    const stake = p.stake != null && Number.isFinite(Number(p.stake)) ? Number(p.stake) : 5;
+    const stake = p.stake != null && Number.isFinite(Number(p.stake)) ? Number(p.stake) : 4;
     if (p.settlement_status === "lost") return -stake;
     if (p.settlement_status === "void") return 0;
     if (p.settlement_status === "won" && p.odds != null && Number.isFinite(Number(p.odds)) && Number(p.odds) > 1)
@@ -85,7 +85,7 @@ function Statystyki() {
       />
 
       <section className="mb-6">
-        <h2 className="mb-3 text-2xl font-semibold uppercase">Pojedyncze zakłady · 5 € każdy</h2>
+        <h2 className="mb-3 text-2xl font-semibold uppercase">Pojedyncze typy · stawka analityczna 4 € każdy</h2>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard label="Rozliczone typy" value={settledSinglePicks.length} />
           <StatCard label="Wygrane" value={settledSinglePicks.filter((p) => p.settlement_status === "won").length} />
