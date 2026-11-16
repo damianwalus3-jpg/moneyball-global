@@ -24,6 +24,19 @@ function withRequestTimeout<T>(request: PromiseLike<T>, label: string, ms = 10_0
   });
 }
 
+
+/** Run independent PostgREST chunks in small parallel waves to avoid serial request waterfalls. */
+async function fetchInChunks<T>(ids: string[], chunkSize: number, load: (chunk: string[]) => Promise<T[]>): Promise<T[]> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += chunkSize) chunks.push(ids.slice(i, i + chunkSize));
+  const rows: T[] = [];
+  for (let i = 0; i < chunks.length; i += 4) {
+    const wave = await Promise.all(chunks.slice(i, i + 4).map(load));
+    for (const result of wave) rows.push(...result);
+  }
+  return rows;
+}
+
 interface PgError {
   code?: string;
   message?: string;
@@ -154,41 +167,35 @@ export async function fetchCouponPageData(): Promise<CouponPageData> {
     ...[],
   ]);
   const todayMatchIds = todayMatches.map((match) => match.id);
-  const todayPredictions: TableRows["predictions"][] = [];
-  for (let index = 0; index < todayMatchIds.length; index += 100) {
-    const chunk = todayMatchIds.slice(index, index + 100);
+  const todayPredictions = await fetchInChunks<TableRows["predictions"]>(todayMatchIds, 100, async (chunk) => {
     const { data, error } = await withRequestTimeout(
       sb.from("predictions").select(READ_COLUMNS.predictions.join(",")).eq(OWNER_COLUMN, uid).in("match_id", chunk),
       "Pobieranie dzisiejszych prognoz",
     );
     if (error) throw new Error(humanizeError(error, "predictions"));
-    todayPredictions.push(...((data ?? []) as unknown as TableRows["predictions"][]));
-  }
+    return (data ?? []) as unknown as TableRows["predictions"][];
+  });
   const predictionById = new Map([...predictions, ...todayPredictions].map((prediction) => [prediction.id, prediction]));
   const allPredictions = [...predictionById.values()];
   const allMatchIds = [...new Set([...todayMatchIds, ...allPredictions.map((prediction) => prediction.match_id)])];
-  const historicalMatches: TableRows["matches"][] = [];
-  for (let index = 0; index < allMatchIds.length; index += 100) {
-    const chunk = allMatchIds.slice(index, index + 100);
+  const historicalMatches = await fetchInChunks<TableRows["matches"]>(allMatchIds, 100, async (chunk) => {
     const { data, error } = await withRequestTimeout(
       sb.from("matches").select(READ_COLUMNS.matches.join(",")).eq(OWNER_COLUMN, uid).in("id", chunk),
       "Pobieranie meczów powiązanych z kuponami",
     );
     if (error) throw new Error(humanizeError(error, "matches"));
-    historicalMatches.push(...((data ?? []) as unknown as TableRows["matches"][]));
-  }
+    return (data ?? []) as unknown as TableRows["matches"][];
+  });
   const matchById = new Map(historicalMatches.map((match) => [match.id, match]));
   const matchIds = [...matchById.keys()];
-  const results: TableRows["match_results"][] = [];
-  for (let index = 0; index < matchIds.length; index += 100) {
-    const chunk = matchIds.slice(index, index + 100);
+  const results = await fetchInChunks<TableRows["match_results"]>(matchIds, 100, async (chunk) => {
     const { data, error } = await withRequestTimeout(
       sb.from("match_results").select(READ_COLUMNS.match_results.join(",")).eq(OWNER_COLUMN, uid).in("match_id", chunk),
       "Pobieranie wyników meczów kuponowych",
     );
     if (error) throw new Error(humanizeError(error, "match_results"));
-    results.push(...((data ?? []) as unknown as TableRows["match_results"][]));
-  }
+    return (data ?? []) as unknown as TableRows["match_results"][];
+  });
   return {
     matches: historicalMatches,
     predictions: allPredictions,
@@ -230,39 +237,35 @@ export async function fetchMatchPageData(): Promise<MatchPageData> {
   if (scansResult.error) throw new Error(humanizeError(scansResult.error, "scan_runs"));
   const matches = [...(timed.data ?? []), ...(undated.data ?? [])] as unknown as TableRows["matches"][];
   const matchIds = matches.map((match) => match.id);
-  const predictions: TableRows["predictions"][] = [];
-  for (let i = 0; i < matchIds.length; i += 100) {
-    const { data, error } = await withRequestTimeout(sb.from("predictions").select(READ_COLUMNS.predictions.join(",")).eq(OWNER_COLUMN, uid).in("match_id", matchIds.slice(i, i + 100)), "Pobieranie prognoz dzisiejszych meczów");
+  const predictions = await fetchInChunks<TableRows["predictions"]>(matchIds, 100, async (chunk) => {
+    const { data, error } = await withRequestTimeout(sb.from("predictions").select(READ_COLUMNS.predictions.join(",")).eq(OWNER_COLUMN, uid).in("match_id", chunk), "Pobieranie prognoz dzisiejszych meczów");
     if (error) throw new Error(humanizeError(error, "predictions"));
-    predictions.push(...((data ?? []) as unknown as TableRows["predictions"][]));
-  }
+    return (data ?? []) as unknown as TableRows["predictions"][];
+  });
   const predictionIds = predictions.map((prediction) => prediction.id);
-  const results: TableRows["match_results"][] = [];
+  const results = await fetchInChunks<TableRows["match_results"]>(matchIds, 100, async (chunk) => {
+    const { data, error } = await withRequestTimeout(sb.from("match_results").select(READ_COLUMNS.match_results.join(",")).eq(OWNER_COLUMN, uid).in("match_id", chunk), "Pobieranie wyników dzisiejszych meczów");
+    if (error) throw new Error(humanizeError(error, "match_results"));
+    return (data ?? []) as unknown as TableRows["match_results"][];
+  });
   const odds: TableRows["odds_snapshots"][] = [];
   const couponLegs: TableRows["coupon_legs"][] = [];
-  for (let i = 0; i < matchIds.length; i += 100) {
-    const { data, error } = await withRequestTimeout(sb.from("match_results").select(READ_COLUMNS.match_results.join(",")).eq(OWNER_COLUMN, uid).in("match_id", matchIds.slice(i, i + 100)), "Pobieranie wyników dzisiejszych meczów");
-    if (error) throw new Error(humanizeError(error, "match_results"));
-    results.push(...((data ?? []) as unknown as TableRows["match_results"][]));
-  }
-  for (let i = 0; i < predictionIds.length; i += 100) {
-    const chunk = predictionIds.slice(i, i + 100);
+  const relatedMarketRows = await fetchInChunks<{ odds: TableRows["odds_snapshots"][]; legs: TableRows["coupon_legs"][] }>(predictionIds, 100, async (chunk) => {
     const [oddsResult, legsResult] = await Promise.all([
       withRequestTimeout(sb.from("odds_snapshots").select(READ_COLUMNS.odds_snapshots.join(",")).eq(OWNER_COLUMN, uid).in("prediction_id", chunk), "Pobieranie kursów dzisiejszych meczów"),
       withRequestTimeout(sb.from("coupon_legs").select(READ_COLUMNS.coupon_legs.join(",")).eq(OWNER_COLUMN, uid).in("prediction_id", chunk), "Pobieranie nóg kuponów dzisiejszych meczów"),
     ]);
     if (oddsResult.error) throw new Error(humanizeError(oddsResult.error, "odds_snapshots"));
     if (legsResult.error) throw new Error(humanizeError(legsResult.error, "coupon_legs"));
-    odds.push(...((oddsResult.data ?? []) as unknown as TableRows["odds_snapshots"][]));
-    couponLegs.push(...((legsResult.data ?? []) as unknown as TableRows["coupon_legs"][]));
-  }
+    return [{ odds: (oddsResult.data ?? []) as unknown as TableRows["odds_snapshots"][], legs: (legsResult.data ?? []) as unknown as TableRows["coupon_legs"][] }];
+  });
+  for (const group of relatedMarketRows) { odds.push(...group.odds); couponLegs.push(...group.legs); }
   const couponIds = [...new Set(couponLegs.map((leg) => leg.coupon_id))];
-  const coupons: TableRows["coupons"][] = [];
-  for (let i = 0; i < couponIds.length; i += 100) {
-    const { data, error } = await withRequestTimeout(sb.from("coupons").select(READ_COLUMNS.coupons.join(",")).eq(OWNER_COLUMN, uid).in("id", couponIds.slice(i, i + 100)), "Pobieranie kuponów powiązanych z dzisiejszymi meczami");
+  const coupons = await fetchInChunks<TableRows["coupons"]>(couponIds, 100, async (chunk) => {
+    const { data, error } = await withRequestTimeout(sb.from("coupons").select(READ_COLUMNS.coupons.join(",")).eq(OWNER_COLUMN, uid).in("id", chunk), "Pobieranie kuponów powiązanych z dzisiejszymi meczami");
     if (error) throw new Error(humanizeError(error, "coupons"));
-    coupons.push(...((data ?? []) as unknown as TableRows["coupons"][]));
-  }
+    return (data ?? []) as unknown as TableRows["coupons"][];
+  });
   return { matches, scans: (scansResult.data ?? []) as unknown as TableRows["scan_runs"][], predictions, results, odds, couponLegs, coupons };
 }
 
