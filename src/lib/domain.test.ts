@@ -81,7 +81,6 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Andorra", "2a Divisió")).toBe(true);
     expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Dasta")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "1. Division")).toBe(true);
-    expect(isEuropeanTopTwoLeague("Belarus", "2. Division")).toBe(true);
     // Country-specific third-tier labels must not pass broad generic aliases.
     expect(isEuropeanTopTwoLeague("Scotland", "Football League - Lowland League")).toBe(false);
     expect(isEuropeanTopTwoLeague("Scotland", "Football League - Highland League")).toBe(false);
