@@ -71,6 +71,16 @@ describe("European domestic league scope", () => {
   it("keeps first and second tiers while excluding cups, youth and lower divisions", () => {
     expect(isEuropeanTopTwoLeague("England", "Premier League")).toBe(true);
     expect(isEuropeanTopTwoLeague("Greece", "Super League 2")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Denmark", "2nd Division - Group 2")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Russia", "Second League A - Division A Gold")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Russia", "Second League - Group 1")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Spain", "Primera División RFEF - Group 1")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Spain", "Segunda División RFEF - Group 1")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Switzerland", "1. Liga Promotion")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Switzerland", "1. Liga Classic - Group 1")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Russia", "First League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Spain", "Segunda División")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Switzerland", "Challenge League")).toBe(true);
     expect(isEuropeanTopTwoLeague("Ukraine", "Persha Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("North Macedonia", "2 MFL")).toBe(true);
     expect(isEuropeanTopTwoLeague("Slovakia", "2. liga")).toBe(true);
