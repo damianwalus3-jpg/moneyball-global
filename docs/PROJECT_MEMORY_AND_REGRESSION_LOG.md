@@ -575,3 +575,21 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Edge Functions ponownie wdrożone i ACTIVE: `footynomad-sync v79`, `moneyball-free-feed v36`, `moneyball-predict v232`.
 - Oczyszczono dzienny feed cache zgodnie z nową funkcją; usunięto zero kolejnych niekwalifikujących się rekordów (poprzednie 7 Lowland League zostało już usunięte). Cache nie zawiera obecnie kolejnych wykrytych tier-3 false positives.
 - Pozostaje wymagane: pełny frontend Vitest/TypeScript/build oraz potwierdzenie Cloudflare Worker deployment. Nie zamykać issue #76 bez statusu Cloudflare i kontroli UI.
+
+
+## Finalna runda false-positive audit — Rosja/Hiszpania/Szwajcaria/Dania — 2026-11-17
+- Rozszerzono filtr o dokładne etykiety z FootyNomad i zweryfikowaną strukturę krajową:
+  - Denmark `2nd Division - Group 2` (tier 3)
+  - Russia `Second League A - Division A Gold/Silver` i `Second League - Group 1..4` (tier 3/4), przy zachowaniu `First League` (tier 2)
+  - Spain `Primera División RFEF` (tier 3) i `Segunda División RFEF` (tier 4), przy zachowaniu `Primera/Segunda División` (tier 1/2)
+  - Switzerland `1. Liga Promotion` (tier 3) i `1. Liga Classic` (tier 4), przy zachowaniu `Super League` i `Challenge League` (tier 1/2).
+- Frontend country-aware exclusions: commit `c77188d3fd85937dcdff3d4d92a8508301e81b5f`.
+- Backend Edge Functions:
+  - footynomad-sync: `8014125caf76d7b8373d71cd67c799216a5630d9`
+  - moneyball-free-feed: `9cd51039dd2a9ba487050313ed134e6545922f53`
+  - moneyball-predict: `96310a9a506016922973920acc073586838417d5`
+- Testy regresyjne: `968e219337d842bba06288ba876593861e802821`.
+- Produkcyjna migracja SQL `20261117020000_exclude_additional_european_tier_three_aliases`, commit `e39e3d72a4805f5f692e060a7cba80dcbe419e1f`.
+- Pełna rozszerzona macierz SQL: **40 testów, 0 rozbieżności**. Dzienny feed cache: Northern Ireland Championship 2 fixtures; zero kolejnych niekwalifikujących się rekordów.
+- Edge Functions po wdrożeniu: `footynomad-sync v79`, `moneyball-free-feed v36`, `moneyball-predict v232` — wszystkie ACTIVE.
+- Aktualny GitHub combined status nadal pokazuje tylko Vercel build-rate-limit failure; nie daje statusu workflow Cloudflare. Nie ogłaszać produkcyjnego deployu frontendu. Następny etap nadal wymaga potwierdzenia CI/test/build/Cloudflare i kontroli Worker.
