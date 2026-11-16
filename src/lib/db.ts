@@ -508,7 +508,7 @@ export async function fetchStatisticsPageData(): Promise<StatisticsPageData> {
         sb.from("predictions").select(READ_COLUMNS.predictions.join(","))
           .eq(OWNER_COLUMN, uid)
           .in("match_id", chunk)
-          .or("model_version.eq.MONEYBALL GLOBAL 3.8,model_version.like.MANUAL%"),
+          .or('model_version.eq."MONEYBALL GLOBAL 3.8",model_version.like.MANUAL%'),
         "Pobieranie aktywnych prognoz do statystyk",
       );
       if (error) throw new Error(humanizeError(error, "predictions"));
