@@ -358,6 +358,23 @@ async function reconcileRescheduledMatches(ownerId:string|null=null){
  }
  return {updated,errors:readErrors};
 }
+async function reconcileAllSettledCoupons(ownerId:string|null=null){
+ const ownerFilter=ownerId?"&owner_id=eq."+encodeURIComponent(ownerId):"";
+ const rows=await db("coupons?select=id,status,settled_at&status=in.(won,lost,void)&settled_at=not.is.null"+ownerFilter+"&order=created_at.asc");
+ const now=new Date().toISOString();
+ let checked=0,failed=0;
+ const errors:string[]=[];
+ for(let offset=0;offset<(rows||[]).length;offset+=4){
+  const batch=(rows||[]).slice(offset,offset+4);
+  const settled=await Promise.allSettled(batch.map((coupon:any)=>reconcileCouponMoney(String(coupon.id),now)));
+  for(let i=0;i<settled.length;i++){
+   checked++;
+   if(settled[i].status==="rejected"){failed++;errors.push(String(batch[i].id)+": "+String((settled[i] as PromiseRejectedResult).reason));}
+  }
+ }
+ return {checked,failed,errors};
+}
+
 Deno.serve(async(req:Request)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:cors});
  const cronToken=req.headers.get("x-cron-token")||"";
@@ -490,6 +507,8 @@ Deno.serve(async(req:Request)=>{
     }
    }catch(e){errors.push(date+": "+String(e));}
   }
-  return new Response(JSON.stringify({ok:errors.length===0,dates,fixtures_fetched:fetched,matches_matched:matched,matched_by_external_id:matchedById,matched_by_team_names:matchedByNames,results_saved:resultsSaved,predictions_settled:predictionsSettled,coupon_legs_settled:couponLegsSettled,voided,rescheduled_matches:rescheduledMatches,reschedule_errors:rescheduleErrors,alternate_results_fetched:alternateFetched,alternate_results_matched:alternateMatched,errors}),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
+  const financialReconciliation=await reconcileAllSettledCoupons(ownerId).catch(e=>({checked:0,failed:1,errors:[String(e)]}));
+  if(financialReconciliation.failed)errors.push(...financialReconciliation.errors.map(e=>"Rozliczenie finansowe: "+e));
+  return new Response(JSON.stringify({ok:errors.length===0,financial_reconciliation:financialReconciliation,dates,fixtures_fetched:fetched,matches_matched:matched,matched_by_external_id:matchedById,matched_by_team_names:matchedByNames,results_saved:resultsSaved,predictions_settled:predictionsSettled,coupon_legs_settled:couponLegsSettled,voided,rescheduled_matches:rescheduledMatches,reschedule_errors:rescheduleErrors,alternate_results_fetched:alternateFetched,alternate_results_matched:alternateMatched,errors}),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
  }catch(e){return new Response(JSON.stringify({ok:false,error:String(e)}),{status:500,headers:{...cors,"Content-Type":"application/json"}});}
 });
