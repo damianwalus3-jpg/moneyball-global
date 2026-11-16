@@ -15,7 +15,7 @@ import {
 } from "@/components/app/ui-bits";
 import { SettleMatchDialog } from "@/components/app/SettleMatchDialog";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
-import { ensureTables, historyPagesQuery } from "@/lib/queries";
+import { historyPagesQuery } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
 import type { Match } from "@/lib/types";
 
@@ -30,10 +30,12 @@ export const Route = createFileRoute("/_authenticated/historia")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  loader: ({ context }) => Promise.all([
-    context.queryClient.prefetchInfiniteQuery(historyPagesQuery({ tab: "todo", search: "" })),
-    ensureTables(context.queryClient, ["match_results", "coupons", "coupon_legs"]),
-  ]),
+  // Start the first page in the background. The screen already has its own
+  // loading/error states, so navigation must not wait for the history request.
+  // Settlement context is fetched lazily for the selected match by SettleMatchDialog.
+  loader: ({ context }) => {
+    void context.queryClient.prefetchInfiniteQuery(historyPagesQuery({ tab: "todo", search: "" }));
+  },
   pendingComponent: PageLoader,
   errorComponent: DataError,
   component: Historia,
