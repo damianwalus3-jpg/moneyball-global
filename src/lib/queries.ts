@@ -1,7 +1,7 @@
 import { queryOptions, useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary } from "./db";
-import type { TableName } from "./types";
+import type { TableName, TableRows } from "./types";
 
 /** Small live summaries refresh frequently; large table reads use a slower cadence. */
 export const LIVE_REFRESH = {
@@ -76,8 +76,8 @@ export function dashboardSelectedPicksQuery() {
   });
 }
 
-export function useTable<K extends TableName>(table: K) {
-  return useSuspenseQuery(tableQuery(table)).data;
+export function useTable<K extends TableName>(table: K): TableRows[K][] {
+  return useSuspenseQuery(tableQuery(table)).data as TableRows[K][];
 }
 
 export function ensureTables(qc: QueryClient, tables: TableName[]) {
