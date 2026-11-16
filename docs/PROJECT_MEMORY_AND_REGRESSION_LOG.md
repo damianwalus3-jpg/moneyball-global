@@ -345,3 +345,10 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Reschedule lookup ponownie pominięty: 62 ms; alternatywne źródła 481 ms; OpenLigaDB pominięty, ESPN i TheSportsDB zwróciły dane, OpenMatchday 0 feed rows.
 - Dwa przebiegi po zmianie: 4.769 s i 4.210 s (średnia 4.490 s), wobec pojedynczego baseline v68 6.125 s — średnio ok. 26.7% krócej. To wstępny pomiar z dwóch cykli, nadal monitorować kolejne 5-minutowe uruchomienia.
 - Harmonogram predykcji o 20:50 ponownie zwrócił HTTP 200 cooldown z `next_scan_at=2026-11-17T07:00:00Z`; stan pozostaje completed, lease null. Nie uruchomiono dodatkowego skanu.
+
+
+## Audyt regresji po poprawce tokenu i timeoutów bazy — 2026-11-16 20:52 UTC
+- Przegląd logów Edge Function od 20:30 do 20:52 wykazał 8 HTTP 5xx dla `moneyball-predict`; wszystkie przypadają na okno przed pełnym hotfixem v219 (nieprawidłowy token / brak uprawnienia helpera owner). Po wdrożeniu v219 o 20:40 wszystkie późniejsze wywołania obserwowane do 20:50 zwracały HTTP 200; brak nowego 5xx po naprawie.
+- `moneyball-results-sync`: 5 wywołań w badanym oknie, 0 HTTP 5xx. Dwa ostatnie przebiegi v71: 4.769 s i 4.210 s.
+- PostgreSQL: od 12:36:27 UTC do 20:52 UTC nie odnotowano nowego statement timeout; 4 widoczne timeout events w szerszym oknie pochodzą z 12:36 i wcześniejszego problemu z pełnymi skanami predictions.
+- Health advisor nadal 0 findings. To potwierdza brak nowych timeoutów i 5xx po hotfixie w obserwowanym oknie, ale monitorowanie pozostaje aktywne.
