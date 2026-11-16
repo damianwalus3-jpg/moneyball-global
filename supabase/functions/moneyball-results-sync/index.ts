@@ -25,6 +25,13 @@ async function db(path:string,method="GET",body?:unknown){
  const raw=await r.text();let data:any;try{data=raw?JSON.parse(raw):null;}catch{data=raw;}
  if(!r.ok)throw new Error("Supabase "+r.status+" at "+path+": "+(data?.message||data?.details||data?.hint||raw||"empty response"));return data;
 }
+async function dbUpsert(path:string,body:unknown,onConflict:string){
+ const r=await fetch(SUPABASE_URL+"/rest/v1/"+path+"?on_conflict="+onConflict,{method:"POST",headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+SERVICE_KEY,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(body)});
+ const raw=await r.text();let data:any;try{data=raw?JSON.parse(raw):null;}catch{data=raw;}
+ if(!r.ok)throw new Error("Supabase upsert "+r.status+" at "+path+": "+(data?.message||data?.details||data?.hint||raw||"empty response"));
+ return data;
+}
+
 async function readDay(date:string){
  const r=await fetch("https://footynomad.com/fixtures/"+date,{headers:{"User-Agent":"Mozilla/5.0 (compatible; MoneyballGlobal/2.0)","Accept":"text/html"}});
  if(!r.ok)throw new Error("FootyNomad "+date+" HTTP "+r.status);
@@ -170,8 +177,7 @@ function matchFeedToDb(feed:ScoreFeed,matches:any[]){
 }
 async function saveSourceObservation(m:any,f:ScoreFeed){
  const row={match_id:m.id,source:f.source,external_match_id:f.external_id,source_status:f.status,home_score:f.home_score,away_score:f.away_score,source_url:f.url,fetched_at:new Date().toISOString(),raw:f.raw};
- const q=await db("match_result_sources?select=id&match_id=eq."+m.id+"&source=eq."+encodeURIComponent(f.source)+"&external_match_id=eq."+encodeURIComponent(f.external_id));
- if(q?.length)await db("match_result_sources?id=eq."+q[0].id,"PATCH",row);else await db("match_result_sources","POST",row);
+ await dbUpsert("match_result_sources",row,"match_id,source,external_match_id");
 }
 
 function outcome(h:number,a:number){return h>a?"1":h<a?"2":"X";}
@@ -396,8 +402,24 @@ Deno.serve(async(req:Request)=>{
     const alternateFeeds=allAlternateFeeds.filter(feed=>day(new Date(feed.date))===date);alternateFetched+=alternateFeeds.length;
     const alternateByMatch=new Map<string,ScoreFeed[]>();
     const alternateObservationStarted=Date.now();
-    for(const feed of alternateFeeds){const fm=matchFeedToDb(feed,matches);if(!fm)continue;alternateMatched++;const arr=alternateByMatch.get(fm.id)||[];arr.push(feed);alternateByMatch.set(fm.id,arr);await saveSourceObservation(fm,feed);}
-    console.log("[moneyball-results-sync] alternate observation persistence",JSON.stringify({feeds:alternateFeeds.length,matched:alternateMatched,durationMs:Date.now()-alternateObservationStarted}));
+    const observationRows=new Map<string,any>();
+    for(const feed of alternateFeeds){
+     const fm=matchFeedToDb(feed,matches);if(!fm)continue;
+     alternateMatched++;
+     const arr=alternateByMatch.get(fm.id)||[];arr.push(feed);alternateByMatch.set(fm.id,arr);
+     const row={match_id:fm.id,source:feed.source,external_match_id:feed.external_id,source_status:feed.status,home_score:feed.home_score,away_score:feed.away_score,source_url:feed.url,fetched_at:new Date().toISOString(),raw:feed.raw};
+     observationRows.set(fm.id+"|"+feed.source+"|"+feed.external_id,row);
+    }
+    const observationBatch=[...observationRows.values()];
+    if(observationBatch.length){
+     try{await dbUpsert("match_result_sources",observationBatch,"match_id,source,external_match_id");}
+     catch(e){
+      const fallback=await limitedSettled(observationBatch,5,async row=>dbUpsert("match_result_sources",row,"match_id,source,external_match_id"));
+      const failed=fallback.filter((x:any)=>x.status==="rejected");
+      for(const x of failed)errors.push("Zapis obserwacji źródła: "+String(x.reason));
+     }
+    }
+    console.log("[moneyball-results-sync] alternate observation persistence",JSON.stringify({feeds:alternateFeeds.length,matched:alternateMatched,upsertRows:observationBatch.length,durationMs:Date.now()-alternateObservationStarted}));
     // Synchronize live status before the final whistle.
     for(const f of fixtures){
      if(f.status!=="live")continue;
