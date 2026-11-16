@@ -12,7 +12,10 @@ import { parseScanRows, SCAN_TEMPLATE_CSV, type ParsedScan } from "@/lib/scan-im
 import { importScan } from "@/lib/scan-import-service";
 
 export function ScanImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  // This dialog is mounted on the Matches page even while closed. Do not load\n  // the complete match archive until the user actually opens the import flow.\n  const matchesQuery = useQuery({ ...tableQuery("matches"), enabled: open });\n  const matches = matchesQuery.data ?? [];
+  // This dialog is mounted on the Matches page even while closed. Do not load
+  // the complete match archive until the user actually opens the import flow.
+  const matchesQuery = useQuery({ ...tableQuery("matches"), enabled: open });
+  const matches = matchesQuery.data ?? [];
   const [text, setText] = useState("");
   const [source, setSource] = useState("CSV import");
 
