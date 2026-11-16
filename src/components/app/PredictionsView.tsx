@@ -76,7 +76,6 @@ export function PredictionsView({ market }: { market: Market }) {
   const [editing, setEditing] = useState<Prediction | null>(null);
   const [open, setOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const byId = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
   const pageQuery = useInfiniteQuery({
     queryKey: ["prediction-pages", market, modelScope, verdictFilter, query],
     queryFn: ({ pageParam }) => fetchPredictionsPage({
