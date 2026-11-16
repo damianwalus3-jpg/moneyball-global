@@ -1,5 +1,5 @@
-import { couponStatus, effectiveOdds, outcomeFromScore, settlePick, settleGoalsPick } from "./domain";
-import { insertRow, updateRow } from "./db";
+import { couponPayout, couponStatus, effectiveOdds, outcomeFromScore, settlePick, settleGoalsPick, signedAmount } from "./domain";
+import { deleteRow, fetchAll, insertRow, updateRow } from "./db";
 import type { Coupon, CouponLeg, Match, MatchResult, Prediction, Settlement } from "./types";
 
 export interface SettleInput {
@@ -38,6 +38,53 @@ async function refreshCouponTotals(coupon: Coupon, legs: CouponLeg[], status: Se
     coupon.combined_odds = combinedOdds;
     coupon.potential_return = potentialReturn;
     coupon.settled_at = settledAt;
+  }
+}
+
+/** Keep the coupon cash ledger idempotent when results are settled or corrected. */
+async function reconcileCouponLedger(coupon: Coupon, legs: CouponLeg[], occurredAt: string) {
+  const transactions = await fetchAll("bankroll_transactions");
+  const related = transactions.filter((tx) => tx.coupon_id === coupon.id);
+  let stakeTx = related.find((tx) => tx.transaction_type === "stake");
+  let returnTx = related.find((tx) => tx.transaction_type === "return" && (tx.note ?? "").startsWith("Automatyczne rozliczenie MONEYBALL"));
+
+  // Every saved coupon is a virtual stake. Backfill older coupons that were saved
+  // before stake recording was made mandatory.
+  if (!stakeTx && coupon.stake != null && Number(coupon.stake) > 0) {
+    stakeTx = await insertRow("bankroll_transactions", {
+      transaction_type: "stake",
+      amount: Number(coupon.stake),
+      balance_after: null,
+      coupon_id: coupon.id,
+      occurred_at: coupon.created_at || occurredAt,
+      note: `Stawka kuponu ${coupon.name}`,
+    });
+  }
+
+  const payout = couponPayout(coupon.stake, legs);
+  const settled = coupon.status !== "pending" && coupon.status !== "cancelled";
+  const shouldReturn = settled && payout != null && payout > 0 && coupon.status !== "lost";
+
+  if (shouldReturn) {
+    const row = {
+      transaction_type: "return" as const,
+      amount: payout,
+      balance_after: null,
+      coupon_id: coupon.id,
+      occurred_at: occurredAt,
+      note: `Automatyczne rozliczenie MONEYBALL: ${coupon.name}`,
+    };
+    if (returnTx) await updateRow("bankroll_transactions", returnTx.id, row);
+    else returnTx = await insertRow("bankroll_transactions", row);
+  } else if (returnTx) {
+    await deleteRow("bankroll_transactions", returnTx.id);
+  }
+
+  const updated = await fetchAll("bankroll_transactions");
+  let balance = 0;
+  for (const tx of [...updated].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))) {
+    balance = Math.round((balance + signedAmount(tx)) * 100) / 100;
+    if (tx.balance_after !== balance) await updateRow("bankroll_transactions", tx.id, { balance_after: balance });
   }
 }
 
@@ -112,6 +159,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
         const status = couponStatus(couponLegs.map((leg) => leg.status));
         if (coupon.status !== status) changedCoupons++;
         await refreshCouponTotals(coupon, couponLegs, status, now);
+        await reconcileCouponLedger(coupon, couponLegs, now);
       }
       return { changedPredictions: affected.length, changedCoupons, verified: false };
     }
@@ -131,7 +179,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
       await updateRow("predictions", prediction.id, {
         settlement_status: status,
         verified: true,
-        stake: Number(prediction.stake ?? 5),
+        stake: Number(prediction.stake ?? 4),
         potential_return: prediction.odds != null && Number(prediction.odds) > 1
           ? Math.round(Number(prediction.stake ?? 5) * Number(prediction.odds) * 100) / 100
           : null,
@@ -175,6 +223,7 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
     const status = couponStatus(couponLegs.map((leg) => leg.status));
     if (coupon.status !== status) changedCoupons++;
     await refreshCouponTotals(coupon, couponLegs, status, now);
+    await reconcileCouponLedger(coupon, couponLegs, now);
   }
 
   return { changedPredictions, changedCoupons, verified: true };
