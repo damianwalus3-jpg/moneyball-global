@@ -319,6 +319,74 @@ export function probabilityQuality(
 }
 
 
+export interface Multiclass1X2QualitySummary {
+  sample: number;
+  brier: number | null;
+  logLoss: number | null;
+  averageProbability: Record<"1" | "X" | "2", number> | null;
+  observedRate: Record<"1" | "X" | "2", number> | null;
+  meanProbabilitySum: number | null;
+}
+
+/**
+ * Full three-class Brier/log-loss. A sample is included only when one match
+ * has exactly one verified, settled forecast for each of 1/X/2 and exactly
+ * one outcome is marked won. Incomplete or contradictory matches are omitted.
+ */
+export function multiclass1X2Quality(
+  predictions: Pick<Prediction, "match_id" | "market" | "selection" | "probability" | "settlement_status" | "verified">[],
+): Multiclass1X2QualitySummary {
+  const empty: Multiclass1X2QualitySummary = {
+    sample: 0, brier: null, logLoss: null, averageProbability: null, observedRate: null, meanProbabilitySum: null,
+  };
+  const groups = new Map<string, typeof predictions>();
+  for (const row of predictions) {
+    if (row.market !== "1X2" || !["1", "X", "2"].includes(row.selection)) continue;
+    const group = groups.get(row.match_id) ?? [];
+    group.push(row);
+    groups.set(row.match_id, group);
+  }
+  const totals = { "1": 0, X: 0, "2": 0 };
+  const observed = { "1": 0, X: 0, "2": 0 };
+  let brier = 0;
+  let logLoss = 0;
+  let probabilitySum = 0;
+  let sample = 0;
+  for (const group of groups.values()) {
+    if (group.length !== 3 || group.some((row) =>
+      !row.verified ||
+      (row.settlement_status !== "won" && row.settlement_status !== "lost") ||
+      row.probability == null ||
+      !Number.isFinite(Number(row.probability)) ||
+      Number(row.probability) < 0 ||
+      Number(row.probability) > 100
+    )) continue;
+    const bySelection = new Map(group.map((row) => [row.selection, row]));
+    if (bySelection.size !== 3 || !["1", "X", "2"].every((key) => bySelection.has(key as "1" | "X" | "2"))) continue;
+    const sum = (["1", "X", "2"] as const).reduce((total, key) => total + Number(bySelection.get(key)!.probability), 0);
+    if (Math.abs(sum - 100) > 1) continue;
+    const winners = (["1", "X", "2"] as const).filter((key) => bySelection.get(key)!.settlement_status === "won");
+    if (winners.length !== 1) continue;
+    const actual = winners[0];
+    let matchBrier = 0;
+    for (const key of ["1", "X", "2"] as const) {
+      const p = Number(bySelection.get(key)!.probability) / 100;
+      const y = key === actual ? 1 : 0;
+      matchBrier += (p - y) ** 2;
+      totals[key] += p;
+      observed[key] += y;
+    }
+    brier += matchBrier;
+    logLoss -= Math.log(Math.max(1e-6, Number(bySelection.get(actual)!.probability) / 100));
+    probabilitySum += sum;
+    sample++;
+  }
+  if (!sample) return empty;
+  const averageProbability = { "1": totals["1"] / sample, X: totals.X / sample, "2": totals["2"] / sample };
+  const observedRate = { "1": observed["1"] / sample, X: observed.X / sample, "2": observed["2"] / sample };
+  return { sample, brier: brier / sample, logLoss: logLoss / sample, averageProbability, observedRate, meanProbabilitySum: probabilitySum / sample };
+}
+
 export function probabilityQualityBySelection(
   predictions: Pick<Prediction, "probability" | "settlement_status" | "verified" | "selection">[],
 ): (ProbabilityQualitySummary & { selection: Selection })[] {
