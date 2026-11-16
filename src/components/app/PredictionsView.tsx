@@ -1,11 +1,12 @@
 import { ChevronDown, ChevronUp, Pencil, Plus, Target } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDelete, EmptyState, PageHeader, SelectionBadge, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { PredictionForm } from "@/components/forms/PredictionForm";
-import { deleteRow, updateRow } from "@/lib/db";
-import { hitRate, impliedProbability, isActivePredictionVersion, MARKET_LABELS, PICK_LABELS } from "@/lib/domain";
+import { deleteRow, fetchPredictionsPage, updateRow, type PredictionPageCursor } from "@/lib/db";
+import { impliedProbability, MARKET_LABELS, PICK_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -67,7 +68,6 @@ function oddsFreshnessLabel(coverage?: Record<string, unknown> | null) {
 
 export function PredictionsView({ market }: { market: Market }) {
   const matches = useTable("matches");
-  const all = useTable("predictions");
   const couponLegs = useTable("coupon_legs");
   const [verdictFilter, setVerdictFilter] = useState<"all" | "WYBRANY" | "ODRZUCONY">("all");
   const [modelScope, setModelScope] = useState<"current" | "all">("current");
@@ -76,29 +76,29 @@ export function PredictionsView({ market }: { market: Market }) {
   const [open, setOpen] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const byId = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
-  const visible = modelScope === "all"
-    ? all
-    : all.filter((prediction) => isActivePredictionVersion(prediction.model_version));
-  const list = visible
-    .filter((prediction) => prediction.market === market)
-    .filter((prediction) => verdictFilter === "all" || prediction.verdict === verdictFilter)
-    .filter((prediction) => {
-      const match = byId.get(prediction.match_id);
-      return !query || `${matchLabel(match)} ${match?.competition ?? ""} ${match?.country ?? ""}`.toLowerCase().includes(query.toLowerCase());
-    })
-    .sort((a, b) => {
-      const aMatch = byId.get(a.match_id);
-      const bMatch = byId.get(b.match_id);
-      return (bMatch?.kickoff_at ?? bMatch?.kickoff_date ?? "").localeCompare(aMatch?.kickoff_at ?? aMatch?.kickoff_date ?? "");
-    });
-  const settledSelected = visible.filter(
-    (prediction) =>
-      prediction.market === market &&
-      prediction.verdict === "WYBRANY" &&
-      prediction.verified &&
-      (prediction.settlement_status === "won" || prediction.settlement_status === "lost"),
+  const pageQuery = useInfiniteQuery({
+    queryKey: ["prediction-pages", market, modelScope, verdictFilter, query],
+    queryFn: ({ pageParam }) => fetchPredictionsPage({
+      market,
+      modelScope,
+      verdict: verdictFilter,
+      search: query,
+      cursor: pageParam,
+    }),
+    initialPageParam: null as PredictionPageCursor | null,
+    getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor ?? undefined : undefined,
+    staleTime: 45_000,
+    gcTime: 600_000,
+    refetchOnWindowFocus: true,
+  });
+  const list = useMemo(
+    () => pageQuery.data?.pages.flatMap((page) => page.rows) ?? [],
+    [pageQuery.data],
   );
-  const rate = hitRate(settledSelected.map((prediction) => prediction.settlement_status));
+  const stats = pageQuery.data?.pages[0];
+  const rate = stats && stats.settled > 0
+    ? { rate: (stats.won / stats.settled) * 100, won: stats.won, settled: stats.settled }
+    : { rate: null, won: 0, settled: 0 };
   const toggle = useAction((prediction: Prediction) =>
     updateRow("predictions", prediction.id, {
       verdict: prediction.verdict === "ODRZUCONY" ? "WYBRANY" : "ODRZUCONY",
@@ -121,12 +121,12 @@ export function PredictionsView({ market }: { market: Market }) {
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Skuteczność WYBRANE" value={fmtPct(rate.rate)} hint={`${rate.won}/${rate.settled} zweryfikowanych`} tone="primary" />
         <StatCard label="Rozliczone" value={rate.settled} />
-        <StatCard label="Oczekujące" value={list.filter((prediction) => prediction.settlement_status === "pending").length} />
-        <StatCard label="Wszystkie" value={list.length} />
+        <StatCard label="Oczekujące" value={stats?.pending_count ?? 0} />
+        <StatCard label="Wszystkie" value={stats?.total_count ?? 0} />
       </div>
       <div className="mb-2 flex flex-wrap gap-2">
         <Button size="sm" variant={modelScope === "current" ? "default" : "outline"} onClick={() => setModelScope("current")}>Aktywny model</Button>
-        <Button size="sm" variant={modelScope === "all" ? "default" : "outline"} onClick={() => setModelScope("all")}>Wszystkie wersje ({all.length})</Button>
+        <Button size="sm" variant={modelScope === "all" ? "default" : "outline"} onClick={() => setModelScope("all")}>Wszystkie wersje</Button>
       </div>
       <div className="mb-4 flex flex-wrap gap-2">
         {(["all", "WYBRANY", "ODRZUCONY"] as const).map((verdict) => (
@@ -136,7 +136,14 @@ export function PredictionsView({ market }: { market: Market }) {
         ))}
         <Input placeholder="Szukaj…" value={query} onChange={(event) => setQuery(event.target.value)} className="h-8 max-w-xs" />
       </div>
-      {list.length === 0 ? (
+      {pageQuery.isPending ? (
+        <div className="surface-card p-6 text-center text-sm text-muted-foreground">Ładowanie prognoz…</div>
+      ) : pageQuery.isError ? (
+        <div className="surface-card flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+          <span className="text-destructive">Nie udało się pobrać prognoz: {pageQuery.error.message}</span>
+          <Button size="sm" variant="outline" onClick={() => pageQuery.refetch()}>Spróbuj ponownie</Button>
+        </div>
+      ) : list.length === 0 ? (
         <EmptyState icon={Target} title="Brak prognoz" description={matches.length === 0 ? "Najpierw dodaj mecze lub zaimportuj skan w Terminarzu." : "Dodaj prognozę lub zmień filtry."} />
       ) : (
         <div className="grid gap-2">
@@ -235,6 +242,13 @@ export function PredictionsView({ market }: { market: Market }) {
               </div>
             );
           })}
+          {pageQuery.hasNextPage && (
+            <div className="flex justify-center py-3">
+              <Button variant="outline" onClick={() => pageQuery.fetchNextPage()} disabled={pageQuery.isFetchingNextPage}>
+                {pageQuery.isFetchingNextPage ? "Wczytywanie…" : "Wczytaj kolejne 50"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
       <PredictionForm open={open} onOpenChange={setOpen} market={market} prediction={editing} matches={matches} />
