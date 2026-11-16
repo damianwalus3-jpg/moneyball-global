@@ -181,7 +181,7 @@ function Kupony() {
             <Input value={namePrefix} onChange={(event) => setNamePrefix(event.target.value)} />
           </Field>
           <Field label="Stawka na kupon (EUR)" htmlFor="coupon-stake" error={stakeError || undefined}>
-            <Input id="coupon-stake" inputMode="decimal" className="num" value={stake} onChange={(event) => setStake(event.target.value)} />
+            <Input id="coupon-stake" inputMode="decimal" className="num" value={stake} disabled onChange={(event) => setStake(event.target.value)} />
           </Field>
         </div>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
