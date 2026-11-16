@@ -221,20 +221,36 @@ async function fetchRawAllUncached<K extends TableName>(table: K, uid: string): 
     const rangeRows: TableRows[K][] = [];
     let lastId: string | null = null;
     for (;;) {
-      let query = sb
-        .from(table)
-        .select(columns)
-        .eq(OWNER_COLUMN, uid)
-        .gte("id", range.lower)
-        .order("id", { ascending: true })
-        .limit(PAGE);
-      if (range.upper) query = query.lt("id", range.upper);
-      if (lastId) query = query.gt("id", lastId);
-      const result = await query;
-      if (result.error) throw new Error(humanizeError(result.error, table));
-      const pageRows = (result.data ?? []) as unknown as TableRows[K][];
+      // Start with a small indexed page. If Postgres still cancels a statement
+      // under load, retry the exact same cursor with a smaller page; never skip
+      // or duplicate rows and never restart the entire history download.
+      let pageSize = PAGE;
+      let pageRows: TableRows[K][] | null = null;
+      for (;;) {
+        let query = sb
+          .from(table)
+          .select(columns)
+          .eq(OWNER_COLUMN, uid)
+          .gte("id", range.lower)
+          .order("id", { ascending: true })
+          .limit(pageSize);
+        if (range.upper) query = query.lt("id", range.upper);
+        if (lastId) query = query.gt("id", lastId);
+        const result = await query;
+        if (!result.error) {
+          pageRows = (result.data ?? []) as unknown as TableRows[K][];
+          break;
+        }
+        const timedOut =
+          result.error.code === "57014" ||
+          /statement timeout|canceling statement/i.test(result.error.message ?? "");
+        if (!timedOut || pageSize <= 50) {
+          throw new Error(humanizeError(result.error, table));
+        }
+        pageSize = Math.max(50, Math.floor(pageSize / 2));
+      }
       rangeRows.push(...pageRows);
-      if (pageRows.length < PAGE) break;
+      if (pageRows.length < pageSize) break;
       const nextId = (pageRows[pageRows.length - 1] as { id?: unknown })?.id;
       if (typeof nextId !== "string" || nextId === lastId) {
         throw new Error("Nie udało się bezpiecznie stronicować tabeli " + table + " po identyfikatorze.");
@@ -243,7 +259,12 @@ async function fetchRawAllUncached<K extends TableName>(table: K, uid: string): 
     }
     return rangeRows;
   };
-  const partitions = await Promise.all(ranges.map(readRange));
+  // Keep database concurrency bounded. Four simultaneous large-table scans
+  // previously competed for Postgres resources and caused statement timeouts.
+  const partitions: TableRows[K][][] = [];
+  for (let i = 0; i < ranges.length; i += 2) {
+    partitions.push(...(await Promise.all(ranges.slice(i, i + 2).map(readRange))));
+  }
   for (const partition of partitions) rows.push(...partition);
   rows.sort((a, b) => String((a as { id: string }).id).localeCompare(String((b as { id: string }).id)));
   return rows;
