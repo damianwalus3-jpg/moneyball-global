@@ -190,7 +190,7 @@ function Panel() {
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <div className="rounded-lg border border-border bg-card/60 p-2"><p className="text-xs text-muted-foreground">Prawdopodobieństwo modelu</p><p className="num text-lg font-bold">{prediction.probability == null ? "—" : `${Number(prediction.probability).toFixed(1)}%`}</p></div>
                     <div className="rounded-lg border border-border bg-card/60 p-2"><p className="text-xs text-muted-foreground">Kurs zapisany przy typie</p><p className="num text-lg font-bold">{fmtOdds(prediction.odds)}</p></div>
-                    <div className="rounded-lg border border-border bg-card/60 p-2"><p className="text-xs text-muted-foreground">Pewność modelu</p><p className="text-base font-bold">{prediction.confidence ?? "Nie zapisana"}</p></div>
+                    <div className="rounded-lg border border-border bg-card/60 p-2"><p className="text-xs text-muted-foreground">Pokrycie danych (0–100)</p><p className="text-base font-bold">{prediction.confidence ?? "Nie zapisana"}</p></div>
                     <div className="rounded-lg border border-border bg-card/60 p-2"><p className="text-xs text-muted-foreground">Wynik meczu</p><p className="text-base font-bold">{score ?? (match.status === "finished" ? "Brak wyniku" : "Oczekuje")}</p></div>
                   </div>
                   <div className="mt-3 rounded-lg border border-primary/35 bg-primary/5 p-3">
