@@ -113,6 +113,12 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Macedonia", "Second League")).toBe(true);
     expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga 2")).toBe(true);
+    // Domestic tier-one/two only: reject international competitions and French National divisions.
+    expect(isEuropeanTopTwoLeague("World", "UEFA Nations League")).toBe(false);
+    expect(isEuropeanTopTwoLeague("World", "UEFA Champions League")).toBe(false);
+    expect(isEuropeanTopTwoLeague("France", "National 2 - Group C")).toBe(false);
+    expect(isEuropeanTopTwoLeague("France", "National 3 - Group C")).toBe(false);
+    expect(isEuropeanTopTwoLeague("France", "Ligue 2")).toBe(true);
     expect(isEuropeanTopTwoLeague("TUR", "2. Lig")).toBe(false);
     expect(isEuropeanTopTwoLeague("DNK", "2. Division")).toBe(false);
     expect(isEuropeanTopTwoLeague("SWE", "Division 1")).toBe(false);
