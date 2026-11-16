@@ -5,7 +5,7 @@ import { ensureTables } from "@/lib/queries";
 
 export const Route = createFileRoute("/_authenticated/prognozy-gole")({
   head: () => ({ meta: [{ title: "Prognozy goli — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Prognozy rynku goli: over/under i BTTS." }] }),
-  loader: ({ context }) => ensureTables(context.queryClient, ["matches", "predictions"]),
+  loader: ({ context }) => ensureTables(context.queryClient, ["matches", "predictions", "coupon_legs"]),
   pendingComponent: PageLoader,
   errorComponent: DataError,
   component: () => <PredictionsView market="GOALS" />,
