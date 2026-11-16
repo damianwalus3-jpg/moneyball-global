@@ -236,21 +236,37 @@ async function processFixture(f:any,m:any,source="FootyNomad",externalId?:string
  const processStarted=Date.now();
  const result=outcome(f.home_score,f.away_score),now=new Date().toISOString();
  const old=await db("match_results?select=id&match_id=eq."+m.id);
- const row={owner_id:m.owner_id,home_score:f.home_score,away_score:f.away_score,home_goals:f.home_score,away_goals:f.away_score,outcome_1x2:result,verified:true,source,finished_at:m.kickoff_at||now,verified_at:now,settled_at:now};
- if(old?.length)await db("match_results?id=eq."+old[0].id,"PATCH",row);else await db("match_results","POST",{match_id:m.id,...row});
+ const resultRow={owner_id:m.owner_id,home_score:f.home_score,away_score:f.away_score,home_goals:f.home_score,away_goals:f.away_score,outcome_1x2:result,verified:true,source,finished_at:m.kickoff_at||now,verified_at:now,settled_at:now};
+ if(old?.length)await db("match_results?id=eq."+old[0].id,"PATCH",resultRow);else await db("match_results","POST",{match_id:m.id,...resultRow});
  await saveSourceObservation(m,{source,external_id:String(externalId||f.external_id||""),home:m.home_team,away:m.away_team,home_score:f.home_score,away_score:f.away_score,status:"finished",date:m.kickoff_at||now,url:f.url||f.source_url||(source==="FootyNomad"?"https://footynomad.com/fixture/"+String(externalId||f.external_id||""):""),raw:f});
  await db("matches?id=eq."+m.id,"PATCH",{status:"finished",updated_at:now});
  const preds=await db("predictions?select=id,market,selection,prediction_type,pick,verdict,stake,odds&match_id=eq."+m.id);
- let settled=0,legsSettled=0;const touched=new Set<string>();
+ const settledRows:any[]=[];
  for(const p of preds||[]){
   const selection=String(p.selection||p.pick||"").trim(),market=String(p.market||"").toUpperCase();
   const isWon=market==="GOALS"?goalsWon(selection,Number(f.home_score),Number(f.away_score)):won(selection,result);
   if(isWon===null)continue;
-  const status=isWon?"won":"lost",selected=String(p.verdict||"").toUpperCase()==="WYBRANY",stake=Number(p.stake??4),odds=p.odds==null?null:Number(p.odds);
-  const financial=selected?{stake,potential_return:odds!=null&&odds>1?Math.round(stake*odds*100)/100:null,profit_loss:isWon?(odds!=null&&odds>1?Math.round(stake*(odds-1)*100)/100:null):-stake}:{};
-  await db("predictions?id=eq."+p.id,"PATCH",{settlement_status:status,result_status:status,verified:true,settled_at:now,...financial});settled++;
-  const linked=await db("coupon_legs?select=id,coupon_id&prediction_id=eq."+p.id);
-  for(const leg of linked||[]){await db("coupon_legs?id=eq."+leg.id,"PATCH",{status,result_status:status});legsSettled++;touched.add(String(leg.coupon_id));}
+  settledRows.push({p,status:isWon?"won":"lost"});
+ }
+ const wonIds=settledRows.filter(x=>x.status==="won").map(x=>x.p.id);
+ const lostIds=settledRows.filter(x=>x.status==="lost").map(x=>x.p.id);
+ if(wonIds.length)await db("predictions?id=in.("+wonIds.join(",")+")","PATCH",{settlement_status:"won",result_status:"won",verified:true,settled_at:now});
+ if(lostIds.length)await db("predictions?id=in.("+lostIds.join(",")+")","PATCH",{settlement_status:"lost",result_status:"lost",verified:true,settled_at:now});
+ const selectedRows=settledRows.filter(x=>String(x.p.verdict||"").toUpperCase()==="WYBRANY");
+ for(const x of selectedRows){
+  const p=x.p,stake=Number(p.stake??4),odds=p.odds==null?null:Number(p.odds);
+  const financial={stake,potential_return:odds!=null&&odds>1?Math.round(stake*odds*100)/100:null,profit_loss:x.status==="won"?(odds!=null&&odds>1?Math.round(stake*(odds-1)*100)/100:null):-stake};
+  await db("predictions?id=eq."+p.id,"PATCH",financial);
+ }
+ const predictionIds=settledRows.map(x=>String(x.p.id));
+ const linked=predictionIds.length?await db("coupon_legs?select=id,coupon_id,prediction_id&prediction_id=in.("+predictionIds.join(",")+")"):[];
+ const touched=new Set<string>();
+ for(const x of settledRows){
+  for(const leg of (linked||[]).filter((l:any)=>String(l.prediction_id)===String(x.p.id)))touched.add(String(leg.coupon_id));
+ }
+ for(const status of ["won","lost"]){
+  const ids=(linked||[]).filter((l:any)=>settledRows.some(x=>String(x.p.id)===String(l.prediction_id)&&x.status===status)).map((l:any)=>String(l.id));
+  if(ids.length)await db("coupon_legs?id=in.("+ids.join(",")+")","PATCH",{status,result_status:status});
  }
  for(const couponId of touched){
   const all=await db("coupon_legs?select=status&coupon_id=eq."+couponId),statuses=(all||[]).map((x:any)=>x.status);
@@ -258,8 +274,9 @@ async function processFixture(f:any,m:any,source="FootyNomad",externalId?:string
   await db("coupons?id=eq."+couponId,"PATCH",{status:cs,settled_at:cs==="pending"?null:now});
   await reconcileCouponMoney(couponId,now);
  }
- console.log("[moneyball-results-sync] processFixture",JSON.stringify({matchId:m.id,predictions:preds?.length||0,settled,legsSettled,durationMs:Date.now()-processStarted}));
- return {settled,legsSettled};
+ const legsSettled=(linked||[]).length;
+ console.log("[moneyball-results-sync] processFixture",JSON.stringify({matchId:m.id,predictions:preds?.length||0,settled:settledRows.length,legsSettled,coupons:touched.size,durationMs:Date.now()-processStarted}));
+ return {settled:settledRows.length,legsSettled};
 }
 
 async function reconcileRescheduledMatches(ownerId:string|null=null){
