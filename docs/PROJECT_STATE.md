@@ -262,3 +262,36 @@ A follow-up read-only query shows the application does have fresh non-odds enric
 
 ### Audit ledger commit
 - `42d529e1597195054a43f3c0d3b4b84d10ad581d` — expanded provider, source, and production findings recorded in this file. Documentation-only commit; no production code, migrations, or data were changed in that commit.
+
+
+## Google Play and bookmaker odds-ingestion benchmark — 2026-11-16
+
+### Apps reviewed (public Play Store descriptions)
+- OddsMax (Google Play): advertises real-time comparison across 40+ bookmakers, multiple market types, accumulators and price-change updates. The listing does not disclose the upstream provider/API, bookmaker-by-bookmaker Belgian coverage, or a reproducible technical ingestion method. Treat it as a UX/product benchmark, not evidence of a reusable API. https://play.google.com/store/apps/details?id=com.oddsmax.app
+- OddScore (Google Play): focuses on odds movement, implied-probability changes, consensus and gaps between bookmakers, with 1X2 and O/U depending on competition. Its listing does not identify its upstream feed. Useful benchmark for storing timestamped price history and displaying movement, not a source to scrape blindly. https://play.google.com/store/apps/details?id=io.oddscore.app
+- BetSport AI (Google Play): listing describes five-bookmaker comparison for the same match/market, bookmaker margin calculation, line movement and multiple bet builder; free tier delayed, VIP real-time. It does not publish the underlying feed/API in the listing. Useful design benchmark: compare like-for-like markets, compute overround, show freshness and distinguish delayed from real-time. https://play.google.com/store/apps/details?id=com.betsportai.app
+- PureStats (Google Play): describes fair odds vs model odds, closing-line value (CLV), ROI and forward-tested league expansion. Useful benchmark for CLV/ROI tracking and transparent validation; listing does not disclose an odds ingestion API. https://play.google.com/store/apps/details?id=com.purestats.app
+- Odds Comparison (Google Play): generic all-bookmaker comparison listing; no upstream data method or Belgian bookmaker-level guarantees disclosed. https://play.google.com/store/apps/details?id=com.oddscompare.app
+- Soccer Odds (Google Play): claims odds tracking from legal sportsbooks and alerts; provider/API is not disclosed in its public listing. https://play.google.com/store/apps/details?id=com.soccerodds.app
+
+### Bookmaker / aggregator feed findings
+- The Odds API V4 documents a normal server-side REST pull: discover sports, request `/v4/sports/{sport}/odds` with region and market, receive event/bookmaker/market/outcome price objects, poll according to the provider's update cadence and credit budget. This is the cleanest documented multi-bookmaker adapter candidate. https://the-odds-api.com/liveapi/guides/v4/
+- Its currently published EU book list includes 1xBet, 888sport, Betfair Exchange, Betsson, BetVictor, Coolbet, Marathonbet, Matchbook, NordicBet, Pinnacle, Tipico, Unibet France/Netherlands/Sweden, William Hill and Winamax France/Germany. The list does NOT currently establish Belgian-licensed Bwin BE, Unibet BE, Ladbrokes BE, Circus or betFIRST availability. Do not silently substitute a different jurisdiction's bookmaker as a Belgian quote. https://the-odds-api.com/sports-odds-data/bookmaker-apis.html
+- The Odds API says its odds endpoint is near-real-time, with documented maximum latency of 2 minutes pre-match and 40 seconds in-play. This must be treated as vendor-stated latency, not independently measured MONEYBALL latency. https://the-odds-api.com/sports-odds-data/bets-api
+- API-Football official docs: pre-match odds are available 1–14 days before kickoff, refreshed every 3 hours, with 7-day history; availability varies by league, season, fixture and bookmaker. In-play odds refresh 5–60 seconds and are removed after matches finish. This is a possible complementary feed but too slow for a strict real-time best-price display and still requires an API key. https://www.api-football.com/documentation-v3
+- bet365 does not publish a general public odds API; third-party relays such as MoviOdds are the supported practical pattern when properly licensed/authorized. Do not copy undocumented mobile-app/private bookmaker endpoints, bypass anti-bot controls, reuse app session tokens, or scrape logged-in accounts. Such methods are fragile, may violate terms, and cannot be treated as stable provider integrations. MoviOdds public comparison: https://moviodds.com/bet365-odds-api-providers/
+
+### Reusable methods to adopt (not proprietary code or private endpoints)
+1. Multi-bookmaker fan-out behind one server-side provider interface; no API keys in browser/mobile code.
+2. Pull sports/competitions once and cache provider metadata; poll only eligible current-day fixtures, batch requests and respect quotas.
+3. Normalize provider event identity by home/away, competition, gender and kickoff; require strict match confidence and prevent one provider fixture from binding to multiple app fixtures.
+4. Normalize markets/outcomes into canonical keys (1X2, DC, BTTS, O/U with exact line); never merge different handicap lines or market types.
+5. Persist every price observation with provider, bookmaker, region/jurisdiction, event ID, market/outcome, decimal price, source timestamp, retrieval timestamp, suspended/live flag and raw payload.
+6. Maintain append-only history for line movement/CLV; update latest quote separately. Compute bookmaker overround only from a complete mutually exclusive market set, and remove vig before comparing fair probabilities.
+7. UI must label quote freshness (live/delayed/stale/missing), provider and jurisdiction; never show a delayed/old quote as live.
+8. Predictions remain recorded without odds. Coupon eligibility requires a fresh, unsuspended, pre-match price from an approved bookmaker/jurisdiction.
+9. Health metrics: provider request success, quota/credits, fixture match rate, market mapping rate, quote age percentiles, bookmaker coverage and missing-price ratio.
+
+### Decision and blocker
+The best safe next technical candidate is a provider adapter for The Odds API, tested side-by-side against MoviOdds on the exact same current-day eligible fixtures. However, its published EU bookmaker list does not demonstrate Belgian licensed bookmaker coverage, and its endpoint requires an API key. The Play Store listings do not reveal their private data vendors or endpoint methods. No legitimate technical basis exists to clone their undisclosed internal scraper or API. We can reproduce the public, documented architecture and UX patterns instead.
+No new odds provider was activated in this audit; no key was supplied and no real fixture-level authenticated test was possible. No new app code or production data was changed in this research pass.
