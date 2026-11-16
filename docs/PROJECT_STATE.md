@@ -329,3 +329,19 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - The Odds API adapter is not deployed. Do not claim multi-bookmaker live comparison is active.
 - Coupon creation still needs an end-to-end audit to ensure every leg requires an explicitly CONFIRMED, fresh, pre-match price; the trigger hardening alone does not certify every coupon UI path.
 - The migration and UI commits are separate. No new live odds were ingested during this change because the feed has no credential.
+
+
+## Coupon odds eligibility hardening — 2026-11-16
+
+- Added `hasFreshConfirmedOdds()` in `src/lib/domain.ts`: requires odds > 1, explicit source and captured timestamp, age 0–6h, pre-match phase, and no suspended/stale/missing status.
+- `saveCouponBatch()` now independently blocks MAIN/MEGA/EXTRA coupons if any leg lacks a fresh confirmed price. This is enforced in the save service, not only by a disabled button.
+- Coupon preview now uses the same freshness predicate; stale or unsourced numeric odds are treated as missing for real coupon readiness. TEST coupons remain available for model-only simulation.
+- Added unit tests for fresh, stale, suspended, in-play, missing-source/time, future timestamp and manual-source quotes.
+- Commits: `66820efc26653cec9b1d0b94ae7140f3ff23056a` (domain helper), `46ce18e045c41f088d8756f7ee6bc7706d192ca0` (save guard), `808d2ed690bff0847737772004cde44bad907f9b` (coupon UI), `507d34db3868ccaf113cda064bc1a899a8648875` (tests).
+- Migration file added to repository: `supabase/migrations/20261116134409_harden_provider_odds_prediction_sync.sql`, commit `c845958e6acdd4b76fdc32fb6df1516306402919`. The same migration is recorded in Supabase migration history as version `20261116134409`.
+
+### Validation state
+- Database trigger behavior was exercised with a temporary quote and the original prediction values restored; no test quote remains.
+- Unit tests and TypeScript/build have not yet been observed passing in GitHub Actions in this session.
+- Vercel status checks on the recent UI commits report `failure` with `build-rate-limit`; this is a Vercel account/build quota issue, not a verified source compilation error. Do not claim the Vercel deployment has completed.
+- Latest source data query still finds zero fresh mapped prematch odds; a valid provider credential and successful feed sync are still required before real coupon prices can appear.
