@@ -723,7 +723,7 @@ function Mecze() {
                                     return (
                                       <div className="mt-3 grid gap-3">
                                         <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-                                          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{rejected ? "Dlaczego typ odrzucono" : "Dlaczego model wybrał ten typ"}</div>
+                                          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{rejected ? "Dlaczego typ odrzucono" : "Dlaczego taka prognoza? · w skrócie"}</div>
                                           <p className="text-sm leading-relaxed">{reason}</p>
                                           {rejected && p.rejection_reason && (
                                             <div className="mt-2 rounded-md border border-amber-500/25 bg-amber-500/5 p-2">
