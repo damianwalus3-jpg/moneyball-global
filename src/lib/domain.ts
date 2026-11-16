@@ -265,6 +265,78 @@ export function validateBatch(coupons: { match_id: string; probability: number |
   return errors;
 }
 
+export interface ProbabilityQualitySummary {
+  sample: number;
+  brier: number | null;
+  logLoss: number | null;
+  averageProbability: number | null;
+  observedRate: number | null;
+  calibrationGap: number | null;
+}
+
+/**
+ * Binary proper-scoring diagnostics for settled, verified event forecasts.
+ * This is not a full three-class 1X2 score: it evaluates the probability of
+ * the recorded selection (e.g. home win, 1X, Over 2.5) as a yes/no event.
+ */
+export function probabilityQuality(
+  predictions: Pick<Prediction, "probability" | "settlement_status" | "verified">[],
+): ProbabilityQualitySummary {
+  const rows = predictions.filter((prediction) => {
+    const probability = Number(prediction.probability);
+    return prediction.verified &&
+      (prediction.settlement_status === "won" || prediction.settlement_status === "lost") &&
+      prediction.probability != null &&
+      Number.isFinite(probability) && probability >= 0 && probability <= 100;
+  });
+  if (rows.length === 0) {
+    return { sample: 0, brier: null, logLoss: null, averageProbability: null, observedRate: null, calibrationGap: null };
+  }
+  const epsilon = 1e-6;
+  let brier = 0;
+  let logLoss = 0;
+  let probabilitySum = 0;
+  let wins = 0;
+  for (const row of rows) {
+    const p = Number(row.probability) / 100;
+    const actual = row.settlement_status === "won" ? 1 : 0;
+    const clipped = Math.min(1 - epsilon, Math.max(epsilon, p));
+    brier += (p - actual) ** 2;
+    logLoss -= actual * Math.log(clipped) + (1 - actual) * Math.log(1 - clipped);
+    probabilitySum += p;
+    wins += actual;
+  }
+  const averageProbability = probabilitySum / rows.length;
+  const observedRate = wins / rows.length;
+  return {
+    sample: rows.length,
+    brier: brier / rows.length,
+    logLoss: logLoss / rows.length,
+    averageProbability,
+    observedRate,
+    calibrationGap: Math.abs(averageProbability - observedRate),
+  };
+}
+
+
+export function probabilityQualityBySelection(
+  predictions: Pick<Prediction, "probability" | "settlement_status" | "verified" | "selection">[],
+): (ProbabilityQualitySummary & { selection: Selection })[] {
+  const groups = new Map<Selection, typeof predictions>();
+  for (const prediction of predictions) {
+    if (prediction.selection === "—" || !isValidPick(
+      prediction.selection === "1" || prediction.selection === "X" || prediction.selection === "2" ? "1X2"
+        : prediction.selection === "1X" || prediction.selection === "X2" || prediction.selection === "12" ? "DOUBLE_CHANCE" : "GOALS",
+      prediction.selection,
+    )) continue;
+    const selection = prediction.selection;
+    if (!groups.has(selection)) groups.set(selection, []);
+    groups.get(selection)!.push(prediction);
+  }
+  return [...groups.entries()].map(([selection, rows]) => ({ selection, ...probabilityQuality(rows) }))
+    .sort((a, b) => a.selection.localeCompare(b.selection));
+}
+
 export interface HitRate {
   total: number;
   won: number;

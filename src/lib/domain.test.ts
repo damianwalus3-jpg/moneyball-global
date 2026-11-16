@@ -10,6 +10,8 @@ import {
   groupHitRates,
   isCouponCandidate,
   modelHitRate,
+  probabilityQuality,
+  probabilityQualityBySelection,
   isKickoffToday,
   isEuropeanTopTwoLeague,
   stakeBalances,
@@ -81,6 +83,52 @@ describe("pick validation", () => {
     expect(isValidPick(null, "1X")).toBe(false);
     expect(isValidPick("UNKNOWN" as never, "1")).toBe(false);
     expect(isValidPick("1X2", "1")).toBe(true);
+  });
+});
+
+describe("probability quality", () => {
+  it("calculates binary Brier score, log loss and calibration gap on verified settled events", () => {
+    const rows = [
+      { probability: 80, settlement_status: "won", verified: true },
+      { probability: 60, settlement_status: "lost", verified: true },
+      { probability: 99, settlement_status: "won", verified: false },
+      { probability: 40, settlement_status: "void", verified: true },
+    ] as const;
+    const quality = probabilityQuality(rows as never);
+    expect(quality.sample).toBe(2);
+    expect(quality.brier).toBeCloseTo(0.2, 8);
+    expect(quality.logLoss).toBeCloseTo((-Math.log(0.8) - Math.log(0.4)) / 2, 8);
+    expect(quality.averageProbability).toBeCloseTo(0.7, 8);
+    expect(quality.observedRate).toBeCloseTo(0.5, 8);
+    expect(quality.calibrationGap).toBeCloseTo(0.2, 8);
+  });
+
+  it("returns null metrics when there are no verified settled forecasts", () => {
+    expect(probabilityQuality([])).toEqual({
+      sample: 0, brier: null, logLoss: null, averageProbability: null, observedRate: null, calibrationGap: null,
+    });
+  });
+
+  it("rejects out-of-range probabilities", () => {
+    const quality = probabilityQuality([
+      { probability: 120, settlement_status: "won", verified: true },
+    ] as never);
+    expect(quality.sample).toBe(0);
+  });
+});
+
+describe("probability quality by selection", () => {
+  it("keeps selections separate so different markets are not pooled into one misleading score", () => {
+    const rows = [
+      { selection: "1X", probability: 80, settlement_status: "won", verified: true },
+      { selection: "1X", probability: 60, settlement_status: "lost", verified: true },
+      { selection: "X2", probability: 70, settlement_status: "won", verified: true },
+      { selection: "—", probability: 99, settlement_status: "won", verified: true },
+    ] as const;
+    const grouped = probabilityQualityBySelection(rows as never);
+    expect(grouped).toHaveLength(2);
+    expect(grouped.find((row) => row.selection === "1X")?.sample).toBe(2);
+    expect(grouped.find((row) => row.selection === "X2")?.sample).toBe(1);
   });
 });
 
