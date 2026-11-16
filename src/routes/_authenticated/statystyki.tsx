@@ -85,7 +85,7 @@ function Statystyki() {
       <PageHeader
         eyebrow="Aktywny model 3.8 · 1X2, DC i gole osobno"
         title="Statystyki"
-        description="Statystyki pokazują aktywny model i wpisy ręczne; stare wersje pozostają w historii. Skuteczność = wygrane / (wygrane + przegrane)."
+        description="Statystyki pokazują aktywny model i wpisy ręczne; stare wersje pozostają w historii. Skuteczność = wygrane / (wygrane + przegrane). Double Chance jest obecnie wyliczane z prawdopodobieństw 1X2, a nie trenowane jako niezależny silnik."
       />
 
       <section className="mb-6">
