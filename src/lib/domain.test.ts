@@ -49,7 +49,7 @@ const match = (id: string, kickoff_at = "2026-11-11T20:00:00.000Z") =>
     scan_run_id: null,
     external_id: null,
     source: "test",
-    competition: "Test league",
+    competition: "Belgian Pro League",
     country: "Belgium",
     gender: "men",
     home_team: "Home",
