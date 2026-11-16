@@ -63,12 +63,12 @@ function Statystyki() {
   const settledCoupons = coupons.filter((c) => c.status === "won" || c.status === "lost" || c.status === "void");
   const staked = settledCoupons.filter((c) => c.stake != null);
   const stakeSum = staked.reduce((s, c) => s + Number(c.stake), 0);
-  const payoutSum = staked.reduce(
-    (s, c) => s + (couponPayout(c.stake, legs.filter((l) => l.coupon_id === c.id)) ?? 0),
-    0,
-  );
-  const profit = Math.round((payoutSum - stakeSum) * 100) / 100;
-  const roi = stakeSum > 0 ? Math.round((profit / stakeSum) * 1000) / 10 : null;
+  const couponPayoutRows = staked.map((coupon) => couponPayout(coupon.stake, legs.filter((leg) => leg.coupon_id === coupon.id)));
+  const knownCouponPayouts = couponPayoutRows.filter((value): value is number => value != null);
+  const couponPayoutIncomplete = knownCouponPayouts.length !== staked.length;
+  const payoutSum = knownCouponPayouts.reduce((sum, value) => sum + value, 0);
+  const profit = couponPayoutIncomplete ? null : Math.round((payoutSum - stakeSum) * 100) / 100;
+  const roi = stakeSum > 0 && profit != null ? Math.round((profit / stakeSum) * 1000) / 10 : null;
   const chr = hitRate(settledCoupons.map((c) => c.status));
 
   if (preds.length === 0 && coupons.length === 0)
@@ -107,7 +107,8 @@ function Statystyki() {
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <StatCard label="Skuteczność kuponów" value={fmtPct(chr.rate)} hint={`${chr.won}/${chr.settled}`} tone="primary" />
             <StatCard label="Postawiono (rozliczone)" value={staked.length ? fmtMoney(stakeSum) : "brak danych"} />
-            <StatCard label="Wynik" value={staked.length ? fmtMoney(profit) : "brak danych"} tone={profit < 0 ? "danger" : "default"} />
+            <StatCard label="Zwrot brutto" value={staked.length && !couponPayoutIncomplete ? fmtMoney(payoutSum) : "brak danych"} />
+            <StatCard label="Zysk / strata netto" value={profit != null ? fmtMoney(profit) : "brak danych"} hint={couponPayoutIncomplete ? "Brak kursu w części kuponów — wynik nie jest zgadywany" : "po odjęciu stawek"} tone={profit != null && profit < 0 ? "danger" : "default"} />
             <StatCard label="ROI" value={fmtPct(roi)} hint="tylko kupony ze stawką" />
           </div>
         </section>
