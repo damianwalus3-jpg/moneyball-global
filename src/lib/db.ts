@@ -192,8 +192,11 @@ const READ_COLUMNS: Record<TableName, readonly string[]> = {
   matches: [...COLUMNS.matches, "league", "kickoff_date"],
 };
 
-const PAGE = 250;
-const MAX_PARALLEL_PAGES = 3;
+// Supabase's default PostgREST row cap is 1,000. Fetch at that ceiling and
+// fan out several pages together: large history tables previously needed
+// dozens of sequential 250-row requests, delaying route navigation.
+const PAGE = 1_000;
+const MAX_PARALLEL_PAGES = 6;
 const RAW_CACHE_MS = 45_000;
 const inFlightTableReads = new Map<string, Promise<unknown>>();
 const rawTableCache = new Map<string, { expiresAt: number; rows: unknown[] }>();
