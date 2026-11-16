@@ -11,6 +11,7 @@ import {
   isCouponCandidate,
   modelHitRate,
   isKickoffToday,
+  isEuropeanTopTwoLeague,
   stakeBalances,
   settlePick,
   settleGoalsPick,
@@ -58,6 +59,19 @@ const match = (id: string, kickoff_at = "2026-11-11T20:00:00.000Z") =>
     created_at: "2026-11-10T10:00:00.000Z",
     updated_at: "2026-11-10T10:00:00.000Z",
   }) as Match;
+
+describe("European domestic league scope", () => {
+  it("keeps first and second tiers while excluding cups, youth and lower divisions", () => {
+    expect(isEuropeanTopTwoLeague("England", "Premier League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Greece", "Super League 2")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Ukraine", "Persha Liga")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Kosovo", "Liga E Pare")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Ukraine", "Druha Liga")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Italy", "Serie C - Girone B")).toBe(false);
+    expect(isEuropeanTopTwoLeague("England", "Premier League Cup")).toBe(false);
+    expect(isEuropeanTopTwoLeague("World", "UEFA Nations League")).toBe(false);
+  });
+});
 
 describe("pick validation", () => {
   it("safely rejects missing or unknown market values from legacy rows", () => {
