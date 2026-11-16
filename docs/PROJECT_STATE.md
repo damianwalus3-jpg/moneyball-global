@@ -295,3 +295,37 @@ A follow-up read-only query shows the application does have fresh non-odds enric
 ### Decision and blocker
 The best safe next technical candidate is a provider adapter for The Odds API, tested side-by-side against MoviOdds on the exact same current-day eligible fixtures. However, its published EU bookmaker list does not demonstrate Belgian licensed bookmaker coverage, and its endpoint requires an API key. The Play Store listings do not reveal their private data vendors or endpoint methods. No legitimate technical basis exists to clone their undisclosed internal scraper or API. We can reproduce the public, documented architecture and UX patterns instead.
 No new odds provider was activated in this audit; no key was supplied and no real fixture-level authenticated test was possible. No new app code or production data was changed in this research pass.
+
+
+## Provider-odds hardening deployment — 2026-11-16
+
+### Implemented in production database
+- Applied and recorded Supabase migration `20261116134409_harden_provider_odds_prediction_sync`.
+- Hardened both active provider-odds trigger functions (`apply_provider_odds_to_matching_predictions` and legacy `apply_provider_odds_to_predictions`):
+  - reconcile only exact owner + match + canonical market + canonical selection;
+  - use only unsuspended prematch quotes with decimal odds > 1;
+  - require captured_at within the last six hours and reject future timestamps beyond two minutes;
+  - select the newest valid quote deterministically by captured_at, provider price timestamp, and row ID;
+  - do not overwrite manually entered prices or Bwin-labelled prices;
+  - mark automated quote metadata as CONFIRMED, STALE or SUSPENDED;
+  - clear the automated price only when its own provider quote is no longer eligible, retaining the prediction row.
+- Restricted EXECUTE on both trigger functions to service_role; authenticated and anon cannot call the SECURITY DEFINER trigger functions directly.
+- Existing provider table RLS remains owner-scoped.
+
+### Verified database behavior
+- Ran a controlled integration test against one existing pending prediction: inserted a temporary test quote (2.01), verified the trigger updated the exact matching prediction, deleted the temporary quote, and restored the original prediction fields.
+- Follow-up query confirmed zero leftover `MONEYBALL_TRIGGER_TEST` rows.
+- Confirmed both provider_odds triggers are present and the active trigger function body contains owner, match, market, selection, freshness, prematch and suspension checks.
+- Current live data still contains zero fresh mapped unsuspended prematch provider quotes within six hours. Today's prediction count remains 252, with 142 null odds and zero CONFIRMED quotes. The new guardrails do not manufacture prices; the feed remains blocked by the missing MoviOdds credential.
+- Supabase advisors after migration: no new warning attributed to these trigger functions; existing unrelated findings remain (RLS tables with no policy, mutable search_path on another function, public pg_net extension, pre-existing SECURITY DEFINER grants, leaked-password protection disabled; performance unused-index notices).
+
+### Application UI change
+- `src/components/app/PredictionsView.tsx` now renders explicit odds status labels for CONFIRMED, STALE, SUSPENDED and MISSING, and checks the six-hour freshness window.
+- Commit: `0eea9603164779217c06f5bfd860e36ed10af948`.
+
+### Important remaining blockers
+- No new bookmaker feed can produce live prices until a valid provider credential is configured. Current MoviOdds health remains `key_configured:false`; The Odds API cannot be validated against Belgian licensed books without its own key.
+- The Play Store apps do not publish their private provider APIs; only their public comparison patterns have been adopted.
+- The Odds API adapter is not deployed. Do not claim multi-bookmaker live comparison is active.
+- Coupon creation still needs an end-to-end audit to ensure every leg requires an explicitly CONFIRMED, fresh, pre-match price; the trigger hardening alone does not certify every coupon UI path.
+- The migration and UI commits are separate. No new live odds were ingested during this change because the feed has no credential.
