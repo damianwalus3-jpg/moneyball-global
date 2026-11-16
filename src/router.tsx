@@ -9,10 +9,13 @@ export const getRouter = () => {
   const router = createRouter({
     routeTree,
     context: { queryClient },
+    // Start loading the destination as soon as the user touches/focuses a menu link.
+    defaultPreload: "intent",
+    defaultPreloadDelay: 0,
     scrollRestoration: true,
     // Lets Query own freshness; set caching defaults on the QueryClient, not the router.
     // Keep intent-prefetched routes warm long enough for the next tap.
-    defaultPreloadStaleTime: 30_000,
+    defaultPreloadStaleTime: 120_000,
   });
 
   return router;
