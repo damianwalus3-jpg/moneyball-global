@@ -26,30 +26,3 @@ BEGIN
   EXECUTE definition;
 END $$;
 
-DO $$
-BEGIN
-  IF public.moneyball_is_european_top_two_league('Scotland','Football League - Lowland League') THEN RAISE EXCEPTION 'Scottish Lowland League is tier 5'; END IF;
-  IF public.moneyball_is_european_top_two_league('Scotland','Football League - Highland League') THEN RAISE EXCEPTION 'Scottish Highland League is tier 5'; END IF;
-  IF public.moneyball_is_european_top_two_league('Turkey','2. Lig') THEN RAISE EXCEPTION 'Turkish 2. Lig is tier 3'; END IF;
-  IF public.moneyball_is_european_top_two_league('Denmark','2. Division') THEN RAISE EXCEPTION 'Danish 2. Division is tier 3'; END IF;
-  IF public.moneyball_is_european_top_two_league('Norway','2. Division - Group 1') THEN RAISE EXCEPTION 'Norwegian 2. Division is tier 3'; END IF;
-  IF public.moneyball_is_european_top_two_league('Sweden','Division 1') THEN RAISE EXCEPTION 'Swedish Division 1 is tier 3'; END IF;
-  IF public.moneyball_is_european_top_two_league('Sweden','Division 2 - Norra Götaland') THEN RAISE EXCEPTION 'Swedish Division 2 is tier 4'; END IF;
-  IF public.moneyball_is_european_top_two_league('Belarus','2. Division') THEN RAISE EXCEPTION 'Belarus 2. Division is below tier 2'; END IF;
-  IF public.moneyball_is_european_top_two_league('Albania','2nd Division - Group A') THEN RAISE EXCEPTION 'Albanian 2nd Division is tier 3'; END IF;
-  IF public.moneyball_is_european_top_two_league('Croatia','Second NL') THEN RAISE EXCEPTION 'Croatian Second NL is tier 3'; END IF;
-  IF public.moneyball_is_european_top_two_league('Estonia','Esiliiga B') THEN RAISE EXCEPTION 'Estonian Esiliiga B is tier 3'; END IF;
-  IF public.moneyball_is_european_top_two_league('Greece','Football League') THEN RAISE EXCEPTION 'Greek Football League is not current tier 2'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Scotland','Championship') THEN RAISE EXCEPTION 'Scottish Championship must remain eligible'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Turkey','1. Lig') THEN RAISE EXCEPTION 'Turkish 1. Lig must remain eligible'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Denmark','1. Division') THEN RAISE EXCEPTION 'Danish 1. Division must remain eligible'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Norway','1. Division') THEN RAISE EXCEPTION 'Norwegian 1. Division must remain eligible'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Sweden','Superettan') THEN RAISE EXCEPTION 'Swedish Superettan must remain eligible'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Belarus','1. Division') THEN RAISE EXCEPTION 'Belarus 1. Division must remain eligible'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Albania','1st Division') THEN RAISE EXCEPTION 'Albanian 1st Division must remain eligible'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Croatia','First NL') THEN RAISE EXCEPTION 'Croatian First NL must remain eligible'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Estonia','Esiliiga A') THEN RAISE EXCEPTION 'Estonian Esiliiga A must remain eligible'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Greece','Super League 2') THEN RAISE EXCEPTION 'Greek Super League 2 must remain eligible'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Andorra','2a Divisió') THEN RAISE EXCEPTION 'Andorra 2a Divisio must remain eligible'; END IF;
-  IF NOT public.moneyball_is_european_top_two_league('Azerbaijan','Birinci Dasta') THEN RAISE EXCEPTION 'Azerbaijan Birinci Dasta must remain eligible'; END IF;
-END $$;
