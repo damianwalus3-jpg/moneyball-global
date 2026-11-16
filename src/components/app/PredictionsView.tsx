@@ -171,7 +171,7 @@ export function PredictionsView({ market }: { market: Market }) {
                       <div><span className="eyebrow">Źródła i pokrycie</span><p className="break-words">{sourceLabel(prediction.data_source)} · {coverageLabel(prediction.data_coverage)}</p></div>
                       <div><span className="eyebrow">Rynek / kurs</span><p>{MARKET_LABELS[prediction.market]} · {prediction.selection} · {fmtOdds(prediction.odds)}{referenceBookmaker ? ` · ${referenceBookmaker}` : ""}</p></div>
                       {prediction.verdict === "WYBRANY" && (() => {
-                        const stake = Number(prediction.stake ?? 5);
+                        const stake = Number(prediction.stake ?? 4);
                         const potentialReturn = prediction.potential_return != null
                           ? Number(prediction.potential_return)
                           : prediction.odds != null && Number(prediction.odds) > 1
