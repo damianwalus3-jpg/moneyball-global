@@ -206,3 +206,41 @@ User reports losing valid predictions because bookmaker prices cannot be confirm
 - 219,022 rows in provider_odds vs only 8 in odds_snapshots (the table the legacy app adapter currently reads). This strongly indicates the odds feed and app display/storage model are disconnected.
 - A historical join of provider_odds to predictions by match_id + mapped_market + mapped_selection finds 5,115 pairs without a freshness restriction. Therefore there is existing recoverable historic mapping logic, but no currently fresh pair in the six-hour window.
 - Latest DB queries were read-only; no production data was modified.
+
+
+## Expanded production and provider audit — 2026-11-16 (continued)
+
+### Live provider health checks
+Unauthenticated GET health endpoints were checked directly against the deployed Supabase Edge Functions:
+- `strikerapi-sync`: `configured:true`. The deployed implementation calls StrikerAPI `get_schedule` for eight hardcoded league keys (Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Champions League, Championship, Eredivisie). It requests `days:30`, not a Brussels-local single-day fixture list. It stores implied market probabilities and bookmaker metadata in `match_market_data`; it does not write canonical quote rows into `provider_odds` or `odds_snapshots`. Its sync can therefore expand the match set beyond the user's Europe/today/first-two-tiers constraints unless caller-side filters are enforced.
+- `pitchapi-sync`: `configured:false`. Its code supports a 77-league enrichment workflow with last-five form, xG, H2H and lineups, but it cannot call the provider until `PITCHAPI_API_KEY` is configured. It has conservative team-name matching (score >=0.82 and >=0.08 separation) and cache TTLs; keep predicted lineups distinct from confirmed lineups.
+- `moneyball-movi-odds-sync`: `key_configured:false`; MoviOdds/bet365 is not currently authenticated in production.
+- `bwin-odds-probe` and `kambi-odds-probe`: deployed source is a static HTTP 404 handler. They are not usable odds integrations.
+- `api-football-sync`: configured secret is not publicly exposed by health; deployed code requires `API_FOOTBALL_KEY`. It imports fixtures and results for a fixed set of 11 competition IDs. Its manual result path updates pending prediction rows directly and must not be used as a replacement for the canonical settlement pipeline unless coupon legs and bankroll transactions are also reconciled.
+
+### Fresh database snapshot
+At the time of the live query on 2026-11-16:
+- `provider_odds`: 219,022 rows; 16,238 mapped to canonical market/selection; newest quote 2026-11-16 02:11:13.758 UTC; zero rows fresh within six hours.
+- Provider/bookmaker split: all rows are MoviOdds / bet365. 136,774 prematch and 82,248 in-play rows; zero fresh within six hours in either phase.
+- `odds_snapshots`: 8 rows; newest 2026-11-13 07:15:05 UTC; zero fresh within six hours.
+- Current Brussels-local day prediction count: 252, with 142 rows having null odds.
+- `provider_odds` has indexes on (match_id, market_name, captured_at DESC), provider_fixture_id and fresh non-suspended captured_at, so a freshness-filtered indexed read path is feasible. Do not bulk-copy the historical table into `odds_snapshots`.
+
+### External product and source benchmark
+- Scorevance publishes pre-match-only resolved forecasts, sample sizes, monthly and competition splits, Brier score and confidence-band calibration. Its public accuracy page reports publisher-self-reported results, not an independent audit. Use the transparency/reporting pattern, not its headline hit rate as a target or guarantee. https://scorevance.tobistech.co.uk/accuracy
+- ScoreProb also publishes pre-kickoff prediction counts, a base-rate comparison, calibration error and Brier score. Its reported figures are self-published and must be treated as such. https://scoreprob.com/model-performance
+- Footlab AI describes a bivariate Poisson goal model combining weighted form, Elo, lineups/absences, home advantage, context and market calibration. This is a useful design reference, not evidence that its claimed performance will transfer to MONEYBALL. https://footlab.ai/en/methodology
+- Sofascore is useful for detailed match-level live stats and visualizations; FotMob for fast mobile match pages, lineups and xG in selected leagues; Flashscore for broad fixture/result coverage. These are corroboration/research websites, not approved scraping APIs. Respect terms and avoid undocumented/private endpoints.
+- Understat and FBref are useful for historical advanced metrics in supported competitions; do not assume full coverage of lower leagues.
+- FootballAPIs' October/November 2026 comparison lists API-Football, Sportmonks, Highlightly and others with differing free plans, league coverage and odds/lineup/xG availability. Its table is a third-party comparison, so confirm provider-specific plan details before relying on it. https://footballapis.com/compare/
+- The Odds API's public page advertises a free tier of 500 credits/month, coverage of 100+ bookmakers, and EU bookmakers including Unibet, Pinnacle and Betfair. It does not establish that Belgian-licensed Bwin, Unibet BE, Ladbrokes BE, Circus or betFIRST prices are available for our specific fixtures. A live event-level test with a key is still required. https://the-odds-api.com/
+
+### Engineering conclusions and next safe changes
+1. The odds ingestion and UI schema are disconnected: sync writes `provider_odds`, while the typed app adapter currently exposes `odds_snapshots`. Build a read-only, owner-scoped, freshness-aware provider-odds adapter/RPC; do not duplicate the historical provider table.
+2. Resolve provider quotes to predictions only by exact canonical match_id + mapped_market + mapped_selection; require unsuspended prematch quotes and an explicit freshness threshold. Never use a stale quote as current or use in-play prices for a prematch coupon.
+3. Preserve every prediction if odds are absent. Add explicit MISSING / STALE / SUSPENDED / CONFIRMED quote status; coupon eligibility requires fresh confirmed odds but the model record stays visible.
+4. The current StrikerAPI sync's 30-day schedule request is broader than the strict daily scope. Fix date filtering and league selection before it can be considered a compliant primary fixture import. Do not let it create fixtures outside today's Europe/Brussels date or outside the configured major + first/second-tier leagues.
+5. Do not activate PitchAPI or a new odds vendor by inventing credentials. A provider key must be created by the user and entered as a Supabase Edge Function secret; never paste it into chat or browser code.
+6. Do not use the current API-Football sync's direct prediction settlement as the authoritative settlement route without reconciling coupon legs and bankroll ledger. Prefer the existing canonical result/coupon settlement functions.
+7. Next validation: use a fixed sample of actual today's eligible fixtures; measure provider fixture match rate, market/outcome match rate, bookmaker jurisdiction, quote age, suspended share, error rate and request/credit cost. Only then choose a secondary provider.
+8. No production code or data was modified by this audit pass. The checks above were read-only; production remains in its previously recorded deployment state.
