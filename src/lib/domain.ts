@@ -150,7 +150,7 @@ export function impliedProbability(odds: number | null | undefined): number | nu
 const EUROPEAN_COUNTRIES = new Set([
   "albania","andorra","armenia","austria","azerbaijan","belarus","belgium","bosnia and herzegovina",
   "bulgaria","croatia","cyprus","czechia","czech republic","denmark","england","estonia","faroe islands",
-  "finland","france","georgia","germany","gibraltar","greece","hungary","iceland","ireland","isle of man",
+  "finland","france","georgia","germany","gibraltar","greece","hungary","iceland","ireland","israel","isle of man",
   "italy","kazakhstan","kosovo","latvia","liechtenstein","lithuania","luxembourg","malta","moldova","monaco",
   "montenegro","netherlands","north macedonia","northern ireland","norway","poland","portugal","romania",
   "russia","san marino","scotland","serbia","slovakia","slovenia","spain","sweden","switzerland","turkey",
