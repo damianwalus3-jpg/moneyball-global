@@ -192,9 +192,9 @@ const READ_COLUMNS: Record<TableName, readonly string[]> = {
   matches: [...COLUMNS.matches, "league", "kickoff_date"],
 };
 
-const PAGE = 250;
+const PAGE = 1_000;
 const MAX_PARALLEL_PAGES = 3;
-const RAW_CACHE_MS = 45_000;
+const RAW_CACHE_MS = 90_000;
 const inFlightTableReads = new Map<string, Promise<unknown>>();
 const rawTableCache = new Map<string, { expiresAt: number; rows: unknown[] }>();
 
