@@ -557,3 +557,21 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Produkcyjny SQL zweryfikował dodatkowe warianty: Türkiye 1. Lig = true; Türkiye/TUR 2. Lig = false; SCO Lowland League = false; DNK 2. Division = false; SWE Division 1 = false.
 - Dzienny cache po czyszczeniu nadal zawiera tylko Northern Ireland Championship (2 fixtures); siedem Lowland League usuniętych wpisów nie wróciło w ostatnim odczycie. Główne rekordy matches pozostają zachowane.
 - Frontend test suite i Cloudflare Worker deployment nadal wymagają potwierdzenia z GitHub Actions. Ostatni znany status check to Vercel build-rate-limit i nie może być interpretowany jako wynik Cloudflare. Nie zamykać issue #76 ani nie deklarować pełnego wdrożenia UI.
+
+
+## Rozszerzony audyt fałszywych trafień Rosja/Hiszpania/Szwajcaria/Dania — 2026-11-17
+- Katalog FootyNomad https://footynomad.com/browse zawierał kolejne nazwy, które kolidowały z generycznymi wzorcami poziomu 2:
+  - Rosja: `First League` = tier 2, ale `Second League A` i `Second League` = tier 3/4. Źródło poziomu: https://en.wikipedia.org/wiki/Russian_Second_League oraz dokumentacja RFU https://www.rfs.ru/subject/1/documents/preview?documentId=2057.
+  - Hiszpania: `Primera Federación` jest tier 3, `Segunda Federación` tier 4; profesjonalne Primera/Segunda División pozostają tier 1/2. Źródło RFEF: https://rfef.es/es/federacion/bases-de-competicion-202526 oraz https://rfef.es/es/competiciones/segunda-federacion.
+  - Szwajcaria: `Hoval Promotion League` = tier 3, `1. Liga Classic` = tier 4; Super League i Challenge League są tier 1/2. Źródła SFV: https://org.football.ch/desktopdefault.aspx/tabid-2869/8789_read-165693/ oraz https://matchcenter.football.ch/default.aspx?lng=1&oid=1.
+  - Dania: `2. Division` i `2nd Division` to tier 3, a `1. Division` to tier 2. Źródło FIFA/DBU comparative analysis: https://profootball.fifa.com/pluginfile.php/1761/mod_resource/content/1/Comparative%20Analysis%20of%20second%20and%20third%20division%20%28FINAL%20-%2031.08.2021%29_compressed.pdf.
+- Dodano country-specific wykluczenia w frontendzie `src/lib/domain.ts` commit `c77188d3fd85937dcdff3d4d92a8508301e81b5f`, w trzech Edge Functions:
+  - FootyNomad sync: `8014125caf76d7b8373d71cd67c799216a5630d9`
+  - free feed: `9cd51039dd2a9ba487050313ed134e6545922f53`
+  - prediction engine: `96310a9a506016922973920acc073586838417d5`
+  - testy frontendowe: `968e219337d842bba06288ba876593861e802821`
+- Produkcyjna migracja SQL `20261117020000_exclude_additional_european_tier_three_aliases` (commit `e39e3d72a4805f5f692e060a7cba80dcbe419e1f`) dodała wykluczenia dla Danii 2nd Division, Rosji Second League, Hiszpanii Primera/Segunda División RFEF oraz Szwajcarii 1. Liga Promotion/Classic.
+- Końcowa macierz produkcyjnego SQL: **40/40 przypadków zgodnych, 0 rozbieżności**. Obejmuje pozytywne tier 1/2, negatywne tier 3/4, nazwy z FootyNomad i kody krajów.
+- Edge Functions ponownie wdrożone i ACTIVE: `footynomad-sync v79`, `moneyball-free-feed v36`, `moneyball-predict v232`.
+- Oczyszczono dzienny feed cache zgodnie z nową funkcją; usunięto zero kolejnych niekwalifikujących się rekordów (poprzednie 7 Lowland League zostało już usunięte). Cache nie zawiera obecnie kolejnych wykrytych tier-3 false positives.
+- Pozostaje wymagane: pełny frontend Vitest/TypeScript/build oraz potwierdzenie Cloudflare Worker deployment. Nie zamykać issue #76 bez statusu Cloudflare i kontroli UI.
