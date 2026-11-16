@@ -330,3 +330,11 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Kod migracji zapisany w GitHub main: `supabase/migrations/20261116204659_schedule_prediction_scans_at_08_and_15_brussels.sql`, commit `7ee157e2c36d16fd221818345f78a522b0153459`. CI/Cloudflare runy dla tego commita wymagają sprawdzenia.
 - Nie zmieniono wyników, prognoz, kuponów, nóg kuponów ani bankrolla. Pełne batch continuation zachowuje dotychczasowy mechanizm.
 - Test produkcyjny po migracji: kolejny tick cron powinien zwrócić cooldown/skip do 08:00 CET; trzeba potwierdzić w logach. Kolejny pełny skan o 08:00 CET następnego dnia powinien zacząć nową datę i batch.
+
+
+## Potwierdzenie harmonogramu i kolejnego cyklu wyników — 2026-11-16 20:50 UTC
+- Po aktualizacji stanu skanu i migracji harmonogramu, wywołania cron `moneyball-predict` o 20:48 i 20:49 UTC zwróciły HTTP 200, `skipped=true`, `reason=cooldown`, `next_scan_at=2026-11-17T07:00:00Z` (08:00 Europe/Brussels). Potwierdzono brak niepotrzebnego wieczornego skanowania; następne pełne skanowanie ma ruszyć jutro o 08:00 CET.
+- Results-sync v71 o 20:50 UTC zwrócił HTTP 200. Odpowiedź: 2 wyniki zapisane/odświeżone, 26 predykcji rozliczonych, 5 kuponów sprawdzonych, 0 zmian finansowych, 0 błędów. Wynik z odpowiedzi pg_net ID 2944.
+- GitHub CI #848 i Cloudflare Worker deploy #434 dla SHA `645c05b9663eb04869a8e8964cb668a6572e23ea` zakończone SUCCESS. Deploy zawiera aktualny stan gałęzi main z migracją harmonogramu.
+- Read-only precheck dla 2026-11-17: 2 mecze kwalifikujące się do zakresu 1./2. ligi; oba FootyNomad z numerycznymi external_id i przyszłym kickoffem. Brak cache FootyNomad/FotbalInfo przed skanem — oba kwalifikują się do ograniczonego pobrania formy w jutrzejszej partii. Nie uruchamiano skanu przed zaplanowanym czasem.
+- Aktualny status: synchronizacja wyników co 5 minut działa; skan predykcji ma dwa dzienne okna 08:00 i 15:00 Europe/Brussels, batch continuation co minutę tylko gdy jest więcej wyników. Cron MoviOdds pozostaje wyłączony.
