@@ -17,7 +17,7 @@ import type { Coupon, CouponStatus, CouponType, Prediction } from "@/lib/types";
 export const Route = createFileRoute("/_authenticated/kupony")({
   head: () => ({ meta: [{ title: "Kupony — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Generator kuponów z dzisiejszych meczów: 3 różne spotkania, prawdopodobieństwo powyżej 75%." }, { property: "og:title", content: "Kupony — MONEYBALL GLOBAL 2.0" }, { property: "og:description", content: "Generuj i zapisuj kupony z dzisiejszych meczów." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context }) =>
-    ensureTables(context.queryClient, ["matches", "predictions", "coupons", "coupon_legs", "scan_runs", "bankroll_transactions"]),
+    ensureTables(context.queryClient, ["matches", "predictions", "coupons", "coupon_legs", "scan_runs", "bankroll_transactions", "match_results"]),
   pendingComponent: PageLoader,
   component: Kupony,
 });
@@ -39,9 +39,11 @@ function Kupony() {
   const predictions = useTable("predictions");
   const coupons = useTable("coupons");
   const legs = useTable("coupon_legs");
+  const results = useTable("match_results");
   const scans = useTable("scan_runs");
   const matchById = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
   const predictionById = useMemo(() => new Map(predictions.map((prediction) => [prediction.id, prediction])), [predictions]);
+  const resultByMatch = useMemo(() => new Map(results.map((result) => [result.match_id, result])), [results]);
 
   const [couponCount, setCouponCount] = useState("2");
   const [couponSize, setCouponSize] = useState<1 | 3>(3);
@@ -309,7 +311,14 @@ function Kupony() {
                         <div className="num w-8 text-sm font-semibold text-primary">{prediction?.selection ?? "—"}</div>
                         <div className="min-w-0 flex-1">
                           <div className="truncate text-sm">{matchLabel(match)}</div>
-                          <div className="text-xs text-muted-foreground">{prediction ? MARKET_LABELS[prediction.market] : "Brak powiązanej prognozy"}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {prediction ? MARKET_LABELS[prediction.market] : "Brak powiązanej prognozy"}
+                            {prediction?.probability != null ? ` · ${fmtPct(prediction.probability)}` : ""}
+                            {match?.kickoff_at ? ` · ${fmtDateTime(match.kickoff_at)}` : ""}
+                          </div>
+                          {match && resultByMatch.get(match.id)?.home_score != null && resultByMatch.get(match.id)?.away_score != null && (
+                            <div className="num text-xs font-semibold text-primary">Wynik: {resultByMatch.get(match.id)?.home_score} : {resultByMatch.get(match.id)?.away_score}</div>
+                          )}
                         </div>
                         <span className="num text-xs">{fmtOdds(leg.odds)}</span>
                         <SettlementBadge status={leg.status} />
