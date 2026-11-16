@@ -154,7 +154,7 @@ const EUROPEAN_COUNTRIES = new Set([
   "italy","kazakhstan","kosovo","latvia","liechtenstein","lithuania","luxembourg","malta","moldova","monaco",
   "montenegro","netherlands","north macedonia","northern ireland","norway","poland","portugal","romania",
   "russia","san marino","scotland","serbia","slovakia","slovenia","spain","sweden","switzerland","turkey",
-  "türkiye","ukraine","wales","united kingdom","uk","alb","and","arm","aut","aze","blr","bel","bih","bul",
+  "türkiye","turkiye","ukraine","wales","united kingdom","uk","alb","and","arm","aut","aze","blr","bel","bih","bul",
   "cro","cyp","cze","dnk","eng","est","fro","fin","fra","geo","deu","ger","gib","grc","gre","hun","isl",
   "irl","ita","kaz","kos","lva","lie","ltu","lux","mlt","mda","mne","nld","mkd","nir","nor","pol","prt",
   "por","rou","rus","smr","sco","srb","svk","svn","esp","swe","che","sui","tur","ukr","wal","gbr"
