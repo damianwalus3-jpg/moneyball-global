@@ -687,7 +687,12 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Statistics calculations and UI remain unchanged: selected/rejected/settled counts, 1X2/DC/Goals separation, Brier, Log Loss, calibration, multiclass 1X2, league/bucket hit rates, coupon ROI and incomplete-payout safeguards are still computed by the existing domain functions.
 - Route loader prefetches the scoped dataset; query cache is invalidated after mutations.
 - No DB migration or data writes required. This reduces prediction payload from 18,563 to about 1,141 rows (about 93.9% fewer) while preserving full active-model history for the supported league scope.
-- Branch: `perf/stats-scoped-predictions`. Await fresh CI before merge; production Cloudflare deploy only after successful checks.
+- The implementation was already present on `main` at SHA `9d639ad8fa4e6f75ddc5f8b7ca06140c0cea253a` (same scoped query and route wiring), so a duplicate/stale PR #72 was closed without merging; no code was reverted.
+- Production CI #811 passed: https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/43931645379
+- Production Cloudflare deploy #402 passed: https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/43931645518
+- Worker version ID: `d4af00f2-f226-464c-8f0a-49cf64a3f977`; production URL: https://moneyball-global.damianwalus3.workers.dev
+- Duplicate PR closed: https://github.com/damianwalus3-jpg/moneyball-global/pull/72
+- Authenticated screen latency still needs a real signed-in UI measurement; CI/deploy success does not establish menu speed.
 
 
 ## Cache consistency guard — 2026-11-16
