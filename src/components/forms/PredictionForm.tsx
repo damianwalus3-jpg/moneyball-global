@@ -22,6 +22,7 @@ export function PredictionForm({
   market,
   prediction,
   matches,
+  matchesLoading = false,
   defaultMatchId,
 }: {
   open: boolean;
@@ -29,6 +30,7 @@ export function PredictionForm({
   market: Market;
   prediction?: Prediction | null;
   matches: Match[];
+  matchesLoading?: boolean;
   defaultMatchId?: string;
 }) {
   const [form, setForm] = useState({
@@ -110,7 +112,9 @@ export function PredictionForm({
         </DialogHeader>
         <form onSubmit={submit} className="grid gap-4">
           <Field label="Mecz" error={errors["match_id"]}>
-            <MatchPicker matches={matches} value={form.match_id} onChange={(id) => setForm((current) => ({ ...current, match_id: id }))} />
+            {matchesLoading
+              ? <div className="rounded-md border border-input px-3 py-2 text-sm text-muted-foreground">Wczytywanie listy meczów…</div>
+              : <MatchPicker matches={matches} value={form.match_id} onChange={(id) => setForm((current) => ({ ...current, match_id: id }))} />}
           </Field>
           <Field label="Wybór" error={errors["selection"]}>
             <ToggleGroup
