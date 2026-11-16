@@ -78,7 +78,9 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("England", "Premier League Cup")).toBe(false);
     expect(isEuropeanTopTwoLeague("Germany", "Frauen Bundesliga")).toBe(false);
     expect(isEuropeanTopTwoLeague("Italy", "Serie A Femminile")).toBe(false);
-    expect(isEuropeanTopTwoLeague("World", "UEFA Nations League")).toBe(false);
+    expect(isEuropeanTopTwoLeague("World", "UEFA Nations League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("World", "UEFA Nations League - League B")).toBe(true);
+    expect(isEuropeanTopTwoLeague("World", "UEFA U21 Championship - Qualification")).toBe(false);
   });
 });
 
