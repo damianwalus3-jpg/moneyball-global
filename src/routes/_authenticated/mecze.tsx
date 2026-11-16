@@ -12,7 +12,7 @@ import { MatchForm } from "@/components/forms/MatchForm";
 import { OddsForm, ScanRunForm } from "@/components/forms/SimpleForms";
 import { deleteRow } from "@/lib/db";
 import { saveCouponBatch } from "@/lib/coupons";
-import { isActivePredictionVersion, MATCH_STATUS_LABELS } from "@/lib/domain";
+import { isActivePredictionVersion, isEuropeanTopTwoLeague, MATCH_STATUS_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, matchLabel } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { brusselsDayKey, fmtDateTime, fmtDayLong, fmtTime } from "@/lib/time";
@@ -398,6 +398,7 @@ function Mecze() {
     // Historical and future fixtures stay in the database for settlement/audit, but
     // must never leak into today's scan/list.
     .filter((match) => matchDay(match) === today)
+    .filter((match) => isEuropeanTopTwoLeague(match.country, match.competition ?? match.league))
         .filter((match) => {
       const isFinished = match.status === "finished" || resultBy.has(match.id);
       if (view === "upcoming") return !isFinished && !["postponed", "cancelled"].includes(match.status);
@@ -423,7 +424,7 @@ function Mecze() {
       <PageHeader
         eyebrow="Europe/Brussels"
         title="Terminarz / Mecze"
-        description="Wszystkie zeskanowane mecze — także te z prognozami ODRZUCONY."
+        description="Dzisiejsze europejskie ligi krajowe — wyłącznie pierwsza i druga liga; typy ODRZUCONY też pozostają widoczne."
         actions={
           <>
             <div className="num flex h-9 items-center rounded-md border border-border px-3 text-sm text-muted-foreground">
