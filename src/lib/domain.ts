@@ -177,6 +177,7 @@ export function isFinishedStatus(status: string | null | undefined) {
 
 export function isCouponCandidate(prediction: Prediction, match: Match | undefined, nowMs: number): boolean {
   if (!match) return false;
+  if (!isEuropeanTopTwoLeague(match.country, match.competition ?? match.league)) return false;
   if (prediction.verdict !== "WYBRANY") return false;
   if (prediction.settlement_status !== "pending") return false;
   if (prediction.probability == null || Number(prediction.probability) <= CANDIDATE_MIN_PROBABILITY) return false;
