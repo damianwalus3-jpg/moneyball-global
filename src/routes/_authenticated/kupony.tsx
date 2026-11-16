@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState, Field, NoGuarantee, PageHeader, PageLoader, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { cancelCoupon, saveCouponBatch } from "@/lib/coupons";
-import { buildCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, isKickoffToday, MARKET_LABELS } from "@/lib/domain";
+import { buildCouponBatch, couponPayout, effectiveOdds, hasFreshConfirmedOdds, isActivePredictionVersion, isCouponCandidate, isKickoffToday, MARKET_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -78,7 +78,7 @@ function Kupony() {
   const requestedCount = Math.max(1, Math.min(20, Math.floor(Number(couponCount) || 1)));
   const stakeValue = 4;
   const preview = generated;
-  const previewMissingOdds = preview.some((coupon) => coupon.some((prediction) => prediction.odds == null || Number(prediction.odds) <= 1));
+  const previewMissingOdds = preview.some((coupon) => coupon.some((prediction) => !hasFreshConfirmedOdds(prediction, Date.now())));
   const uniqueCandidateMatches = new Set(candidates.map((prediction) => prediction.match_id)).size;
 
   const saveBatch = useAction(
