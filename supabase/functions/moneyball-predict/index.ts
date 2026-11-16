@@ -326,7 +326,7 @@ function historyModel(home:string,away:string,kickoff:string,history:any[],footy
    else {p1=p1*(1-eloWeight)+eloP1*eloWeight;p2=p2*(1-eloWeight)+eloP2*eloWeight;method+=" Uzupełniono ratingiem Elo BeyondELO.";}
    eloUsed=true;eloHome=eh;eloAway=ea;eloDiff=+(eh-ea).toFixed(1);eloAsOf=hf?.elo_as_of||af?.elo_as_of||null;
   }
-  const xgSources=[...new Set([...(hf?.xg_last10||[]),...(af?.xg_last10||[])].map((x:any)=>String(x.source||"HISTORICAL_XG")))];
+  const xgSources=[...new Set([...Object.keys(xgHomeSourceCounts),...Object.keys(xgAwaySourceCounts)])];
   // Do not sharpen model probabilities with hard-coded temperatures until a
   // reproducible, versioned out-of-sample calibration report is available.
   // Keep raw model probabilities neutral rather than claiming an unverified calibration.
