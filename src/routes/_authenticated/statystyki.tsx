@@ -56,7 +56,7 @@ function Statystyki() {
   }
   const scopedCoupons = coupons.filter((coupon) => {
     const couponLegRows = legsByCoupon.get(coupon.id) ?? [];
-    return couponLegRows.length > 0 && couponLegRows.every((leg) => scopedMatchIds.has(leg.match_id));
+    return couponLegRows.length > 0 && couponLegRows.every((leg) => !!leg.match_id && scopedMatchIds.has(leg.match_id));
   });
   const settledSinglePicks = activePreds.filter((p) => p.verdict === "WYBRANY" && p.verified && (p.settlement_status === "won" || p.settlement_status === "lost" || p.settlement_status === "void"));
   const singlePickProfitRows = settledSinglePicks.map((p) => {
