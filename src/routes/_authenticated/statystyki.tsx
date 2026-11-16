@@ -100,7 +100,7 @@ function Statystyki() {
       </section>
       <div className="grid gap-6">
         {(["1X2", "DOUBLE_CHANCE", "GOALS"] as Market[]).map((t) => (
-          <MarketBlock key={t} type={t} preds={activePreds.filter((prediction) => prediction.market === t)} leagueOf={(p) => byId.get(p.match_id)?.competition ?? "—"} />
+          <MarketBlock key={t} type={t} preds={activePreds.filter((prediction) => prediction.market === t)} leagueOf={(p) => byId.get(p.match_id)?.competition ?? "—"} matchOf={(id) => byId.get(id)} />
         ))}
 
         <section>
@@ -119,7 +119,7 @@ function Statystyki() {
   );
 }
 
-function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Prediction[]; leagueOf: (p: Prediction) => string }) {
+function MarketBlock({ type, preds, leagueOf, matchOf }: { type: Market; preds: Prediction[]; leagueOf: (p: Prediction) => string; matchOf: (id: string) => any }) {
   const [detailFilter, setDetailFilter] = useState<"model" | "selected" | "rejected" | "settled" | "pending" | null>(null);
   const sel = preds.filter((prediction) => prediction.verdict === "WYBRANY");
   const rej = preds.filter((prediction) => prediction.verdict === "ODRZUCONY");
@@ -159,7 +159,7 @@ function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Predictio
         return <section className="mt-3 rounded-xl border border-primary/30 bg-card p-3 sm:p-4" aria-live="polite">
           <div className="mb-3 flex items-center justify-between gap-2"><div><h3 className="font-display text-lg font-bold uppercase">{title}</h3><p className="text-xs text-muted-foreground">{rows.length} rekordów · kliknij kafelek ponownie, aby zamknąć</p></div><Button size="sm" variant="outline" onClick={() => setDetailFilter(null)}>Zamknij</Button></div>
           {rows.length ? <div className="grid gap-2">{rows.map((p) => {
-            const match = byId.get(p.match_id);
+            const match = matchOf(p.match_id);
             const status = p.settlement_status === "won" ? "WYGRANY" : p.settlement_status === "lost" ? "PRZEGRANY" : p.settlement_status === "void" ? "ZWROT" : "OCZEKUJE";
             return <article key={p.id} className="rounded-lg border border-border bg-secondary/15 p-3">
               <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h4 className="break-words font-semibold">{match ? `${match.home_team} – ${match.away_team}` : `Mecz ${p.match_id}`}</h4><p className="text-xs text-muted-foreground">{match?.competition ?? "Liga nieznana"}{match?.kickoff_at ? ` · ${new Date(match.kickoff_at).toLocaleString("pl-BE", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}` : ""}</p></div><div className="flex flex-wrap gap-1"><span className={p.verdict === "WYBRANY" ? "rounded-full bg-primary/15 px-2 py-1 text-xs font-semibold text-primary" : "rounded-full bg-muted px-2 py-1 text-xs"}>{p.verdict ?? "BEZ DECYZJI"}</span><span className="rounded-full bg-secondary px-2 py-1 text-xs">{status}</span></div></div>
