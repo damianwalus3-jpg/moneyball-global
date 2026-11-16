@@ -312,7 +312,8 @@ export async function insertRow<K extends TableName>(table: K, row: Record<strin
 
 export async function updateRow(table: TableName, id: string, patch: Record<string, unknown>) {
   const uid = await currentUserId();
-  invalidateRawTableCache(table);\n  const safePatch = whitelist(table, patch);
+  invalidateRawTableCache(table);
+  const safePatch = whitelist(table, patch);
   const { error } = await requireSupabase()
     .from(table)
     .update(safePatch)
