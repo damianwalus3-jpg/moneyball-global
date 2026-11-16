@@ -320,3 +320,13 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Repo main: migration `20261116204304_restrict_prediction_scheduler_rpcs_to_service_role.sql`, commit `958074ce60e633649778f31175495fe7157e1ac5`. CI #845 SUCCESS i Cloudflare Worker deploy #431 SUCCESS.
 - Nie zmieniono bankrolla ani rekordów kuponów/nóg. Automatyczny skan nie utworzył kuponów, bo żaden z 8 meczów nie miał wystarczającego pokrycia i progu WYBRANY.
 - Pozostałe priorytety: poprawić pokrycie historii dla dzisiejszych 8 meczów (GitHub public competitions=0; cache FootyNomad/FotbalInfo=0), monitorować serię wyników v71 i kolejny skan po 21:00 UTC, wykonać E2E na rzeczywistym FT, oraz pomiar czasu menu po zapisaniu profilu MAIN (obecnie brak potwierdzonej sesji dla domeny aplikacji).
+
+
+## Harmonogram automatycznego skanu predykcji 08:00 / 15:00 Europe/Brussels — 2026-11-16
+- Wcześniejszy audyt wykazał, że po ukończeniu pełnego dziennego skanu `moneyball_finish_prediction_scan` ustawiał `next_scan_at = now()+15min`, co powodowało niepotrzebne ponawianie pełnego skanu co 15 minut, także późnym wieczorem. To nie odpowiadało ustaleniu z poprzednich czatów: skan rano 08:00 i ponowny o 15:00 czasu belgijskiego.
+- Zmieniono `public.moneyball_finish_prediction_scan`: jeśli `p_has_more=true`, lease jest zwalniany i kolejna partia może ruszyć od następnego cron tick (co minutę); jeśli `p_has_more=false`, `next_scan_at` ustawiany jest na najbliższe 08:00 lub 15:00 w strefie `Europe/Brussels`. Po 15:00 następny termin to 08:00 kolejnego dnia. Wyniki i synchronizacja meczów pozostają co 5 minut — ta zmiana dotyczy tylko pełnego skanu predykcji.
+- Migracja produkcyjna `20261116204659_schedule_prediction_scans_at_08_and_15_brussels` zastosowana pomyślnie. Test granic harmonogramu: 07:00 -> 08:00 dziś; 08:00 -> 15:00 dziś; 14:59 -> 15:00 dziś; 15:00 -> 08:00 jutro; 21:45 -> 08:00 jutro.
+- Stan bieżącego skanu 2026-11-16 zaktualizowano bez zmiany prognoz: status `completed`, następny termin `2026-11-17 07:00 UTC` (=08:00 Europe/Brussels). Eliminuje to niepotrzebne kolejne skanowanie 22:00 lokalnie.
+- Kod migracji zapisany w GitHub main: `supabase/migrations/20261116204659_schedule_prediction_scans_at_08_and_15_brussels.sql`, commit `7ee157e2c36d16fd221818345f78a522b0153459`. CI/Cloudflare runy dla tego commita wymagają sprawdzenia.
+- Nie zmieniono wyników, prognoz, kuponów, nóg kuponów ani bankrolla. Pełne batch continuation zachowuje dotychczasowy mechanizm.
+- Test produkcyjny po migracji: kolejny tick cron powinien zwrócić cooldown/skip do 08:00 CET; trzeba potwierdzić w logach. Kolejny pełny skan o 08:00 CET następnego dnia powinien zacząć nową datę i batch.
