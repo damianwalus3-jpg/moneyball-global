@@ -360,19 +360,37 @@ async function reconcileRescheduledMatches(ownerId:string|null=null){
 }
 async function reconcileAllSettledCoupons(ownerId:string|null=null){
  const ownerFilter=ownerId?"&owner_id=eq."+encodeURIComponent(ownerId):"";
- const rows=await db("coupons?select=id,status,settled_at&status=in.(won,lost,void)&settled_at=not.is.null"+ownerFilter+"&order=created_at.asc");
- const now=new Date().toISOString();
- let checked=0,failed=0;
- const errors:string[]=[];
- for(let offset=0;offset<(rows||[]).length;offset+=4){
-  const batch=(rows||[]).slice(offset,offset+4);
-  const settled=await Promise.allSettled(batch.map((coupon:any)=>reconcileCouponMoney(String(coupon.id),now)));
-  for(let i=0;i<settled.length;i++){
-   checked++;
-   if(settled[i].status==="rejected"){failed++;errors.push(String(batch[i].id)+": "+String((settled[i] as PromiseRejectedResult).reason));}
-  }
+ const coupons=await db("coupons?select=id,status,settled_at,stake&status=in.(won,lost,void)&settled_at=not.is.null"+ownerFilter+"&order=created_at.asc");
+ const ids=(coupons||[]).map((x:any)=>String(x.id));
+ if(!ids.length)return {checked:0,reconciled:0,failed:0,errors:[] as string[]};
+ const [legs,transactions]=await Promise.all([
+  db("coupon_legs?select=coupon_id,status,odds&coupon_id=in.("+ids.join(",")+")"),
+  db("bankroll_transactions?select=coupon_id,transaction_type&coupon_id=in.("+ids.join(",")+")")
+ ]);
+ const legsByCoupon=new Map<string,any[]>(),txByCoupon=new Map<string,any[]>();
+ for(const leg of legs||[]){const key=String(leg.coupon_id),arr=legsByCoupon.get(key)||[];arr.push(leg);legsByCoupon.set(key,arr);}
+ for(const tx of transactions||[]){const key=String(tx.coupon_id),arr=txByCoupon.get(key)||[];arr.push(tx);txByCoupon.set(key,arr);}
+ const repair=(coupons||[]).filter((coupon:any)=>{
+  const couponLegs=legsByCoupon.get(String(coupon.id))||[];
+  if(!couponLegs.length)return false;
+  const statuses=couponLegs.map((x:any)=>String(x.status||"pending"));
+  const lost=statuses.includes("lost"),pending=statuses.includes("pending"),allVoid=statuses.every((x:string)=>x==="void");
+  const expectedStatus=lost?"lost":pending?"pending":allVoid?"void":"won";
+  if(expectedStatus!==coupon.status||!coupon.settled_at)return true;
+  const tx=txByCoupon.get(String(coupon.id))||[];
+  if(Number(coupon.stake)>0&&!tx.some((x:any)=>x.transaction_type==="stake"))return true;
+  const active=couponLegs.filter((x:any)=>x.status!=="void");
+  const oddsComplete=active.length>0&&active.every((x:any)=>x.odds!=null&&Number.isFinite(Number(x.odds))&&Number(x.odds)>1);
+  const payoutExpected=!pending&&!lost&&(allVoid||oddsComplete);
+  return payoutExpected&&!tx.some((x:any)=>x.transaction_type==="return");
+ });
+ let checked=0,failed=0;const errors:string[]=[];
+ for(let offset=0;offset<repair.length;offset+=3){
+  const batch=repair.slice(offset,offset+3);
+  const settled=await Promise.allSettled(batch.map((coupon:any)=>reconcileCouponMoney(String(coupon.id),new Date().toISOString())));
+  for(let i=0;i<settled.length;i++){checked++;if(settled[i].status==="rejected"){failed++;errors.push(String(batch[i].id)+": "+String((settled[i] as PromiseRejectedResult).reason));}}
  }
- return {checked,failed,errors};
+ return {checked:coupons.length,reconciled:repair.length,failed,errors};
 }
 
 Deno.serve(async(req:Request)=>{
