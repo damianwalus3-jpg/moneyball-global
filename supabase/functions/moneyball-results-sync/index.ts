@@ -223,13 +223,15 @@ function goalsWon(selection:string,home:number,away:number):boolean|null{
  }
 }
 async function reconcileCouponMoney(couponId:string,now:string){
- const rows=await db("coupons?select=id,owner_id,name,status,stake,combined_odds,potential_return,created_at&id=eq."+couponId);
+ const rows=await db("coupons?select=id,owner_id,name,status,stake,target_legs,combined_odds,potential_return,created_at&id=eq."+couponId);
  const coupon=(rows||[])[0];
  if(!coupon||coupon.status==="cancelled")return;
  const stake=Number(coupon.stake);
  if(!Number.isFinite(stake)||stake<0)throw new Error("Nieprawidłowa stawka kuponu: "+couponId);
  const legs=await db("coupon_legs?select=id,prediction_id,status,odds&coupon_id=eq."+couponId);
  if(!legs?.length)throw new Error("Kupon bez zapisanych zdarzeń — pominięto rozliczenie: "+couponId);
+ const expectedLegs=Number(coupon.target_legs||3);
+ if(legs.length!==expectedLegs)throw new Error("Niekompletny kupon — oczekiwano "+expectedLegs+" zdarzeń, zapisano "+legs.length+": "+couponId);
  const predictionIds=(legs||[]).map((x:any)=>String(x.prediction_id)).filter(Boolean);
  const predictions=predictionIds.length?await db("predictions?select=id,odds&owner_id=eq."+encodeURIComponent(String(coupon.owner_id))+"&id=in.("+predictionIds.join(",")+")"):[];
  const predictionById=new Map((predictions||[]).map((p:any)=>[String(p.id),p]));
@@ -360,7 +362,7 @@ async function reconcileRescheduledMatches(ownerId:string|null=null){
 }
 async function reconcileAllSettledCoupons(ownerId:string|null=null){
  const ownerFilter=ownerId?"&owner_id=eq."+encodeURIComponent(ownerId):"";
- const coupons=await db("coupons?select=id,status,settled_at,stake&status=in.(won,lost,void)&settled_at=not.is.null"+ownerFilter+"&order=created_at.asc");
+ const coupons=await db("coupons?select=id,status,settled_at,stake,target_legs&status=in.(won,lost,void)&settled_at=not.is.null"+ownerFilter+"&order=created_at.asc");
  const ids=(coupons||[]).map((x:any)=>String(x.id));
  if(!ids.length)return {checked:0,reconciled:0,failed:0,errors:[] as string[]};
  const [legs,transactions]=await Promise.all([
@@ -372,7 +374,7 @@ async function reconcileAllSettledCoupons(ownerId:string|null=null){
  for(const tx of transactions||[]){const key=String(tx.coupon_id),arr=txByCoupon.get(key)||[];arr.push(tx);txByCoupon.set(key,arr);}
  const repair=(coupons||[]).filter((coupon:any)=>{
   const couponLegs=legsByCoupon.get(String(coupon.id))||[];
-  if(!couponLegs.length)return false;
+  if(couponLegs.length!==Number(coupon.target_legs||3))return false;
   const statuses=couponLegs.map((x:any)=>String(x.status||"pending"));
   const lost=statuses.includes("lost"),pending=statuses.includes("pending"),allVoid=statuses.every((x:string)=>x==="void");
   const expectedStatus=lost?"lost":pending?"pending":allVoid?"void":"won";
