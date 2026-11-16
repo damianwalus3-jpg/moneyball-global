@@ -87,9 +87,10 @@ export function PredictionsView({ market }: { market: Market }) {
     }),
     initialPageParam: null as PredictionPageCursor | null,
     getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor ?? undefined : undefined,
-    staleTime: 45_000,
-    gcTime: 600_000,
-    refetchOnWindowFocus: true,
+    staleTime: 120_000,
+    gcTime: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
   const list = useMemo(
     () => pageQuery.data?.pages.flatMap((page) => page.rows) ?? [],
@@ -244,7 +245,7 @@ export function PredictionsView({ market }: { market: Market }) {
           })}
           {pageQuery.hasNextPage && (
             <div className="flex justify-center py-3">
-              <Button variant="outline" onClick={() => pageQuery.fetchNextPage()} disabled={pageQuery.isFetchingNextPage}>
+              <Button variant="outline" onClick={() => pageQuery.fetchNextPage()} disabled={pageQuery.isFetching}>
                 {pageQuery.isFetchingNextPage ? "Wczytywanie…" : "Wczytaj kolejne 50"}
               </Button>
             </div>
