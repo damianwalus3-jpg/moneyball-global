@@ -1,4 +1,4 @@
-import { stakeBalances, totalOdds, validateBatch } from "./domain";
+import { hasFreshConfirmedOdds, stakeBalances, totalOdds, validateBatch } from "./domain";
 import { deleteRow, fetchAll, insertRow, insertRows, updateRow } from "./db";
 import type { CouponType, Prediction } from "./types";
 
@@ -21,6 +21,8 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
   const requireOdds = options.couponType != null && options.couponType !== "TEST";
   const errors = validateBatch(coupons, targetLegs, requireOdds);
   if (errors.length) throw new Error(errors.join(" "));
+  if (requireOdds && coupons.some((coupon) => coupon.some((prediction) => !hasFreshConfirmedOdds(prediction, Date.now()))))
+    throw new Error("Kupon MAIN/MEGA/EXTRA wymaga kursu z potwierdzonego źródła, bez zawieszenia, przedmeczowego i pobranego maksymalnie 6 godzin temu. Nieaktualny kurs nie może wejść do kuponu.");
   if (options.stake !== 4)
     throw new Error("Stała stawka MONEYBALL wynosi dokładnie 4,00 € na kupon.");
   const stake = 4;
