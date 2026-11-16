@@ -82,3 +82,12 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Automatyczny job #11 nadal `active=false`. Nie włączono go: harmonogram wylicza offset wyłącznie z minut od 08:00, więc nie jest bezpiecznym cyklicznym skanerem na cały dzień i nie ma potwierdzonego mechanizmu lease/overlap. Wymaga przebudowy kursora i blokady przed włączeniem.
 - Kursy nadal nie działają: `MOVIODDS_API_KEY` nie skonfigurowany, MoviOdds zwraca HTTP 401, a w provider_odds jest 0 świeżych niesuspendowanych kursów z ostatnich 6h. Job #10 pozostaje wyłączony. Kupony TEST mogą służyć do oceny hit-rate; MAIN/MEGA/EXTRA wymagają rzeczywistych świeżych kursów.
 - Następny priorytet: poprawić cron predykcji na stabilny cursor/lease (nie offset zależny od godziny), przetestować pełny przebieg dzień po dniu; następnie znaleźć legalne autoryzowane źródło kursów bez klucza płatnego lub uzyskać bezpłatny dostęp dostawcy. Nie przedstawiać braku kursów jako rozwiązania.
+
+
+## Automatyczny rejestr prac i audyt harmonogramu — 2026-11-16
+- Utworzono tabelę `public.project_work_log` migracją `create_project_work_log`. Jest to trwały dziennik zadań inżynieryjnych: status, opis, zmienione pliki, commit, wdrożenie, wyniki testów i blokady. RLS jest włączone; brak publicznych polityk zapisu/odczytu.
+- Pierwszy wpis: `auto-work-log-and-predict-scheduler-2026-11-16`, status `started`.
+- Ponownie sprawdzono produkcyjny `cron.job`: job #11 `moneyball-global-auto-predict-sequential` pozostaje `active=false`. Jego stary SQL nadal liczy OFFSET jako liczbę minut od 08:00 × 10 i uruchamia się co minutę. Nie jest bezpieczny dla całodziennego skanowania: może pomijać nowe mecze, a OFFSET może przesuwać rekordy.
+- Potwierdzono aktywną funkcję `moneyball-predict` v212. Nadal obsługuje `offset`/limit do 10, zwraca `has_more` na podstawie liczby rekordów surowej partii, a dopiero potem filtruje część zakresu w JS. Nie należy podłączać do niej automatycznego paginowania cronem w obecnej postaci.
+- Kolejny krok: wprowadzić osobny, odporny mechanizm kolejki/kursora z lease, filtrem scope przed paginacją i automatycznym zapisem każdej próby do `project_work_log`; testy obejmą restart, timeout, nakładanie wywołań, nowo dodane mecze oraz brak pominięć/duplikatów.
+- Blokada: przed aktywacją harmonogramu trzeba bezpiecznie zmienić kontrakt funkcji i sprawdzić schemat tabeli meczów oraz istniejące uprawnienia. Stary cron pozostaje wyłączony.
