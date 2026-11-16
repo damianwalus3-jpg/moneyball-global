@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, ChevronDown, ChevronUp, CircleDollarSign, FileUp, Flag, Pencil, Plus, ScanLine } from "lucide-react";
 import { Fragment, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,7 @@ import { deleteRow } from "@/lib/db";
 import { saveCouponBatch } from "@/lib/coupons";
 import { isActivePredictionVersion, isEuropeanTopTwoLeague, MATCH_STATUS_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, matchLabel } from "@/lib/format";
-import { ensureTables, useAction, useTable } from "@/lib/queries";
+import { matchPageDataQuery, useAction } from "@/lib/queries";
 import { brusselsDayKey, fmtDateTime, fmtDayLong, fmtTime } from "@/lib/time";
 import { getSupabase } from "@/lib/supabase";
 import type { Match, Prediction, ScanRun } from "@/lib/types";
@@ -30,16 +31,7 @@ export const Route = createFileRoute("/_authenticated/mecze")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  loader: ({ context }) =>
-    ensureTables(context.queryClient, [
-      "matches",
-      "scan_runs",
-      "predictions",
-      "match_results",
-      "odds_snapshots",
-      "coupons",
-      "coupon_legs",
-    ]),
+  loader: ({ context }) => context.queryClient.ensureQueryData(matchPageDataQuery()),
   pendingComponent: PageLoader,
   errorComponent: DataError,
   component: Mecze,
@@ -184,13 +176,14 @@ function RecentFormCard({ title, form }: { title: string; form: TeamForm | null 
 }
 
 function Mecze() {
-  const matches = useTable("matches");
-  const scans = useTable("scan_runs");
-  const preds = useTable("predictions");
-  const results = useTable("match_results");
-  const odds = useTable("odds_snapshots");
-  const couponLegs = useTable("coupon_legs");
-  const coupons = useTable("coupons");
+  const pageDataQuery = useQuery(matchPageDataQuery());
+  const matches = pageDataQuery.data?.matches ?? [];
+  const scans = pageDataQuery.data?.scans ?? [];
+  const preds = pageDataQuery.data?.predictions ?? [];
+  const results = pageDataQuery.data?.results ?? [];
+  const odds = pageDataQuery.data?.odds ?? [];
+  const couponLegs = pageDataQuery.data?.couponLegs ?? [];
+  const coupons = pageDataQuery.data?.coupons ?? [];
   const [view, setView] = useState<View>("all");
   const [q, setQ] = useState("");
   const [editMatch, setEditMatch] = useState<Match | null>(null);
