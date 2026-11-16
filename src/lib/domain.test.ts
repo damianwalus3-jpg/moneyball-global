@@ -76,6 +76,12 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Slovakia", "2. liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("ESP", "ESP_2_segunda-division")).toBe(true);
     expect(isEuropeanTopTwoLeague("Kosovo", "Liga E Pare")).toBe(true);
+    // Exact current FootyNomad competition labels from its country/league catalogue.
+    expect(isEuropeanTopTwoLeague("Andorra", "1a Divisió")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Andorra", "2a Divisió")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Dasta")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Belarus", "1. Division")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Belarus", "2. Division")).toBe(true);
     expect(isEuropeanTopTwoLeague("Ukraine", "Druha Liga")).toBe(false);
     expect(isEuropeanTopTwoLeague("Italy", "Serie C - Girone B")).toBe(false);
     expect(isEuropeanTopTwoLeague("England", "Premier League Cup")).toBe(false);
