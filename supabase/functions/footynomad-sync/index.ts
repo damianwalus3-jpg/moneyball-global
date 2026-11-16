@@ -1,3 +1,8 @@
+function isExcludedSeniorTeam(value: unknown): boolean {
+ const team=String(value??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+ return /\\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico)\\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
+}
+
 function isTopTwoTierLeague(competition: unknown): boolean {
  const comp=String(competition??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
  if(!comp)return false;
@@ -43,7 +48,7 @@ async function readFixtures(date:string){
   const league=textOf((summary.match(/href=["']\/league\/[^"']+["'][^>]*>([\s\S]*?)<\/a>/i)||[])[1]||"");
   const cs=html.lastIndexOf('<h2 class="section-title',m.index),ce=cs>=0?html.indexOf("</h2>",cs):-1;
   const country=cs>=0&&ce>cs?textOf(html.slice(cs,ce)).replace(/\s+\d+$/,"").trim():null;
-  if(!isEuropeanFixture(country,league,home,away)||!isTopTwoTierLeague(league))continue;
+  if(!isEuropeanFixture(country,league,home,away)||!isTopTwoTierLeague(league))continue;\n    if (isExcludedSeniorTeam(home) || isExcludedSeniorTeam(away)) continue;
   const cls=(attrs.match(/class=["']([^"']+)/i)||[])[1]||"",status=cls.includes("ticket-live")?"live":cls.includes("ticket-ft")?"finished":cls.includes("ticket-pst")?"postponed":cls.includes("ticket-canc")?"cancelled":"scheduled";
   const hs=(body.match(/class=["'][^"']*ticket-hs[^"']*["'][^>]*>([0-9]+)</i)||[])[1],as=(body.match(/class=["'][^"']*ticket-as[^"']*["'][^>]*>([0-9]+)</i)||[])[1];
   const gender=/\bW\b|Women|female|girls/i.test(home+" "+away+" "+league)?"women":"men";
