@@ -172,6 +172,37 @@ export function isEuropeanTopTwoLeague(country: string | null | undefined, compe
   return /\b(?:premier league|premiership|championship|super league 2|super league|superliga|super lig|pro league|jupiler pro league|challenger pro league|bundesliga|austrian 2 liga|2 liga|ligue 1|ligue 2|serie a|serie b|la liga|laliga|primera division|segunda division|segunda liga|segunda divisao|liga portugal 2|liga portugal|eredivisie|eerste divisie|keuken kampioen divisie|primeira liga|ekstraklasa|i liga|1 lig|2 lig|1 liga|2 liga|liga i|liga ii|liga 1|liga 2|liga e pare|prva liga|first league|second league|fnl|first division|second division|division 1|division 2|div 1|div 2|1st division|2nd division|1st league|2nd league|a lyga|i lyga|virsliga|meistriliiga|esiliiga|veikkausliiga|ykkosliiga|allsvenskan|superettan|eliteserien|obos ligaen|1 divisjon|premier division|league of ireland premier|league of ireland first|scottish championship|challenge league|tff first league|national football league|football league|nb i|nb ii|nemzeti bajnoksag i|nemzeti bajnoksag ii|kategoria superiore|kategoria e pare|premyer liqa|i liqa|1 deild|cymru premier|cymru north|cymru south|erovnuli liga 2|first nl|prva nl|2 snl|persha liga|first professional football league|second professional football league|bulgarian second league|first division a|first division b|1 division|2 division|divizia nationala|divizia a|primera divisio|segunda divisio|albanian superliga|armenian premier league|belarusian premier league|belarusian first league|premijer liga|first professional league|meistaradeildin|besta deild|urvalsdeild|national division|super liga|super liga 2|super liga Srbije|superliga kosovo|campionato sammarinese|2 mfl|vtora mfl|prva makedonska|super league greece|super liga romania|liga 1 romania|liga 2 romania|montenegro first league|azerbaijan premier league|premyer liqasi|super league albania)\b/.test(league);
 }
 
+/** Deduplicate the same fixture imported under different provider IDs. Prefer FootyNomad, then the most recently updated row. */
+export function dedupeEuropeanMatches(matches: Match[]): Match[] {
+  const normalize = (value: string | null | undefined) =>
+    String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const keyOf = (match: Match) => [
+    match.kickoff_at ? brusselsDayKey(match.kickoff_at) : match.kickoff_date ?? "",
+    normalize(match.home_team),
+    normalize(match.away_team),
+    match.gender ?? "men",
+  ].join("|");
+  const rank = (match: Match) => [
+    match.source?.toLowerCase() === "footynomad" ? 1 : 0,
+    match.kickoff_at ? 1 : 0,
+    Date.parse(match.updated_at ?? match.created_at ?? "") || 0,
+  ];
+  const selected = new Map<string, Match>();
+  for (const match of matches) {
+    const key = keyOf(match);
+    const current = selected.get(key);
+    if (!current) {
+      selected.set(key, match);
+      continue;
+    }
+    const a = rank(match), b = rank(current);
+    if (a[0] > b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] > b[2])))) {
+      selected.set(key, match);
+    }
+  }
+  return [...selected.values()];
+}
+
 /** True only for senior men's first/second-tier fixtures, excluding reserve/B teams. */
 export function isEligibleEuropeanMatch(match: Pick<Match, "country" | "competition" | "league" | "gender" | "home_team" | "away_team">): boolean {
   if (!isEuropeanTopTwoLeague(match.country, match.competition ?? match.league)) return false;
