@@ -2,6 +2,7 @@ import { requireSupabase } from "./supabase";
 import { COLUMNS, OWNER_COLUMN } from "./schema";
 import type { TableName, TableRows } from "./types";
 import { brusselsDayKey, brusselsInputToISO } from "./time";
+import { isEuropeanTopTwoLeague } from "./domain";
 
 export interface DashboardMarketStats {
   won: number;
@@ -476,6 +477,45 @@ export async function fetchMatchSettlementContext(matchId: string): Promise<Matc
     coupons,
     existingResult: ((resultResult.data ?? [])[0] ?? undefined) as unknown as TableRows["match_results"] | undefined,
   };
+}
+
+export interface StatisticsPageData {
+  matches: TableRows["matches"][];
+  predictions: TableRows["predictions"][];
+  coupons: TableRows["coupons"][];
+  legs: TableRows["coupon_legs"][];
+}
+
+/** Statistics need the full eligible sample, but not predictions for every
+ * historical fixture/model version. Keep the exact league rule in the domain
+ * layer and fetch active-model predictions only for eligible match IDs. */
+export async function fetchStatisticsPageData(): Promise<StatisticsPageData> {
+  // Use the shared keyset-paginated table loader here: direct PostgREST selects
+  // are capped at 1,000 rows and would silently truncate the 2,596-match universe.
+  const [matches, coupons, legs] = await Promise.all([
+    fetchAll("matches"),
+    fetchAll("coupons"),
+    fetchAll("coupon_legs"),
+  ]);
+  const uid = await currentUserId();
+  const sb = requireSupabase();
+  const eligibleMatchIds = matches
+    .filter((match) => isEuropeanTopTwoLeague(match.country, match.competition ?? match.league))
+    .map((match) => match.id);
+  const predictions = eligibleMatchIds.length === 0 ? [] : await fetchInChunks<TableRows["predictions"]>(
+    eligibleMatchIds, 100, async (chunk) => {
+      const { data, error } = await withRequestTimeout(
+        sb.from("predictions").select(READ_COLUMNS.predictions.join(","))
+          .eq(OWNER_COLUMN, uid)
+          .in("match_id", chunk)
+          .or('model_version.eq."MONEYBALL GLOBAL 3.8",model_version.like.MANUAL%'),
+        "Pobieranie aktywnych prognoz do statystyk",
+      );
+      if (error) throw new Error(humanizeError(error, "predictions"));
+      return (data ?? []) as unknown as TableRows["predictions"][];
+    },
+  );
+  return { matches, predictions, coupons, legs };
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {

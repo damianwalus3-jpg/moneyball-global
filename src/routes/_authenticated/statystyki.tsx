@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
 import { ACTIVE_MODEL_VERSION, couponPayout, groupHitRates, hitRate, isActivePredictionVersion, isEuropeanTopTwoLeague, modelHitRate, probabilityQuality, probabilityQualityBySelection, multiclass1X2Quality, PICK_LABELS, type HitRate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
-import { ensureTables, useTable } from "@/lib/queries";
+import { statisticsPageDataQuery, useStatisticsPageData } from "@/lib/queries";
 import type { Market, Prediction } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/statystyki")({
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/statystyki")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  loader: ({ context }) => ensureTables(context.queryClient, ["matches", "predictions", "coupons", "coupon_legs"]),
+  loader: ({ context }) => context.queryClient.ensureQueryData(statisticsPageDataQuery()),
   pendingComponent: PageLoader,
   errorComponent: DataError,
   component: Statystyki,
@@ -38,10 +38,7 @@ const bucketOf = (p: number | null) => {
 };
 
 function Statystyki() {
-  const matches = useTable("matches");
-  const preds = useTable("predictions");
-  const coupons = useTable("coupons");
-  const legs = useTable("coupon_legs");
+  const { matches, predictions: preds, coupons, legs } = useStatisticsPageData();
   const scopedMatchIds = new Set(matches
     .filter((match) => isEuropeanTopTwoLeague(match.country, match.competition ?? match.league))
     .map((match) => match.id));
