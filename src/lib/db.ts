@@ -889,6 +889,9 @@ export async function updateRow(table: TableName, id: string, patch: Record<stri
 
 export async function deleteRow(table: TableName, id: string) {
   const uid = await currentUserId();
+  // Match insert/update behavior so cached statistics and related views cannot
+  // keep a deleted row after React Query invalidates and reloads the table.
+  invalidateRawTableCache(table);
   const { error } = await requireSupabase()
     .from(table)
     .delete()
