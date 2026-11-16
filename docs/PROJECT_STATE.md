@@ -740,3 +740,13 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Deployed production Worker version: `4413a358-877a-40a7-bf72-622a93f16f6f` at https://moneyball-global.damianwalus3.workers.dev.
 - The Vercel status check reported its separate build-rate-limit failure; it is not the production host and did not block the successful Cloudflare deployment.
 - This is a targeted reduction of History navigation's blocking work. Actual authenticated navigation latency still requires a signed-in browser measurement; do not claim the entire menu issue is solved.
+
+
+## Prediction tabs — scope match reads to visible rows (2026-11-16)
+
+- Audit found all three prediction tabs preloaded the complete matches table (2,596 rows at the last authenticated baseline) before showing the screen, even though the visible list is paginated to 50 predictions.
+- Replaced the initial full match-table dependency with an owner-scoped lookup for only the distinct match IDs referenced by the currently loaded prediction pages, in batches of 100.
+- The full match list is now fetched only when the user opens the manual prediction form; the form shows a loading message while that deferred list is fetched.
+- Coupon-leg checks remain fail-safe: edit/delete controls are unavailable until the coupon-link table has loaded successfully, and delete still refuses any prediction linked to a coupon.
+- Prediction pagination, market filters, historical calculations, and all saved records remain unchanged. No database migration or data write is required.
+- This change is on a review branch and is not production until CI and Cloudflare Main deployment pass.
