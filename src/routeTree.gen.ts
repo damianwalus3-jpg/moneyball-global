@@ -141,6 +141,7 @@ export interface FileRoutesByTo {
   '/prognozy-gole': typeof AuthenticatedPrognozyGoleRoute
   '/statystyki': typeof AuthenticatedStatystykiRoute
   '/ustawienia': typeof AuthenticatedUstawieniaRoute
+  '/wyniki': typeof AuthenticatedWynikiRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -195,6 +196,7 @@ export interface FileRouteTypes {
     | '/prognozy-gole'
     | '/statystyki'
     | '/ustawienia'
+    | '/wyniki'
   id:
     | '__root__'
     | '/'
