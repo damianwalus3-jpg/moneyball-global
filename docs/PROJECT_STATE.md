@@ -487,3 +487,41 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 2. Consider paginated/history-specific reads for the 18,563-row predictions table only after preserving all-history filters and Brier/Log Loss calculations; do not simply truncate records.
 3. Monitor results-sync internal structured logs and real match settlements, including exactly-once bankroll returns.
 4. Keep route preloading and bounded parallel reads; do not add duplicate indexes without EXPLAIN/Index Advisor evidence.
+
+
+## Follow-up verification and next performance target — 2026-11-16
+
+### Completed workflow verification
+- Checked the final jobs for docs commit `aea730adb3fe9a3fb146de924a0a985200ce10c8`.
+- CI workflow run `#791` / run ID `43922718349`: SUCCESS. Deno Edge Function type-check, tests, TypeScript type-check and build all completed successfully.
+- Cloudflare production deploy workflow run `#394` / run ID `43922718316`: SUCCESS. Build for Cloudflare Workers and Deploy to Cloudflare Workers completed successfully.
+- The functional code SHA `40fc4dba402c4c787276c6201cdc456d3f2fe76b` had already been deployed successfully by production deploy `#393`; run `#394` subsequently completed for the documentation commit. Production remains `https://moneyball-global.damianwalus3.workers.dev/`.
+- This verifies CI and the production deployment workflow. It does NOT verify signed-in menu speed; no authenticated browser timings are available in this session.
+
+### Newly confirmed full-history read on prediction screens
+- Re-read current `main` source: `src/components/app/PredictionsView.tsx` calls `useTable("predictions")`, `useTable("matches")` and `useTable("coupon_legs")`.
+- The `current` model scope only filters the already-downloaded predictions array in the browser using `isActivePredictionVersion()`. Selecting `Wszystkie wersje` also operates on the same complete in-memory array. Therefore the default view still downloads the full prediction history even when only the active model is shown.
+- `src/lib/db.ts` currently uses keyset pagination in 250-row pages across four UUID partitions (at most two partitions concurrently) to fetch the full predictions table. This protects against deep OFFSET scans and reduces per-query timeout risk, but it still transfers all historical prediction rows to the browser.
+- Previously inspected data volume was 18,563 predictions and 2,596 matches. The full-history transfer is therefore a concrete remaining performance cost, not a hypothetical rendering issue.
+- The screen also calculates its selected-pick hit rate from the full in-memory history. Any optimization must preserve this all-history statistic (or replace it with an equivalent verified server-side aggregate), preserve active-vs-all model version semantics, and retain access to every historical prediction.
+- Do not merely truncate the array, change the 120-second cache, or hide history. Next safe design is server-side scoped reads for the initial/current view plus cursor-paginated archive access; compute all-history market statistics independently with verified aggregate semantics. Keep edits/deletes and coupon-leg protections intact.
+
+### Current results-sync latency sample
+- Queried recent production Edge Function request logs for `moneyball-results-sync`.
+- Version 68 at 2026-11-16 17:55:20 UTC returned HTTP 200 but took 20,238 ms. Previous samples: 17:50:13 13,510 ms; 17:45:09 9,785 ms; 17:40:07 7,475 ms; 17:35:04 4,757 ms. Earlier versions 65–67 also returned HTTP 200 with runtimes from about 10 to 16 seconds.
+- This confirms the function continues to answer successfully but latency remains highly variable and has not been proven stable or timeout-proof. Continue inspecting structured summaries and stage timings; do not claim a permanent timeout fix.
+
+### External research used for this decision
+- TanStack Router data loading recommends coordinating route data early and loading independent requirements in parallel: https://tanstack.com/router/latest/docs/guide/data-loading
+- TanStack Router supports intent preloading and reuse of cached/preloaded route data: https://tanstack.com/router/latest/docs/guide/preloading
+- TanStack Query identifies dependent request waterfalls as a major performance footgun: https://tanstack.com/query/latest/docs/framework/react/guides/request-waterfalls
+- TanStack Table documents server-side pagination and cursor-based pagination patterns: https://tanstack.com/table/latest/docs/framework/react/guide/pagination
+- Community discussions on large React datasets consistently distinguish virtualization (render cost) from server-side pagination/filtering (network and memory cost); use as anecdotal guidance, not authoritative proof: https://www.reddit.com/r/reactjs/comments/1o2h9j7/frontend_devs_working_with_large_datasets_100k/ and https://www.reddit.com/r/reactjs/comments/1pk0ipl/how_to_optimize_tanstack_table_react_table_for/
+
+### Next implementation sequence
+1. Inspect active model-version definitions, prediction timestamp/market indexes, and existing summary RPCs before changing query shape.
+2. Add an owner-scoped query for the current prediction screen's required slice; use deterministic keyset pagination for archive/history and avoid large IN lists or offset scans.
+3. Preserve complete all-history hit-rate/statistics through a verified SQL aggregate or a paginated archive calculation; cross-check aggregate output against the existing full-history client calculation before switching.
+4. Add tests for active/all model scopes, market filters, verdict filters, cursor boundaries, duplicate prevention and historical aggregate equivalence.
+5. Run CI/build, deploy to the existing Cloudflare Worker, then compare cold and cached navigation in an authenticated session. Do not mark the menu-speed issue fixed without measured signed-in timings.
+6. Keep monitoring the 5-minute results-sync schedule and inspect stage summaries, result settlement counts and exactly-once coupon ledger writes. Never fabricate outcomes or mutate historical coupons.
