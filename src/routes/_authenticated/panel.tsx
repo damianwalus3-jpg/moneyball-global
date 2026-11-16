@@ -129,9 +129,9 @@ function Panel() {
                     <Badge variant={settlement === "WYGRANY" ? "success" : settlement === "PRZEGRANY" ? "danger" : settlement === "ZWROT" ? "muted" : "warning"}>{settlement}</Badge>
                   </div>
                   <div className="w-full border-t border-border pt-2 sm:w-auto sm:border-0 sm:pt-0">
-                    <a href={`/mecze?match=${encodeURIComponent(match.id)}`} className="inline-flex items-center gap-1 text-sm font-semibold text-primary underline-offset-4 hover:underline">
+                    <Link to="/mecze" search={{ match: match.id }} preload="intent" preloadDelay={0} className="inline-flex items-center gap-1 text-sm font-semibold text-primary underline-offset-4 hover:underline">
                       Dlaczego taki typ? Szczegóły meczu <ChevronRight className="size-4" />
-                    </a>
+                    </Link>
                   </div>
                 </div>
               );
