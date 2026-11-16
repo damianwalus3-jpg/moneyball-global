@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { EmptyState, Field, NoGuarantee, PageHeader, PageLoader, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { cancelCoupon, saveCouponBatch } from "@/lib/coupons";
 import { buildCouponBatch, buildSingleCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, isKickoffToday, MARKET_LABELS } from "@/lib/domain";
-import { fmtMoney, fmtOdds, fmtPct, matchLabel, parseDecimal } from "@/lib/format";
+import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
 import type { Coupon, CouponStatus, CouponType, Prediction } from "@/lib/types";
@@ -45,7 +45,6 @@ function Kupony() {
 
   const [couponCount, setCouponCount] = useState("2");
   const [couponSize, setCouponSize] = useState<1 | 3>(3);
-  const [stake, setStake] = useState("4");
   const recordStake = true;
   const [couponType, setCouponType] = useState<CouponType>("TEST");
   const [namePrefix, setNamePrefix] = useState("MONEYBALL");
@@ -75,8 +74,7 @@ function Kupony() {
     .sort((a, b) => Number(b.probability) - Number(a.probability));
 
   const requestedCount = Math.max(1, Math.min(20, Math.floor(Number(couponCount) || 1)));
-  const stakeValue = parseDecimal(stake);
-  const stakeError = stakeValue == null || stakeValue <= 0 ? "Stawka musi być większa od zera." : "";
+  const stakeValue = 4;
   const preview = generated;
   const previewMissingOdds = preview.some((coupon) => coupon.some((prediction) => prediction.odds == null || Number(prediction.odds) <= 1));
   const uniqueCandidateMatches = new Set(candidates.map((prediction) => prediction.match_id)).size;
@@ -134,7 +132,6 @@ function Kupony() {
     if (batch.length > 0) saveBatch.mutate(batch);
   }
   const saveDisabled =
-    !!stakeError ||
     saveBatch.isPending ||
     candidates.length < couponSize ||
     preview.some((coupon) => coupon.length !== couponSize) ||
