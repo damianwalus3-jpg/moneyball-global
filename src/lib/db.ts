@@ -2,6 +2,7 @@ import { requireSupabase } from "./supabase";
 import { COLUMNS, OWNER_COLUMN } from "./schema";
 import type { TableName, TableRows } from "./types";
 import { brusselsDayKey, brusselsInputToISO } from "./time";
+import { isEuropeanTopTwoLeague } from "./domain";
 
 export interface DashboardMarketStats {
   won: number;
@@ -475,6 +476,62 @@ export async function fetchMatchSettlementContext(matchId: string): Promise<Matc
     legs,
     coupons,
     existingResult: ((resultResult.data ?? [])[0] ?? undefined) as unknown as TableRows["match_results"] | undefined,
+  };
+}
+
+export interface StatisticsPageData {
+  matches: TableRows["matches"][];
+  predictions: TableRows["predictions"][];
+  coupons: TableRows["coupons"][];
+  legs: TableRows["coupon_legs"][];
+}
+
+/** Statistics need the full eligible sample, but not predictions for every
+ * historical fixture/model version. Keep the exact league rule in the domain
+ * layer and fetch active-model predictions only for eligible match IDs. */
+export async function fetchStatisticsPageData(): Promise<StatisticsPageData> {
+  const uid = await currentUserId();
+  const sb = requireSupabase();
+  const [matchesResult, couponsResult, legsResult] = await Promise.all([
+    withRequestTimeout(
+      sb.from("matches").select(READ_COLUMNS.matches.join(",")).eq(OWNER_COLUMN, uid),
+      "Pobieranie meczów do statystyk",
+    ),
+    withRequestTimeout(
+      sb.from("coupons").select(READ_COLUMNS.coupons.join(",")).eq(OWNER_COLUMN, uid),
+      "Pobieranie kuponów do statystyk",
+    ),
+    withRequestTimeout(
+      sb.from("coupon_legs").select(READ_COLUMNS.coupon_legs.join(",")).eq(OWNER_COLUMN, uid),
+      "Pobieranie nóg kuponów do statystyk",
+    ),
+  ]);
+  if (matchesResult.error) throw new Error(humanizeError(matchesResult.error, "matches"));
+  if (couponsResult.error) throw new Error(humanizeError(couponsResult.error, "coupons"));
+  if (legsResult.error) throw new Error(humanizeError(legsResult.error, "coupon_legs"));
+
+  const matches = (matchesResult.data ?? []) as unknown as TableRows["matches"][];
+  const eligibleMatchIds = matches
+    .filter((match) => isEuropeanTopTwoLeague(match.country, match.competition ?? match.league))
+    .map((match) => match.id);
+  const predictions = eligibleMatchIds.length === 0 ? [] : await fetchInChunks<TableRows["predictions"]>(
+    eligibleMatchIds, 100, async (chunk) => {
+      const { data, error } = await withRequestTimeout(
+        sb.from("predictions").select(READ_COLUMNS.predictions.join(","))
+          .eq(OWNER_COLUMN, uid)
+          .in("match_id", chunk)
+          .or("model_version.eq.MONEYBALL GLOBAL 3.8,model_version.like.MANUAL%"),
+        "Pobieranie aktywnych prognoz do statystyk",
+      );
+      if (error) throw new Error(humanizeError(error, "predictions"));
+      return (data ?? []) as unknown as TableRows["predictions"][];
+    },
+  );
+  return {
+    matches,
+    predictions,
+    coupons: (couponsResult.data ?? []) as unknown as TableRows["coupons"][],
+    legs: (legsResult.data ?? []) as unknown as TableRows["coupon_legs"][],
   };
 }
 
