@@ -118,41 +118,36 @@ const READ_COLUMNS: Record<TableName, readonly string[]> = {
 
 const PAGE = 250;
 const MAX_PARALLEL_PAGES = 3;
+const RAW_CACHE_MS = 8_000;
 const inFlightTableReads = new Map<string, Promise<unknown>>();
+const rawTableCache = new Map<string, { expiresAt: number; rows: unknown[] }>();
 
 async function fetchRawAllUncached<K extends TableName>(table: K, uid: string): Promise<TableRows[K][]> {
   const sb = requireSupabase();
   const columns = READ_COLUMNS[table].join(",");
-  const { count, error: countError } = await sb
-    .from(table)
-    .select("id", { count: "exact", head: true })
-    .eq(OWNER_COLUMN, uid);
-  if (countError) throw new Error(humanizeError(countError, table));
-  const pageCount = Math.ceil((count ?? 0) / PAGE);
-  if (pageCount === 0) return [];
-
   const rows: TableRows[K][] = [];
-  // Keep each SQL statement small and cap concurrency to avoid saturating
-  // PostgREST when a screen needs several related tables at once.
-  for (let firstPage = 0; firstPage < pageCount; firstPage += MAX_PARALLEL_PAGES) {
+  // Do not run a separate COUNT(*) request before every table read. Read
+  // bounded pages and stop as soon as the server returns a short page.
+  for (let firstPage = 0; ; firstPage += MAX_PARALLEL_PAGES) {
     const batch = await Promise.all(
-      Array.from(
-        { length: Math.min(MAX_PARALLEL_PAGES, pageCount - firstPage) },
-        (_, offset) => {
-          const page = firstPage + offset;
-          return sb
-            .from(table)
-            .select(columns)
-            .eq(OWNER_COLUMN, uid)
-            .order("id", { ascending: true })
-            .range(page * PAGE, (page + 1) * PAGE - 1);
-        },
-      ),
+      Array.from({ length: MAX_PARALLEL_PAGES }, (_, offset) => {
+        const page = firstPage + offset;
+        return sb
+          .from(table)
+          .select(columns)
+          .eq(OWNER_COLUMN, uid)
+          .order("id", { ascending: true })
+          .range(page * PAGE, (page + 1) * PAGE - 1);
+      }),
     );
+    let hasMore = true;
     for (const result of batch) {
       if (result.error) throw new Error(humanizeError(result.error, table));
-      rows.push(...((result.data ?? []) as unknown as TableRows[K][]));
+      const pageRows = (result.data ?? []) as unknown as TableRows[K][];
+      rows.push(...pageRows);
+      if (pageRows.length < PAGE) hasMore = false;
     }
+    if (!hasMore) break;
   }
   return rows;
 }
@@ -160,15 +155,25 @@ async function fetchRawAllUncached<K extends TableName>(table: K, uid: string): 
 async function fetchRawAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
   const uid = await currentUserId();
   const key = `${uid}:${table}`;
+  const cached = rawTableCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.rows as TableRows[K][];
   const existing = inFlightTableReads.get(key);
   if (existing) return existing as Promise<TableRows[K][]>;
-  const request = fetchRawAllUncached(table, uid);
+  const request = fetchRawAllUncached(table, uid).then((rows) => {
+    rawTableCache.set(key, { rows, expiresAt: Date.now() + RAW_CACHE_MS });
+    return rows;
+  });
   inFlightTableReads.set(key, request);
   try {
     return await request;
   } finally {
     if (inFlightTableReads.get(key) === request) inFlightTableReads.delete(key);
   }
+}
+
+function invalidateRawTableCache(table?: TableName) {
+  if (!table) { rawTableCache.clear(); return; }
+  for (const key of rawTableCache.keys()) if (key.endsWith(":" + table)) rawTableCache.delete(key);
 }
 
 /** Read adapter for screens still using the previous field names. All writes
@@ -289,7 +294,7 @@ export async function insertRows<K extends TableName>(
 ): Promise<TableRows[K][]> {
   if (rows.length === 0) return [];
   const uid = await currentUserId();
-  const payload = rows.map((row) => ({ ...whitelist(table, row), [OWNER_COLUMN]: uid }));
+  invalidateRawTableCache(table);\n  const payload = rows.map((row) => ({ ...whitelist(table, row), [OWNER_COLUMN]: uid }));
   const { data, error } = await requireSupabase()
     .from(table)
     .insert(payload)
@@ -306,7 +311,7 @@ export async function insertRow<K extends TableName>(table: K, row: Record<strin
 
 export async function updateRow(table: TableName, id: string, patch: Record<string, unknown>) {
   const uid = await currentUserId();
-  const safePatch = whitelist(table, patch);
+  invalidateRawTableCache(table);\n  const safePatch = whitelist(table, patch);
   const { error } = await requireSupabase()
     .from(table)
     .update(safePatch)
