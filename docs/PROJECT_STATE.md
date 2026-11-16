@@ -244,3 +244,21 @@ At the time of the live query on 2026-11-16:
 6. Do not use the current API-Football sync's direct prediction settlement as the authoritative settlement route without reconciling coupon legs and bankroll ledger. Prefer the existing canonical result/coupon settlement functions.
 7. Next validation: use a fixed sample of actual today's eligible fixtures; measure provider fixture match rate, market/outcome match rate, bookmaker jurisdiction, quote age, suspended share, error rate and request/credit cost. Only then choose a secondary provider.
 8. No production code or data was modified by this audit pass. The checks above were read-only; production remains in its previously recorded deployment state.
+
+
+### Additional live-data audit — 2026-11-16 13:xx UTC
+A follow-up read-only query shows the application does have fresh non-odds enrichment data:
+- `match_market_data` source `MONEYBALL_PUBLIC_AGGREGATOR`: 1,858 rows, latest 2026-11-16 13:14:54 UTC, 9 within the last six hours.
+- `FootyNomad`: 136 rows, latest 13:17:44 UTC, 9 within six hours.
+- `StrikerAPI`: 57 rows, latest 2026-11-10 11:54:17 UTC, none within six hours.
+- Recent sample payloads show the public aggregator is currently providing ESPN-derived last-five form and match statistics; it is not a current bookmaker price feed. FootyNomad rows likewise contain team form. Do not count these as odds or xG unless the actual payload field supports that interpretation.
+- Brussels-local fixture status query: 25 scheduled, 3 live, 3 postponed for the current day at audit time. The current feed must not treat postponed or live matches as pre-match coupon candidates.
+
+### Updated provider selection
+- Keep FootyNomad as the canonical fixture/list source per project requirements, and use fresh public aggregator/ESPN-derived form as a corroborating enrichment source where the data is match-specific and timestamped.
+- StrikerAPI is configured but its production match-market-data rows are stale since 2026-11-10; the sync code's 30-day schedule window and eight-league hardcoding also conflict with the app's strict daily/Europe/league-scope requirements. It should not be allowed to widen today's match list.
+- PitchAPI's code is potentially useful for xG/H2H/lineup enrichment, but the production health endpoint explicitly reports no key. Do not label its data as active.
+- MoviOdds is not authenticated; current odds rows are stale. The Odds API's free public tier is 500 credits/month and lists selected EU bookmakers (including Unibet, Pinnacle and Betfair), but Belgian bookmaker/jurisdiction coverage remains unverified. Do not integrate it as a Belgian price source without a real-fixture test.
+
+### Audit ledger commit
+- `42d529e1597195054a43f3c0d3b4b84d10ad581d` — expanded provider, source, and production findings recorded in this file. Documentation-only commit; no production code, migrations, or data were changed in that commit.
