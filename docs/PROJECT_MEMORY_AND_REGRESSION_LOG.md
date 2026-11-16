@@ -279,3 +279,11 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - W poprzednim oknie 24h results-sync: 192 wywołania, średnio 8.865 s, p95 14.098 s, max 26.796 s, 0 HTTP 5xx. Po zmianach zmierzyć ponownie ten sam zestaw metryk i rozdzielić oszczędność reschedule/alternates.
 - Weryfikacja GitHub Actions dla commitów Edge Function/migracji była w toku przy ostatnim odczycie: CI #833/#834/#835; Cloudflare deploy #421 dla SHA `c1b09e1...` in progress; wcześniejsze Cloudflare runy #419/#420 zostały anulowane przez concurrency. Ponieważ zmiany Edge Function wdrożono bezpośrednio w Supabase, Cloudflare Worker nie zawiera logiki Edge Function; nie uznawać CI/deploy Worker za test Edge Function.
 - Nie zmieniono harmonogramu głównego results-sync (pozostaje co 5 minut), nie włączono MoviOdds cron i nie zmieniono bankrolla, kuponów, wyników ani predykcji.
+
+
+## Hotfix harmonogramu predykcji po hardeningu RPC — 2026-11-16
+- Po odebraniu anon/authenticated bezpośredniego EXECUTE na `moneyball_cron_token_valid(text)` monitoring ujawnił, że `moneyball-predict` nadal weryfikował token przez REST z anon publishable key. To powodowało `Nieprawidłowy token harmonogramu` w cyklach 20:32–20:38 UTC. Błąd został powiązany czasowo i kodowo z migracją uprawnień; nie pozostawiono go bez naprawy.
+- Zachowano bezpieczne REVOKE. Zmieniono `supabase/functions/moneyball-predict/index.ts`, aby weryfikacja helpera cron używała SERVICE_KEY zarówno jako apikey, jak i Bearer. Token nadal jest sprawdzany przez bazę; nie osłabiono uprawnień publicznych.
+- Produkcyjna Edge Function `moneyball-predict` wdrożona bezpośrednio jako v218 ACTIVE, verify_jwt=false (dotychczasowe ustawienie zachowane), artefakt SHA `e15cce4c64dbcab0654afbbc1899f98fd214cec2614e93f5ba486a591642e8bb`.
+- Kod zapisany w GitHub main: commit `e8fac33e91bd2be35ce087d7ce878d7a9706b033`. CI i kolejny cykl cron po v218 wymagają potwierdzenia; ostatnie logi pobrane bezpośrednio po deployu zawierały jeszcze tylko wywołania v217, które wystartowały przed wdrożeniem.
+- Weryfikacja po wdrożeniu: sprawdzić kolejne wywołanie cron moneyball-predict (co minutę) — brak `Nieprawidłowy token harmonogramu`, status HTTP 200, rozpoczęcie/zakończenie skanu i brak błędów lease. Nie zamykać tego punktu do czasu logu v218.
