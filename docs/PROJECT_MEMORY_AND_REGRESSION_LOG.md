@@ -338,3 +338,10 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - GitHub CI #848 i Cloudflare Worker deploy #434 dla SHA `645c05b9663eb04869a8e8964cb668a6572e23ea` zakończone SUCCESS. Deploy zawiera aktualny stan gałęzi main z migracją harmonogramu.
 - Read-only precheck dla 2026-11-17: 2 mecze kwalifikujące się do zakresu 1./2. ligi; oba FootyNomad z numerycznymi external_id i przyszłym kickoffem. Brak cache FootyNomad/FotbalInfo przed skanem — oba kwalifikują się do ograniczonego pobrania formy w jutrzejszej partii. Nie uruchamiano skanu przed zaplanowanym czasem.
 - Aktualny status: synchronizacja wyników co 5 minut działa; skan predykcji ma dwa dzienne okna 08:00 i 15:00 Europe/Brussels, batch continuation co minutę tylko gdy jest więcej wyników. Cron MoviOdds pozostaje wyłączony.
+
+
+## Drugi pomiar po optymalizacji results-sync v71 — 2026-11-16 20:50 UTC
+- Drugi przebieg produkcyjny v71 zakończony HTTP 200 w 4.210 s; zero błędów. Wyniki: 2 zapisane/odświeżone, 26 predykcji rozliczonych, 5 kuponów sprawdzonych, 0 zmian finansowych.
+- Reschedule lookup ponownie pominięty: 62 ms; alternatywne źródła 481 ms; OpenLigaDB pominięty, ESPN i TheSportsDB zwróciły dane, OpenMatchday 0 feed rows.
+- Dwa przebiegi po zmianie: 4.769 s i 4.210 s (średnia 4.490 s), wobec pojedynczego baseline v68 6.125 s — średnio ok. 26.7% krócej. To wstępny pomiar z dwóch cykli, nadal monitorować kolejne 5-minutowe uruchomienia.
+- Harmonogram predykcji o 20:50 ponownie zwrócił HTTP 200 cooldown z `next_scan_at=2026-11-17T07:00:00Z`; stan pozostaje completed, lease null. Nie uruchomiono dodatkowego skanu.
