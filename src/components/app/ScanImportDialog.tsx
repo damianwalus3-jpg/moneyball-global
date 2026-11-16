@@ -1,17 +1,18 @@
 import { Download, FileUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/app/ui-bits";
 import { downloadFile, parseCsv } from "@/lib/backup";
-import { useAction, useTable } from "@/lib/queries";
+import { tableQuery, useAction } from "@/lib/queries";
 import { parseScanRows, SCAN_TEMPLATE_CSV, type ParsedScan } from "@/lib/scan-import";
 import { importScan } from "@/lib/scan-import-service";
 
 export function ScanImportDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const matches = useTable("matches");
+  // This dialog is mounted on the Matches page even while closed. Do not load\n  // the complete match archive until the user actually opens the import flow.\n  const matchesQuery = useQuery({ ...tableQuery("matches"), enabled: open });\n  const matches = matchesQuery.data ?? [];
   const [text, setText] = useState("");
   const [source, setSource] = useState("CSV import");
 
@@ -38,6 +39,7 @@ export function ScanImportDialog({ open, onOpenChange }: { open: boolean; onOpen
   const run = useAction(
     async () => {
       if (!parsed) throw new Error("Wklej lub wczytaj poprawny CSV.");
+      if (matchesQuery.isPending || matchesQuery.isError) throw new Error("Lista meczów nie została poprawnie załadowana. Zamknij i otwórz import ponownie.");
       if (parsed.errors.length) throw new Error("Popraw błędy w wierszach przed importem.");
       if (!source.trim()) throw new Error("Podaj źródło importu.");
       return importScan(parsed, matches, source);
@@ -89,6 +91,8 @@ export function ScanImportDialog({ open, onOpenChange }: { open: boolean; onOpen
               className="font-mono text-xs"
             />
           </Field>
+          {matchesQuery.isFetching && <p className="text-sm text-muted-foreground">Ładowanie istniejących meczów potrzebnych do bezpiecznej deduplikacji importu…</p>}
+          {matchesQuery.isError && <p className="text-sm text-destructive">Nie udało się pobrać istniejących meczów. Import jest zablokowany, aby nie tworzyć duplikatów.</p>}
           {parseError && <p className="text-sm text-destructive">{parseError}</p>}
           {parsed && (
             <div className="rounded-lg border border-border p-3 text-sm">
@@ -112,7 +116,7 @@ export function ScanImportDialog({ open, onOpenChange }: { open: boolean; onOpen
         </div>
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Anuluj</Button>
-          <Button onClick={() => run.mutate(undefined)} disabled={!parsed || parsed.errors.length > 0 || run.isPending}>
+          <Button onClick={() => run.mutate(undefined)} disabled={!parsed || parsed.errors.length > 0 || run.isPending || matchesQuery.isPending || matchesQuery.isError}>
             {run.isPending ? "Importowanie…" : "Importuj skan"}
           </Button>
         </DialogFooter>
