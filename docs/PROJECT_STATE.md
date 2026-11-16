@@ -345,3 +345,31 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Unit tests and TypeScript/build have not yet been observed passing in GitHub Actions in this session.
 - Vercel status checks on the recent UI commits report `failure` with `build-rate-limit`; this is a Vercel account/build quota issue, not a verified source compilation error. Do not claim the Vercel deployment has completed.
 - Latest source data query still finds zero fresh mapped prematch odds; a valid provider credential and successful feed sync are still required before real coupon prices can appear.
+
+
+## Production health re-check — 2026-11-16 14:55 Europe/Brussels
+
+### Confirmed healthy
+- Supabase project `gzgeklcukrclgwbsmbsp` reports `ACTIVE_HEALTHY` (Postgres 17.11).
+- Core tables exist: matches, predictions, provider_odds, odds_snapshots, coupons, coupon_legs, bankroll_transactions, scan_runs, match_results.
+- Live Cloudflare Worker root `https://moneyball-global.damianwalus3.workers.dev` returns MONEYBALL GLOBAL 2.0 public shell; observed response time ~453 ms.
+- Public Vercel URL `https://finalne-typy.vercel.app` returns a different page titled "Moneyball Intelligence", app-version 3.9.4, with tracker-specific copy; observed shell response ~145 ms. Treat this as a separate/legacy frontend until its deployment relationship is confirmed.
+- Supabase MoviOdds GET health responds successfully in ~300 ms and correctly reports `key_configured:false`.
+- Current Brussels-day fixtures in canonical matches table: 31 (25 scheduled, 3 live, 3 postponed).
+- Current Brussels-day predictions: 252; 110 have a non-null numeric odds field; latest prediction row created 2026-11-16 13:17:53 UTC (14:17:53 Brussels). 24 rows were created in the preceding hour at the time of audit.
+- FootyNomad sync requests return HTTP 200 and report 26 fixtures on latest refresh; results sync requests return HTTP 200 every five minutes.
+- Today's scan_runs include 12 completed and 1 partial.
+
+### Confirmed blockers / caveats
+- No fresh mapped, unsuspended, prematch provider_odds quote exists within six hours.
+- MoviOdds API key remains unconfigured, so there are no current bet365 quotes.
+- Prediction cron job 11 (one-minute batches) is inactive. This was deliberately paused by migration `20261115195133_pause_overlapping_prediction_cron` to avoid overlapping heavy prediction runs. Do not reactivate it without replacing it with a bounded, non-overlapping batch scheduler.
+- Result sync returns HTTP 200, but latest runs report 0 results saved / 0 predictions settled; alternate source reports 12 candidate matches, but no settlement was written in the latest checked run. This requires score/status matching audit before declaring automatic settlement healthy.
+- The `moneyball-predict` endpoint returns 401 to an unauthenticated public GET; this is expected because `verify_jwt=true`, not proof of a broken function.
+- Vercel checks on recent source commits fail with `build-rate-limit`; deployment of those changes is not confirmed.
+- No logged-in end-to-end test of the protected app screens was possible in this audit. Public landing shell success is not proof that dashboard, coupons, statistics, or settlement screens work.
+
+### Decision
+- The product is not abandoned: database, Worker shell, FootyNomad refresh and result-sync scheduling are responding.
+- It is not production-ready as a betting workflow: current odds feed is empty, prediction scheduling is paused, and settlement writes were not observed in the latest result-sync run.
+- Next engineering work: (1) restore a bounded non-overlapping prediction batch scheduler, (2) audit result matching and verify at least one real finished match through prediction/coupon settlement, (3) activate a properly authorized odds feed, (4) unblock CI/build and confirm deployment, (5) authenticated E2E performance test.
