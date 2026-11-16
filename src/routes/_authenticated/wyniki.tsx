@@ -1,20 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { CheckCircle2, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DataError, EmptyState, PageHeader, PageLoader, SelectionBadge, SettlementBadge, TypeBadge } from "@/components/app/ui-bits";
-import { isActivePredictionVersion } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
-import { resultsPageDataQuery, useAction, useResultsPageData } from "@/lib/queries";
+import { resultsPagesQuery, useAction } from "@/lib/queries";
 import { brusselsDayKey, fmtTime } from "@/lib/time";
 import { getSupabase } from "@/lib/supabase";
 import type { Prediction } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/wyniki")({
   head: () => ({ meta: [{ title: "Wyniki · MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Chronologiczna historia wyników meczów i rozliczeń typów." }] }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(resultsPageDataQuery()),
   pendingComponent: PageLoader,
   errorComponent: DataError,
   component: Wyniki,
@@ -30,11 +29,11 @@ function profitFor(p: Prediction): number | null {
   return null;
 }
 function Wyniki() {
-  const { matches, predictions, results } = useResultsPageData();
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
-  const resultBy = useMemo(() => new Map(results.map(r => [r.match_id, r])), [results]);
-  const active = useMemo(() => predictions.filter(p => isActivePredictionVersion(p.model_version)), [predictions]);
+  const pageQuery = useInfiniteQuery(resultsPagesQuery({ filter, search }));
+  const rows = pageQuery.data?.pages.flatMap((page) => page.rows) ?? [];
+  const summary = pageQuery.data?.pages[0];
   const refresh = useAction(async () => {
     const sb = getSupabase();
     if (!sb) throw new Error("Brak połączenia z bazą.");
@@ -47,24 +46,10 @@ function Wyniki() {
     return response.data;
   }, { success: r => "Odświeżono wyniki · dopasowano " + (r.matches_matched ?? 0) + " · rozliczono " + (r.predictions_settled ?? 0) + " typów" });
 
-  const now = Date.now();
-  const from = now - 72 * 60 * 60 * 1000;
-  const to = now + 24 * 60 * 60 * 1000;
-  const rows = matches
-    .filter(m => m.kickoff_at && new Date(m.kickoff_at).getTime() >= from && new Date(m.kickoff_at).getTime() <= to)
-    .map(match => ({ match, result: resultBy.get(match.id), picks: active.filter(p => p.match_id === match.id) }))
-    .filter(({ picks }) => picks.length > 0)
-    .filter(({ match, picks }) => {
-      if (filter === "final" && !picks.some(p => p.verdict === "WYBRANY")) return false;
-      if (filter === "rejected" && !picks.some(p => p.verdict === "ODRZUCONY")) return false;
-      if (filter === "jackpot" && !picks.some(p => /jackpot/i.test(p.group_name))) return false;
-      return !search || (matchLabel(match) + " " + (match.competition ?? "")).toLowerCase().includes(search.toLowerCase());
-    })
-    .sort((a,b) => (b.match.kickoff_at ?? "").localeCompare(a.match.kickoff_at ?? ""));
-  const totalPicks = rows.reduce((n,r) => n+r.picks.length,0);
-  const selectedPicks = rows.reduce((n,r) => n+r.picks.filter(p=>p.verdict==="WYBRANY").length,0);
-  const verified = rows.filter(r=>r.result?.verified).length;
-  const needsResult = rows.filter(r=>r.match.status==="finished" && !r.result?.verified).length;
+  const totalPicks = summary?.picks_count ?? 0;
+  const selectedPicks = summary?.selected_picks ?? 0;
+  const verified = summary?.verified ?? 0;
+  const needsResult = summary?.needs_result ?? 0;
   const grouped = new Map<string, typeof rows>();
   for (const row of rows) {
     const key = brusselsDayKey(row.match.kickoff_at!);
@@ -74,9 +59,9 @@ function Wyniki() {
   return <div>
     <PageHeader eyebrow="Tracker · godziny Belgii (CET/CEST)" title="Wyniki · chronologicznie" description="Wyniki meczów oraz rozliczenia typów FINAL, ODRZUCONY i JACKPOT." actions={<Button variant="outline" onClick={()=>refresh.mutate()} disabled={refresh.isPending}><RefreshCw className={refresh.isPending ? "animate-spin" : ""}/>{refresh.isPending ? "Aktualizuję…" : "Odśwież"}</Button>} />
     <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-      <div className="surface-card p-3"><div className="text-xs text-muted-foreground">Mecze z typami</div><div className="num text-xl font-bold">{rows.length}</div></div>
+      <div className="surface-card p-3"><div className="text-xs text-muted-foreground">Mecze z typami</div><div className="num text-xl font-bold">{summary?.matches_count ?? 0}</div></div>
       <div className="surface-card p-3"><div className="text-xs text-muted-foreground">Liczba typów</div><div className="num text-xl font-bold">{totalPicks}</div><div className="text-xs text-muted-foreground">{selectedPicks} wybranych</div></div>
-      <div className="surface-card p-3"><div className="text-xs text-muted-foreground">Wyniki potwierdzone</div><div className="num text-xl font-bold text-success">{verified}/{rows.length}</div></div>
+      <div className="surface-card p-3"><div className="text-xs text-muted-foreground">Wyniki potwierdzone</div><div className="num text-xl font-bold text-success">{verified}/{summary?.matches_count ?? 0}</div></div>
       <div className="surface-card p-3"><div className="text-xs text-muted-foreground">Do uzupełnienia</div><div className="num text-xl font-bold text-warning">{needsResult}</div></div>
     </div>
     <div className="mb-4 flex flex-wrap gap-2">
@@ -84,11 +69,13 @@ function Wyniki() {
       <div className="relative min-w-0 flex-1"><Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground"/><Input className="pl-8" placeholder="Szukaj meczu lub ligi…" value={search} onChange={e=>setSearch(e.target.value)}/></div>
     </div>
     <div className="mb-4 flex flex-wrap gap-2 text-xs">
-      <span className="rounded-full border border-border px-3 py-2">● {verified} / {rows.length} z potwierdzonym wynikiem</span>
+      <span className="rounded-full border border-border px-3 py-2">● {verified} / {summary?.matches_count ?? 0} z potwierdzonym wynikiem</span>
       <span className="rounded-full border border-warning/40 px-3 py-2 text-warning">{needsResult} wyników do sprawdzenia</span>
       <span className="rounded-full border border-border px-3 py-2">Godziny: Belgia (CET/CEST)</span>
     </div>
-    {rows.length === 0 ? <EmptyState icon={CheckCircle2} title="Brak meczów z typami w tym okresie" description="Historia pozostaje zapisana w bazie. Ta lista pokazuje ostatnie 72 godziny i najbliższe 24 godziny."/> :
+    {pageQuery.isPending ? <div className="surface-card p-6 text-center text-sm text-muted-foreground">Ładowanie wyników…</div>
+      : pageQuery.isError ? <div className="surface-card flex flex-wrap items-center justify-between gap-3 p-4 text-sm"><span className="text-destructive">Nie udało się pobrać wyników: {pageQuery.error.message}</span><Button size="sm" variant="outline" onClick={() => pageQuery.refetch()}>Spróbuj ponownie</Button></div>
+      : rows.length === 0 ? <EmptyState icon={CheckCircle2} title="Brak meczów z typami w tym okresie" description="Historia pozostaje zapisana w bazie. Ta lista pokazuje ostatnie 72 godziny i najbliższe 24 godziny."/> :
       <div className="grid gap-6">{Array.from(grouped.entries()).map(([day,items])=><section key={day}>
         <div className="mb-2 flex items-center justify-between border-b border-border pb-2"><div className="font-semibold">{day === brusselsDayKey(new Date()) ? "Dzisiaj" : "Historia · " + day}</div><Badge variant="muted">{items.length} meczów</Badge></div>
         <div className="grid gap-2">{items.map(({match,result,picks})=><article key={match.id} className="surface-card p-3 sm:p-4">
@@ -104,5 +91,6 @@ function Wyniki() {
           </div>)}</div>
         </article>)}</div>
       </section>)}</div>}
+    {pageQuery.hasNextPage && <div className="mt-4 flex justify-center"><Button variant="outline" onClick={() => pageQuery.fetchNextPage()} disabled={pageQuery.isFetchingNextPage}>{pageQuery.isFetchingNextPage ? "Wczytywanie…" : "Wczytaj kolejne 30 meczów"}</Button></div>}
   </div>;
 }
