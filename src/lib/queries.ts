@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun, fetchCouponPageData, fetchMatchPageData, fetchResultsPage, fetchHistoryPage, fetchStatisticsPageData } from "./db";
+import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun, fetchCouponPageData, fetchMatchPageData, fetchMatchesByIds, fetchResultsPage, fetchHistoryPage, fetchStatisticsPageData } from "./db";
 import type { HistoryPageCursor, ResultsPageCursor } from "./db";
 import type { TableName, TableRows } from "./types";
 
@@ -66,6 +66,18 @@ export function tableQuery<K extends TableName>(table: K) {
     queryKey: ["table", table] as const,
     queryFn: () => fetchAll(table),
     ...refresh,
+  });
+}
+
+export function predictionMatchesQuery(matchIds: string[]) {
+  const ids = [...new Set(matchIds.filter(Boolean))].sort();
+  return queryOptions({
+    queryKey: ["prediction-matches", ids] as const,
+    queryFn: () => fetchMatchesByIds(ids),
+    enabled: ids.length > 0,
+    staleTime: 120_000,
+    gcTime: 600_000,
+    refetchInterval: false,
   });
 }
 
