@@ -22,7 +22,7 @@ export const TABLE_REFRESH = {
   refetchOnWindowFocus: true,
 } as const;
 
-const TABLE_REFRESH_BY_NAME: Partial<Record<TableName, typeof TABLE_REFRESH>> = {
+const TABLE_REFRESH_BY_NAME = {
   // Fixtures are expensive to refresh and the user requires a 15-minute cadence.
   // Dashboard summaries remain on LIVE_REFRESH and are intentionally separate.
   matches: {
