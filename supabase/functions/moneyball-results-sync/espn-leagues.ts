@@ -34,7 +34,8 @@ export function selectEspnLeagues(fixtures: EspnLeagueNeed[]): string[] {
     const gender = normalize(fixture.gender);
     const isWomen = gender === "women" || /\b(women|womens|female|girls)\b/.test(competition);
 
-    if (/\b(champions league|europa league|conference league|nations league|uefa)\b/.test(competition)) {
+    const isUefaCompetition = /\b(champions league|europa league|conference league|nations league|uefa)\b/.test(competition);
+    if (isUefaCompetition) {
       if (/\bwomen|female\b/.test(competition) || isWomen) {
         if (/\bnations\b/.test(competition)) selected.add("uefa.w.nations");
         else selected.add("uefa.w.europa");
@@ -44,13 +45,19 @@ export function selectEspnLeagues(fixtures: EspnLeagueNeed[]): string[] {
       else if (/\bnations\b/.test(competition)) selected.add("uefa.nations");
     }
 
+    if (isUefaCompetition) continue;
     const prefix = COUNTRY_PREFIX[country];
     if (!prefix) continue;
     if (isWomen) {
       const women'sCompetitions = WOMEN[prefix] ?? [];
-      for (const code of women'sCompetitions) {
-        if (code.endsWith(".1") || /\b(fa cup|league cup|knvb cup|cup)\b/.test(competition)) selected.add(code);
-      }
+      const cupCode = /\b(fa cup)\b/.test(competition) ? prefix + ".w.fa"
+        : /\b(league cup)\b/.test(competition) ? prefix + ".w.league_cup"
+        : /\b(promotion|relegation)\b/.test(competition) ? prefix + ".w.promotion.relegation"
+        : /\b(knvb cup)\b/.test(competition) ? prefix + ".w.knvb_cup"
+        : null;
+      const leagueCode = women'sCompetitions.find((code) => code.endsWith(".1"));
+      if (cupCode && women'sCompetitions.includes(cupCode)) selected.add(cupCode);
+      else if (leagueCode) selected.add(leagueCode);
       continue;
     }
 
