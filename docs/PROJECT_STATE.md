@@ -157,3 +157,10 @@ User reports losing valid predictions because bookmaker prices cannot be confirm
 - No new odds-source code has been committed or deployed in this audit.
 - MoviOdds key configuration, live sync metrics, actual quote coverage, and Bwin/Kambi/API-Football deployed implementations remain unverified.
 - Next: inspect Supabase logs and deployed source, then run fixture-level coverage comparison before selecting a secondary feed.
+
+
+### Production log findings from the same audit
+- Supabase logs show `moneyball-movi-odds-sync` is being called automatically, not merely sitting idle.
+- In the last 24h log window, the function had multiple POST HTTP 200 syncs (some taking about 12–74 seconds, one up to ~107 seconds) and repeated POST HTTP 500 failures (roughly 1–5 seconds). There were also GET health checks returning 200.
+- This confirms the current single-provider sync is intermittent and slow; it is a concrete likely contributor to missing/unconfirmed prices. The log query did not expose the JSON response body for each failed POST, so the precise 500 cause is not yet proven. Do not guess whether it is auth, MoviOdds, catalog, or database until inspecting invocation response/diagnostic logs.
+- Next fix should make the sync resilient and observable: per-match errors instead of failing the entire run, bounded batches/timeouts, and a persisted sync summary with counts for app matches, matched fixtures, snapshot successes, saved quotes, stale/suspended quotes, and provider errors. Add an independent fallback source only after the current failure mode and actual fixture coverage are measured.
