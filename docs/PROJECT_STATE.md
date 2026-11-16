@@ -411,3 +411,16 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Coupon accounting: partial pass (coupon records and settled states exist; 6 legs remain pending; full ledger audit and fresh controlled coupon settlement proof still required).
 - Performance/build/deployment: not certified in this pass. Previous Vercel build-rate-limit remains a deployment blocker; protected authenticated screens were not tested.
 - Decision: continue the project, but keep it in simulation/test mode. Do not enable real-money coupon eligibility or reactivate the old prediction cron. The next implementation must add an idempotent leased prediction queue, and the next test must exercise one real finished fixture through the entire result/settlement/ledger chain without fabricating scores. Odds remain a separate external credential/coverage dependency.
+
+
+## Manual prediction scan fallback — 2026-11-16
+
+- Added a manual full-day scan action to the authenticated dashboard in `src/routes/_authenticated/panel.tsx`.
+- Button label: `Skanuj dzisiejsze mecze`. It calls the existing JWT-protected `moneyball-predict` Edge Function through the logged-in Supabase client.
+- It processes today's Europe/Brussels date in sequential batches of 10 using the function's existing offset/batch_size contract. It does not launch parallel prediction calls. A hard ceiling of 100 batches prevents an unbounded browser session.
+- It reports the number of matches analyzed, predictions created/updated, selected model picks and batch count, and surfaces function errors. It refreshes dashboard summary, selected picks and finance queries after a completed scan.
+- The automatic fixture feed remains separately scheduled every 15 minutes; this button analyzes fixtures already synchronized into the canonical database. If a just-announced fixture has not yet been imported, wait for feed refresh or use the normal feed schedule.
+- It does not create coupons or place bets. The existing coupon flow still enforces fresh confirmed odds. This is a manual operational fallback, not a replacement for a durable server-side leased queue.
+- No cron schedule was re-enabled. No API keys or paid services were added.
+- GitHub commits: `e1d15c59aba1496239a8b13f4d5e8df25cbca3ee` (button and sequential batch runner), `eab093eaa538c2a80ae0657f53ca4ecc71357a28` (Brussels date helper fix).
+- Deployment/build and authenticated browser click test are not yet confirmed. The button is committed to `main`, but must not be described as visible in production until the deployment succeeds.
