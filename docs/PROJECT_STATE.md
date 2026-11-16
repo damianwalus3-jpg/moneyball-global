@@ -701,3 +701,13 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Added raw table cache invalidation before delete, matching insert/update behavior.
 - Added targeted statistics and match-settlement-context invalidation to `useAction` error handling, because a multi-step settlement may have partially written before a later operation fails. This ensures affected screens re-read current database state instead of showing stale derived data.
 - No schema or data changes. CI required before merge.
+
+
+## Post-deploy runtime audit — 2026-11-16 19:30 UTC
+
+- Production Worker SHA `9d639ad8fa4e6f75ddc5f8b7ca06140c0cea253a` deployed successfully as Cloudflare Worker version `d4af00f2-f226-464c-8f0a-49cf64a3f977` (deploy workflow #402). CI #811 passed.
+- The deployed asset manifest includes a dedicated `statystyki-*.js` bundle; the route uses `statisticsPageDataQuery` and no longer calls `useTable("predictions")`.
+- The attempted duplicate PR #72 was closed without merge because its scoped-statistics implementation was already present on main. No code was reverted or duplicated.
+- Supabase PostgreSQL log audit for 10:07–19:30 UTC found 23 PostgREST statement-timeout events involving the old unscoped `predictions` keyset scans, between 12:13:49 and 12:36:27 UTC. These all predate the current 18:43 UTC production deploy; no later PostgREST prediction timeout was observed in the queried window.
+- Results-sync function version 68 continued returning HTTP 200 every 5 minutes. Recent execution times between 18:50 and 19:15 UTC ranged 4.859–9.496 seconds; earlier 17:55 UTC peak was 20.238 seconds. No 5xx response was observed in the queried logs. Latency remains variable, so timeout elimination is not claimed.
+- Next: monitor logs after this deployment for recurrence of prediction timeouts and obtain a real authenticated Statistics / Results / History / menu timing measurement. Public root latency is not a substitute for authenticated measurements.
