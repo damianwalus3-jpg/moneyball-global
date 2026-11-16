@@ -724,3 +724,8 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Code-search audit: after the scoped Results, History, Predictions and Statistics work already recorded above, the CSV import was the only remaining explicit full-table prediction fetch found. Other remaining `fetchAll` uses concern bankroll transaction reconciliation/export/backup and complete coupon/leg aggregates; do not remove or narrow these without proving all-history financial parity. Match-specific prediction reads in `db.ts` are owner-scoped and filtered by match ID.
 - No production code or data was changed by this PR yet. Do not redo the completed scoped-read work; resume at the Cloudflare PR-build diagnostic, then merge/deploy and verify CSV duplicate behavior once.
 
+### CSV dedup lookup hardening — 2026-11-16
+- A deeper correctness review of the PR helper found a PostgREST response-cap edge case: 100 imported match IDs could theoretically have more than 1,000 historical prediction rows, causing a single response to omit duplicate keys.
+- Hardened `fetchExistingPredictionKeysForMatches` with deterministic UUID keyset pagination (`id > cursor`, ordered by `id`, 1,000 rows per page) inside each existing 100-match batch. The bounded four-batch concurrency remains unchanged; identity keys remain exactly match/model/market/selection.
+- This is a new guard discovered during review, not a repeat of the already-completed screen pagination work. No historical records or production data were changed.
+- New code commit: `73e4a461caf37225b616af6c6a78323801eb5eb5`. Exact-head CI must be rerun before merge.
