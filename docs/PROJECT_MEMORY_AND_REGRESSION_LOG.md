@@ -365,3 +365,11 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Health advisor: nadal 0 findings. Ostatni obserwowany cron moneyball-predict o 20:54 UTC: HTTP 200, 1.981 s; poprzednie 20:50–20:53 również HTTP 200. Results-sync v71 ostatnie dwa potwierdzone cykle HTTP 200, 4.769 s i 4.210 s, bez błędów.
 - Stan trwały projektu: `MONEYBALL GLOBAL MAIN` only, repo `damianwalus3-jpg/moneyball-global`, branch `main`, produkcja Cloudflare Workers + istniejący Supabase. Nie używać TEST, Vercel ani Lovable; nie zmieniać historycznych finansów ręcznie; stawka kuponu pozostaje 4 €; skan Europy główne ligi + 1./2. poziom o 08:00 i 15:00 Europe/Brussels; synchronizacja wyników co 5 min.
 - Otwarta blokada do pełnego testu: użytkownik musi zalogować się do MAIN w przygotowanym profilu przeglądarki (nie wysyłać hasła na czacie). Profil setup URL był przekazany wcześniej; brak potwierdzenia zapisanej sesji. Pełny E2E rozliczenia nadal wymaga rzeczywistego FT dla kuponu z zapisanymi nogami; nie wolno tworzyć sztucznego wyniku tylko dla testu.
+
+
+## Dodatkowa kontrola wyników i księgi — 2026-11-16 20:55–20:57 UTC
+- Results-sync v71 o 20:55 UTC: HTTP 200, 5.583 s; 79 fixtures pobranych, 20 dopasowanych, 2 wyniki zapisane/odświeżone, 26 prognoz rozliczonych, 0 coupon legs do rozliczenia, 0 błędów. Alternatywne źródła 14 fetched / 13 matched. Kontrola przełożeń pominięta (`skipped=true`) w 165 ms. Financial reconciliation: 5 kuponów sprawdzonych, 0 zmian, 0 błędów.
+- Cron predykcji 20:55, 20:56, 20:57: HTTP 200, `skipped=true`, `reason=cooldown`, następny skan `2026-11-17T07:00:00Z` (=08:00 Europe/Brussels). Stan completed, lease null.
+- PostgreSQL logs 20:50–20:57 UTC: brak statement timeout ani canceling statement.
+- Ponowny odczyt ledgeru (read-only): deposit 1 / 91.60 €, stake 5 / 23.00 €, return 1 / 5.25 €; saldo wynikające z zapisanych transakcji = 73.85 €. Nie zmieniano ledgeru, kuponów ani stawek.
+- Results-sync v71 kolejne próbki: 4.769 s, 4.210 s, 5.583 s; średnia 4.854 s wobec pojedynczego baseline v68 6.125 s (wstępnie ok. 20.8% krócej). Wniosek: stabilny trend wymaga większej liczby pomiarów; nie używać już wyłącznie dwóch pierwszych próbek jako jedynej średniej.
