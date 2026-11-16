@@ -170,11 +170,12 @@ async function fetchRawAllUncached<K extends TableName>(table: K, uid: string): 
   const sb = requireSupabase();
   const columns = READ_COLUMNS[table].join(",");
   const rows: TableRows[K][] = [];
-  // Do not run a separate COUNT(*) request before every table read. Read
-  // bounded pages and stop as soon as the server returns a short page.
-  for (let firstPage = 0; ; firstPage += MAX_PARALLEL_PAGES) {
+  // Read the first page alone: most operational tables fit in one page.
+  // Only fan out to parallel pages when the first page is full.
+  for (let firstPage = 0; ; ) {
+    const pageCount = firstPage === 0 ? 1 : MAX_PARALLEL_PAGES;
     const batch = await Promise.all(
-      Array.from({ length: MAX_PARALLEL_PAGES }, (_, offset) => {
+      Array.from({ length: pageCount }, (_, offset) => {
         const page = firstPage + offset;
         return sb
           .from(table)
@@ -192,6 +193,7 @@ async function fetchRawAllUncached<K extends TableName>(table: K, uid: string): 
       if (pageRows.length < PAGE) hasMore = false;
     }
     if (!hasMore) break;
+    firstPage += pageCount;
   }
   return rows;
 }
