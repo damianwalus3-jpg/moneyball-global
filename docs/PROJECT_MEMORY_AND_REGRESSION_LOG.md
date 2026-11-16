@@ -402,3 +402,15 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - GitHub CI #860 SUCCESS (Deno check, tests, TypeScript, build). Cloudflare Workers deploy #446 SUCCESS (Cloudflare build + deploy). Produkcyjny Worker po publikacji zwrócił stronę główną MONEYBALL GLOBAL 2.0; ekstrakcja root 173 ms. `/login` nadal zwraca prawidłowy formularz; jej czas ekstrakcji 3.50 s nie jest pomiarem RUM i nie może być uznany za czas ładowania UI.
 - Pełny pomiar interakcji menu i prywatnego widoku statystyk nadal wymaga zalogowanej sesji MAIN. Nie deklarować poprawy procentowej bez RUM; potwierdzony efekt kodowy to brak blokowania nawigacji przez loader statystyk.
 - Zmiana nie dotyka Supabase, wyników, kuponów, stawek, bankrolla ani historii.
+
+
+## Naprawa zakresu meczów UEFA Nations League — 2026-11-16
+- Zgłoszenie użytkownika na podstawie zrzutu ekranu: lista meczów nie pokazywała UEFA Nations League mimo trwającej kolejki; zachować europejskie ligi krajowe poziomu 1 i 2, wykluczać poziom 3 i niższe.
+- Diagnoza z produkcyjnej bazy dla 16.11.2026: rekordy UEFA Nations League były zapisane, lecz 9 spotkań miało `country='World'` i odpadało z filtra wymagającego europejskiego kraju oraz ligi krajowej top-two. Osobny mecz z `country='North Macedonia'` przechodził. W chwili audytu 9 rekordów World obejmowało 5 FT i 4 LIVE.
+- Niezależna kontrola FootyNomad: strona dzienna podawała 79 meczów, w tym sekcję UEFA Nations League z 10 spotkaniami; UEFA potwierdzała kolejkę 16.11 oraz kontynuację 17.11. Źródła: https://footynomad.com/list oraz https://www.uefa.com/uefanationsleague/news/02a2-1fea18abbcbc-456e846509e7-1000--2026-27-uefa-nations-league-all-the-league-phase-fixtures-a/
+- Naprawa: dokładny wyjątek dla `UEFA Nations League*` niezależny od kraju dostawcy, bez rozszerzania na UEFA U21/U19, puchary, kobiece rozgrywki, ligi trzeciego poziomu ani rozgrywki spoza Europy. Zachowano dotychczasową krajową allowlistę top-two.
+- Frontend/domain: `src/lib/domain.ts` i testy `src/lib/domain.test.ts`; testy obejmują Nations League (w tym wariant nazwy), UEFA U21 Qualification, Persha Liga, Druha Liga, Serie C i Premier League Cup.
+- Ingestion/prediction: poprawiono `supabase/functions/footynomad-sync/index.ts`, `moneyball-free-feed/index.ts`, `moneyball-predict/index.ts`; deployed produkcyjnie odpowiednio v66, v23, v221.
+- Baza: migracje `20261116230000_include_uefa_nations_league_in_european_scope` oraz `allow_uefa_nations_league_competition_variants`; funkcja `public.moneyball_is_european_top_two_league` uwzględnia Nations League mimo `country='World'`.
+- Test SQL po wdrożeniu: World/UEFA Nations League=true; World/UEFA Nations League - League B=true; World/UEFA U21 Championship - Qualification=false; Ukraine/Persha Liga=true; Ukraine/Druha Liga=false; Italy/Serie C=false. North Macedonia/UEFA Nations League również true.
+- Otwarte: potwierdzić następny produkcyjny feed GET i ręczny/cron skan predykcji dla bieżącej daty, następnie zweryfikować ekran Mecze po odświeżeniu i CI/Cloudflare deploy. Nie deklarować końcowego zielonego światła przed tymi testami.
