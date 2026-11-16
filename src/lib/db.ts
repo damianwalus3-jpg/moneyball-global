@@ -294,7 +294,8 @@ export async function insertRows<K extends TableName>(
 ): Promise<TableRows[K][]> {
   if (rows.length === 0) return [];
   const uid = await currentUserId();
-  invalidateRawTableCache(table);\n  const payload = rows.map((row) => ({ ...whitelist(table, row), [OWNER_COLUMN]: uid }));
+  invalidateRawTableCache(table);
+  const payload = rows.map((row) => ({ ...whitelist(table, row), [OWNER_COLUMN]: uid }));
   const { data, error } = await requireSupabase()
     .from(table)
     .insert(payload)
