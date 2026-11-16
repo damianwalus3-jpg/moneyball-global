@@ -727,3 +727,13 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Read-only database verification after deployment: matches 2,596; predictions 18,563; coupons 9; coupon legs 22; match results 883; bankroll transactions 7. No coupon, leg, bankroll or transaction rows were altered by this change.
 - The active results-sync cron remains `*/5 * * * *`. The audited 19:20–19:40 UTC sync executions returned HTTP 200 in about 7.1–9.0 seconds. PostgreSQL timeout search for 19:18–19:45 UTC returned no timeout events.
 - Do not repeat this scoped CSV deduplication work. Continue monitoring only for regressions or new bottlenecks; do not modify historical financial records without explicit user instruction.
+
+
+## History route navigation latency follow-up — 2026-11-16
+
+- Audit found the History route loader was awaiting three whole-table reads (match_results, coupons, coupon_legs) in addition to prefetching the first paginated history page.
+- Those three reads were obsolete: the current SettleMatchDialog obtains a scoped settlement context only after a specific match is selected, via fetchMatchSettlementContext.
+- Removed the redundant whole-table reads from the History route loader.
+- Changed the first history page prefetch to background/non-blocking. The History component already owns explicit loading and error states, so the page shell can render immediately while the first page loads.
+- No settlement logic, coupon data, match results, bankroll, or historical records are modified. The selected-match dialog continues to fetch and validate its own complete affected-coupon context before allowing settlement.
+- This is a targeted navigation-latency fix; it is not yet considered production until CI, build, and Cloudflare Main deployment succeed.
