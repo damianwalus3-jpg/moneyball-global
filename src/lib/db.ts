@@ -71,6 +71,40 @@ export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   return data as DashboardSummary;
 }
 
+
+export interface CouponFinanceRow {
+  id: string;
+  name: string;
+  coupon_type: string;
+  status: "won" | "lost" | "void";
+  stake: number | null;
+  odds: number | null;
+  settled_at: string;
+  payout: number | null;
+  net: number | null;
+}
+export interface CouponFinancePeriod {
+  count: number;
+  stake: number;
+  payout: number;
+  net: number | null;
+  incomplete: number;
+}
+export interface CouponFinanceSummary {
+  day: CouponFinancePeriod;
+  week: CouponFinancePeriod;
+  month: CouponFinancePeriod;
+  history: CouponFinanceRow[];
+}
+export async function fetchCouponFinanceSummary(): Promise<CouponFinanceSummary> {
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().rpc("moneyball_coupon_finance_summary"),
+    "Pobieranie historii finansowej kuponów",
+  );
+  if (error) throw new Error(humanizeError(error));
+  return data as CouponFinanceSummary;
+}
+
 export interface DashboardSelectedPick {
   prediction_id: string;
   market: string;
