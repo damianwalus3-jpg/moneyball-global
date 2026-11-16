@@ -245,7 +245,7 @@ async function readTipsAuditFairMarket(date:string,matches:any[]){
   let payload:any=null;
   if(tipsAuditPayloadCache&&Date.now()-tipsAuditPayloadCacheAt<5*60*1000)payload=tipsAuditPayloadCache;
   else{
-   const response=await fetch("https://tipsaudit.com/api/v1/predictions",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/3.8 (+https://finalne-typy.vercel.app)"},signal:AbortSignal.timeout(12000)});
+   const response=await fetch("https://tipsaudit.com/api/v1/predictions",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/3.8"},signal:AbortSignal.timeout(12000)});
    if(!response.ok)throw new Error("TipsAudit HTTP "+response.status);
    payload=await response.json();tipsAuditPayloadCache=payload;tipsAuditPayloadCacheAt=Date.now();
   }
