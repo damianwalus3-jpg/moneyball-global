@@ -185,3 +185,9 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Stan testowanych kuponów: dwa kupony TEST po 4 EUR nadal pending (3/3 nogi każdy). Ich mecze miały w bazie kickoff/statusy: Faroe Islands–Moldova live bez FT; Iceland–Luxembourg i Lithuania–Liechtenstein scheduled na 17:00 UTC; Gibraltar–Malta, Switzerland–Scotland i Greece–Serbia scheduled na 19:45 UTC. Zatem 6 pending nóg jest zgodne z terminarzem; settlement po FT dopiero zweryfikuje cały proces.
 - Wynik ostatniego results-sync sprzed wdrożenia wersji 65: HTTP 200, 79 fixtures fetched, 10 matched, 2 results saved, 26 predictions settled, 0 coupon legs settled, brak errors; financial reconciliation 5 checked / 0 failed. Ten wynik nie jest testem nowego kodu.
 - Kryterium końcowe pozostaje: po FT przynajmniej jedna noga musi przejść automatycznie do won/lost/void, status kuponu musi się zaktualizować, payout/net P&L musi być prawidłowy, saldo ma zmienić się dokładnie raz, a kolejny cykl nie może dopisać drugiego wpisu. Nie deklarować jeszcze pełnego E2E.
+
+
+### Weryfikacja po wdrożeniu Edge Function v65
+- Cron results-sync uruchomił nową wersję o 17:10 UTC i zwrócił HTTP 200, `ok:true`, financial_reconciliation: 5 checked / 0 reconciled / 0 failed / errors [], 79 fixtures, 10 matches, 2 nowe wyniki, 26 rozliczonych predykcji, 0 nóg kuponów, 0 błędów. Zero nóg jest zgodne z aktualnymi stanami meczów, a nie błędem RPC.
+- Dodatkowy test transakcyjny: tymczasowo oznaczono nogi kuponu TEST jako won, wywołano RPC i sprawdzono, że tworzy jeden wiersz zwrotu; cała symulacja została wycofana przez ROLLBACK. Następne zapytanie potwierdziło stan pierwotny: kupon pending, 3 nogi pending, 0 wierszy return. Test nie zmienił prawdziwych wyników ani salda.
+- Test dwukrotnego wywołania RPC na pending zwrócił dwa identyczne salda i brak payout; cron po deployu przeszedł bez błędów. Oczekujemy na pierwszy faktyczny FT z kuponów 4 EUR, aby zamknąć test E2E.
