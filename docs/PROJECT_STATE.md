@@ -712,20 +712,15 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Results-sync function version 68 continued returning HTTP 200 every 5 minutes. Recent execution times between 18:50 and 19:15 UTC ranged 4.859–9.496 seconds; earlier 17:55 UTC peak was 20.238 seconds. No 5xx response was observed in the queried logs. Latency remains variable, so timeout elimination is not claimed.
 - Next: monitor logs after this deployment for recurrence of prediction timeouts and obtain a real authenticated Statistics / Results / History / menu timing measurement. Public root latency is not a substitute for authenticated measurements.
 
-## CSV import deduplication — pending PR #73 (2026-11-16)
 
-- Main still had exactly one explicit `fetchAll("predictions")` call: `src/lib/scan-import-service.ts`, used on every CSV scan solely to detect duplicate prediction identities.
-- PR #73 (`perf/scan-import-scoped-dedup`, head `f4de5541e087d8f0c2f47d8059e8ee5a02fe6d82`) replaces this with `fetchExistingPredictionKeysForMatches`: owner-scoped, imported match IDs only, four identity columns only, 100-ID bounded chunks. The composite duplicate key remains unchanged. No historical predictions are updated/deleted and no DB migration is involved.
-- Exact-head GitHub CI run `43937945846` completed SUCCESS (Deno checks, tests, TypeScript and build).
-- Cloudflare Workers Builds check for this PR completed FAILURE (build `75caa1f7-0031-4e97-9874-f79b1e7ac764`); GitHub exposes no diagnostic text or annotations. The separate Vercel status failed due its free deployment rate limit and is not the production host.
-- A prior Cloudflare Workers build for the already-merged production commit `f403c68908131bc40ab948ace6a1c6d3305efa2d` succeeded and produced Worker version `ee7221d3-53b4-4604-8874-b9ef62bf7184`. This confirms the integration can build, but does not explain the PR-specific failure.
-- The repository's own CI runs `bun run build` and passed for the PR head. Production deployment workflow is configured to run only on pushes to `main`; it has not run for this unmerged PR.
-- Do not merge or mark deployed until the Cloudflare PR build failure is understood or a safe, verified production deploy path is confirmed. Cloudflare's official troubleshooting guidance says the authoritative build logs are in Worker > Deployments > View Build History; the connected dashboard build details are not accessible through the current tool session.
-- Code-search audit: after the scoped Results, History, Predictions and Statistics work already recorded above, the CSV import was the only remaining explicit full-table prediction fetch found. Other remaining `fetchAll` uses concern bankroll transaction reconciliation/export/backup and complete coupon/leg aggregates; do not remove or narrow these without proving all-history financial parity. Match-specific prediction reads in `db.ts` are owner-scoped and filtered by match ID.
-- No production code or data was changed by this PR yet. Do not redo the completed scoped-read work; resume at the Cloudflare PR-build diagnostic, then merge/deploy and verify CSV duplicate behavior once.
+## CSV import duplicate lookup — pending PR #73 (2026-11-16)
 
-### CSV dedup lookup hardening — 2026-11-16
-- A deeper correctness review of the PR helper found a PostgREST response-cap edge case: 100 imported match IDs could theoretically have more than 1,000 historical prediction rows, causing a single response to omit duplicate keys.
-- Hardened `fetchExistingPredictionKeysForMatches` with deterministic UUID keyset pagination (`id > cursor`, ordered by `id`, 1,000 rows per page) inside each existing 100-match batch. The bounded four-batch concurrency remains unchanged; identity keys remain exactly match/model/market/selection.
-- This is a new guard discovered during review, not a repeat of the already-completed screen pagination work. No historical records or production data were changed.
-- New code commit: `73e4a461caf37225b616af6c6a78323801eb5eb5`. Exact-head CI must be rerun before merge.
+- Main still uses the previous full-history duplicate lookup in `src/lib/scan-import-service.ts`; this change is not live yet.
+- PR #73 replaces it with owner-scoped lookup restricted to match IDs in the CSV import and the composite identity `match_id + model_version + market + selection`. Existing predictions are skipped, never overwritten or deleted.
+- The latest PR code also keyset-pages each 100-match batch by UUID in pages of 1,000 rows, preventing PostgREST's response cap from silently omitting duplicates. This pagination hardening was added after the first CI run.
+- New predictions remain inserted in existing batches of 500; match reuse and scan-run status handling are unchanged. No database migration is required.
+- Earlier CI run #815 passed the first implementation, but it predates the UUID-pagination hardening. The current PR head must receive a fresh CI run before merge.
+- Cloudflare Workers Builds PR check is failing immediately without logs or annotations. This is separate from the repository's main-branch GitHub Actions deploy workflow, which successfully built and deployed commit `54c5cd31cc63a98665dd586cd40f38aa89f493d0` to the production Worker.
+- Production is `https://moneyball-global.damianwalus3.workers.dev`; the test Worker is separate and must not be treated as production.
+- Do not alter historical predictions, match results, coupons, coupon legs, bankroll balances or transactions during this optimization.
+- After merge, verify the main-branch CI/deploy workflow and confirm the production Worker version before marking the change live.
