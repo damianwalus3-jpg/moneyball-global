@@ -19,6 +19,14 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
   const targetLegs = options.targetLegs ?? 3;
   if (targetLegs !== 3) throw new Error("MONEYBALL zapisuje wyłącznie kupony 3-zdarzeniowe.");
   const requireOdds = options.couponType != null && options.couponType !== "TEST";
+  // Enforce selection rules again at the persistence boundary. UI filtering is not a data-integrity boundary.
+  if (coupons.some((coupon) => coupon.some((prediction) =>
+    prediction.verdict !== "WYBRANY" ||
+    prediction.settlement_status !== "pending" ||
+    prediction.probability == null || Number(prediction.probability) <= 75
+  ))) {
+    throw new Error("Kupon może zawierać wyłącznie aktywne typy WYBRANY z prawdopodobieństwem powyżej 75%. Typ ODRZUCONY lub już rozliczony nie może zostać zapisany.");
+  }
   const errors = validateBatch(coupons, targetLegs, requireOdds);
   if (errors.length) throw new Error(errors.join(" "));
   if (requireOdds && coupons.some((coupon) => coupon.some((prediction) => !hasFreshConfirmedOdds(prediction, Date.now()))))
