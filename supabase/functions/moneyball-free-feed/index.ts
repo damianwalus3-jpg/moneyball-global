@@ -256,7 +256,7 @@ Deno.serve(async (request) => {
         const localDate = new Intl.DateTimeFormat("en-CA", {
           timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
         }).format(new Date(f.kickoff_at));
-        return localDate !== date || !isEuropeanFixture(f.country, f.competition, f.home_team, f.away_team) || !isTopTwoTierLeague(f.competition) || f.gender !== "men" || isExcludedSeniorTeam(f.home_team) || isExcludedSeniorTeam(f.away_team);
+        return localDate !== date || !isEuropeanFixture(f.country, f.competition, f.home_team, f.away_team) || !isTopTwoTierLeague(f.competition, f.country) || f.gender !== "men" || isExcludedSeniorTeam(f.home_team) || isExcludedSeniorTeam(f.away_team);
       });
       for (const f of staleRows) {
         await db("moneyball_global_fixture_feed?scan_date=eq." + date + "&external_id=eq." + encodeURIComponent(String(f.external_id)), "DELETE");
