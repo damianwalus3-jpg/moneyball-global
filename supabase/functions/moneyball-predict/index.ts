@@ -521,10 +521,20 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   if(!ownerId)throw Error("Nie można odczytać właściciela sesji.");
  }
  const date=String(body.date||new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()));
+ const scheduledMode=body.mode==="scheduled"&&!!cronToken;
  const requestedOffset=Number.isFinite(Number(body.offset))?Math.max(0,Math.floor(Number(body.offset))):0;
  const analysisOffset=Math.min(requestedOffset,10000);
  const requestedBatchSize=Number.isFinite(Number(body.batch_size))?Math.floor(Number(body.batch_size)):10;
  const batchSize=Math.max(1,Math.min(10,requestedBatchSize));
+ let scanLeaseToken:string|null=null,scanCursorKickoff:string|null=null,scanCursorId:string|null=null;
+ if(scheduledMode){
+  const claim=await db("rpc/moneyball_claim_prediction_scan",token,"POST",{p_owner_id:ownerId,p_date:date,p_token:cronToken});
+  if(!claim?.claimed)return out({ok:true,scheduled:true,skipped:true,reason:claim?.reason||"not_claimed",next_scan_at:claim?.next_scan_at||null});
+  scanLeaseToken=String(claim.lease_token||"");
+  if(!scanLeaseToken)throw Error("Harmonogram nie otrzymał tokenu blokady.");
+  scanCursorKickoff=claim.cursor_kickoff_at||null;
+  scanCursorId=claim.cursor_match_id||null;
+ }
  // Query only the exact Europe/Brussels calendar day. This avoids earlier UTC-day
  // fixtures consuming pagination slots before today's local fixtures.
  const nextDateObj=new Date(date+"T12:00:00Z");nextDateObj.setUTCDate(nextDateObj.getUTCDate()+1);
@@ -538,7 +548,21 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  };
  const fromUtc=brusselsMidnightUtc(date);
  const toUtc=brusselsMidnightUtc(nextDate);
- const all=await db("matches?select=id,owner_id,scan_run_id,external_id,source,competition,league,country,gender,home_team,away_team,kickoff_at,kickoff_date,status&owner_id=eq."+encodeURIComponent(ownerId)+"&or=(and(kickoff_at.gte."+encodeURIComponent(fromUtc)+",kickoff_at.lt."+encodeURIComponent(toUtc)+"),and(kickoff_at.is.null,kickoff_date.eq."+date+"))&order=kickoff_at.asc,id.asc&limit="+batchSize+"&offset="+analysisOffset,token);
+ let scheduledPage:any=null;
+ const all=scheduledMode
+  ?(scheduledPage=await db("rpc/moneyball_prediction_scan_page",token,"POST",{p_owner_id:ownerId,p_date:date,p_cursor_kickoff_at:scanCursorKickoff,p_cursor_match_id:scanCursorId,p_limit:batchSize,p_token:cronToken})).rows||[]
+  :await db("matches?select=id,owner_id,scan_run_id,external_id,source,competition,league,country,gender,home_team,away_team,kickoff_at,kickoff_date,status&owner_id=eq."+encodeURIComponent(ownerId)+"&or=(and(kickoff_at.gte."+encodeURIComponent(fromUtc)+",kickoff_at.lt."+encodeURIComponent(toUtc)+"),and(kickoff_at.is.null,kickoff_date.eq."+date+"))&order=kickoff_at.asc,id.asc&limit="+batchSize+"&offset="+analysisOffset,token);
+ const moreAvailable=scheduledMode?!!scheduledPage?.has_more:all.length===batchSize;
+ const lastRawMatch=all.length?all[all.length-1]:null;
+ const finishScheduledScan=async(processed:number)=>{
+  if(!scheduledMode||!scanLeaseToken)return null;
+  return await db("rpc/moneyball_finish_prediction_scan",token,"POST",{
+   p_owner_id:ownerId,p_date:date,p_lease_token:scanLeaseToken,
+   p_cursor_kickoff_at:lastRawMatch?.kickoff_at||scanCursorKickoff,
+   p_cursor_match_id:lastRawMatch?.id||scanCursorId,
+   p_has_more:moreAvailable,p_processed:processed,p_token:cronToken
+  });
+ };
  const dateFromExternalId=(m:any)=>/:(\\d{4}-\\d{2}-\\d{2}):/.exec(String(m.external_id||""))?.[1]||null;
  const matchDate=(m:any)=>m.kickoff_at?new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(m.kickoff_at)):(String(m.kickoff_date||"").slice(0,10)||dateFromExternalId(m));
  const rawDateMatches=all.filter((m:any)=>matchDate(m)===date&&fixtureGender(m)==="men"&&isEuropeanFixture(m.country,m.competition||m.league,m.home_team,m.away_team)&&isTopTwoTierLeague(m.competition||m.league));
@@ -584,7 +608,7 @@ const history=historyTimed||[];
  }
  const americanToDecimal=(value:any)=>{const n=Number(value);if(!Number.isFinite(n)||n===0)return null;return +(n>0?1+n/100:1+100/Math.abs(n)).toFixed(3);};
 
- if(!matches.length)return out({ok:true,date,total:0,matches:0,offset:analysisOffset,batch_size:batchSize,has_more:all.length===batchSize,predictions:0,created:0,updated:0,preserved:0,covered:0,missing:0,selected:0,message:all.length===batchSize?"Ta strona nie zawiera europejskich meczów; skan przechodzi do następnej partii.":"Brak kolejnych meczów w bazie."});
+ if(!matches.length){const scanState=await finishScheduledScan(all.length);return out({ok:true,date,total:0,matches:0,offset:analysisOffset,batch_size:batchSize,has_more:moreAvailable,predictions:0,created:0,updated:0,preserved:0,covered:0,missing:0,selected:0,scheduled:scheduledMode,scan_state:scanState,message:moreAvailable?"Brak kwalifikujących się meczów w tej partii; skan przechodzi dalej.":"Brak kolejnych kwalifikujących się meczów."});}
  // Add a no-key public score-history fallback for teams missing recent verified results.
  const xgoalsTeamForms=new Map<string,any>();
  const footyForms=new Map<string,any>(),footyCandidates:any[]=[];
@@ -801,5 +825,5 @@ const history=historyTimed||[];
   await db("predictions?on_conflict=owner_id,match_id,model_version,market,selection",token,"POST",insertRows.slice(i,i+50),"resolution=merge-duplicates,return=minimal");
  }
  const couponCreated=false,couponLegs=0;
- return out({ok:true,date,model:V,provider:"Verified database history + cached FootyNomad/FotbalInfo + compact OpenMatchday public sources + fresh market probabilities",tipsaudit:{ok:tipsAudit.ok,matched:tipsAudit.matched,generated_at:tipsAudit.generated_at,error:tipsAudit.error||null},matches:matches.length,offset:analysisOffset,batch_size:batchSize,has_more:all.length===batchSize,fixtures_before_deduplication:rawDateMatches.length,duplicates_removed:duplicatesRemoved,predictions:rows.length,created,updated,preserved,covered,missing,footy_form_candidates:footyForms.size,fotbal_form_candidates:fotbalCandidates.length,footy_form_matches:footyForms.size,openmatchday_fixtures:publicForms.fixtures,openmatchday_error:publicForms.error||null,github_public_teams:Object.keys(githubPublic.teams||{}).length,github_public_competitions:githubPublic.coverage?.competitions_with_results||0,github_openfootball_matches:githubPublic.coverage?.openfootball_league_matches_read||0,github_openfootball_files:githubPublic.coverage?.openfootball_league_files_loaded||0,github_public_generated_at:githubPublic.generated_at||null,github_public_error:githubPublic.error||null,github_form_matches:new Set(rows.filter((x:any)=>String(x.note).includes("KEYLESS_GITHUB_LAST10_FORM")).map((x:any)=>x.match_id)).size,selected:rows.filter(x=>x.verdict==="WYBRANY").length,couponCreated,couponLegs,limitations:["W trakcie skanowania używane są zweryfikowana historia bazy, zapisane cache FootyNomad/FotbalInfo i kompaktowe źródła OpenMatchday. Duże archiwa historyczne CSV/JSON nie są parsowane ponownie w każdej partii, aby uniknąć limitu CPU Edge Function.","Nie wszystkie ligi mają świeże xG, potwierdzone składy i kontuzje. Brakujące dane pozostają jawnie oznaczone; model bazowy jest ODRZUCONY i nie trafia do kuponów. Kursy rynkowe są używane wyłącznie, gdy zapis ma maksymalnie 48 godzin.","Dane publiczne odświeżane przez GitHub Actions zgodnie z harmonogramem poszczególnych źródeł.","Kupony tworzy użytkownik przyciskiem generatora; skan nie zapisuje automatycznie kuponów."]});
+ const scanState=await finishScheduledScan(matches.length);\n return out({ok:true,date,model:V,provider:"Verified database history + cached FootyNomad/FotbalInfo + compact OpenMatchday public sources + fresh market probabilities",tipsaudit:{ok:tipsAudit.ok,matched:tipsAudit.matched,generated_at:tipsAudit.generated_at,error:tipsAudit.error||null},matches:matches.length,offset:scheduledMode?null:analysisOffset,batch_size:batchSize,has_more:moreAvailable,scheduled:scheduledMode,scan_state:scanState,fixtures_before_deduplication:rawDateMatches.length,duplicates_removed:duplicatesRemoved,predictions:rows.length,created,updated,preserved,covered,missing,footy_form_candidates:footyForms.size,fotbal_form_candidates:fotbalCandidates.length,footy_form_matches:footyForms.size,openmatchday_fixtures:publicForms.fixtures,openmatchday_error:publicForms.error||null,github_public_teams:Object.keys(githubPublic.teams||{}).length,github_public_competitions:githubPublic.coverage?.competitions_with_results||0,github_openfootball_matches:githubPublic.coverage?.openfootball_league_matches_read||0,github_openfootball_files:githubPublic.coverage?.openfootball_league_files_loaded||0,github_public_generated_at:githubPublic.generated_at||null,github_public_error:githubPublic.error||null,github_form_matches:new Set(rows.filter((x:any)=>String(x.note).includes("KEYLESS_GITHUB_LAST10_FORM")).map((x:any)=>x.match_id)).size,selected:rows.filter(x=>x.verdict==="WYBRANY").length,couponCreated,couponLegs,limitations:["W trakcie skanowania używane są zweryfikowana historia bazy, zapisane cache FootyNomad/FotbalInfo i kompaktowe źródła OpenMatchday. Duże archiwa historyczne CSV/JSON nie są parsowane ponownie w każdej partii, aby uniknąć limitu CPU Edge Function.","Nie wszystkie ligi mają świeże xG, potwierdzone składy i kontuzje. Brakujące dane pozostają jawnie oznaczone; model bazowy jest ODRZUCONY i nie trafia do kuponów. Kursy rynkowe są używane wyłącznie, gdy zapis ma maksymalnie 48 godzin.","Dane publiczne odświeżane przez GitHub Actions zgodnie z harmonogramem poszczególnych źródeł.","Kupony tworzy użytkownik przyciskiem generatora; skan nie zapisuje automatycznie kuponów."]});
 }catch(e){console.error("moneyball-predict failed:",String(e),e instanceof Error?e.stack:"");return out({ok:false,error:String(e)},500)}});
