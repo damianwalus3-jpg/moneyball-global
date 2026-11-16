@@ -380,20 +380,32 @@ export async function fetchMatchSettlementContext(matchId: string): Promise<Matc
   if (resultResult.error) throw new Error(humanizeError(resultResult.error, "match_results"));
   const predictions = (predictionsResult.data ?? []) as unknown as TableRows["predictions"][];
   const predictionIds = predictions.map((row) => row.id);
-  const legs = predictionIds.length === 0 ? [] : await fetchInChunks<TableRows["coupon_legs"]>(
+
+  // First discover coupons touched by this match, then load every leg of those
+  // coupons. Settlement must evaluate the complete AKO, not only this match's leg.
+  const matchLegs = predictionIds.length === 0 ? [] : await fetchInChunks<TableRows["coupon_legs"]>(
     predictionIds, 100, async (chunk) => {
       const { data, error } = await withRequestTimeout(
         sb.from("coupon_legs").select(READ_COLUMNS.coupon_legs.join(","))
           .eq(OWNER_COLUMN, uid).in("prediction_id", chunk),
-        "Pobieranie nóg kuponów powiązanych z meczem",
+        "Wyszukiwanie kuponów powiązanych z meczem",
       );
       if (error) throw new Error(humanizeError(error, "coupon_legs"));
       return (data ?? []) as unknown as TableRows["coupon_legs"][];
     },
   );
-  const couponIds = [...new Set(legs.map((leg) => leg.coupon_id))];
-  const coupons = couponIds.length === 0 ? [] : await fetchInChunks<TableRows["coupons"]>(
-    couponIds, 100, async (chunk) => {
+  const couponIds = [...new Set(matchLegs.map((leg) => leg.coupon_id))];
+  const [legs, coupons] = couponIds.length === 0 ? [[], []] as [TableRows["coupon_legs"][], TableRows["coupons"][]] : await Promise.all([
+    fetchInChunks<TableRows["coupon_legs"]>(couponIds, 100, async (chunk) => {
+      const { data, error } = await withRequestTimeout(
+        sb.from("coupon_legs").select(READ_COLUMNS.coupon_legs.join(","))
+          .eq(OWNER_COLUMN, uid).in("coupon_id", chunk),
+        "Pobieranie wszystkich nóg powiązanych kuponów",
+      );
+      if (error) throw new Error(humanizeError(error, "coupon_legs"));
+      return (data ?? []) as unknown as TableRows["coupon_legs"][];
+    }),
+    fetchInChunks<TableRows["coupons"]>(couponIds, 100, async (chunk) => {
       const { data, error } = await withRequestTimeout(
         sb.from("coupons").select(READ_COLUMNS.coupons.join(","))
           .eq(OWNER_COLUMN, uid).in("id", chunk),
@@ -401,8 +413,8 @@ export async function fetchMatchSettlementContext(matchId: string): Promise<Matc
       );
       if (error) throw new Error(humanizeError(error, "coupons"));
       return (data ?? []) as unknown as TableRows["coupons"][];
-    },
-  );
+    }),
+  ]);
   return {
     predictions,
     legs,
