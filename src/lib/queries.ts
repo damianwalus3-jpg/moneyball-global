@@ -1,7 +1,7 @@
 import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun, fetchCouponPageData, fetchMatchPageData, fetchResultsPage } from "./db";
-import type { ResultsPageCursor } from "./db";
+import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun, fetchCouponPageData, fetchMatchPageData, fetchResultsPage, fetchHistoryPage } from "./db";
+import type { HistoryPageCursor, ResultsPageCursor } from "./db";
 import type { TableName, TableRows } from "./types";
 
 /** Small live summaries refresh frequently; large table reads use a slower cadence. */
@@ -66,6 +66,28 @@ export function tableQuery<K extends TableName>(table: K) {
     queryKey: ["table", table] as const,
     queryFn: () => fetchAll(table),
     ...refresh,
+  });
+}
+
+export function historyPagesQuery(filters: {
+  tab: "todo" | "done";
+  search: string;
+}) {
+  return infiniteQueryOptions({
+    queryKey: ["history-pages", filters.tab, filters.search] as const,
+    queryFn: ({ pageParam }) => fetchHistoryPage({
+      tab: filters.tab,
+      search: filters.search,
+      cursor: pageParam,
+    }),
+    initialPageParam: null as HistoryPageCursor | null,
+    getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor ?? undefined : undefined,
+    staleTime: 120_000,
+    gcTime: 60_000,
+    refetchInterval: (query) => (query.state.data?.pages.length ?? 0) > 1 ? false : 5 * 60_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -177,7 +199,7 @@ export function useAction<TArgs, TResult = unknown>(
   return useMutation({
     mutationFn: fn,
     onSuccess: async (r) => {
-      await Promise.all([qc.invalidateQueries({ queryKey: ["table"] }), qc.resetQueries({ queryKey: ["prediction-pages"] }), qc.invalidateQueries({ queryKey: ["dashboard-summary"] }), qc.invalidateQueries({ queryKey: ["coupon-page-data"] }), qc.invalidateQueries({ queryKey: ["match-page-data"] }), qc.resetQueries({ queryKey: ["results-pages"] }), qc.invalidateQueries({ queryKey: ["match-predictions"] })]);
+      await Promise.all([qc.invalidateQueries({ queryKey: ["table"] }), qc.resetQueries({ queryKey: ["prediction-pages"] }), qc.invalidateQueries({ queryKey: ["dashboard-summary"] }), qc.invalidateQueries({ queryKey: ["coupon-page-data"] }), qc.invalidateQueries({ queryKey: ["match-page-data"] }), qc.resetQueries({ queryKey: ["results-pages"] }), qc.resetQueries({ queryKey: ["history-pages"] }), qc.invalidateQueries({ queryKey: ["match-predictions"] })]);
       const msg = typeof opts.success === "function" ? opts.success(r) : opts.success;
       if (msg) toast.success(msg);
       opts.onDone?.(r);
