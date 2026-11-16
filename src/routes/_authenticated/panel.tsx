@@ -184,7 +184,7 @@ function Panel() {
                     <p className="mt-1 text-sm text-muted-foreground">
                       {prediction.market === "1X2" ? (prediction.selection === "1" ? "Zwycięstwo gospodarzy" : prediction.selection === "X" ? "Remis" : "Zwycięstwo gości")
                         : prediction.market === "DOUBLE_CHANCE" ? (prediction.selection === "1X" ? "Gospodarze wygrają lub będzie remis" : prediction.selection === "X2" ? "Remis lub zwycięstwo gości" : "Nie będzie remisu")
-                        : ({ BTTS_YES: "Obie drużyny strzelą gola", BTTS_NO: "Nie obie drużyny strzelą gola", OVER_1.5: "Powyżej 1,5 gola", UNDER_1.5: "Poniżej 1,5 gola", OVER_2.5: "Powyżej 2,5 gola", UNDER_2.5: "Poniżej 2,5 gola", OVER_3.5: "Powyżej 3,5 gola", UNDER_3.5: "Poniżej 3,5 gola" } as Record<string,string>)[prediction.selection] ?? prediction.selection}
+                        : ({ BTTS_YES: "Obie drużyny strzelą gola", BTTS_NO: "Nie obie drużyny strzelą gola", "OVER_1.5": "Powyżej 1,5 gola", "UNDER_1.5": "Poniżej 1,5 gola", "OVER_2.5": "Powyżej 2,5 gola", "UNDER_2.5": "Poniżej 2,5 gola", "OVER_3.5": "Powyżej 3,5 gola", "UNDER_3.5": "Poniżej 3,5 gola" } as Record<string,string>)[prediction.selection] ?? prediction.selection}
                     </p>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
