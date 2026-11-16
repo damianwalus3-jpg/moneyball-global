@@ -22,19 +22,37 @@ export const TABLE_REFRESH = {
   refetchOnWindowFocus: true,
 } as const;
 
-const LIVE_TABLES = new Set<TableName>([
-  "matches",
-  "match_results",
-  "coupons",
-  "coupon_legs",
-]);
+const TABLE_REFRESH_BY_NAME: Partial<Record<TableName, typeof TABLE_REFRESH>> = {
+  // Fixtures are expensive to refresh and the user requires a 15-minute cadence.
+  // Dashboard summaries remain on LIVE_REFRESH and are intentionally separate.
+  matches: {
+    ...TABLE_REFRESH,
+    staleTime: 60_000,
+    refetchInterval: 15 * 60_000,
+  },
+  // Results should settle promptly without polling every full table every 30 seconds.
+  match_results: {
+    ...TABLE_REFRESH,
+    staleTime: 30_000,
+    refetchInterval: 5 * 60_000,
+  },
+  coupons: {
+    ...TABLE_REFRESH,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  },
+  coupon_legs: {
+    ...TABLE_REFRESH,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  },
+};
 
 export function tableQuery<K extends TableName>(table: K) {
-  const refresh = table === "predictions"
-    ? { ...TABLE_REFRESH, staleTime: 120_000, refetchInterval: false as const }
-    : LIVE_TABLES.has(table)
-      ? LIVE_REFRESH
-      : { ...TABLE_REFRESH, staleTime: 120_000, refetchInterval: false as const };
+  const refresh = TABLE_REFRESH_BY_NAME[table]
+    ?? (table === "predictions"
+      ? { ...TABLE_REFRESH, staleTime: 120_000, refetchInterval: false as const }
+      : { ...TABLE_REFRESH, staleTime: 120_000, refetchInterval: false as const });
   return queryOptions({
     queryKey: ["table", table] as const,
     queryFn: () => fetchAll(table),
