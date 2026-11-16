@@ -168,7 +168,7 @@ function RecentFormCard({ title, form }: { title: string; form: TeamForm | null 
             FOOTYNOMAD_LAST5: "FootyNomad",
             FOOTYNOMAD_LAST5_CACHE: "FootyNomad · pamięć podręczna",
             FOTBALINFO_PREMATCH: "FotbalInfo",
-            XGOALSPRO_PUBLIC_RESULTS: "xGoalsPro",
+            XGOALSPRO_PUBLIC_RESULTS: "xGoalsPro · wyniki, bez metryk xG",
             KEYLESS_GITHUB_LAST10: "OpenMatchday / OpenFootball",
             STATSBOMB_OPEN_DATA: "StatsBomb Open Data",
             AMERICAN_SOCCER_ANALYSIS: "American Soccer Analysis",
