@@ -17,12 +17,13 @@ export interface SaveBatchOptions {
 export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatchOptions) {
   if (!coupons.length) throw new Error("Brak kuponów do zapisania.");
   const targetLegs = options.targetLegs ?? 3;
+  if (targetLegs !== 3) throw new Error("MONEYBALL zapisuje wyłącznie kupony 3-zdarzeniowe.");
   const requireOdds = options.couponType != null && options.couponType !== "TEST";
   const errors = validateBatch(coupons, targetLegs, requireOdds);
   if (errors.length) throw new Error(errors.join(" "));
-  if (options.stake == null || !Number.isFinite(options.stake) || options.stake <= 0)
-    throw new Error("Stawka musi być większa od zera.");
-  const stake = options.stake;
+  if (options.stake !== 4)
+    throw new Error("Stała stawka MONEYBALL wynosi dokładnie 4,00 € na kupon.");
+  const stake = 4;
   const createdCoupons: string[] = [];
   const createdLegs: string[] = [];
   const createdTransactions: string[] = [];
@@ -43,7 +44,7 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
         status: "pending",
         target_legs: targetLegs,
         combined_odds: odds,
-        stake: options.stake,
+        stake,
         potential_return: potentialReturn,
         notes: options.notes ?? null,
       });
