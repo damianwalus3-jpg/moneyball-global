@@ -207,6 +207,11 @@ describe("coupon candidates", () => {
     expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), competition: "Frauen Bundesliga" }, now)).toBe(false);
     expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), gender: "women" }, now)).toBe(false);
   });
+  it("rejects reserve and B teams even when the fixture feed labels them as men's", () => {
+    expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), home_team: "UCSA", away_team: "Polissya II" }, now)).toBe(false);
+    expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), away_team: "Celta de Vigo II" }, now)).toBe(false);
+    expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), away_team: "Bayern Munich B" }, now)).toBe(false);
+  });
   it("rejects started and cancelled matches", () => {
     expect(isCouponCandidate(prediction("p", "m1", 90), match("m1", "2026-11-10T11:00:00Z"), now)).toBe(false);
     expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), status: "cancelled" }, now)).toBe(false);
