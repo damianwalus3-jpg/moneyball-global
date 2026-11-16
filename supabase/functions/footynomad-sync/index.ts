@@ -1,6 +1,6 @@
 function isExcludedSeniorTeam(value: unknown): boolean {
- const team=String(value??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
- return /\\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico)\\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
+ const team=String(value??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+ return /\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico)\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
 }
 
 function isTopTwoTierLeague(competition: unknown): boolean {
