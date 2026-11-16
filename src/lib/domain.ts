@@ -182,7 +182,7 @@ export function dedupeEuropeanMatches(matches: Match[]): Match[] {
     normalize(match.away_team),
     match.gender ?? "men",
   ].join("|");
-  const rank = (match: Match) => [
+  const rank = (match: Match): [number, number, number] => [
     match.source?.toLowerCase() === "footynomad" ? 1 : 0,
     match.kickoff_at ? 1 : 0,
     Date.parse(match.updated_at ?? match.created_at ?? "") || 0,
