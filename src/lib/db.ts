@@ -113,6 +113,91 @@ export async function fetchLatestScanRun(): Promise<TableRows["scan_runs"] | nul
   return (data ?? null) as TableRows["scan_runs"] | null;
 }
 
+
+export interface CouponPageData {
+  matches: TableRows["matches"][];
+  predictions: TableRows["predictions"][];
+  coupons: TableRows["coupons"][];
+  legs: TableRows["coupon_legs"][];
+  results: TableRows["match_results"][];
+}
+
+/** Loads only today's candidate pool plus records referenced by saved coupons.
+ * This replaces downloading the complete matches and predictions history just
+ * to render the coupon screen. */
+export async function fetchCouponPageData(): Promise<CouponPageData> {
+  const uid = await currentUserId();
+  const sb = requireSupabase();
+  const { brusselsDayKey, brusselsInputToISO } = await import("./time");
+  const day = brusselsDayKey(new Date());
+  const [year, month, date] = day.split("-").map(Number);
+  const next = new Date(Date.UTC(year, month - 1, date + 1)).toISOString().slice(0, 10);
+  const from = brusselsInputToISO(day + "T00:00");
+  const to = brusselsInputToISO(next + "T00:00");
+  if (!from || !to) throw new Error("Nie udało się ustalić dzisiejszej daty Europe/Brussels.");
+
+  const [todayTimed, todayUndated, couponsResult, legsResult] = await Promise.all([
+    withRequestTimeout(sb.from("matches").select(READ_COLUMNS.matches.join(",")).eq(OWNER_COLUMN, uid).gte("kickoff_at", from).lt("kickoff_at", to), "Pobieranie dzisiejszych meczów"),
+    withRequestTimeout(sb.from("matches").select(READ_COLUMNS.matches.join(",")).eq(OWNER_COLUMN, uid).is("kickoff_at", null).eq("kickoff_date", day), "Pobieranie meczów bez godziny"),
+    withRequestTimeout(sb.from("coupons").select(READ_COLUMNS.coupons.join(",")).eq(OWNER_COLUMN, uid).order("created_at", { ascending: false }), "Pobieranie kuponów"),
+    withRequestTimeout(sb.from("coupon_legs").select(READ_COLUMNS.coupon_legs.join(",")).eq(OWNER_COLUMN, uid), "Pobieranie nóg kuponów"),
+  ]);
+  for (const [result, table] of [[todayTimed,"matches"],[todayUndated,"matches"],[couponsResult,"coupons"],[legsResult,"coupon_legs"]] as const) {
+    if (result.error) throw new Error(humanizeError(result.error, table));
+  }
+  const todayMatches = [...(todayTimed.data ?? []), ...(todayUndated.data ?? [])] as unknown as TableRows["matches"][];
+  const coupons = (couponsResult.data ?? []) as unknown as TableRows["coupons"][];
+  const legs = (legsResult.data ?? []) as unknown as TableRows["coupon_legs"][];
+  const predictions = await fetchPredictionsByIds([
+    ...legs.map((leg) => leg.prediction_id),
+    // Fetch all candidate predictions for today's fixtures in modest chunks.
+    ...[],
+  ]);
+  const todayMatchIds = todayMatches.map((match) => match.id);
+  const todayPredictions: TableRows["predictions"][] = [];
+  for (let index = 0; index < todayMatchIds.length; index += 100) {
+    const chunk = todayMatchIds.slice(index, index + 100);
+    const { data, error } = await withRequestTimeout(
+      sb.from("predictions").select(READ_COLUMNS.predictions.join(",")).eq(OWNER_COLUMN, uid).in("match_id", chunk),
+      "Pobieranie dzisiejszych prognoz",
+    );
+    if (error) throw new Error(humanizeError(error, "predictions"));
+    todayPredictions.push(...((data ?? []) as unknown as TableRows["predictions"][]));
+  }
+  const predictionById = new Map([...predictions, ...todayPredictions].map((prediction) => [prediction.id, prediction]));
+  const allPredictions = [...predictionById.values()];
+  const allMatchIds = [...new Set([...todayMatchIds, ...allPredictions.map((prediction) => prediction.match_id)])];
+  const historicalMatches: TableRows["matches"][] = [];
+  for (let index = 0; index < allMatchIds.length; index += 100) {
+    const chunk = allMatchIds.slice(index, index + 100);
+    const { data, error } = await withRequestTimeout(
+      sb.from("matches").select(READ_COLUMNS.matches.join(",")).eq(OWNER_COLUMN, uid).in("id", chunk),
+      "Pobieranie meczów powiązanych z kuponami",
+    );
+    if (error) throw new Error(humanizeError(error, "matches"));
+    historicalMatches.push(...((data ?? []) as unknown as TableRows["matches"][]));
+  }
+  const matchById = new Map(historicalMatches.map((match) => [match.id, match]));
+  const matchIds = [...matchById.keys()];
+  const results: TableRows["match_results"][] = [];
+  for (let index = 0; index < matchIds.length; index += 100) {
+    const chunk = matchIds.slice(index, index + 100);
+    const { data, error } = await withRequestTimeout(
+      sb.from("match_results").select(READ_COLUMNS.match_results.join(",")).eq(OWNER_COLUMN, uid).in("match_id", chunk),
+      "Pobieranie wyników meczów kuponowych",
+    );
+    if (error) throw new Error(humanizeError(error, "match_results"));
+    results.push(...((data ?? []) as unknown as TableRows["match_results"][]));
+  }
+  return {
+    matches: historicalMatches,
+    predictions: allPredictions,
+    coupons,
+    legs,
+    results,
+  };
+}
+
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const { data, error } = await withRequestTimeout(requireSupabase().rpc("moneyball_dashboard_summary"), "Pobieranie podsumowania panelu");
   if (error) throw new Error(humanizeError(error));
