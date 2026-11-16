@@ -100,6 +100,7 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Finland", "Ykkosliiga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Portugal", "Liga Portugal 2")).toBe(true);
     expect(isEuropeanTopTwoLeague("England", "League One")).toBe(false);
+    expect(isEuropeanTopTwoLeague("England", "Premier League 2")).toBe(false);
     expect(isEuropeanTopTwoLeague("Germany", "3. Liga")).toBe(false);
     expect(isEuropeanTopTwoLeague("Italy", "Serie C")).toBe(false);
     expect(isEuropeanTopTwoLeague("Ukraine", "Druha Liga")).toBe(false);
