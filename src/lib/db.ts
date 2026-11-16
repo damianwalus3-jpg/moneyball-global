@@ -271,6 +271,26 @@ async function fetchRawAllUncached<K extends TableName>(table: K, uid: string): 
   return rows;
 }
 
+/** Fetch only predictions referenced by a set of rows; avoids downloading the full history for joins. */
+async function fetchPredictionsByIds(ids: (string | null | undefined)[]): Promise<TableRows["predictions"][]> {
+  const uniqueIds = [...new Set(ids.filter((id): id is string => typeof id === "string" && id.length > 0))];
+  if (uniqueIds.length === 0) return [];
+  const uid = await currentUserId();
+  const sb = requireSupabase();
+  const rows: TableRows["predictions"][] = [];
+  // Keep IN lists modest and owner-scoped; this is a lookup for referenced IDs, not a history scan.
+  for (let index = 0; index < uniqueIds.length; index += 100) {
+    const chunk = uniqueIds.slice(index, index + 100);
+    const { data, error } = await withRequestTimeout(
+      sb.from("predictions").select(READ_COLUMNS.predictions.join(",")).eq(OWNER_COLUMN, uid).in("id", chunk),
+      "Pobieranie powiązanych prognoz",
+    );
+    if (error) throw new Error(humanizeError(error, "predictions"));
+    rows.push(...((data ?? []) as unknown as TableRows["predictions"][]));
+  }
+  return rows;
+}
+
 async function fetchRawAll<K extends TableName>(table: K): Promise<TableRows[K][]> {
   const uid = await currentUserId();
   const key = `${uid}:${table}`;
@@ -325,7 +345,7 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
   }
   if (table === "coupon_legs") {
     const legs = rows as TableRows["coupon_legs"][];
-    const predictions = await fetchRawAll("predictions");
+    const predictions = await fetchPredictionsByIds(legs.map((leg) => leg.prediction_id));
     const byId = new Map(predictions.map((prediction) => [prediction.id, prediction]));
     return legs.map((leg) => {
       const prediction = byId.get(leg.prediction_id);
@@ -344,10 +364,8 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
   }
   if (table === "coupons") {
     const coupons = rows as TableRows["coupons"][];
-    const [legs, predictions] = await Promise.all([
-      fetchRawAll("coupon_legs"),
-      fetchRawAll("predictions"),
-    ]);
+    const legs = await fetchRawAll("coupon_legs");
+    const predictions = await fetchPredictionsByIds(legs.map((leg) => leg.prediction_id));
     const byId = new Map(predictions.map((prediction) => [prediction.id, prediction]));
     // Group once instead of scanning every coupon leg for every coupon (O(n²)).
     const legsByCoupon = new Map<string, typeof legs>();
@@ -378,7 +396,7 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
   }
   if (table === "odds_snapshots") {
     const odds = rows as TableRows["odds_snapshots"][];
-    const predictions = await fetchRawAll("predictions");
+    const predictions = await fetchPredictionsByIds(odds.map((snapshot) => snapshot.prediction_id));
     const byId = new Map(predictions.map((prediction) => [prediction.id, prediction]));
     const grouped = new Map<string, Record<string, unknown>>();
     for (const snapshot of odds) {
