@@ -207,6 +207,15 @@ export function isCouponCandidate(prediction: Prediction, match: Match | undefin
 }
 
 /** Coupons are built only from matches kicking off today (Europe/Brussels calendar day). */
+/** Persistence-boundary rule: only live selected predictions above 75% may enter a coupon. */
+export function isEligibleCouponPrediction(prediction: Pick<Prediction, "verdict" | "settlement_status" | "probability">): boolean {
+  return prediction.verdict === "WYBRANY"
+    && prediction.settlement_status === "pending"
+    && prediction.probability != null
+    && Number.isFinite(Number(prediction.probability))
+    && Number(prediction.probability) > CANDIDATE_MIN_PROBABILITY;
+}
+
 export function isKickoffToday(kickoffAt: string | null | undefined, nowMs: number): boolean {
   if (!kickoffAt) return false;
   const kickoff = new Date(kickoffAt);
