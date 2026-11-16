@@ -218,16 +218,16 @@ function Panel() {
                       return matches ? `${w}W · ${d}R · ${l}P z ${matches}${goals}` : "Dane formy bez bilansu W/R/P";
                     };
                     const rows: [string,string][] = [
-                      ["Źródło modelu", String(data.model_source ?? data.history_source ?? prediction.data_source ?? "Nie zapisano")],
-                      ["Źródło kursu", [data.odds_source, data.odds_bookmaker].filter(Boolean).join(" · ") || "Nie zapisano"],
-                      ["Ostatnie mecze gospodarzy", formLine(data.home_form)],
-                      ["Ostatnie mecze gości", formLine(data.away_form)],
-                      ["Liczba meczów w historii gospodarzy / gości", `${data.home_history_matches ?? data.home_form?.matches ?? "—"} / ${data.away_history_matches ?? data.away_form?.matches ?? "—"}`],
-                      ["xG wykorzystane w modelu", data.historical_xg_used ? "Tak" : "Nie — brak wymaganych świeżych danych"],
-                      ["Źródła xG", Array.isArray(data.historical_xg_sources) && data.historical_xg_sources.length ? data.historical_xg_sources.join(", ") : "Brak"],
-                      ["Rating Elo gospodarzy / gości", data.elo_used ? `${data.home_elo ?? "—"} / ${data.away_elo ?? "—"} (różnica ${data.elo_diff ?? "—"})` : "Nie wykorzystano"],
-                      ["Składy i kontuzje", data.squad_note ?? "Brak potwierdzonej informacji o składzie meczowym."],
-                      ["Kontuzje gospodarzy / gości", `${data.home_injuries_available ? (data.home_injury_count ?? "potwierdzone") : "brak danych"} / ${data.away_injuries_available ? (data.away_injury_count ?? "potwierdzone") : "brak danych"}`],
+                      ["Źródło modelu", String(data["model_source"] ?? data["history_source"] ?? "Nie zapisano")],
+                      ["Źródło kursu", [data["odds_source"], data["odds_bookmaker"]].filter(Boolean).join(" · ") || "Nie zapisano"],
+                      ["Ostatnie mecze gospodarzy", formLine(data["home_form"])],
+                      ["Ostatnie mecze gości", formLine(data["away_form"])],
+                      ["Liczba meczów w historii gospodarzy / gości", `${data["home_history_matches"] ?? data["home_form"]?.matches ?? "—"} / ${data["away_history_matches"] ?? data["away_form"]?.matches ?? "—"}`],
+                      ["xG wykorzystane w modelu", data["historical_xg_used"] ? "Tak" : "Nie — brak wymaganych świeżych danych"],
+                      ["Źródła xG", Array.isArray(data["historical_xg_sources"]) && data["historical_xg_sources"].length ? data["historical_xg_sources"].join(", ") : "Brak"],
+                      ["Rating Elo gospodarzy / gości", data["elo_used"] ? `${data["home_elo"] ?? "—"} / ${data["away_elo"] ?? "—"} (różnica ${data["elo_diff"] ?? "—"})` : "Nie wykorzystano"],
+                      ["Składy i kontuzje", data["squad_note"] ?? "Brak potwierdzonej informacji o składzie meczowym."],
+                      ["Kontuzje gospodarzy / gości", `${data["home_injuries_available"] ? (data["home_injury_count"] ?? "potwierdzone") : "brak danych"} / ${data["away_injuries_available"] ? (data["away_injury_count"] ?? "potwierdzone") : "brak danych"}`],
                     ];
                     return <div className="mt-2 rounded-lg border border-border bg-card/50 p-3">
                       <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Szczegóły analizy i dane źródłowe</p>
