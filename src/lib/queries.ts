@@ -24,16 +24,17 @@ export const TABLE_REFRESH = {
 
 const LIVE_TABLES = new Set<TableName>([
   "matches",
-  "predictions",
   "match_results",
   "coupons",
   "coupon_legs",
 ]);
 
 export function tableQuery<K extends TableName>(table: K) {
-  const refresh = LIVE_TABLES.has(table)
-    ? LIVE_REFRESH
-    : { ...TABLE_REFRESH, staleTime: 120_000, refetchInterval: false as const };
+  const refresh = table === "predictions"
+    ? { ...TABLE_REFRESH, staleTime: 120_000, refetchInterval: false as const }
+    : LIVE_TABLES.has(table)
+      ? LIVE_REFRESH
+      : { ...TABLE_REFRESH, staleTime: 120_000, refetchInterval: false as const };
   return queryOptions({
     queryKey: ["table", table] as const,
     queryFn: () => fetchAll(table),
