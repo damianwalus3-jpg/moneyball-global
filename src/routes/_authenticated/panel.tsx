@@ -40,7 +40,7 @@ function DashboardTile({ to, label, value, hint, icon, tone = "default" }: {
 
 type FinancePeriodKey = "day" | "week" | "month" | "all";
 function FinanceDashboard({ finance, loading, error, retry }: {
-  finance?: import("@/lib/db").CouponFinanceSummary;
+  finance: import("@/lib/db").CouponFinanceSummary | undefined;
   loading: boolean; error: boolean; retry: () => void;
 }) {
   const [periodKey, setPeriodKey] = useState<FinancePeriodKey>("week");
