@@ -110,3 +110,14 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Automatyczny tick cron #11 o 16:10 UTC utworzył request Edge Function; pg_net response ID `2588` zwrócił HTTP 200 i `scheduled=true, skipped=true, reason=cooldown`, co potwierdza, że aktywny harmonogram nie dubluje skanu w okresie cooldown. W tym samym cyklu działał osobno results-sync (request `2589`, HTTP 200).
 
 - Dodatkowy test pełnego ponownego skanu po wymuszeniu końca cooldown (request `2591`): HTTP 200, ponownie 8 meczów / 96 predykcji, 0 nowych duplikatów; 33 pending rekordy odświeżone, 63 settled/preserved zachowane, 0 nowych rekordów. Stan wrócił do `completed` i zaplanował kolejny pełny rescan na 16:27:02 UTC. Potwierdza to idempotencję przy powtarzaniu pełnego skanu.
+
+
+## Kontynuacja — naprawa wykluczania rezerw i lig młodzieżowych — 2026-11-16
+- Audyt po wznowieniu pracy wykazał podwójnie escapowane granice słów PostgreSQL (\\m/\\M). Test bezpośredni potwierdził, że taki wzorzec nie wykrywał Polissya II; poprawny wariant \m/\M wykrywa go prawidłowo.
+- Zastosowano produkcyjne migracje poprawiające funkcję moneyball_is_european_top_two_league oraz RPC moneyball_prediction_scan_page. Filtr odrzuca puchary/play-off, ligę trzecią i niższe, kobiece/youth/U15-U23, reserves, B team i II/III. Zachowano możliwość inferencji mężczyzn przy pustym polu gender, ale markery youth/reserve są odrzucane niezależnie od gender.
+- Test produkcyjny po migracji: Polissya II i Celta de Vigo II teams_ok=false; Serie C, Frauen Bundesliga i Druha Liga odrzucone; Persha Liga, Super League 2 i standardowy mecz Premier League dopuszczone.
+- W silniku JS moneyball-predict poprawiono fixtureGender, by nazwa rezerw/youth miała pierwszeństwo przed błędnym gender=men; dodano odrzucanie pucharów/play-off w isTopTwoTierLeague. Filtr kuponów isCouponCandidate odrzuca rezerwy/B-teamy także przy błędnym oznaczeniu męskim. Dodano testy dla Polissya II, Celta de Vigo II i Bayern Munich B.
+- Zmiany kodu: edge commit ec595fbe7687f83b161b0c34726cdc884736d727; domain commit 6a76378d6dcc5fef4d577766b6c24e3b1d41c0b6; test commit 3561ffc9a104ba016e97cf0a3fd89a26ac7c1b0f; migracja repo commit df3e09e666a36be5a7bda9127a3cb3639f489fb8.
+- Edge Function moneyball-predict wdrożona jako wersja 214 (verify_jwt=true), kod pobrany bezpośrednio z main. Należy jeszcze potwierdzić CI/Cloudflare i następny cron tick.
+- Dokumentacja Supabase potwierdza deploy Edge Functions przez MCP/CLI i CI/CD; Cloudflare rekomenduje Workers Builds lub GitHub Actions. Hosting frontendu pozostaje Cloudflare Workers — bez Vercel.
+- Tabela provider_odds ma provider_polled_at, price_timestamp i captured_at; nie ma polled_at. Job kursów #10 pozostaje wyłączony. Nie włączać MAIN/MEGA/EXTRA bez prawdziwych świeżych kursów.
