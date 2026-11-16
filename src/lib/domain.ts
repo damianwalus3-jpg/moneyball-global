@@ -194,8 +194,8 @@ export function isCouponCandidate(prediction: Prediction, match: Match | undefin
   if (!isEuropeanTopTwoLeague(match.country, match.competition ?? match.league)) return false;
   if (match.gender && match.gender !== "men") return false;
   const reserveTeam = (value: string | null | undefined) => {
-    const team = String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    return /\\b(reserves?|academy|youth|b team)\\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
+    const team = String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    return /\b(reserves?|academy|youth|b team)\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
   };
   if (reserveTeam(match.home_team) || reserveTeam(match.away_team)) return false;
   if (prediction.verdict !== "WYBRANY") return false;
