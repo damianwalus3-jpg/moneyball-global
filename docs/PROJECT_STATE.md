@@ -190,3 +190,19 @@ User reports losing valid predictions because bookmaker prices cannot be confirm
 3. Add source freshness diagnostics and sync health counters; stop treating a 200 function response as proof that quote coverage is complete.
 4. Restore a valid MoviOdds credential or choose a verified accessible source. For The Odds API, a user-managed API key is required for reliable event-level tests; do not request it in chat or store it in source code. Provide a secure Supabase secret configuration path only if the user chooses that provider.
 5. After a fresh source is available, run a side-by-side test on the same current European fixtures and only then enable fallback selection / coupon-ready status.
+
+
+### Live unauthenticated provider probe — 2026-11-16
+- Public GET health response: `key_configured:false`.
+- TinyFish direct HTTP probes without credentials returned HTTP 401 for MoviOdds `/catalog?sport=soccer`, `/snapshot?fi=202407630`, and `/odds?sport=soccer&groups=40`. Thus the current feed is inaccessible without a valid key in the tested production path. Do not claim the key is optional operationally just because documentation mentions keyless limits.
+- MoviOdds published pricing page advertises a free $0 API key and paid tiers from $39/month; documentation says keys can be created from account page. This is a no-subscription route if user elects to restore access, but requires a credential stored securely as Supabase secret `MOVIODDS_API_KEY`. Never ask the user to paste it in chat. https://moviodds.com/pricing/ and https://moviodds.com/doc
+- The Odds API's Belgian Pro League page explicitly says current/upcoming odds are covered and available on its free plan. This is the best candidate to test as a second provider, but a free API key and real event-level bookmaker/market response are still required. https://the-odds-api.com/sports/belgium-pro-league-odds.html
+- ParlayAPI's Unibet BE page shows Belgium first-division soccer moneyline/h2h rows, while its regions page reports several other Belgian/European brands as unavailable/not integrated. It is not a broad all-market fallback. https://api.parlay-api.com/books/unibet_be and https://api.parlay-api.com/regions
+- Corrected earlier preliminary assumption: MoviOdds key absence is confirmed by health response and tested endpoint 401s, but logs alone did not prove every historical POST 500 had the same root cause.
+
+### Exact production coverage finding
+- Latest quote time 2026-11-16 02:11:13 UTC; no provider_odds row is fresh within six hours at audit time.
+- 284 predictions exist for today's fixtures; 110 have odds on the prediction record and 174 have null odds.
+- 219,022 rows in provider_odds vs only 8 in odds_snapshots (the table the legacy app adapter currently reads). This strongly indicates the odds feed and app display/storage model are disconnected.
+- A historical join of provider_odds to predictions by match_id + mapped_market + mapped_selection finds 5,115 pairs without a freshness restriction. Therefore there is existing recoverable historic mapping logic, but no currently fresh pair in the six-hour window.
+- Latest DB queries were read-only; no production data was modified.
