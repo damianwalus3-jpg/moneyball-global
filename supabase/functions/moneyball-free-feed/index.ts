@@ -34,7 +34,17 @@ function isExcludedSeniorTeam(value: unknown): boolean {
  return /\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico)\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
 }
 
-function isTopTwoTierLeague(competition: unknown): boolean {
+function isTopTwoTierLeague(competition: unknown, country?: unknown): boolean {
+  const scopeCountry = String(country ?? "").toLowerCase().trim();
+  const scopeLabel = String(competition ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if ((scopeCountry === "scotland" && /\b(lowland league|highland league)\b/.test(scopeLabel))
+    || (scopeCountry === "turkey" && /\b2 lig\b/.test(scopeLabel))
+    || (["denmark", "norway", "belarus"].includes(scopeCountry) && /\b2 division\b/.test(scopeLabel))
+    || (scopeCountry === "sweden" && /\bdivision [12]\b/.test(scopeLabel))
+    || (scopeCountry === "albania" && /\b2nd division\b/.test(scopeLabel))
+    || (scopeCountry === "croatia" && /\bsecond nl\b/.test(scopeLabel))
+    || (scopeCountry === "estonia" && /\besiliiga b\b/.test(scopeLabel))
+    || (scopeCountry === "greece" && /\bfootball league\b/.test(scopeLabel))) return false;
   const comp = String(competition ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   if (!comp) return false;
   if (/\bserie c\b|\blega pro\b|\bserie c1\b|\bserie c2\b/.test(comp)) return false;
@@ -98,7 +108,7 @@ async function readFixtures(date: string) {
     const country = sectionStart >= 0 && sectionEnd > sectionStart
       ? textOf(html.slice(sectionStart, sectionEnd)).replace(/\s+\d+$/, "").trim() || null
       : null;
-    if (!isEuropeanFixture(country,competition,home,away) || !isTopTwoTierLeague(competition)) continue;
+    if (!isEuropeanFixture(country,competition,home,away) || !isTopTwoTierLeague(competition,country)) continue;
     if (isExcludedSeniorTeam(home) || isExcludedSeniorTeam(away)) continue;
     const cls = (attrs.match(/class=["']([^"']+)/i) || [])[1] || "";
     const status = cls.includes("ticket-live") ? "live"
@@ -184,7 +194,7 @@ Deno.serve(async (request) => {
       const date = String(url.searchParams.get("date") || brusselsDate());
       if (date.length !== 10 || date[4] !== "-" || date[7] !== "-") return json({ error: "Nieprawidłowa data." }, 400);
       const allFixtures = await db("moneyball_global_fixture_feed?select=scan_date,external_id,source,competition,country,gender,home_team,away_team,kickoff_at,status,home_score,away_score,fetched_at&scan_date=eq." + date + "&order=kickoff_at.asc");
-      const fixtures = (allFixtures || []).filter((f:any) => isEuropeanFixture(f.country,f.competition,f.home_team,f.away_team) && isTopTwoTierLeague(f.competition));
+      const fixtures = (allFixtures || []).filter((f:any) => isEuropeanFixture(f.country,f.competition,f.home_team,f.away_team) && isTopTwoTierLeague(f.competition,f.country));
       return json({ ok: true, service: "MONEYBALL free FootyNomad feed", date, fetched_at: fixtures[0]?.fetched_at || null, fixtures_count: fixtures.length, fixtures });
     } catch (error) {
       return json({ ok: false, error: String(error) }, 500);
