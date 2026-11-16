@@ -96,6 +96,7 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Greece", "Football League")).toBe(false);
     expect(isEuropeanTopTwoLeague("SCO", "Football League - Lowland League")).toBe(false);
     expect(isEuropeanTopTwoLeague("Türkiye", "2. Lig")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Türkiye", "1. Lig")).toBe(true);
     expect(isEuropeanTopTwoLeague("TUR", "2. Lig")).toBe(false);
     expect(isEuropeanTopTwoLeague("DNK", "2. Division")).toBe(false);
     expect(isEuropeanTopTwoLeague("SWE", "Division 1")).toBe(false);
