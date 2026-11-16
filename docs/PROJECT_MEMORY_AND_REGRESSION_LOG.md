@@ -386,3 +386,11 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Supabase health advisor: 0 findings. Security advisor nadal raportuje 5 tabel z RLS bez polityk (worker-only, oczekiwane), pg_net w public schema (nie przenosić bez migracji/zgodności z cron), oraz wyłączoną ochronę przed wyciekłymi hasłami. Nie wprowadzono zmian auth/extension w ciemno.
 - Read-only ledger nadal: deposit 91.60 €, stakes 23.00 €, returns 5.25 €, saldo 73.85 €. Brak nowych/duplikowanych wpisów.
 - Otwarta blokada na zielone światło: rzeczywisty pomiar menu po zalogowaniu i rzeczywisty settlement E2E po FT dla istniejącego kuponu. Kod/CI/deploy i automaty cron działają; nie oznaczać tych dwóch testów za wykonane bez danych.
+
+
+## Hardening uprawnień tabel worker-only — 2026-11-16 22:17 CET
+- Audyt `information_schema.role_table_grants` wykazał, że mimo RLS bez polityk pięć tabel wewnętrznych miało nadal jawne GRANT-y dla `anon` i `authenticated`. RLS odrzucał zapytania bez polityk, ale pozostawione granty były zbędną powierzchnią dostępu.
+- Zastosowano produkcyjną migrację `20261116211700_revoke_browser_access_to_worker_internal_tables`: REVOKE ALL dla anon/authenticated z `match_result_sources`, `moneyball_password_recovery`, `moneyball_prediction_scan_state`, `moneyball_reschedule_sync_state`, `project_work_log`; service_role zachował SELECT/INSERT/UPDATE/DELETE.
+- Po migracji ponowny odczyt `information_schema.role_table_grants` potwierdził brak jakichkolwiek grantów dla anon/authenticated na tych pięciu tabelach; service_role zachował dostęp. Health advisor nadal 0 findings. Security advisor nadal zgłasza wyłącznie INFO dla RLS/no-policy (5 tabel — teraz zgodne z zamierzonym worker-only), WARN pg_net w public schema i WARN leaked password protection disabled. pg_net nie przenoszono, aby nie naruszyć istniejących funkcji `net.http_*` i cronów.
+- Migracja SQL została zapisana w repo `supabase/migrations/20261116211700_revoke_browser_access_to_worker_internal_tables.sql`, commit `b5c847ca1962162ab400af9b7e8006d41ed0f5a6`. Weryfikacja po wdrożeniu obejmuje brak grantów browser-role i działanie service_role; czeka na najbliższy cron tick po migracji.
+- Nie zmieniano danych meczów, prognoz, kuponów ani bankrolla.
