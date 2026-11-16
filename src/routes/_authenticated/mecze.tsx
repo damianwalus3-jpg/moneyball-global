@@ -13,7 +13,7 @@ import { MatchForm } from "@/components/forms/MatchForm";
 import { OddsForm, ScanRunForm } from "@/components/forms/SimpleForms";
 import { deleteRow } from "@/lib/db";
 import { saveCouponBatch } from "@/lib/coupons";
-import { isActivePredictionVersion, isEuropeanTopTwoLeague, MATCH_STATUS_LABELS } from "@/lib/domain";
+import { isActivePredictionVersion, isEligibleEuropeanMatch, MATCH_STATUS_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, matchLabel } from "@/lib/format";
 import { matchPageDataQuery, useAction } from "@/lib/queries";
 import { brusselsDayKey, fmtDateTime, fmtDayLong, fmtTime } from "@/lib/time";
@@ -391,7 +391,7 @@ function Mecze() {
     // Historical and future fixtures stay in the database for settlement/audit, but
     // must never leak into today's scan/list.
     .filter((match) => matchDay(match) === today)
-    .filter((match) => isEuropeanTopTwoLeague(match.country, match.competition ?? match.league))
+    .filter((match) => isEligibleEuropeanMatch(match))
         .filter((match) => {
       const isFinished = match.status === "finished" || resultBy.has(match.id);
       if (view === "upcoming") return !isFinished && !["postponed", "cancelled"].includes(match.status);
