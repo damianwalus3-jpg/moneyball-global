@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { CheckCircle2, Flag, History } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,7 +15,7 @@ import {
 } from "@/components/app/ui-bits";
 import { SettleMatchDialog } from "@/components/app/SettleMatchDialog";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
-import { ensureTables, useTable } from "@/lib/queries";
+import { ensureTables, historyPagesQuery } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
 import type { Match } from "@/lib/types";
 
@@ -29,8 +30,10 @@ export const Route = createFileRoute("/_authenticated/historia")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  loader: ({ context }) =>
-    ensureTables(context.queryClient, ["matches", "predictions", "match_results", "coupons", "coupon_legs"]),
+  loader: ({ context }) => Promise.all([
+    context.queryClient.prefetchInfiniteQuery(historyPagesQuery({ tab: "todo", search: "" })),
+    ensureTables(context.queryClient, ["match_results", "coupons", "coupon_legs"]),
+  ]),
   pendingComponent: PageLoader,
   errorComponent: DataError,
   component: Historia,
@@ -39,37 +42,12 @@ export const Route = createFileRoute("/_authenticated/historia")({
 const isVoided = (match: Match) => match.status === "cancelled" || match.status === "postponed";
 
 function Historia() {
-  const matches = useTable("matches");
-  const preds = useTable("predictions");
-  const results = useTable("match_results");
-  const legs = useTable("coupon_legs");
   const [tab, setTab] = useState<"todo" | "done">("todo");
   const [q, setQ] = useState("");
   const [settle, setSettle] = useState<Match | null>(null);
-  const resultBy = useMemo(() => new Map(results.map((r) => [r.match_id, r])), [results]);
-  const now = Date.now();
-
-  const todo = matches
-    .filter((m) => {
-      const result = resultBy.get(m.id);
-      const started = m.kickoff_at && new Date(m.kickoff_at).getTime() < now;
-      // Postponed/cancelled fixtures are already settled as void; they must not
-      // remain in the pending queue just because no numeric score exists.
-      if (!started || isVoided(m) || result?.verified) return false;
-      const matchPredictions = preds.filter((p) => p.match_id === m.id);
-      const selectedIds = new Set(matchPredictions.filter((p) => p.verdict === "WYBRANY").map((p) => p.id));
-      const selectedPending = matchPredictions.some((p) => p.verdict === "WYBRANY" && p.settlement_status === "pending");
-      const couponPending = legs.some((leg) => selectedIds.has(leg.prediction_id) && leg.status === "pending");
-      return selectedPending || couponPending;
-    })
-    .sort((a, b) => (a.kickoff_at ?? "").localeCompare(b.kickoff_at ?? ""));
-  const done = matches
-    // Verified score results and confirmed void fixtures both belong in history.
-    .filter((m) => resultBy.get(m.id)?.verified === true || isVoided(m))
-    .sort((a, b) => (b.kickoff_at ?? "").localeCompare(a.kickoff_at ?? ""));
-  const list = (tab === "todo" ? todo : done).filter(
-    (m) => !q || `${matchLabel(m)} ${m.competition ?? ""}`.toLowerCase().includes(q.toLowerCase()),
-  );
+  const pageQuery = useInfiniteQuery(historyPagesQuery({ tab, search: q }));
+  const list = pageQuery.data?.pages.flatMap((page) => page.rows) ?? [];
+  const summary = pageQuery.data?.pages[0];
 
   return (
     <div>
@@ -80,15 +58,22 @@ function Historia() {
       />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Button size="sm" variant={tab === "todo" ? "default" : "outline"} onClick={() => setTab("todo")}>
-          Do rozliczenia ({todo.length})
+          Do rozliczenia ({summary?.todo_count ?? 0})
         </Button>
         <Button size="sm" variant={tab === "done" ? "default" : "outline"} onClick={() => setTab("done")}>
-          Rozliczone ({done.length})
+          Rozliczone ({summary?.done_count ?? 0})
         </Button>
         <Input placeholder="Szukaj…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 max-w-xs" />
       </div>
 
-      {list.length === 0 ? (
+      {pageQuery.isPending ? (
+        <div className="surface-card p-6 text-center text-sm text-muted-foreground">Ładowanie historii…</div>
+      ) : pageQuery.isError ? (
+        <div className="surface-card flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+          <span className="text-destructive">Nie udało się pobrać historii: {pageQuery.error.message}</span>
+          <Button size="sm" variant="outline" onClick={() => pageQuery.refetch()}>Spróbuj ponownie</Button>
+        </div>
+      ) : list.length === 0 ? (
         <EmptyState
           icon={tab === "todo" ? CheckCircle2 : History}
           title={tab === "todo" ? "Nic do rozliczenia" : "Brak zweryfikowanych wyników"}
@@ -100,9 +85,7 @@ function Historia() {
         />
       ) : (
         <div className="grid gap-2">
-          {list.map((m) => {
-            const r = resultBy.get(m.id);
-            const mp = preds.filter((p) => p.match_id === m.id);
+          {list.map(({ match: m, result: r, predictions: mp }) => {
             return (
               <div key={m.id} className="surface-card p-3">
                 <div className="flex flex-wrap items-center gap-3">
@@ -149,6 +132,13 @@ function Historia() {
               </div>
             );
           })}
+          {pageQuery.hasNextPage && (
+            <div className="flex justify-center py-3">
+              <Button variant="outline" onClick={() => pageQuery.fetchNextPage()} disabled={pageQuery.isFetching}>
+                {pageQuery.isFetchingNextPage ? "Wczytywanie…" : "Wczytaj kolejne 30"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
       <SettleMatchDialog match={settle} onClose={() => setSettle(null)} />
