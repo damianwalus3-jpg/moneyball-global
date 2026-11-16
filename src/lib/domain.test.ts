@@ -94,6 +94,11 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Croatia", "Second NL")).toBe(false);
     expect(isEuropeanTopTwoLeague("Estonia", "Esiliiga B")).toBe(false);
     expect(isEuropeanTopTwoLeague("Greece", "Football League")).toBe(false);
+    expect(isEuropeanTopTwoLeague("SCO", "Football League - Lowland League")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Türkiye", "2. Lig")).toBe(false);
+    expect(isEuropeanTopTwoLeague("TUR", "2. Lig")).toBe(false);
+    expect(isEuropeanTopTwoLeague("DNK", "2. Division")).toBe(false);
+    expect(isEuropeanTopTwoLeague("SWE", "Division 1")).toBe(false);
     // The actual tier-two names in those countries remain eligible.
     expect(isEuropeanTopTwoLeague("Scotland", "Championship")).toBe(true);
     expect(isEuropeanTopTwoLeague("Turkey", "1. Lig")).toBe(true);
