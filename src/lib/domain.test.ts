@@ -9,6 +9,7 @@ import {
   isValidPick,
   groupHitRates,
   isCouponCandidate,
+  hasFreshConfirmedOdds,
   modelHitRate,
   probabilityQuality,
   multiclass1X2Quality,
@@ -163,6 +164,31 @@ describe("probability quality by selection", () => {
     expect(grouped).toHaveLength(2);
     expect(grouped.find((row) => row.selection === "1X")?.sample).toBe(2);
     expect(grouped.find((row) => row.selection === "X2")?.sample).toBe(1);
+  });
+});
+
+describe("fresh bookmaker quote validation", () => {
+  const now = Date.parse("2026-11-16T12:00:00.000Z");
+  const fresh = {
+    odds_source: "MoviOdds",
+    odds_bookmaker: "bet365",
+    odds_captured_at: "2026-11-16T11:30:00.000Z",
+    odds_phase: "prematch",
+    odds_suspended: false,
+    odds_status: "CONFIRMED",
+  };
+  it("accepts a recent, sourced, unsuspended prematch quote", () => {
+    expect(hasFreshConfirmedOdds(prediction("p", "m1", 90, { data_coverage: fresh }), now)).toBe(true);
+  });
+  it("rejects missing source/time, stale, suspended and in-play quotes", () => {
+    expect(hasFreshConfirmedOdds(prediction("p", "m1", 90), now)).toBe(false);
+    expect(hasFreshConfirmedOdds(prediction("p", "m1", 90, { data_coverage: { ...fresh, odds_captured_at: "2026-11-16T05:00:00.000Z" } }), now)).toBe(false);
+    expect(hasFreshConfirmedOdds(prediction("p", "m1", 90, { data_coverage: { ...fresh, odds_status: "SUSPENDED", odds_suspended: true } }), now)).toBe(false);
+    expect(hasFreshConfirmedOdds(prediction("p", "m1", 90, { data_coverage: { ...fresh, odds_phase: "inplay" } }), now)).toBe(false);
+    expect(hasFreshConfirmedOdds(prediction("p", "m1", 90, { data_coverage: { ...fresh, odds_captured_at: "2026-11-16T12:05:00.000Z" } }), now)).toBe(false);
+  });
+  it("allows a manual price only when its source timestamp is recent", () => {
+    expect(hasFreshConfirmedOdds(prediction("p", "m1", 2.1, { data_coverage: { ...fresh, odds_source: "manual" } }), now)).toBe(true);
   });
 });
 
