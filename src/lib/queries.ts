@@ -7,7 +7,7 @@ import type { TableName } from "./types";
 export const LIVE_REFRESH = {
   staleTime: 15_000,
   gcTime: 600_000,
-  refetchInterval: 60_000,
+  refetchInterval: 30_000,
   refetchIntervalInBackground: false,
   refetchOnWindowFocus: true,
 } as const;
