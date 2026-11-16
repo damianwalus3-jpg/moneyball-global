@@ -445,3 +445,20 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 3. Continue the existing scoped-query refactor documented above; prioritize route-specific query waterfalls and remaining full-history prediction consumers. Preserve all historical data and finance totals.
 4. Observe the next real final results for the two €4 test coupons. Verify coupon legs, coupon terminal status, gross return, net profit/loss, and exactly-once ledger settlement after multiple cron cycles. Do not fabricate results.
 5. Obtain authenticated navigation measurements before claiming menu-speed issue resolved. Public homepage latency alone is not enough.
+
+
+## Bounded parallel reads for match and coupon pages — 2026-11-16
+
+- Inspected the live source in `src/lib/db.ts`. The match and coupon page loaders had sequential chunk loops for predictions, match results, related coupon legs, odds snapshots, historical match rows and linked coupons. These were request waterfalls: later independent 100-ID batches waited for the previous batch even though they can be fetched independently.
+- Added `fetchInChunks()`: preserves chunk order, runs at most four independent 100-ID chunks concurrently, and retains the existing owner-scoped filters, selected columns, per-request timeout and error handling. Applied it to the independent chunk reads in `fetchCouponPageData()` and `fetchMatchPageData()`. The initial four independent page reads were already parallel and remain unchanged. No database rows, coupon rules, refresh cadence, or historical data were changed.
+- Commit: `d5c1539e2c8193f85b1fc8c3fcd2063b20c9e34c` — `perf(data): parallelize bounded match and coupon page reads`. Source was fetched back from GitHub at this exact SHA and confirmed to contain the helper and replacements.
+- CI run `#786` for this commit was observed in progress at the time of this note. Cloudflare deploy run `#389` was pending behind the production deployment concurrency group. Do not claim this frontend change is live until CI and the exact-SHA Cloudflare deployment succeed.
+- Previous deploy run `#388` for docs-only SHA `58c2274` was cancelled because a higher-priority queued production deployment existed; run `#387` was also cancelled. Run `#386` for SHA `5f3081e` had previously been in progress. Check the Actions page for the final state of `#386` and `#389` before drawing deployment conclusions.
+- Latest available Supabase function logs for `moneyball-results-sync` show HTTP 200 cycles with measured execution times: 17:45 UTC 9.785s; 17:40 7.475s; 17:35 4.757s; 17:30 16.089s; 17:25 11.194s; 17:20 13.062s; 17:15 15.169s; 17:10 10.033s; 17:05 11.778s; 17:00 9.651s; 16:55 9.842s; 16:50 10.866s. This confirms repeated successful HTTP responses and variable latency, not a guaranteed speedup or zero internal errors; inspect structured function logs/request summaries for settlement counts when available.
+- The CI page reports Node.js 20 deprecation and upcoming Ubuntu runner migration warnings; they did not fail CI run #785. These are maintenance warnings, not the present user-facing timeout cause.
+
+### Next checks
+1. Confirm CI `#786` and Cloudflare production deployment `#389` for exact SHA `d5c1539`; then verify the production Worker shell and, where possible, authenticated page navigation.
+2. Compare before/after authenticated match and coupon page load timings across repeated visits. Do not claim the UI is faster solely because code now issues parallel requests.
+3. Continue removing full-table history reads from legacy screens, preserving all-history financial totals through existing summary RPCs and using scoped/cursor reads where appropriate.
+4. Continue monitoring results-sync cycle metrics and verify real match -> prediction -> coupon leg -> exactly-once €4 ledger settlement without synthetic scores.
