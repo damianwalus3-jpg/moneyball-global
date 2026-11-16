@@ -713,14 +713,17 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Next: monitor logs after this deployment for recurrence of prediction timeouts and obtain a real authenticated Statistics / Results / History / menu timing measurement. Public root latency is not a substitute for authenticated measurements.
 
 
-## CSV import duplicate lookup — pending PR #73 (2026-11-16)
+## CSV import duplicate lookup — deployed to MONEYBALL GLOBAL Main (2026-11-16)
 
-- Main still uses the previous full-history duplicate lookup in `src/lib/scan-import-service.ts`; this change is not live yet.
-- PR #73 replaces it with owner-scoped lookup restricted to match IDs in the CSV import and the composite identity `match_id + model_version + market + selection`. Existing predictions are skipped, never overwritten or deleted.
-- The latest PR code also keyset-pages each 100-match batch by UUID in pages of 1,000 rows, preventing PostgREST's response cap from silently omitting duplicates. This pagination hardening was added after the first CI run.
-- New predictions remain inserted in existing batches of 500; match reuse and scan-run status handling are unchanged. No database migration is required.
-- Earlier CI run #815 passed the first implementation, but it predates the UUID-pagination hardening. The current PR head must receive a fresh CI run before merge.
-- Cloudflare Workers Builds PR check is failing immediately without logs or annotations. This is separate from the repository's main-branch GitHub Actions deploy workflow, which successfully built and deployed commit `54c5cd31cc63a98665dd586cd40f38aa89f493d0` to the production Worker.
-- Production is `https://moneyball-global.damianwalus3.workers.dev`; the test Worker is separate and must not be treated as production.
-- Do not alter historical predictions, match results, coupons, coupon legs, bankroll balances or transactions during this optimization.
-- After merge, verify the main-branch CI/deploy workflow and confirm the production Worker version before marking the change live.
+- PR #73 was merged as `f8004c60032323b7bff72b9850944b5687b4aed2`. The implementation is now on `main`.
+- `src/lib/scan-import-service.ts` no longer calls `fetchAll("predictions")` to detect CSV duplicates. It calls `fetchExistingPredictionKeysForMatches`.
+- The helper is owner-scoped, queries only imported match IDs in batches of 100, selects the duplicate identity columns, and keyset-pages each batch by UUID in pages of 1,000 rows. This avoids both a full prediction-history scan and the PostgREST 1,000-row response cap.
+- Duplicate identity remains `match_id + model_version + market + selection`; already-existing predictions are skipped, never overwritten or deleted. New rows remain inserted in existing batches of 500. No DB migration was needed.
+- Exact PR-head CI run #816 passed all steps: Deno checks, tests, TypeScript and build.
+- Main CI run #817 passed. Main Cloudflare deployment run #818 passed all steps, including build and deploy.
+- Cloudflare Workers Builds check for the merged main commit also completed SUCCESS (build `c7d7946e-0e63-4bd5-a944-7d30536ad435`). The earlier immediate PR-build failures are not the current main status.
+- Production Worker: `https://moneyball-global.damianwalus3.workers.dev`; deployed Worker version: `fd91d2df-6d76-45b5-b5c4-09161e11c863`.
+- Public production root was rechecked after deployment and returned the MONEYBALL GLOBAL 2.0 page with the correct €4 analytical stake. The authenticated `/panel` route correctly requires login; authenticated menu timing has not been measured.
+- Read-only database verification after deployment: matches 2,596; predictions 18,563; coupons 9; coupon legs 22; match results 883; bankroll transactions 7. No coupon, leg, bankroll or transaction rows were altered by this change.
+- The active results-sync cron remains `*/5 * * * *`. The audited 19:20–19:40 UTC sync executions returned HTTP 200 in about 7.1–9.0 seconds. PostgreSQL timeout search for 19:18–19:45 UTC returned no timeout events.
+- Do not repeat this scoped CSV deduplication work. Continue monitoring only for regressions or new bottlenecks; do not modify historical financial records without explicit user instruction.
