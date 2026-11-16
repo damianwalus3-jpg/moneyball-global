@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary } from "./db";
 import type { TableName } from "./types";
 
-/** Read-only refresh: results are synced by the backend, the browser only re-reads them. */
+/** Small live summaries refresh frequently; large table reads use a slower cadence. */
 export const LIVE_REFRESH = {
   staleTime: 15_000,
   gcTime: 600_000,
@@ -12,14 +12,23 @@ export const LIVE_REFRESH = {
   refetchOnWindowFocus: true,
 } as const;
 
+/** Large table reads are cached longer to keep navigation responsive and avoid
+ * repeatedly downloading complete tables. Mutations still invalidate them. */
+export const TABLE_REFRESH = {
+  staleTime: 45_000,
+  gcTime: 600_000,
+  refetchInterval: 60_000,
+  refetchIntervalInBackground: false,
+  refetchOnWindowFocus: true,
+} as const;
+
 export function tableQuery<K extends TableName>(table: K) {
   return queryOptions({
     queryKey: ["table", table] as const,
     queryFn: () => fetchAll(table),
-    ...LIVE_REFRESH,
+    ...TABLE_REFRESH,
   });
 }
-
 
 export function couponFinanceQuery() {
   return queryOptions({
