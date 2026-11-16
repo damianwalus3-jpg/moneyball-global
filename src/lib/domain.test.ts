@@ -211,6 +211,8 @@ describe("coupon candidates", () => {
     expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), home_team: "UCSA", away_team: "Polissya II" }, now)).toBe(false);
     expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), away_team: "Celta de Vigo II" }, now)).toBe(false);
     expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), away_team: "Bayern Munich B" }, now)).toBe(false);
+    expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), away_team: "RC Celta Fortuna" }, now)).toBe(false);
+    expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), away_team: "Real Madrid Castilla" }, now)).toBe(false);
   });
   it("rejects started and cancelled matches", () => {
     expect(isCouponCandidate(prediction("p", "m1", 90), match("m1", "2026-11-10T11:00:00Z"), now)).toBe(false);
