@@ -3,7 +3,7 @@ import { BarChart3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
-import { ACTIVE_MODEL_VERSION, couponPayout, groupHitRates, hitRate, isActivePredictionVersion, isEuropeanTopTwoLeague, modelHitRate, probabilityQuality, type HitRate } from "@/lib/domain";
+import { ACTIVE_MODEL_VERSION, couponPayout, groupHitRates, hitRate, isActivePredictionVersion, isEuropeanTopTwoLeague, modelHitRate, probabilityQuality, probabilityQualityBySelection, PICK_LABELS, type HitRate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { ensureTables, useTable } from "@/lib/queries";
 import type { Market, Prediction } from "@/lib/types";
@@ -141,7 +141,7 @@ function MarketBlock({ type, preds, leagueOf, matchOf }: { type: Market; preds: 
   const verifiedSettled = sel.filter((prediction) => prediction.verified && (prediction.settlement_status === "won" || prediction.settlement_status === "lost"));
   const hrSel = hitRate(verifiedSettled.map((prediction) => prediction.settlement_status));
   const hrModel = type === "GOALS" ? null : modelHitRate(preds, type);
-  const quality = probabilityQuality(preds.filter((prediction) => prediction.model_version === ACTIVE_MODEL_VERSION));
+  const qualityRows = probabilityQualityBySelection(preds.filter((prediction) => prediction.model_version === ACTIVE_MODEL_VERSION));
   const byBucket = groupHitRates(verifiedSettled, (p) => bucketOf(p.probability), (prediction) => prediction.settlement_status).sort(
     (a, b) => BUCKETS.findIndex((x) => x.key === a.key) - BUCKETS.findIndex((x) => x.key === b.key),
   );
@@ -187,18 +187,21 @@ function MarketBlock({ type, preds, leagueOf, matchOf }: { type: Market; preds: 
       })()}
       <div className="mt-3 rounded-xl border border-border bg-card p-3 sm:p-4">
         <div className="mb-2 flex items-center justify-between gap-2">
-          <h3 className="font-display font-bold uppercase">Jakość prawdopodobieństw · model {ACTIVE_MODEL_VERSION}</h3>
-          <span className="text-xs text-muted-foreground">próba: {quality.sample}</span>
+          <h3 className="font-display font-bold uppercase">Jakość prognoz według typu · model {ACTIVE_MODEL_VERSION}</h3>
+          <span className="text-xs text-muted-foreground">osobne próby dla każdego typu</span>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <StatCard label="Brier Score ↓" value={quality.brier == null ? "—" : quality.brier.toFixed(3)} hint="0 = idealnie" />
-          <StatCard label="Log Loss ↓" value={quality.logLoss == null ? "—" : quality.logLoss.toFixed(3)} hint="niżej = lepiej" />
-          <StatCard label="Śr. prognoza" value={fmtPct(quality.averageProbability == null ? null : quality.averageProbability * 100)} />
-          <StatCard label="Rzeczywista skuteczność" value={fmtPct(quality.observedRate == null ? null : quality.observedRate * 100)} hint={quality.calibrationGap == null ? "brak próby" : `różnica ${fmtPct(quality.calibrationGap * 100)}`} />
-        </div>
+        {qualityRows.length ? <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {qualityRows.map((row) => <div key={row.selection} className="rounded-lg border border-border p-2">
+            <p className="mb-2 text-xs font-semibold">{PICK_LABELS[row.selection]}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <StatCard label="Brier ↓" value={row.brier == null ? "—" : row.brier.toFixed(3)} hint={`n=${row.sample}`} />
+              <StatCard label="Log Loss ↓" value={row.logLoss == null ? "—" : row.logLoss.toFixed(3)} />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">Prognoza {fmtPct(row.averageProbability == null ? null : row.averageProbability * 100)} · wynik {fmtPct(row.observedRate == null ? null : row.observedRate * 100)}</p>
+          </div>)}
+        </div> : <p className="text-sm text-muted-foreground">Brak wystarczających, zweryfikowanych rozliczeń dla aktywnego modelu.</p>}
         <p className="mt-2 text-xs text-muted-foreground">
-          Wynik liczony dla zweryfikowanych, rozliczonych zdarzeń binarnych (wygrana/przegrana), również odrzuconych przez filtr kuponu.
-          To nie jest pełny wieloklasowy Brier dla wektora 1X2. Double Chance jest pochodną 1X2, więc nie stanowi niezależnego modelu.
+          Brier i Log Loss liczone osobno dla każdego wyboru, wyłącznie na zweryfikowanych wygranych i przegranych. To ocena binarna typu, nie pełny wieloklasowy Brier 1X2. Double Chance pozostaje pochodną 1X2.
         </p>
       </div>
       {hrSel.settled > 0 && (
