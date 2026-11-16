@@ -100,7 +100,8 @@ async function readFixtures(date: string) {
     const country = sectionStart >= 0 && sectionEnd > sectionStart
       ? textOf(html.slice(sectionStart, sectionEnd)).replace(/\s+\d+$/, "").trim() || null
       : null;
-    if (!isEuropeanFixture(country,competition,home,away) || !isTopTwoTierLeague(competition)) continue;\n    if (isExcludedSeniorTeam(home) || isExcludedSeniorTeam(away)) continue;
+    if (!isEuropeanFixture(country,competition,home,away) || !isTopTwoTierLeague(competition)) continue;
+    if (isExcludedSeniorTeam(home) || isExcludedSeniorTeam(away)) continue;
     const cls = (attrs.match(/class=["']([^"']+)/i) || [])[1] || "";
     const status = cls.includes("ticket-live") ? "live"
       : cls.includes("ticket-ft") ? "finished"
