@@ -18,7 +18,7 @@ function sourceLabel(source?: string | null) {
   return source.replace(/_/g, " ");
 }
 
-function coverageLabel(coverage?: Record<string, unknown> | null) {
+function coverageLabel(coverage?: Record<string, unknown> | null, dataSource?: string | null) {
   if (!coverage) return "brak metadanych pokrycia";
   const homeXg = Number(coverage["historical_xg_home_matches"] ?? coverage["xg_home_matches"] ?? 0);
   const awayXg = Number(coverage["historical_xg_away_matches"] ?? coverage["xg_away_matches"] ?? 0);
@@ -30,9 +30,15 @@ function coverageLabel(coverage?: Record<string, unknown> | null) {
   const xgLabel = coverage["historical_xg_used"]
     ? `xG ✓ (H ${homeXg} / G ${awayXg}${xgSources.length ? " · " + [...new Set(xgSources)].join(", ") : ""})`
     : "xG niewykorzystane";
-  const model = String(coverage["model_source"] ?? "");
+  const storedModel = String(coverage["model_source"] ?? "");
+  const legacySource = String(dataSource ?? "");
+  const marketOnly = /movi|tipsaudit|striker|bet365|unibet|leovegas|manual/i.test(legacySource);
+  const model = storedModel || (!marketOnly ? legacySource : "");
+  const modelLabel = model.startsWith("EXTERNAL_MODEL")
+    ? "zewnętrzny model · brak potwierdzonych metadanych wejściowych"
+    : model ? sourceLabel(model) : "źródło nieopisane";
   return [
-    "model " + (model ? sourceLabel(model) : "źródło nieopisane"),
+    "model " + modelLabel,
     "historia " + (coverage["verified_history"] ? "✓" : "—"),
     xgLabel,
     ...(coverage["xgoals_public_results"] ? ["xGoalsPro · wyniki W/D/L (nie xG)"] : []),
@@ -162,7 +168,7 @@ export function PredictionsView({ market }: { market: Market }) {
                   <div className="text-xs text-muted-foreground">
                     {match?.competition ?? match?.league ?? "—"} · {match?.kickoff_at ? fmtDateTime(match.kickoff_at) : match?.kickoff_date ? match.kickoff_date + " · godzina nieznana" : "brak daty"}
                   </div>
-                  <div className="break-words text-xs text-muted-foreground">Dane modelu: {coverageLabel(prediction.data_coverage)}</div>
+                  <div className="break-words text-xs text-muted-foreground">Dane modelu: {coverageLabel(prediction.data_coverage, prediction.data_source)}</div>
                   <div className="break-words text-xs text-muted-foreground">{oddsFreshnessLabel(prediction.data_coverage)}</div>
                   {fairOdds && <div className="text-xs text-muted-foreground">Kurs fair dla typu: {fmtOdds(fairSelectionOdds)} · 1/X/2: {fmtOdds(fairOdds.home)} / {fmtOdds(fairOdds.draw)} / {fmtOdds(fairOdds.away)} · <a href="https://tipsaudit.com" target="_blank" rel="noreferrer" className="underline">Data: TipsAudit</a> (bez marży, nie jest ofertą bukmachera)</div>}
                   {prediction.probability == null && <div className="text-xs text-warning">Brak wystarczających potwierdzonych danych — prawdopodobieństwo nie zostało wygenerowane.</div>}
