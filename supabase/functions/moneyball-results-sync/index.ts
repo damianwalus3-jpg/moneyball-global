@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { selectEspnLeagues } from "./espn-leagues.ts";
 const SUPABASE_URL="https://gzgeklcukrclgwbsmbsp.supabase.co";
 const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type, x-cron-token","Access-Control-Allow-Methods":"GET, POST, OPTIONS"};
@@ -60,39 +61,18 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
  const dateOnlyMatches=await db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=gte."+encodeURIComponent(startDate)+"&kickoff_date=lte."+encodeURIComponent(endDate)).catch(()=>[]);
  const unresolved=[...(timedMatches||[]),...(dateOnlyMatches||[])],todayKey=day(new Date());
  const due=unresolved.filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team)&&((m.kickoff_at&&new Date(m.kickoff_at).getTime()<Date.now())||(!m.kickoff_at&&m.kickoff_date&&String(m.kickoff_date)<=todayKey))&& !["finished","postponed","cancelled"].includes(String(m.status||"").toLowerCase()));
- const prefixes=new Set<string>(),worldHints:string[]=[];
- for(const m of due){const c=teamKey(m.country||"");const prefix=ESPN_COUNTRY_PREFIX[c];if(prefix)prefixes.add(prefix);if(c==="world")worldHints.push(String(m.league||""));}
- let leagues=[...ESPN_LEAGUES];
- try{
-  const ir=await fetch("https://sports.core.api.espn.com/v2/sports/soccer/leagues?limit=1000",{headers:{"Accept":"application/json","User-Agent":"MoneyballGlobal/2.0"},signal:AbortSignal.timeout(8000)});
-  if(ir.ok){
-   const ix=await ir.json(),allCodes=(ix.items||[]).map((x:any)=>String(x.$ref||"").match(/\/leagues\/([^/?]+)/)?.[1]).filter(Boolean) as string[];
-   const dynamic=allCodes.filter(code=>{
-    const prefix=code.split(".")[0];
-    if(prefixes.has(prefix)&&["eng","esp","ita","ger","fra","bel","ned","por","sco","aut","gre","tur","rus","swe","den","nor","pol","ukr","sui","uefa"].includes(prefix))return true;
-    if(["afc","fifa","uefa","caf","concacaf","conmebol"].includes(prefix)){
-     const hints=worldHints.join(" ").toLowerCase();
-     if(!hints)return false;
-     if(prefix==="uefa")return /uefa|champions|europa|conference|women/.test(hints);
-     if(prefix==="caf")return /africa|afcon|caf|nations cup/.test(hints);
-     if(prefix==="concacaf")return /concacaf|gold cup|caribbean|nations league/.test(hints);
-     if(prefix==="conmebol")return /conmebol|copa|libertadores|sudamericana/.test(hints);
-     if(prefix==="afc")return /asia|asian|afc|u17|u20|u21/.test(hints);
-     return /world|fifa|u17|u20|u21/.test(hints);
-    }
-    return false;
-   });
-   leagues=[...new Set([...leagues,...dynamic])];
-  }
- }catch(_){}
+ const leagues=selectEspnLeagues(due);
  const dateRange=startDate.replace(/-/g,"")+(startDate===endDate?"":"-"+endDate.replace(/-/g,""));
+ const espnStarted=Date.now();
  const espn=await limitedSettled(leagues,12,async league=>{
   const url="https://site.api.espn.com/apis/site/v2/sports/soccer/"+league+"/scoreboard?dates="+dateRange;
   const r=await fetch(url,{headers:{"User-Agent":"Mozilla/5.0 MoneyballGlobal/2.0","Accept":"application/json"},signal:AbortSignal.timeout(10000)});
   if(!r.ok)throw new Error("ESPN "+league+" HTTP "+r.status);
   const j=await r.json();return {league,url,events:j.events||[]};
  });
- for(const x of espn){if(x.status!=="fulfilled")continue;for(const e of x.value.events||[]){
+ const espnFailures=espn.filter((x:any)=>x.status==="rejected").map((x:any)=>String(x.reason));
+ let espnEvents=0;
+ for(const x of espn){if(x.status!=="fulfilled")continue;espnEvents+=(x.value.events||[]).length;for(const e of x.value.events||[]){
   const comps=e.competitions?.[0]?.competitors||[];
   const h=comps.find((c:any)=>c.homeAway==="home"),a=comps.find((c:any)=>c.homeAway==="away");
   const state=String(e.status?.type?.name||e.status?.type?.state||"").toLowerCase();
@@ -101,6 +81,7 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
   if(!h||!a)continue;
   out.push({source:"ESPN",external_id:String(e.id),home:h.team?.displayName||h.team?.name||"",away:a.team?.displayName||a.team?.name||"",home_score:finished?Number(h.score):null,away_score:finished?Number(a.score):null,status:postponed?"postponed":finished?"finished":state.includes("in")?"live":"scheduled",date:e.date||startDate,url:x.value.url,raw:e});
  }}
+ console.log("[moneyball-results-sync] ESPN selection",JSON.stringify({dueFixtures:due.length,leagues,successfulLeagues:espn.filter((x:any)=>x.status==="fulfilled").length,events:espnEvents,failures:espnFailures,durationMs:Date.now()-espnStarted}));
  // TheSportsDB public v1 feed: no signup or paid key; one request per date, with the free tier returning a small sample.
  const eventDates:string[]=[];const cursor=new Date(startDate+"T00:00:00Z"),last=new Date(endDate+"T00:00:00Z");
  for(;cursor<=last;cursor.setUTCDate(cursor.getUTCDate()+1))eventDates.push(cursor.toISOString().slice(0,10));
