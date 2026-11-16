@@ -1,14 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { CalendarDays, ChevronRight, ScanLine, Ticket, Trophy, type LucideIcon } from "lucide-react";
+import { CalendarDays, ChevronRight, Loader2, ScanLine, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fmtMoney, fmtOdds } from "@/lib/format";
 import { couponFinanceQuery, dashboardSelectedPicksQuery, dashboardSummaryQuery } from "@/lib/queries";
 import { EmptyState, NoGuarantee, PageHeader, StatCard } from "@/components/app/ui-bits";
 import { fmtPct } from "@/lib/format";
-import { fmtDateTime } from "@/lib/time";
+import { brusselsDayKey, fmtDateTime } from "@/lib/time";
+import { getSupabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => ({ meta: [{ title: "Panel — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Podsumowanie prognoz, kuponów i bankrolla." }, { property: "og:title", content: "Panel — MONEYBALL" }, { property: "og:description", content: "Podsumowanie prognoz." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -91,6 +92,43 @@ function Panel() {
   const summaryQuery = useQuery(dashboardSummaryQuery());
   const selectedQuery = useQuery(dashboardSelectedPicksQuery());
   const financeQuery = useQuery(couponFinanceQuery());
+  const [scanRunning, setScanRunning] = useState(false);
+  const [scanProgress, setScanProgress] = useState("");
+  const [scanError, setScanError] = useState("");
+  const [scanSummary, setScanSummary] = useState<{ matches: number; predictions: number; selected: number; batches: number } | null>(null);
+
+  // Manual fallback: run bounded sequential batches while the scheduled prediction cron is paused.
+  const runManualScan = async () => {
+    if (scanRunning) return;
+    const sb = getSupabase();
+    if (!sb) { setScanError("Brak połączenia z Supabase. Zaloguj się ponownie."); return; }
+    setScanRunning(true); setScanError(""); setScanSummary(null);
+    const date = brusselsDayKey();
+    let offset = 0, batches = 0, matches = 0, predictions = 0, selected = 0;
+    try {
+      while (batches < 100) {
+        setScanProgress(`Analiza partii ${batches + 1} · ${matches} meczów przeanalizowanych`);
+        const { data, error } = await sb.functions.invoke("moneyball-predict", { body: { date, offset, batch_size: 10 } });
+        if (error) throw error;
+        if (!data?.ok) throw new Error(data?.error || "Silnik typowania nie potwierdził poprawnego wykonania.");
+        batches += 1;
+        matches += Number(data.matches || 0);
+        predictions += Number(data.created || 0) + Number(data.updated || 0);
+        selected += Number(data.selected || 0);
+        if (!data.has_more) break;
+        offset += 10;
+      }
+      if (batches >= 100) throw new Error("Osiągnięto limit bezpieczeństwa 100 partii. Sprawdź terminarz przed ponowieniem.");
+      setScanSummary({ matches, predictions, selected, batches });
+      setScanProgress("Skan zakończony. Odświeżam panel…");
+      await Promise.all([summaryQuery.refetch(), selectedQuery.refetch(), financeQuery.refetch()]);
+    } catch (error) {
+      setScanError(error instanceof Error ? error.message : "Nie udało się wykonać ręcznego skanu.");
+    } finally {
+      setScanRunning(false);
+      setScanProgress("");
+    }
+  };
   const summary = summaryQuery.data ?? { matches_today: 0, bankroll: null, coupons_in_play: 0, candidates: 0, to_settle: 0, hit_rates: { "1X2": { won: 0, settled: 0, rate: null }, DOUBLE_CHANCE: { won: 0, settled: 0, rate: null }, GOALS: { won: 0, settled: 0, rate: null } } };
   const selectedRows = selectedQuery.data ?? [];
   const selectedPicks = selectedRows.map((row) => ({
@@ -131,11 +169,19 @@ function Panel() {
         description="Najważniejsze informacje o dzisiejszych meczach, prognozach i kuponach."
         actions={
           <>
-            <Button asChild><Link to="/mecze"><ScanLine /> Terminarz i skan</Link></Button>
+            <Button onClick={() => void runManualScan()} disabled={scanRunning}>{scanRunning ? <Loader2 className="animate-spin" /> : <ScanLine />}{scanRunning ? "Analizuję…" : "Skanuj dzisiejsze mecze"}</Button>
+            <Button variant="outline" asChild><Link to="/mecze"><CalendarDays /> Terminarz</Link></Button>
             <Button variant="outline" asChild><Link to="/kupony"><Ticket /> Kupony</Link></Button>
           </>
         }
       />
+      {(scanRunning || scanError || scanSummary) && <section className="mb-4 rounded-xl border border-primary/30 bg-card p-3 text-sm" aria-live="polite">
+        <div className="flex items-center gap-2 font-semibold">{scanRunning && <Loader2 className="size-4 animate-spin" />}{scanRunning ? "Ręczny skan MONEYBALL" : scanError ? "Skan nie został ukończony" : "Skan zakończony"}</div>
+        {scanProgress && <p className="mt-1 text-muted-foreground">{scanProgress}</p>}
+        {scanSummary && <p className="mt-1">Przeanalizowano: <strong>{scanSummary.matches}</strong> meczów · zapisano/odświeżono: <strong>{scanSummary.predictions}</strong> typów · wybrane przez model: <strong>{scanSummary.selected}</strong> · partie: {scanSummary.batches}</p>}
+        {scanError && <p className="mt-1 text-destructive">{scanError}</p>}
+        <p className="mt-2 text-xs text-muted-foreground">Przycisk analizuje mecze już pobrane do bazy. Feed FootyNomad odświeża się osobno co 15 minut. Nie stawia zakładów ani nie tworzy kuponów automatycznie.</p>
+      </section>}
       {summaryQuery.isError && (
         <div className="mb-4 rounded-xl border border-destructive/40 bg-card p-3 text-sm">
           <p className="font-semibold text-destructive">Nie udało się pobrać statystyk panelu</p>
