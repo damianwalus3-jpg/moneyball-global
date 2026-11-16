@@ -330,7 +330,7 @@ function historyModel(home:string,away:string,kickoff:string,history:any[],footy
   // Do not sharpen model probabilities with hard-coded temperatures until a
   // reproducible, versioned out-of-sample calibration report is available.
   // Keep raw model probabilities neutral rather than claiming an unverified calibration.
-  const calibrationTemperature=1,calibrationMethod="none_unverified_calibration_disabled";
+  const calibrationTemperature: number=1,calibrationMethod="none_unverified_calibration_disabled";
   if(calibrationTemperature!==1){
    const scaled=[p1,px,p2].map((p:number)=>Math.exp(Math.log(Math.max(p,1e-15))/calibrationTemperature));
    const scaledSum=scaled.reduce((sum:number,value:number)=>sum+value,0);
