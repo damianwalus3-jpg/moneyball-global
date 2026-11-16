@@ -195,8 +195,8 @@ const READ_COLUMNS: Record<TableName, readonly string[]> = {
 // Supabase's default PostgREST row cap is 1,000. Use keyset pagination
 // (id > lastId) rather than OFFSET: deep offsets on the 18k-row predictions
 // table were hitting PostgreSQL statement_timeout during navigation.
-const PAGE = 1_000;
-const RAW_CACHE_MS = 45_000;
+const PAGE = 250;
+const RAW_CACHE_MS = 120_000;
 const inFlightTableReads = new Map<string, Promise<unknown>>();
 const rawTableCache = new Map<string, { expiresAt: number; rows: unknown[] }>();
 
