@@ -457,3 +457,8 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Ostatni commit dokumentacyjny `6a93c69763ed06b5ee4138d6992437d5208b819b`: CI run 934 SUCCESS; Cloudflare production deploy run 520 SUCCESS. Oznacza to, że najnowszy branch main został wdrożony na produkcyjny Worker.
 - Publiczny produkcyjny URL `https://moneyball-global.damianwalus3.workers.dev/` po deployu zwraca stronę MONEYBALL GLOBAL 2.0, opis prognoz 1X2/DC/Goli i stałą stawkę 4 €. Ekstrakcja strony w ostatnim sprawdzeniu: 505 ms; to nie jest pomiar RUM ani czas interakcji zalogowanego panelu.
 - Wciąż otwarty oddzielny test: rzeczywiste RUM na zalogowanej sesji MAIN oraz pełne porównanie aktualnego ekranu Mecze z surową listą FootyNomad. Nie ogłaszać pełnego zielonego światła całego projektu na podstawie samego deployu.
+## Dodatkowy alias drugiej ligi — Macedonia Północna — 2026-11-16
+- Dalsze porównanie europejskich nazw lig wykazało brak aliasu `2 MFL` dla drugiego poziomu w Macedonii Północnej. Dodano alias w filtrze frontendu, FootyNomad sync, free feed i predykcjach oraz test regresyjny.
+- Zastosowano produkcyjną migrację `20261116222413_add_north_macedonia_2_mfl_alias`; test SQL rozszerzony do 24/24 PASS.
+- Edge Functions wdrożone po tej poprawce: footynomad-sync v74, moneyball-free-feed v31, moneyball-predict v228 — ACTIVE.
+- Źródła do porównania nazw poziomów: Stat-Football, OpenFootball leagues, FBref domestic second-tier list oraz UEFA competition landscape. Lista aliasów jest mapowaniem nazw używanych przez źródła, a nie dowodem, że każdy kraj ma w FootyNomad mecze każdego dnia.
