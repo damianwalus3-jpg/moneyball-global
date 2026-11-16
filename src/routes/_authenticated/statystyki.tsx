@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { BarChart3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
 import { ACTIVE_MODEL_VERSION, couponPayout, groupHitRates, hitRate, isActivePredictionVersion, isEuropeanTopTwoLeague, modelHitRate, probabilityQuality, probabilityQualityBySelection, multiclass1X2Quality, PICK_LABELS, type HitRate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
-import { statisticsPageDataQuery, useStatisticsPageData } from "@/lib/queries";
+import { statisticsPageDataQuery } from "@/lib/queries";
 import type { Market, Prediction } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/statystyki")({
@@ -19,7 +20,6 @@ export const Route = createFileRoute("/_authenticated/statystyki")({
       { name: "twitter:card", content: "summary" },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(statisticsPageDataQuery()),
   pendingComponent: PageLoader,
   errorComponent: DataError,
   component: Statystyki,
@@ -38,7 +38,24 @@ const bucketOf = (p: number | null) => {
 };
 
 function Statystyki() {
-  const { matches, predictions: preds, coupons, legs } = useStatisticsPageData();
+  const statsQuery = useQuery(statisticsPageDataQuery());
+  if (statsQuery.isPending) {
+    return (
+      <div>
+        <PageHeader title="Statystyki" />
+        <PageLoader />
+      </div>
+    );
+  }
+  if (statsQuery.error || !statsQuery.data) {
+    return (
+      <DataError
+        error={statsQuery.error ?? new Error("Brak danych statystycznych.")}
+        reset={() => { void statsQuery.refetch(); }}
+      />
+    );
+  }
+  const { matches, predictions: preds, coupons, legs } = statsQuery.data;
   const scopedMatchIds = new Set(matches
     .filter((match) => isEuropeanTopTwoLeague(match.country, match.competition ?? match.league))
     .map((match) => match.id));
