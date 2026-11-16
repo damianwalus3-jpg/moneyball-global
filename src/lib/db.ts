@@ -270,6 +270,28 @@ export async function fetchMatchPageData(): Promise<MatchPageData> {
   return { matches, scans: (scansResult.data ?? []) as unknown as TableRows["scan_runs"][], predictions, results, odds, couponLegs, coupons };
 }
 
+/** Return existing prediction identity keys only for the imported match IDs.
+ * This keeps CSV deduplication exact without downloading the complete history. */
+export async function fetchExistingPredictionKeysForMatches(matchIds: string[]): Promise<string[]> {
+  const uniqueIds = [...new Set(matchIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return [];
+  const uid = await currentUserId();
+  const sb = requireSupabase();
+  return fetchInChunks<string>(uniqueIds, 100, async (chunk) => {
+    const { data, error } = await withRequestTimeout(
+      sb.from("predictions")
+        .select("match_id,model_version,market,selection")
+        .eq(OWNER_COLUMN, uid)
+        .in("match_id", chunk),
+      "Sprawdzanie duplikatów prognoz importu",
+    );
+    if (error) throw new Error(humanizeError(error, "predictions"));
+    return (data ?? []).map((row) =>
+      [row.match_id, row.model_version, row.market, row.selection].join("|"),
+    );
+  });
+}
+
 export interface PredictionPageCursor {
   created_at: string;
   id: string;
