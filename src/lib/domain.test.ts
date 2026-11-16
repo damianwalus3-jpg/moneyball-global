@@ -11,6 +11,7 @@ import {
   isCouponCandidate,
   modelHitRate,
   probabilityQuality,
+  multiclass1X2Quality,
   probabilityQualityBySelection,
   isKickoffToday,
   isEuropeanTopTwoLeague,
@@ -114,6 +115,39 @@ describe("probability quality", () => {
       { probability: 120, settlement_status: "won", verified: true },
     ] as never);
     expect(quality.sample).toBe(0);
+  });
+});
+
+describe("multiclass 1X2 quality", () => {
+  const rows = [
+    { match_id: "m1", market: "1X2", selection: "1", probability: 60, settlement_status: "won", verified: true },
+    { match_id: "m1", market: "1X2", selection: "X", probability: 25, settlement_status: "lost", verified: true },
+    { match_id: "m1", market: "1X2", selection: "2", probability: 15, settlement_status: "lost", verified: true },
+  ] as const;
+
+  it("calculates the full three-class Brier and log loss from a complete verified match", () => {
+    const quality = multiclass1X2Quality(rows as never);
+    expect(quality.sample).toBe(1);
+    expect(quality.brier).toBeCloseTo(0.245, 8);
+    expect(quality.logLoss).toBeCloseTo(-Math.log(0.6), 8);
+    expect(quality.averageProbability).toEqual({ "1": 0.6, X: 0.25, "2": 0.15 });
+    expect(quality.observedRate).toEqual({ "1": 1, X: 0, "2": 0 });
+  });
+
+  it("excludes incomplete, unverified, contradictory and non-normalized matches", () => {
+    const incomplete = rows.slice(0, 2);
+    const unverified = rows.map((row, index) => index === 1 ? { ...row, verified: false } : row);
+    const contradictory = rows.map((row, index) => index === 1 ? { ...row, settlement_status: "won" } : row);
+    const notNormalized = rows.map((row, index) => index === 0 ? { ...row, probability: 70 } : row);
+    for (const sample of [incomplete, unverified, contradictory, notNormalized]) {
+      expect(multiclass1X2Quality(sample as never).sample).toBe(0);
+      expect(multiclass1X2Quality(sample as never).brier).toBeNull();
+    }
+  });
+
+  it("does not pool other markets into 1X2 scoring", () => {
+    const dc = rows.map((row) => ({ ...row, market: "DOUBLE_CHANCE" }));
+    expect(multiclass1X2Quality(dc as never).sample).toBe(0);
   });
 });
 
