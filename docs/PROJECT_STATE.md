@@ -566,3 +566,29 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 3. Merge only after checks pass; confirm production deploy success.
 4. Measure authenticated navigation timings after deployment; public Worker root timings are not a substitute.
 5. Recheck all other full-history consumers (History, Results, Statistics, Matches, Coupons and scan deduplication) separately; this PR only fixes prediction screens.
+
+
+## Release confirmation — prediction screen pagination — 2026-11-16
+
+- PR #63 merged to `main` as commit `37eac0b628499b5e4cb5ea6c30d0bdda541d8dd0`.
+- GitHub Actions CI #798 / run ID `43926120481`: SUCCESS. Deno Edge Function type-check, tests, TypeScript and build all succeeded.
+- Cloudflare production deploy #396 / run ID `43926120530`: SUCCESS.
+- Cloudflare Worker production URL: `https://moneyball-global.damianwalus3.workers.dev/`.
+- Exact deployed Cloudflare Version ID: `4754b474-5f42-426f-bfd5-cf866f8b28f8`.
+- Deploy log confirms upload of the new `PredictionsView` asset and the updated 1X2/Goals route assets.
+- The earlier note in the PR-stage section saying CI had not run and merge was blocked is superseded by this release confirmation.
+- This confirms the production deployment pipeline and exact Worker version. It does NOT establish authenticated panel navigation timings; the signed-in browser session was unavailable, and a public-root fetch could not be independently completed in this environment.
+
+### Post-release results-sync sample
+- Version 68, 2026-11-16 18:00:07 UTC: HTTP 200, 7,805 ms.
+- Version 68, 18:05:06 UTC: HTTP 200, 6,645 ms.
+- Version 68, 18:10:07 UTC: HTTP 200, 7,561 ms.
+- Each structured request summary: dates [`2026-11-16`], fixturesFetched 79, matchesMatched 13, resultsSaved 2, predictionsSettled 26, couponLegsSettled 0, alternateResultsFetched 14, alternateResultsMatched 13, errors 0.
+- Three consecutive cycles show improved and consistent latency versus the earlier 20.238 s outlier, but keep monitoring; do not claim zero future timeouts. Coupon-leg settlement remains unverified by these cycles.
+
+### Next regression targets
+- Do not repeat full-history fetching on other screens. Remaining identified consumers include History, Results, Statistics and SettleMatchDialog; scan import deduplication also needs a separate safe strategy.
+- Convert each screen to owner-scoped queries/pagination or a verified aggregate while preserving full historical records, search, model-version scope, result corrections and coupon relationships.
+- The prediction screen page uses created_at/id cursor order; if later changing sort order to kickoff date, redesign the cursor and add duplicate/missing-row regression tests before shipping.
+- After each release, compare full-scope totals and hit rates against SQL, test first/next pages for duplicate IDs, and verify all three market filters.
+- Keep the authenticated menu-speed issue open until actual signed-in P50/P95 navigation measurements are available.
