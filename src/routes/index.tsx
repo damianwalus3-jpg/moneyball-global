@@ -9,12 +9,12 @@ export const Route = createFileRoute("/")({
       { title: "MONEYBALL GLOBAL 2.0 — prognozy piłkarskie" },
       {
         name: "description",
-        content: "Prywatny panel do śledzenia prognoz 1X2 i Double Chance, kuponów i rozliczeń ze stałą stawką analityczną 5 €.",
+        content: "Prywatny panel do śledzenia prognoz 1X2, Double Chance i Goli, kuponów i rozliczeń ze stałą stawką analityczną 4 €.",
       },
       { property: "og:title", content: "MONEYBALL GLOBAL 2.0" },
       {
         property: "og:description",
-        content: "Prywatny panel do śledzenia prognoz 1X2 i Double Chance, kuponów i rozliczeń ze stałą stawką analityczną 5 €.",
+        content: "Prywatny panel do śledzenia prognoz 1X2 i Double Chance, kuponów i rozliczeń ze stałą stawką analityczną 4 €.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -34,7 +34,7 @@ function Index() {
           <span className="block text-primary">Global 2.0</span>
         </h1>
         <p className="mt-4 text-muted-foreground">
-          Skany, prognozy 1X2 i Double Chance, kupony pojedyncze i AKO oraz rozliczenia ze stałą stawką analityczną 5 € — w jednym miejscu.
+          Skany, prognozy 1X2, Double Chance i Goli, kupony pojedyncze i AKO oraz rozliczenia ze stałą stawką analityczną 4 € — w jednym miejscu.
         </p>
         <Button asChild size="lg" className="mt-8 w-full text-base">
           <Link to="/panel">
