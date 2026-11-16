@@ -75,6 +75,8 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Ukraine", "Druha Liga")).toBe(false);
     expect(isEuropeanTopTwoLeague("Italy", "Serie C - Girone B")).toBe(false);
     expect(isEuropeanTopTwoLeague("England", "Premier League Cup")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Germany", "Frauen Bundesliga")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Italy", "Serie A Femminile")).toBe(false);
     expect(isEuropeanTopTwoLeague("World", "UEFA Nations League")).toBe(false);
   });
 });
@@ -200,6 +202,10 @@ describe("coupon candidates", () => {
   });
   it("rejects ODRZUCONY predictions", () => {
     expect(isCouponCandidate(prediction("p", "m1", 90, { verdict: "ODRZUCONY" }), match("m1"), now)).toBe(false);
+  });
+  it("rejects women competitions and non-men fixtures", () => {
+    expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), competition: "Frauen Bundesliga" }, now)).toBe(false);
+    expect(isCouponCandidate(prediction("p", "m1", 90), { ...match("m1"), gender: "women" }, now)).toBe(false);
   });
   it("rejects started and cancelled matches", () => {
     expect(isCouponCandidate(prediction("p", "m1", 90), match("m1", "2026-11-10T11:00:00Z"), now)).toBe(false);
