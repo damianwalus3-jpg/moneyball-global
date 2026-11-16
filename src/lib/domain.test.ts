@@ -81,6 +81,21 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("World", "UEFA Nations League")).toBe(true);
     expect(isEuropeanTopTwoLeague("World", "UEFA Nations League - League B")).toBe(true);
     expect(isEuropeanTopTwoLeague("World", "UEFA U21 Championship - Qualification")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Austria", "Austrian 2. Liga")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Netherlands", "Eerste Divisie")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Turkey", "TFF First League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Poland", "I Liga")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Romania", "Liga II")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Switzerland", "Challenge League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Czechia", "FNL")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Denmark", "1. Division")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Estonia", "Esiliiga")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Finland", "Ykkosliiga")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Portugal", "Liga Portugal 2")).toBe(true);
+    expect(isEuropeanTopTwoLeague("England", "League One")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Germany", "3. Liga")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Italy", "Serie C")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Ukraine", "Druha Liga")).toBe(false);
   });
 });
 
