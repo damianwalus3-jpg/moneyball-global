@@ -34,7 +34,7 @@ function fixtureGender(m:any){
  if(/\b(women|womens|woman|frauen|femenina|femenino|feminin|female|damallsvenskan|wsl|liga f)\b/.test(label))return "women";
  if(/\b(u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend)\b/.test(label))return "unknown";
  // Reserve sides are excluded even when the feed incorrectly labels the fixture as men's.
- const reserveTeam=(team:string)=>/\b(reserves?|academy|youth|b team)\b/.test(team)||/(^| )(ii|iii|b)$/.test(team);
+ const reserveTeam=(team:string)=>/\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico)\b/.test(team)||/(^| )(ii|iii|b)$/.test(team);
  if(reserveTeam(home)||reserveTeam(away))return "unknown";
  const explicit=String(m?.gender||"").toLowerCase();
  if(explicit==="women")return "women";
