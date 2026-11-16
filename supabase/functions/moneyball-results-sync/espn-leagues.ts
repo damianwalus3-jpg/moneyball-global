@@ -15,7 +15,7 @@ const TOP_TIER = new Set([
 ]);
 const SECOND_TIER = new Set(["eng.2", "esp.2", "ita.2", "ger.2", "fra.2"]);
 const WOMEN: Record<string, string[]> = {
-  eng: ["eng.w.1", "eng.w.fa", "eng.w.league_cup", "eng.w.promotion.relegation"],
+  eng: ["eng.w.1", "eng.w.fa", "eng.w.charity"],
   esp: ["esp.w.1"], fra: ["fra.w.1"], ned: ["ned.w.1", "ned.w.knvb_cup"],
 };
 
@@ -33,15 +33,21 @@ export function selectEspnLeagues(fixtures: EspnLeagueNeed[]): string[] {
     const gender = normalize(fixture.gender);
     const isWomen = gender === "women" || /\b(women|womens|female|girls)\b/.test(competition);
 
-    const isUefaCompetition = /\b(champions league|europa league|conference league|nations league|uefa)\b/.test(competition);
+    const isUefaCompetition = /\b(champions league|europa league|conference league|nations league|uefa|european under 21|u21|under 21|u19|under 19)\b/.test(competition);
     if (isUefaCompetition) {
       if (/\bwomen|female\b/.test(competition) || isWomen) {
         if (/\bnations\b/.test(competition)) selected.add("uefa.w.nations");
-        else selected.add("uefa.w.europa");
-      } else if (/\bchampions\b/.test(competition)) selected.add("uefa.champions");
-      else if (/\bconference\b/.test(competition)) selected.add("uefa.europa.conf");
-      else if (/\beuropa\b/.test(competition)) selected.add("uefa.europa");
+        else if (/\bchampions\b/.test(competition)) selected.add("uefa.wchampions");
+        else selected.add("uefa.weuro");
+      } else if (/\bu21|under 21\b/.test(competition)) {
+        selected.add(/qualif/.test(competition) ? "uefa.euro_u21_qual" : "uefa.euro_u21");
+      } else if (/\bu19|under 19\b/.test(competition)) selected.add("uefa.euro.u19");
+      else if (/\bchampions\b/.test(competition)) selected.add(/qualif/.test(competition) ? "uefa.champions_qual" : "uefa.champions");
+      else if (/\bconference\b/.test(competition)) selected.add(/qualif/.test(competition) ? "uefa.europa.conf_qual" : "uefa.europa.conf");
+      else if (/\beuropa\b/.test(competition)) selected.add(/qualif/.test(competition) ? "uefa.europa_qual" : "uefa.europa");
       else if (/\bnations\b/.test(competition)) selected.add("uefa.nations");
+      else if (/\beuro.*qualif|european championship.*qualif/.test(competition)) selected.add("uefa.euroq");
+      else if (/\beuro|european championship/.test(competition)) selected.add("uefa.euro");
     }
 
     if (isUefaCompetition) continue;
@@ -50,9 +56,9 @@ export function selectEspnLeagues(fixtures: EspnLeagueNeed[]): string[] {
     if (isWomen) {
       const womensCompetitions = WOMEN[prefix] ?? [];
       const cupCode = /\b(fa cup)\b/.test(competition) ? prefix + ".w.fa"
-        : /\b(league cup)\b/.test(competition) ? prefix + ".w.league_cup"
-        : /\b(promotion|relegation)\b/.test(competition) ? prefix + ".w.promotion.relegation"
+        : /\b(charity shield)\b/.test(competition) ? prefix + ".w.charity"
         : /\b(knvb cup)\b/.test(competition) ? prefix + ".w.knvb_cup"
+        : /\b(copa de la reina)\b/.test(competition) ? prefix + ".copa_de_la_reina"
         : null;
       const leagueCode = womensCompetitions.find((code) => code.endsWith(".1"));
       if (cupCode && womensCompetitions.includes(cupCode)) selected.add(cupCode);
