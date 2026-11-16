@@ -20,9 +20,21 @@ function sourceLabel(source?: string | null) {
 
 function coverageLabel(coverage?: Record<string, unknown> | null) {
   if (!coverage) return "brak metadanych pokrycia";
+  const homeXg = Number(coverage["historical_xg_home_matches"] ?? coverage["xg_home_matches"] ?? 0);
+  const awayXg = Number(coverage["historical_xg_away_matches"] ?? coverage["xg_away_matches"] ?? 0);
+  const xgSources = Array.isArray(coverage["historical_xg_sources"])
+    ? (coverage["historical_xg_sources"] as unknown[]).map(String)
+    : Array.isArray(coverage["xg_sources"])
+      ? (coverage["xg_sources"] as unknown[]).map(String)
+      : [];
+  const xgLabel = coverage["historical_xg_used"]
+    ? `xG ✓ (H ${homeXg} / G ${awayXg}${xgSources.length ? " · " + [...new Set(xgSources)].join(", ") : ""})`
+    : "xG niewykorzystane";
+  const model = String(coverage["model_source"] ?? "");
   return [
+    "model " + (model ? sourceLabel(model) : "źródło nieopisane"),
     "historia " + (coverage["verified_history"] ? "✓" : "—"),
-    "xG " + (coverage["historical_xg_used"] ? "✓" : "—"),
+    xgLabel,
     "Elo " + (coverage["elo_used"] ? "✓" : "—"),
     "FootyNomad " + (coverage["footynomad_last5"] ? "✓" : "—"),
     "GitHub " + (coverage["keyless_github_last10"] ? "✓" : "—"),
@@ -136,7 +148,7 @@ export function PredictionsView({ market }: { market: Market }) {
                   <div className="text-xs text-muted-foreground">
                     {match?.competition ?? match?.league ?? "—"} · {match?.kickoff_at ? fmtDateTime(match.kickoff_at) : match?.kickoff_date ? match.kickoff_date + " · godzina nieznana" : "brak daty"}
                   </div>
-                  <div className="text-xs text-muted-foreground">Źródło: {sourceLabel(prediction.data_source)} · {coverageLabel(prediction.data_coverage)}</div>
+                  <div className="break-words text-xs text-muted-foreground">Dane: {coverageLabel(prediction.data_coverage)}{prediction.data_coverage?.["odds_source"] ? ` · kurs ${String(prediction.data_coverage["odds_source"])}${prediction.data_coverage["odds_bookmaker"] ? " / " + String(prediction.data_coverage["odds_bookmaker"]) : ""}` : prediction.data_source ? ` · kurs/źródło rynkowe ${sourceLabel(prediction.data_source)}` : ""}</div>
                   {fairOdds && <div className="text-xs text-muted-foreground">Kurs fair dla typu: {fmtOdds(fairSelectionOdds)} · 1/X/2: {fmtOdds(fairOdds.home)} / {fmtOdds(fairOdds.draw)} / {fmtOdds(fairOdds.away)} · <a href="https://tipsaudit.com" target="_blank" rel="noreferrer" className="underline">Data: TipsAudit</a> (bez marży, nie jest ofertą bukmachera)</div>}
                   {prediction.probability == null && <div className="text-xs text-warning">Brak wystarczających potwierdzonych danych — prawdopodobieństwo nie zostało wygenerowane.</div>}
                   {prediction.rationale && <div className="text-xs text-muted-foreground">Uzasadnienie: {prediction.rationale}</div>}
