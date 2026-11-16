@@ -13,7 +13,7 @@ import { MatchForm } from "@/components/forms/MatchForm";
 import { OddsForm, ScanRunForm } from "@/components/forms/SimpleForms";
 import { deleteRow } from "@/lib/db";
 import { saveCouponBatch } from "@/lib/coupons";
-import { isActivePredictionVersion, isEligibleEuropeanMatch, MATCH_STATUS_LABELS } from "@/lib/domain";
+import { isActivePredictionVersion, isEligibleEuropeanMatch, dedupeEuropeanMatches, MATCH_STATUS_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, matchLabel } from "@/lib/format";
 import { matchPageDataQuery, useAction } from "@/lib/queries";
 import { brusselsDayKey, fmtDateTime, fmtDayLong, fmtTime } from "@/lib/time";
@@ -386,13 +386,14 @@ function Mecze() {
   // Fixtures without a known date are placed after dated fixtures.
   const matchSortKey = (match: Match) =>
     match.kickoff_at ?? (match.kickoff_date ? `${match.kickoff_date}T23:59:59Z` : "9999-12-31T23:59:59Z");
-  const filtered = matches
+  const eligibleMatches = matches
     // The match screen is intentionally scoped to the current Brussels calendar day.
     // Historical and future fixtures stay in the database for settlement/audit, but
     // must never leak into today's scan/list.
     .filter((match) => matchDay(match) === today)
-    .filter((match) => isEligibleEuropeanMatch(match))
-        .filter((match) => {
+    .filter((match) => isEligibleEuropeanMatch(match));
+  const filtered = dedupeEuropeanMatches(eligibleMatches)
+    .filter((match) => {
       const isFinished = match.status === "finished" || resultBy.has(match.id);
       if (view === "upcoming") return !isFinished && !["postponed", "cancelled"].includes(match.status);
       if (view === "past") return isFinished;
