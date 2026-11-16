@@ -630,3 +630,34 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - `useAction` resets result pages after result sync/settlement to refresh only the first page, instead of refetching every loaded page.
 - This wave still requires GitHub CI, TypeScript, production build and Cloudflare deployment before release.
 - History and Statistics still need their own safe full-history refactors; do not mark all menu screens optimized.
+
+
+## History / settlement queue pagination — 2026-11-16
+
+### Root cause and replacement
+- `Historia` previously loaded all matches, all 18,563 predictions, all match results and all coupon legs into the browser, then repeatedly filtered predictions per match.
+- Added SECURITY INVOKER RPC `moneyball_history_page`, scoped by `auth.uid()`, with 30-match cursor pages (maximum 50).
+- Preserves the previous queue rules:
+  - TODO: kickoff is in the past, match is not cancelled/postponed, no verified result, and there is either a selected pending prediction or a pending coupon leg tied to a selected prediction.
+  - DONE: verified match result or cancelled/postponed fixture.
+  - TODO order is oldest kickoff first; DONE order is newest first; null kickoff fixtures remain at the end of DONE.
+  - Search and tab counters retain prior semantics.
+- Each page returns only the match, its latest result, and predictions belonging to that match. No global predictions array is loaded.
+- Match settlement dialog continues to load predictions only for the chosen match (PR #64); existing coupon legs, coupons and result rows are retained for the settlement routine.
+
+### Database regression checks
+- Current direct counts: TODO=3, DONE=897.
+- RPC returned TODO first page=3 and DONE first/second pages=30+30, with zero duplicate match IDs.
+- Search `Chernihiv` in DONE returned 2 matches; requested page size 100 is capped to 50.
+- Coupon-leg integrity check: 0 mismatches between `coupon_legs.match_id` and the linked prediction's `match_id`; no pending coupon legs with null match_id.
+- Authenticated EXPLAIN ANALYZE for first DONE page: 33.572 ms, 2,419 shared hits, zero temp spill.
+- No data rows, historical results, coupons or bankroll transactions changed.
+
+### Migration and frontend
+- Applied migration: `20261116193000_moneyball_history_server_pagination.sql`.
+- Branch: `perf/history-pagination`.
+- `Historia` now uses `useInfiniteQuery` and a “Wczytaj kolejne 30” action; its route prefetches only the first TODO page and the small tables still needed by SettleMatchDialog.
+- Mutations reset the history page cache so corrected results re-enter the proper queue.
+- Paginated query polling stops when more than one page is loaded, avoiding sequentially refetching every page; focus/reconnect refetch is disabled for this large list. This follows TanStack Query guidance that infinite-query refetches fetch stored pages sequentially and that limiting refetches reduces network work: https://tanstack.com/query/latest/docs/framework/react/guides/infinite-queries
+- Still requires CI, TypeScript/build, merge and Cloudflare deploy validation.
+- Statistics remains the last major full-history consumer and needs a separate aggregate/detail design; do not mark all screens optimized yet.

@@ -352,6 +352,47 @@ export async function fetchResultsPage(args: {
   return data as ResultsPageResult;
 }
 
+export interface HistoryPageCursor {
+  sort_at: string;
+  id: string;
+}
+
+export interface HistoryPageRow {
+  match: TableRows["matches"];
+  result: TableRows["match_results"] | null;
+  predictions: TableRows["predictions"][];
+}
+
+export interface HistoryPageResult {
+  rows: HistoryPageRow[];
+  has_more: boolean;
+  next_cursor: HistoryPageCursor | null;
+  todo_count: number;
+  done_count: number;
+  matches_count: number;
+}
+
+/** History/settlement queue is paginated on the server; each row carries only
+ * that match's predictions, not the entire prediction history. */
+export async function fetchHistoryPage(args: {
+  tab: "todo" | "done";
+  search: string;
+  cursor: HistoryPageCursor | null;
+}): Promise<HistoryPageResult> {
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().rpc("moneyball_history_page", {
+      p_tab: args.tab,
+      p_search: args.search,
+      p_before_sort_at: args.cursor?.sort_at ?? null,
+      p_before_id: args.cursor?.id ?? null,
+      p_page_size: 30,
+    }),
+    "Pobieranie historii i kolejki rozliczeń",
+  );
+  if (error) throw new Error(humanizeError(error));
+  return data as HistoryPageResult;
+}
+
 /** Only predictions belonging to the match currently being settled. */
 export async function fetchPredictionsForMatch(matchId: string): Promise<TableRows["predictions"][]> {
   if (!matchId) return [];
