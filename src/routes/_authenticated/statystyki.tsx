@@ -3,7 +3,7 @@ import { BarChart3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
-import { ACTIVE_MODEL_VERSION, couponPayout, groupHitRates, hitRate, isActivePredictionVersion, isEuropeanTopTwoLeague, modelHitRate, probabilityQuality, probabilityQualityBySelection, PICK_LABELS, type HitRate } from "@/lib/domain";
+import { ACTIVE_MODEL_VERSION, couponPayout, groupHitRates, hitRate, isActivePredictionVersion, isEuropeanTopTwoLeague, modelHitRate, probabilityQuality, probabilityQualityBySelection, multiclass1X2Quality, PICK_LABELS, type HitRate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { ensureTables, useTable } from "@/lib/queries";
 import type { Market, Prediction } from "@/lib/types";
@@ -142,6 +142,7 @@ function MarketBlock({ type, preds, leagueOf, matchOf }: { type: Market; preds: 
   const hrSel = hitRate(verifiedSettled.map((prediction) => prediction.settlement_status));
   const hrModel = type === "GOALS" ? null : modelHitRate(preds, type);
   const qualityRows = probabilityQualityBySelection(preds.filter((prediction) => prediction.model_version === ACTIVE_MODEL_VERSION));
+  const multiclassQuality = type === "1X2" ? multiclass1X2Quality(preds.filter((prediction) => prediction.model_version === ACTIVE_MODEL_VERSION)) : null;
   const byBucket = groupHitRates(verifiedSettled, (p) => bucketOf(p.probability), (prediction) => prediction.settlement_status).sort(
     (a, b) => BUCKETS.findIndex((x) => x.key === a.key) - BUCKETS.findIndex((x) => x.key === b.key),
   );
@@ -190,6 +191,27 @@ function MarketBlock({ type, preds, leagueOf, matchOf }: { type: Market; preds: 
           <h3 className="font-display font-bold uppercase">Jakość prognoz według typu · model {ACTIVE_MODEL_VERSION}</h3>
           <span className="text-xs text-muted-foreground">osobne próby dla każdego typu</span>
         </div>
+        {multiclassQuality && (
+          <div className="mb-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <h4 className="font-semibold">Pełny Brier Score 1X2 · trzy klasy</h4>
+              <span className="text-xs text-muted-foreground">tylko kompletne, zweryfikowane mecze · n={multiclassQuality.sample}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+              <StatCard label="Brier 1X2 ↓" value={multiclassQuality.brier == null ? "—" : multiclassQuality.brier.toFixed(3)} hint="suma błędów 1, X i 2" />
+              <StatCard label="Log Loss 1X2 ↓" value={multiclassQuality.logLoss == null ? "—" : multiclassQuality.logLoss.toFixed(3)} hint="kara za niską szansę wyniku" />
+              <StatCard label="Średnia suma p" value={multiclassQuality.meanProbabilitySum == null ? "—" : fmtPct(multiclassQuality.meanProbabilitySum)} hint="kontrola normalizacji" />
+              <StatCard label="Próba" value={multiclassQuality.sample} hint={multiclassQuality.sample < 30 ? "za mało danych do mocnych wniosków" : "zweryfikowane mecze"} />
+            </div>
+            {multiclassQuality.averageProbability && multiclassQuality.observedRate && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Prognoza / rzeczywisty udział: 1 {fmtPct(multiclassQuality.averageProbability["1"] * 100)} / {fmtPct(multiclassQuality.observedRate["1"] * 100)} ·
+                X {fmtPct(multiclassQuality.averageProbability.X * 100)} / {fmtPct(multiclassQuality.observedRate.X * 100)} ·
+                2 {fmtPct(multiclassQuality.averageProbability["2"] * 100)} / {fmtPct(multiclassQuality.observedRate["2"] * 100)}
+              </p>
+            )}
+          </div>
+        )}
         {qualityRows.length ? <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           {qualityRows.map((row) => <div key={row.selection} className="rounded-lg border border-border p-2">
             <p className="mb-2 text-xs font-semibold">{PICK_LABELS[row.selection]}</p>
