@@ -21,7 +21,20 @@ export function tableQuery<K extends TableName>(table: K) {
 }
 
 
-export function couponFinanceQuery() {\n  return queryOptions({\n    queryKey: ["coupon-finance-summary"] as const,\n    queryFn: fetchCouponFinanceSummary,\n    retry: false,\n    staleTime: 60_000,\n    gcTime: 600_000,\n    refetchInterval: 60_000,\n    refetchIntervalInBackground: false,\n    refetchOnWindowFocus: true,\n  });\n}\n\nexport function dashboardSummaryQuery() {
+export function couponFinanceQuery() {
+  return queryOptions({
+    queryKey: ["coupon-finance-summary"] as const,
+    queryFn: fetchCouponFinanceSummary,
+    retry: false,
+    staleTime: 60_000,
+    gcTime: 600_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function dashboardSummaryQuery() {
   return queryOptions({
     queryKey: ["dashboard-summary"] as const,
     queryFn: fetchDashboardSummary,
