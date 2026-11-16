@@ -226,6 +226,7 @@ async function reconcileCouponMoney(couponId:string,now:string){
 }
 
 async function processFixture(f:any,m:any,source="FootyNomad",externalId?:string){
+ const processStarted=Date.now();
  const result=outcome(f.home_score,f.away_score),now=new Date().toISOString();
  const old=await db("match_results?select=id&match_id=eq."+m.id);
  const row={owner_id:m.owner_id,home_score:f.home_score,away_score:f.away_score,home_goals:f.home_score,away_goals:f.away_score,outcome_1x2:result,verified:true,source,finished_at:m.kickoff_at||now,verified_at:now,settled_at:now};
@@ -250,6 +251,7 @@ async function processFixture(f:any,m:any,source="FootyNomad",externalId?:string
   await db("coupons?id=eq."+couponId,"PATCH",{status:cs,settled_at:cs==="pending"?null:now});
   await reconcileCouponMoney(couponId,now);
  }
+ console.log("[moneyball-results-sync] processFixture",JSON.stringify({matchId:m.id,predictions:preds?.length||0,settled,legsSettled,durationMs:Date.now()-processStarted}));
  return {settled,legsSettled};
 }
 
@@ -355,7 +357,9 @@ Deno.serve(async(req:Request)=>{
   if(requested&&/^\d{4}-\d{2}-\d{2}$/.test(requested))dates.push(requested);
   else for(let i=span-1;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);dates.push(day(d));}
   let fetched=0,matched=0,matchedById=0,matchedByNames=0,resultsSaved=0,predictionsSettled=0,couponLegsSettled=0,voided=0,alternateFetched=0,alternateMatched=0,rescheduledMatches=0;const errors:string[]=[],rescheduleErrors:string[]=[];
+  const rescheduleStarted=Date.now();
   try{const reconciled=await reconcileRescheduledMatches(ownerId);rescheduledMatches=reconciled.updated;rescheduleErrors.push(...reconciled.errors);}catch(e){rescheduleErrors.push(String(e));}
+  console.log("[moneyball-results-sync] reschedule reconciliation",JSON.stringify({updated:rescheduledMatches,errors:rescheduleErrors.length,durationMs:Date.now()-rescheduleStarted}));
   const allAlternateFeeds=await readAlternateResults(dates[0],dates[dates.length-1]).catch(e=>{errors.push("Źródła zapasowe: "+String(e));return [] as ScoreFeed[];});
   for(const date of dates){
    try{
@@ -363,6 +367,7 @@ Deno.serve(async(req:Request)=>{
     const start=new Date(Date.parse(date+"T00:00:00.000Z")-86400000),end=new Date(Date.parse(date+"T00:00:00.000Z")+2*86400000);
      const matchFields="select=id,external_id,source,home_team,away_team,country,league,gender,kickoff_at,kickoff_date,status,owner_id";
      const ownerFilter=ownerId?"&owner_id=eq."+encodeURIComponent(ownerId):"";
+     const matchLoadStarted=Date.now();
      const rawMatches=await db("matches?"+matchFields+"&kickoff_at=gte."+encodeURIComponent(start.toISOString())+"&kickoff_at=lt."+encodeURIComponent(end.toISOString())+ownerFilter);
      const rawDateOnly=await db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=eq."+encodeURIComponent(date)+ownerFilter);
      const matches=[...(rawMatches||[]).filter((m:any)=>m.kickoff_at&&day(new Date(m.kickoff_at))===date),...(rawDateOnly||[]).filter((m:any)=>String(m.kickoff_date||"").slice(0,10)===date)].filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team));
@@ -375,6 +380,7 @@ Deno.serve(async(req:Request)=>{
      existingResults.push(...(rows||[]));
     }
     const existingResultByMatch=new Map<string,any>((existingResults||[]).map((r:any)=>[r.match_id,r]));
+    console.log("[moneyball-results-sync] main match load",JSON.stringify({rawMatches:rawMatches?.length||0,dateOnly:rawDateOnly?.length||0,eligibleDayMatches:matches.length,existingResults:existingResults.length,durationMs:Date.now()-matchLoadStarted}));
     const map=new Map(matches.filter((m:any)=>m.external_id&&String(m.source||"").toLowerCase()==="footynomad").map((m:any)=>[String(m.external_id),m]));
     const normTeam=(v:string)=>String(v||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g," ").trim().replace(/\\s+/g," ");
     const genderOf=(m:any)=>["men","women"].includes(String(m?.gender||"").toLowerCase())?String(m.gender).toLowerCase():"unknown";
@@ -389,7 +395,9 @@ Deno.serve(async(req:Request)=>{
     console.log("[moneyball-results-sync] FootyNomad",JSON.stringify({date,fixtures:fixtures.length,durationMs:Date.now()-footyNomadStarted}));
     const alternateFeeds=allAlternateFeeds.filter(feed=>day(new Date(feed.date))===date);alternateFetched+=alternateFeeds.length;
     const alternateByMatch=new Map<string,ScoreFeed[]>();
+    const alternateObservationStarted=Date.now();
     for(const feed of alternateFeeds){const fm=matchFeedToDb(feed,matches);if(!fm)continue;alternateMatched++;const arr=alternateByMatch.get(fm.id)||[];arr.push(feed);alternateByMatch.set(fm.id,arr);await saveSourceObservation(fm,feed);}
+    console.log("[moneyball-results-sync] alternate observation persistence",JSON.stringify({feeds:alternateFeeds.length,matched:alternateMatched,durationMs:Date.now()-alternateObservationStarted}));
     // Synchronize live status before the final whistle.
     for(const f of fixtures){
      if(f.status!=="live")continue;
@@ -414,6 +422,7 @@ Deno.serve(async(req:Request)=>{
      for(const m of candidates)eligible.push({f,m,matchMethod:exact?"external_id":"team_names"});
     }
     matched+=eligible.length;matchedById+=eligible.filter((x:any)=>x.matchMethod==="external_id").length;matchedByNames+=eligible.filter((x:any)=>x.matchMethod==="team_names").length;
+    const resultProcessingStarted=Date.now();
     for(let i=0;i<eligible.length;i+=5){
      const batch=eligible.slice(i,i+5);
      const done=await Promise.allSettled(batch.map(async(x:any)=>{
@@ -436,8 +445,10 @@ Deno.serve(async(req:Request)=>{
      }));
      for(let j=0;j<done.length;j++){const d=done[j];if(d.status==="fulfilled"){if(!(d.value as any).skipped)resultsSaved++;predictionsSettled+=d.value.settled;couponLegsSettled+=d.value.legsSettled;}else errors.push(date+" "+batch[j].f.external_id+": "+String(d.reason));}
     }
+    console.log("[moneyball-results-sync] result processing",JSON.stringify({eligible:eligible.length,durationMs:Date.now()-resultProcessingStarted}));
     const fixtureMap=new Map(fixtures.map((f:any)=>[String(f.external_id),f]));
     const oldMatches=(matches||[]).filter((m:any)=>!["finished","postponed","cancelled"].includes(m.status)&&(m.kickoff_at?new Date(m.kickoff_at).getTime()<Date.now()-3*60*60*1000:!!m.kickoff_date&&(String(m.kickoff_date)<date||(String(m.kickoff_date)===date&&(alternateByMatch.get(m.id)||[]).some((a:any)=>a.status==="finished"&&Number.isInteger(a.home_score)&&Number.isInteger(a.away_score)))))&&!eligible.some((x:any)=>x.m.id===m.id));
+    const fallbackProcessingStarted=Date.now();
     for(let i=0;i<oldMatches.length;i+=5){
      const batch=oldMatches.slice(i,i+5);
      const done=await Promise.allSettled(batch.map(async(m:any)=>{
@@ -460,6 +471,7 @@ Deno.serve(async(req:Request)=>{
      }));
      for(let j=0;j<done.length;j++){const d=done[j];if(d.status==="fulfilled"&&d.value)voided++;else if(d.status==="rejected")errors.push(date+" "+batch[j].external_id+": "+String(d.reason));}
     }
+    console.log("[moneyball-results-sync] old match fallback",JSON.stringify({matches:oldMatches.length,durationMs:Date.now()-fallbackProcessingStarted}));
    }catch(e){errors.push(date+": "+String(e));}
   }
   const financeStarted=Date.now();
