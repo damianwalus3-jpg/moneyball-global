@@ -109,6 +109,12 @@ function Kupony() {
     lost: coupons.filter((coupon) => coupon.status === "lost").length,
     void: coupons.filter((coupon) => coupon.status === "void").length,
   };
+  const settledCoupons = coupons.filter((coupon) => ["won", "lost", "void"].includes(coupon.status));
+  const settledStake = settledCoupons.reduce((sum, coupon) => sum + Number(coupon.stake ?? 0), 0);
+  const settledReturn = settledCoupons.reduce((sum, coupon) => sum + (couponPayout(coupon.stake, legs.filter((leg) => leg.coupon_id === coupon.id)) ?? 0), 0);
+  const settledNet = Math.round((settledReturn - settledStake) * 100) / 100;
+  const pendingStake = coupons.filter((coupon) => coupon.status === "pending").reduce((sum, coupon) => sum + Number(coupon.stake ?? 0), 0);
+  const settledRoi = settledStake > 0 ? Math.round((settledNet / settledStake) * 1000) / 10 : null;
 
   function buildBatch() {
     return couponSize === 1
@@ -143,12 +149,21 @@ function Kupony() {
           ? "Każdy kupon zawiera jeden typ. W partii nie powtarzamy tego samego meczu."
           : "Każdy kupon zawiera trzy różne mecze. W jednej wygenerowanej partii żaden mecz nie powtarza się w kolejnym kuponie."}
       />
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="W grze" value={counts.pending} />
-        <StatCard label="Wygrane" value={counts.won} />
-        <StatCard label="Przegrane" value={counts.lost} />
-        <StatCard label="Dostępne mecze" value={uniqueCandidateMatches} hint="dziś · WYBRANY · >75% · przed startem" tone="primary" />
-      </div>
+      <section className="mb-5">
+        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-muted-foreground">Wynik kuponów · rozliczone</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          <StatCard label="Rozliczone" value={settledCoupons.length} hint={`${counts.won} wygrane · ${counts.lost} przegrane · ${counts.void} zwroty`} />
+          <StatCard label="Postawiono" value={settledCoupons.length ? fmtMoney(settledStake) : "—"} />
+          <StatCard label="Zwrot brutto" value={settledCoupons.length ? fmtMoney(settledReturn) : "—"} />
+          <StatCard label="Zysk / strata netto" value={settledCoupons.length ? fmtMoney(settledNet) : "—"} tone={settledNet < 0 ? "danger" : "primary"} />
+          <StatCard label="ROI" value={fmtPct(settledRoi)} hint="netto / postawione" />
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <StatCard label="Kupony w grze" value={counts.pending} hint={`Zamrożone stawki: ${fmtMoney(pendingStake)}`} tone="warning" />
+          <StatCard label="Dostępne mecze" value={uniqueCandidateMatches} hint="Dziś · WYBRANY · powyżej 75%" tone="primary" />
+          <StatCard label="Anulowane" value={coupons.filter((coupon) => coupon.status === "cancelled").length} hint="Stawka zwrócona do wirtualnego salda" />
+        </div>
+      </section>
 
       <section className="surface-card mb-6 p-4">
         <div className="mb-3 flex items-center gap-2">
@@ -156,7 +171,7 @@ function Kupony() {
           <h2 className="text-xl font-semibold uppercase">GENERATOR KUPONÓW</h2>
         </div>
         <p className="mb-4 rounded-md border border-primary/40 bg-primary/10 p-3 text-sm text-foreground">
-          <strong>Skanowanie analizuje mecze, ale nie tworzy kuponów.</strong> Kupony powstają dopiero po kliknięciu „GENERUJ I ZAPISZ KUPONY”, wyłącznie z dzisiejszych meczów (Europe/Brussels), z 3 różnych spotkań bez powtórzeń i z prawdopodobieństwem powyżej 75%.
+          Skan aktualizuje prognozy automatycznie. Kupon zapisujesz przyciskiem poniżej. AKO zawiera dokładnie 3 różne mecze, a każdy nowy kupon ma stałą stawkę 4 €. Wynik finansowy aktualizuje się po potwierdzeniu wyników spotkań.
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Liczba kuponów">
@@ -180,8 +195,8 @@ function Kupony() {
           <Field label="Nazwa partii">
             <Input value={namePrefix} onChange={(event) => setNamePrefix(event.target.value)} />
           </Field>
-          <Field label="Stawka na kupon (EUR)" htmlFor="coupon-stake" error={stakeError || undefined}>
-            <Input id="coupon-stake" inputMode="decimal" className="num" value={stake} disabled onChange={(event) => setStake(event.target.value)} />
+          <Field label="Stała stawka na kupon">
+            <div className="flex h-10 items-center rounded-md border border-border bg-secondary/40 px-3 font-semibold tabular-nums">4,00 € <span className="ml-2 text-xs font-normal text-muted-foreground">automatycznie</span></div>
           </Field>
         </div>
         <div className="mt-3 flex flex-wrap gap-4 text-sm">
@@ -257,9 +272,7 @@ function Kupony() {
               : "GENERUJ I ZAPISZ KUPONY"}
         </Button>
         <p className="mt-2 text-center text-xs text-muted-foreground">
-          {stakeError
-            ? stakeError
-            : `Stawka ${fmtMoney(stakeValue)} na kupon${recordStake ? " · zapis do bankrolla" : " · bez zapisu do bankrolla"}${preview.length ? ` · ${preview.length} kuponów w podglądzie` : ""}`}
+          `Stała stawka 4,00 € · zapis do wirtualnego bankrolla${preview.length ? ` · ${preview.length} kuponów w podglądzie` : ""}`
         </p>
       </section>
 
