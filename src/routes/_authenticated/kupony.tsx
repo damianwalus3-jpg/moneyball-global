@@ -291,7 +291,8 @@ function Kupony() {
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((coupon) => {
             const couponLegs = legs.filter((leg) => leg.coupon_id === coupon.id);
-            const payout = couponPayout(coupon.stake, couponLegs);
+            const payoutLegs = couponLegs.map((leg) => ({ ...leg, odds: leg.odds ?? predictionById.get(leg.prediction_id)?.odds ?? null }));
+            const payout = couponPayout(coupon.stake, payoutLegs);
             const net = payout == null || coupon.stake == null ? null : Math.round((payout - Number(coupon.stake)) * 100) / 100;
             return (
               <div key={coupon.id} className="surface-card p-4">
@@ -320,13 +321,13 @@ function Kupony() {
                             <div className="num text-xs font-semibold text-primary">Wynik: {resultByMatch.get(match.id)?.home_score} : {resultByMatch.get(match.id)?.away_score}</div>
                           )}
                         </div>
-                        <span className="num text-xs">{fmtOdds(leg.odds)}</span>
+                        <span className="num text-xs">{fmtOdds(leg.odds ?? prediction?.odds ?? null)}</span>
                         <SettlementBadge status={leg.status} />
                       </div>
                     );
                   })}
                   {couponLegs.length !== coupon.target_legs && <p className="text-xs text-destructive">Kupon ma {couponLegs.length} zdarzeń zamiast {coupon.target_legs}.</p>}
-                  {couponLegs.some((leg) => leg.odds == null || Number(leg.odds) <= 1) && (
+                  {couponLegs.some((leg) => { const odds = leg.odds ?? predictionById.get(leg.prediction_id)?.odds; return odds == null || Number(odds) <= 1; }) && (
                     <p className="text-xs text-amber-300">Brak potwierdzonych kursów — kupon służy do testowania skuteczności, nie jest potwierdzonym kuponem bukmacherskim.</p>
                   )}
                 </div>
