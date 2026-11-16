@@ -1,5 +1,5 @@
 import { stakeBalances, totalOdds, validateBatch } from "./domain";
-import { deleteRow, fetchAll, insertRow, insertRows } from "./db";
+import { deleteRow, fetchAll, insertRow, insertRows, updateRow } from "./db";
 import type { CouponType, Prediction } from "./types";
 
 export interface SaveBatchOptions {
@@ -87,4 +87,40 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
     throw error;
   }
   return createdCoupons.length;
+}
+
+/** Cancel a coupon without erasing its audit trail; return its virtual stake once. */
+export async function cancelCoupon(couponId: string) {
+  const [coupons, legs, transactions] = await Promise.all([
+    fetchAll("coupons"),
+    fetchAll("coupon_legs"),
+    fetchAll("bankroll_transactions"),
+  ]);
+  const coupon = coupons.find((item) => item.id === couponId);
+  if (!coupon) throw new Error("Nie znaleziono kuponu.");
+  if (coupon.status !== "pending") throw new Error("Można anulować wyłącznie kupon oczekujący.");
+  const couponLegs = legs.filter((leg) => leg.coupon_id === couponId);
+  for (const leg of couponLegs) {
+    if (leg.status !== "void") await updateRow("coupon_legs", leg.id, { status: "void" });
+  }
+  await updateRow("coupons", couponId, { status: "cancelled", settled_at: new Date().toISOString() });
+
+  const hasStake = transactions.some((tx) => tx.coupon_id === couponId && tx.transaction_type === "stake");
+  const hasReturn = transactions.some((tx) => tx.coupon_id === couponId && tx.transaction_type === "return");
+  if (hasStake && !hasReturn && coupon.stake != null && Number(coupon.stake) > 0) {
+    await insertRow("bankroll_transactions", {
+      transaction_type: "return",
+      amount: Number(coupon.stake),
+      balance_after: null,
+      coupon_id: couponId,
+      occurred_at: new Date().toISOString(),
+      note: `Zwrot anulowanego kuponu: ${coupon.name}`,
+    });
+  }
+  const updated = await fetchAll("bankroll_transactions");
+  let balance = 0;
+  for (const tx of [...updated].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))) {
+    balance = Math.round((balance + (tx.transaction_type === "deposit" || tx.transaction_type === "return" ? Math.abs(Number(tx.amount)) : tx.transaction_type === "adjustment" ? Number(tx.amount) : -Math.abs(Number(tx.amount)))) * 100) / 100;
+    if (tx.balance_after !== balance) await updateRow("bankroll_transactions", tx.id, { balance_after: balance });
+  }
 }
