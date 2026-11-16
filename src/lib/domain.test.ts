@@ -65,6 +65,8 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("England", "Premier League")).toBe(true);
     expect(isEuropeanTopTwoLeague("Greece", "Super League 2")).toBe(true);
     expect(isEuropeanTopTwoLeague("Ukraine", "Persha Liga")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Slovakia", "2. liga")).toBe(true);
+    expect(isEuropeanTopTwoLeague("ESP", "ESP_2_segunda-division")).toBe(true);
     expect(isEuropeanTopTwoLeague("Kosovo", "Liga E Pare")).toBe(true);
     expect(isEuropeanTopTwoLeague("Ukraine", "Druha Liga")).toBe(false);
     expect(isEuropeanTopTwoLeague("Italy", "Serie C - Girone B")).toBe(false);
