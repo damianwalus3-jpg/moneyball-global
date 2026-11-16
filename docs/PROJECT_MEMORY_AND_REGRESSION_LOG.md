@@ -593,3 +593,18 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Pełna rozszerzona macierz SQL: **40 testów, 0 rozbieżności**. Dzienny feed cache: Northern Ireland Championship 2 fixtures; zero kolejnych niekwalifikujących się rekordów.
 - Edge Functions po wdrożeniu: `footynomad-sync v79`, `moneyball-free-feed v36`, `moneyball-predict v232` — wszystkie ACTIVE.
 - Aktualny GitHub combined status nadal pokazuje tylko Vercel build-rate-limit failure; nie daje statusu workflow Cloudflare. Nie ogłaszać produkcyjnego deployu frontendu. Następny etap nadal wymaga potwierdzenia CI/test/build/Cloudflare i kontroli Worker.
+
+
+## Końcowe aliasy kraju z katalogu FootyNomad — 2026-11-17
+- Odczyt katalogu FootyNomad https://footynomad.com/browse wykazał, że dostawca używa nazw krajów `Bosnia` i `Macedonia`, a nie zawsze pełnych nazw oficjalnych. Poprzednie zestawy krajów akceptowały tylko `Bosnia and Herzegovina` i `North Macedonia`; takie rekordy mogły zostać odrzucone przed sprawdzeniem ligi.
+- Dodano aliasy krajów `bosnia`, `macedonia`, `turkiye` do frontendu i trzech Edge Functions:
+  - frontend: `69c4c38e272955db6bf7c26739cb0fa3a4a865c7`
+  - footynomad-sync: `f7f04702bca047c12802dce93ed6f4b84d4720ee`
+  - moneyball-free-feed: `67269b24887b01e50befb090ed824498f4eaac76`
+  - moneyball-predict: `ff49cec4e7ab133c21a18a16a1a748041697fe81`
+- Dodatkowy brak: allowlista obejmowała `Erovnuli Liga 2`, ale nie topową `Erovnuli Liga`. Dodano obie nazwy jako dozwolone poziomy 1/2. Testy: `cd33bd1d0f12a66e2c4f47f14c2660fe9fa46dc9`.
+- Produkcyjna migracja SQL `20261117023000_add_footynomad_country_aliases_and_georgia_top_tier`, commit `52ab56e1956db43ef1444f1a8151bce46b602895`, dodała aliasy country w canonical SQL scope i `erovnuli liga` do allowlisty.
+- Rozszerzona macierz produkcyjnego SQL: **47 przypadków, 0 rozbieżności**, w tym Bosnia, Macedonia, Georgia, Türkiye i wszystkie poprzednie tier 1/2 oraz false-positive tier 3/4.
+- Edge Functions ponownie wdrożone i ACTIVE: `footynomad-sync v80`, `moneyball-free-feed v37`, `moneyball-predict v233`.
+- Aktualny dzienny feed cache nadal zawiera tylko Northern Ireland Championship (2 fixtures); brak znanych false-positive tier 3/4.
+- Nadal niepotwierdzone: GitHub Actions Vitest/TypeScript/build oraz produkcyjny Cloudflare Worker frontend. Nie zamykać issue #76 bez potwierdzenia tych kroków.
