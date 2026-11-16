@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EmptyState, Field, NoGuarantee, PageHeader, PageLoader, SettlementBadge, StatCard } from "@/components/app/ui-bits";
-import { saveCouponBatch } from "@/lib/coupons";
+import { cancelCoupon, saveCouponBatch } from "@/lib/coupons";
 import { deleteRow } from "@/lib/db";
 import { buildCouponBatch, buildSingleCouponBatch, couponPayout, effectiveOdds, isActivePredictionVersion, isCouponCandidate, isKickoffToday, MARKET_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel, parseDecimal } from "@/lib/format";
@@ -95,9 +95,8 @@ function Kupony() {
   );
 
   const removeCoupon = useAction(async (coupon: Coupon) => {
-    for (const leg of legs.filter((item) => item.coupon_id === coupon.id)) await deleteRow("coupon_legs", leg.id);
-    await deleteRow("coupons", coupon.id);
-  }, { success: "Kupon usunięty lub bezpiecznie anulowany" });
+    await cancelCoupon(coupon.id);
+  }, { success: "Kupon anulowany, stawka zwrócona, historia zachowana" });
 
 
 
@@ -318,7 +317,7 @@ function Kupony() {
                 </div>
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
                   {coupon.status === "pending" && (
-                    <Button size="sm" variant="ghost" onClick={() => removeCoupon.mutate(coupon)} disabled={removeCoupon.isPending}>Anuluj / usuń</Button>
+                    <Button size="sm" variant="ghost" onClick={() => removeCoupon.mutate(coupon)} disabled={removeCoupon.isPending}>Anuluj kupon</Button>
                   )}
                 </div>
               </div>
