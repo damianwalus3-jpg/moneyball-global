@@ -25,6 +25,8 @@ describe("selectEspnLeagues", () => {
 
   it("selects only the matching UEFA competition", () => {
     expect(selectEspnLeagues([{ country: "Europe", league: "UEFA Champions League", gender: "men" }])).toEqual(["uefa.champions"]);
+    expect(selectEspnLeagues([{ country: "World", league: "UEFA U21 Championship - Qualification", gender: "men" }])).toEqual(["uefa.euro_u21_qual"]);
+    expect(selectEspnLeagues([{ country: "World", league: "UEFA Nations League", gender: "men" }])).toEqual(["uefa.nations"]);
   });
 
   it("deduplicates multiple fixtures in the same competition", () => {
