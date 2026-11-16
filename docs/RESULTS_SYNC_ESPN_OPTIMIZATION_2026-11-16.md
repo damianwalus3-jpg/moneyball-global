@@ -45,3 +45,16 @@ Dla tych rekordów selektor ESPN wybiera tylko `uefa.nations` i `uefa.euro_u21_q
 4. Pełne E2E rozliczenia kuponu nadal nie jest zaliczone: wymagany rzeczywisty FT meczu z kuponu 4 EUR, automatyczna zmiana statusu nogi i kuponu oraz dokładnie jeden zwrot w ledgerze. Ponowny cykl musi pozostawić saldo bez zmian.
 5. Nie wykonywać fikcyjnych wyników ani nie zmieniać ręcznie prawdziwych statusów nóg w celu zaliczenia testu.
 
+
+## Wersja 68 — optymalizacja zapisu i rozliczania (16.11.2026)
+- Dodano `dbUpsert` z PostgREST `on_conflict` i `resolution=merge-duplicates`; zapis obserwacji źródeł nie wykonuje już SELECT+PATCH/POST dla każdego wiersza.
+- Obserwacje alternatywnych źródeł są grupowane i zapisywane jednym UPSERT-em; awaryjnie wykonywane są ograniczone równoległe pojedyncze UPSERT-y.
+- Rozliczenie predykcji grupuje aktualizacje statusów won/lost; nogi kuponów pobierane są jednym zapytaniem dla rozliczanych predykcji, a następnie aktualizowane grupowo.
+- Nadal osobno aktualizowane są finansowe pola wybranych predykcji i wykonywane jest uzgodnienie finansowe kuponu.
+- CI run #779: SUCCESS (Deno typecheck, Vitest, TypeScript, build).
+- Cloudflare Workers deploy run #382: SUCCESS.
+- Supabase Edge Function `moneyball-results-sync`: wersja 68 ACTIVE.
+- Pierwszy pomiar wersji 68 (17:35:04 UTC): HTTP 200, 4.757 s, 79 fixtures z FootyNomad, 7 zaległych spotkań do ESPN, 2 ligi ESPN, 11 eventów ESPN, 14 obserwacji alternatywnych, 13 dopasowanych, 2 wyniki zapisane, 26 predykcji rozliczonych, 0 błędów. ESPN 264 ms; alternatywne źródła 880 ms; odczyt meczów 244 ms; uzgodnienie finansowe 75 ms.
+- Porównanie pojedynczych wykonań: wersja 67 = 16.089 s, wersja 68 = 4.757 s (spadek ok. 70.4%). To pierwszy pomiar wersji 68, wymaga potwierdzenia na kilku kolejnych cyklach; nie jest gwarancją stałego czasu.
+- Uwaga: w tym przebiegu `couponLegsSettled=0`. 26 predykcji zostało rozliczonych, ale nie było powiązanych nóg kuponów do aktualizacji dla tych meczów. Nie oznacza to zaliczenia testu pełnego rozliczenia kuponu.
+- Następny krok: zweryfikować, czy wybrane predykcje kuponów mają poprawne relacje `coupon_legs.prediction_id`, oraz wykonać kontrolowany test idempotencji na rzeczywistym kuponie testowym bez modyfikowania historycznych wyników.
