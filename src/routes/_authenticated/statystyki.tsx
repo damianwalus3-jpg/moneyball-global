@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BarChart3 } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
 import { couponPayout, groupHitRates, hitRate, isActivePredictionVersion, modelHitRate, type HitRate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
@@ -119,6 +120,7 @@ function Statystyki() {
 }
 
 function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Prediction[]; leagueOf: (p: Prediction) => string }) {
+  const [detailFilter, setDetailFilter] = useState<"model" | "selected" | "rejected" | "settled" | "pending" | null>(null);
   const sel = preds.filter((prediction) => prediction.verdict === "WYBRANY");
   const rej = preds.filter((prediction) => prediction.verdict === "ODRZUCONY");
   const verifiedSettled = sel.filter((prediction) => prediction.verified && (prediction.settlement_status === "won" || prediction.settlement_status === "lost"));
@@ -137,12 +139,36 @@ function MarketBlock({ type, preds, leagueOf }: { type: Market; preds: Predictio
     <section>
       <h2 className="mb-3 text-2xl font-semibold uppercase">{type === "DOUBLE_CHANCE" ? "Double Chance" : type === "GOALS" ? "Gole / BTTS" : "1X2"}</h2>
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {hrModel && <StatCard label="Skuteczność modelu" value={fmtPct(hrModel.rate)} hint={`${hrModel.won}/${hrModel.settled} · model ogółem`} tone="primary" />}
-        <StatCard label="Skuteczność WYBRANE" value={fmtPct(hrSel.rate)} hint={`${hrSel.won}/${hrSel.settled}`} tone="primary" />
-        <StatCard label="Prognozy" value={preds.length} hint={`${sel.length} wybranych · ${rej.length} odrzuconych`} />
-        <StatCard label="Zweryfikowane rozliczenia" value={hrSel.settled} />
-        <StatCard label="Oczekujące" value={sel.filter((prediction) => prediction.settlement_status === "pending").length} />
+        {hrModel && <button type="button" aria-pressed={detailFilter === "model"} onClick={() => setDetailFilter(detailFilter === "model" ? null : "model")} className="min-w-0 rounded-xl text-left outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary"><StatCard label="Skuteczność modelu" value={fmtPct(hrModel.rate)} hint={`${hrModel.won}/${hrModel.settled} · model ogółem · szczegóły ↗`} tone="primary" className={detailFilter === "model" ? "ring-2 ring-primary" : ""} /></button>}
+        <button type="button" aria-pressed={detailFilter === "selected"} onClick={() => setDetailFilter(detailFilter === "selected" ? null : "selected")} className="min-w-0 rounded-xl text-left outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-primary"><StatCard label="Skuteczność WYBRANE" value={fmtPct(hrSel.rate)} hint={`${hrSel.won}/${hrSel.settled} · szczegóły ↗`} tone="primary" className={detailFilter === "selected" ? "ring-2 ring-primary" : ""} /></button>
+        <button type="button" aria-pressed={detailFilter === "rejected"} onClick={() => setDetailFilter(detailFilter === "rejected" ? null : "rejected")} className="min-w-0 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-primary"><StatCard label="Prognozy" value={preds.length} hint={`${sel.length} wybranych · ${rej.length} odrzuconych · szczegóły ↗`} className={detailFilter === "rejected" ? "ring-2 ring-primary" : ""} /></button>
+        <button type="button" aria-pressed={detailFilter === "settled"} onClick={() => setDetailFilter(detailFilter === "settled" ? null : "settled")} className="min-w-0 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-primary"><StatCard label="Zweryfikowane rozliczenia" value={hrSel.settled} hint="lista rozliczonych ↗" className={detailFilter === "settled" ? "ring-2 ring-primary" : ""} /></button>
+        <button type="button" aria-pressed={detailFilter === "pending"} onClick={() => setDetailFilter(detailFilter === "pending" ? null : "pending")} className="min-w-0 rounded-xl text-left outline-none focus-visible:ring-2 focus-visible:ring-primary"><StatCard label="Oczekujące" value={sel.filter((prediction) => prediction.settlement_status === "pending").length} hint="lista oczekujących ↗" className={detailFilter === "pending" ? "ring-2 ring-primary" : ""} /></button>
       </div>
+      {detailFilter && (() => {
+        const rows = detailFilter === "model" ? preds
+          : detailFilter === "selected" ? sel
+          : detailFilter === "rejected" ? rej
+          : detailFilter === "settled" ? verifiedSettled
+          : sel.filter((prediction) => prediction.settlement_status === "pending");
+        const title = detailFilter === "model" ? "Wszystkie prognozy modelu"
+          : detailFilter === "selected" ? "Wybrane typy"
+          : detailFilter === "rejected" ? "Odrzucone prognozy"
+          : detailFilter === "settled" ? "Zweryfikowane rozliczenia"
+          : "Oczekujące typy";
+        return <section className="mt-3 rounded-xl border border-primary/30 bg-card p-3 sm:p-4" aria-live="polite">
+          <div className="mb-3 flex items-center justify-between gap-2"><div><h3 className="font-display text-lg font-bold uppercase">{title}</h3><p className="text-xs text-muted-foreground">{rows.length} rekordów · kliknij kafelek ponownie, aby zamknąć</p></div><Button size="sm" variant="outline" onClick={() => setDetailFilter(null)}>Zamknij</Button></div>
+          {rows.length ? <div className="grid gap-2">{rows.map((p) => {
+            const match = byId.get(p.match_id);
+            const status = p.settlement_status === "won" ? "WYGRANY" : p.settlement_status === "lost" ? "PRZEGRANY" : p.settlement_status === "void" ? "ZWROT" : "OCZEKUJE";
+            return <article key={p.id} className="rounded-lg border border-border bg-secondary/15 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><h4 className="break-words font-semibold">{match ? `${match.home_team} – ${match.away_team}` : `Mecz ${p.match_id}`}</h4><p className="text-xs text-muted-foreground">{match?.competition ?? "Liga nieznana"}{match?.kickoff_at ? ` · ${new Date(match.kickoff_at).toLocaleString("pl-BE", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}` : ""}</p></div><div className="flex flex-wrap gap-1"><span className={p.verdict === "WYBRANY" ? "rounded-full bg-primary/15 px-2 py-1 text-xs font-semibold text-primary" : "rounded-full bg-muted px-2 py-1 text-xs"}>{p.verdict ?? "BEZ DECYZJI"}</span><span className="rounded-full bg-secondary px-2 py-1 text-xs">{status}</span></div></div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4"><div><span className="block text-xs text-muted-foreground">Typ</span><strong>{p.selection ?? "—"}</strong></div><div><span className="block text-xs text-muted-foreground">Prawdopodobieństwo</span><strong>{p.probability == null ? "—" : fmtPct(Number(p.probability))}</strong></div><div><span className="block text-xs text-muted-foreground">Kurs</span><strong>{p.odds == null ? "—" : Number(p.odds).toFixed(2)}</strong></div><div><span className="block text-xs text-muted-foreground">Wynik</span><strong>{match?.home_score != null && match?.away_score != null ? `${match.home_score} : ${match.away_score}` : "—"}</strong></div></div>
+              {p.rationale && <p className="mt-2 whitespace-pre-wrap break-words border-t border-border pt-2 text-sm text-muted-foreground">{p.rationale}</p>}
+            </article>;
+          })}</div> : <p className="rounded-lg bg-secondary/30 p-3 text-sm text-muted-foreground">Brak rekordów w tej kategorii.</p>}
+        </section>;
+      })()}
       {hrSel.settled > 0 && (
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
           <Table
