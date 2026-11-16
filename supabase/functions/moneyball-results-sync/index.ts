@@ -198,6 +198,7 @@ async function markVoid(m:any,reason:string){
    const all=await db("coupon_legs?select=status&coupon_id=eq."+leg.coupon_id),statuses=(all||[]).map((x:any)=>x.status);
    const cs=statuses.includes("lost")?"lost":statuses.length&&statuses.every((x:string)=>x==="won"||x==="void")?(statuses.every((x:string)=>x==="void")?"void":"won"):"pending";
    await db("coupons?id=eq."+leg.coupon_id,"PATCH",{status:cs,settled_at:cs==="pending"?null:now});
+   await reconcileCouponMoney(String(leg.coupon_id),now);
   }
  }
 }
