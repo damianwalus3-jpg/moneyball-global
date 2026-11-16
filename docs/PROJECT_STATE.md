@@ -688,3 +688,11 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Route loader prefetches the scoped dataset; query cache is invalidated after mutations.
 - No DB migration or data writes required. This reduces prediction payload from 18,563 to about 1,141 rows (about 93.9% fewer) while preserving full active-model history for the supported league scope.
 - Branch: `perf/stats-scoped-predictions`. Await fresh CI before merge; production Cloudflare deploy only after successful checks.
+
+
+## Cache consistency guard — 2026-11-16
+
+- Follow-up audit found `deleteRow` did not invalidate the raw table cache, unlike `insertRows` and `updateRow`. After a delete, React Query could refetch a table through the still-warm raw cache and temporarily reintroduce the deleted row in statistics or related screens.
+- Added raw table cache invalidation before delete, matching insert/update behavior.
+- Added targeted statistics and match-settlement-context invalidation to `useAction` error handling, because a multi-step settlement may have partially written before a later operation fails. This ensures affected screens re-read current database state instead of showing stale derived data.
+- No schema or data changes. CI required before merge.
