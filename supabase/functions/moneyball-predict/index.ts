@@ -16,7 +16,17 @@ function isEuropeanFixture(country: unknown, competition: unknown, home?: unknow
  return false;
 }
 
-function isTopTwoTierLeague(competition: unknown): boolean {
+function isTopTwoTierLeague(competition: unknown, country?: unknown): boolean {
+  const scopeCountry = String(country ?? "").toLowerCase().trim();
+  const scopeLabel = String(competition ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  if ((scopeCountry === "scotland" && /\b(lowland league|highland league)\b/.test(scopeLabel))
+    || (scopeCountry === "turkey" && /\b2 lig\b/.test(scopeLabel))
+    || (["denmark", "norway", "belarus"].includes(scopeCountry) && /\b2 division\b/.test(scopeLabel))
+    || (scopeCountry === "sweden" && /\bdivision [12]\b/.test(scopeLabel))
+    || (scopeCountry === "albania" && /\b2nd division\b/.test(scopeLabel))
+    || (scopeCountry === "croatia" && /\bsecond nl\b/.test(scopeLabel))
+    || (scopeCountry === "estonia" && /\besiliiga b\b/.test(scopeLabel))
+    || (scopeCountry === "greece" && /\bfootball league\b/.test(scopeLabel))) return false;
  const comp=String(competition??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
  if(!comp)return false;
   if (/\bserie c\b|\blega pro\b|\bserie c1\b|\bserie c2\b/.test(comp)) return false;
@@ -122,7 +132,7 @@ async function readFootyNomadForm(id:string,expectedHome:string,expectedAway:str
 }
 
 function fotbalSlug(value:string){
- return String(value||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase()
+ return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()
   .replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");
 }
 const FOTBAL_COUNTRY_SLUGS:Record<string,string>={SVN:"slovenia",SLO:"slovenia",SVK:"slovakia",CZE:"czechia",ROU:"romania",GER:"germany",DEU:"germany",ENG:"england",SCO:"scotland",NIR:"northern-ireland",WAL:"wales",IRL:"ireland",BEL:"belgium",NED:"netherlands",NLD:"netherlands",ESP:"spain",FRA:"france",ITA:"italy",POR:"portugal",PRT:"portugal",AUT:"austria",SUI:"switzerland",CHE:"switzerland",POL:"poland",CRO:"croatia",SRB:"serbia",HUN:"hungary",TUR:"turkey",UKR:"ukraine",NOR:"norway",SWE:"sweden",DEN:"denmark",DNK:"denmark",FIN:"finland",GRE:"greece",GRC:"greece",BUL:"bulgaria"};
@@ -574,7 +584,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  };
  const dateFromExternalId=(m:any)=>/:(\\d{4}-\\d{2}-\\d{2}):/.exec(String(m.external_id||""))?.[1]||null;
  const matchDate=(m:any)=>m.kickoff_at?new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(m.kickoff_at)):(String(m.kickoff_date||"").slice(0,10)||dateFromExternalId(m));
- const rawDateMatches=all.filter((m:any)=>matchDate(m)===date&&fixtureGender(m)==="men"&&isEuropeanFixture(m.country,m.competition||m.league,m.home_team,m.away_team)&&isTopTwoTierLeague(m.competition||m.league));
+ const rawDateMatches=all.filter((m:any)=>matchDate(m)===date&&fixtureGender(m)==="men"&&isEuropeanFixture(m.country,m.competition||m.league,m.home_team,m.away_team)&&isTopTwoTierLeague(m.competition||m.league,m.country));
  const deduped=dedupeFixturesByDate(rawDateMatches,matchDate);const matches=deduped.matches;const duplicatesRemoved=deduped.duplicatesRemoved;
  const historyFields="select=id,home_team,away_team,kickoff_at,gender,match_results(home_score,away_score,verified)";
  const historySince=new Date(Date.parse(date+"T00:00:00Z")-240*24*60*60*1000).toISOString();
