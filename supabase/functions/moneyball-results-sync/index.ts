@@ -223,12 +223,17 @@ function goalsWon(selection:string,home:number,away:number):boolean|null{
  }
 }
 async function reconcileCouponMoney(couponId:string,now:string){
- const rows=await db("coupons?select=id,owner_id,name,status,stake,combined_odds,created_at&id=eq."+couponId);
- const coupon=(rows||[])[0];if(!coupon||coupon.status==="cancelled")return;
+ const rows=await db("coupons?select=id,owner_id,name,status,stake,combined_odds,potential_return,created_at&id=eq."+couponId);
+ const coupon=(rows||[])[0];
+ if(!coupon||coupon.status==="cancelled")return;
+ const stake=Number(coupon.stake);
+ if(!Number.isFinite(stake)||stake<0)throw new Error("Nieprawidłowa stawka kuponu: "+couponId);
  const legs=await db("coupon_legs?select=id,prediction_id,status,odds&coupon_id=eq."+couponId);
+ if(!legs?.length)throw new Error("Kupon bez zapisanych zdarzeń — pominięto rozliczenie: "+couponId);
  const predictionIds=(legs||[]).map((x:any)=>String(x.prediction_id)).filter(Boolean);
  const predictions=predictionIds.length?await db("predictions?select=id,odds&owner_id=eq."+encodeURIComponent(String(coupon.owner_id))+"&id=in.("+predictionIds.join(",")+")"):[];
  const predictionById=new Map((predictions||[]).map((p:any)=>[String(p.id),p]));
+ // Freeze missing leg prices from the linked prediction only; never invent a price.
  for(const leg of legs||[]){
   const prediction:any=predictionById.get(String(leg.prediction_id));
   if((leg.odds==null||Number(leg.odds)<=1)&&prediction?.odds!=null&&Number(prediction.odds)>1){
@@ -236,27 +241,52 @@ async function reconcileCouponMoney(couponId:string,now:string){
    await db("coupon_legs?id=eq."+leg.id,"PATCH",{odds:leg.odds});
   }
  }
+ const statuses=(legs||[]).map((x:any)=>String(x.status||"pending"));
+ const hasLost=statuses.includes("lost");
+ const hasPending=statuses.includes("pending");
+ const allVoid=statuses.every((s:string)=>s==="void");
+ const settled=!hasPending;
+ const computedStatus=hasLost?"lost":hasPending?"pending":allVoid?"void":"won";
+ const activeLegs=(legs||[]).filter((x:any)=>x.status!=="void");
+ const activeOdds=activeLegs.map((x:any)=>x.odds==null?null:Number(x.odds));
+ const oddsComplete=activeOdds.length>0&&activeOdds.every((x:any)=>x!=null&&Number.isFinite(x)&&x>1);
+ const effective=allVoid?1:oddsComplete?Math.round(activeOdds.reduce((v:number,x:any)=>v*Number(x),1)*100)/100:null;
+ const potential=effective!=null?Math.round(stake*effective*100)/100:null;
+ // Persist the coupon's financial snapshot, including on losses (potential return is not actual payout).
+ await db("coupons?id=eq."+couponId,"PATCH",{
+  combined_odds:effective,
+  total_odds:effective,
+  potential_return:potential,
+  status:computedStatus,
+  settled_at:settled?now:null
+ });
  const tx=await db("bankroll_transactions?select=id,transaction_type,amount,balance_after,occurred_at,note,coupon_id&coupon_id=eq."+couponId);
- let stakeTx=(tx||[]).find((x:any)=>x.transaction_type==="stake");
- let returnTx=(tx||[]).find((x:any)=>x.transaction_type==="return"&&String(x.note||"").startsWith("Automatyczne rozliczenie MONEYBALL"));
- if(!stakeTx&&Number(coupon.stake)>0)await db("bankroll_transactions","POST",{owner_id:coupon.owner_id,coupon_id:couponId,transaction_type:"stake",amount:Number(coupon.stake),balance_after:null,occurred_at:coupon.created_at||now,note:"Stawka kuponu "+coupon.name});
- const statuses=(legs||[]).map((x:any)=>x.status),settled=statuses.length>0&&statuses.every((s:string)=>s!=="pending"),lost=statuses.includes("lost");
+ const stakeTx=(tx||[]).find((x:any)=>x.transaction_type==="stake");
+ let returnTx=(tx||[]).find((x:any)=>x.transaction_type==="return");
+ if(!stakeTx&&stake>0){
+  await db("bankroll_transactions","POST",{
+   owner_id:coupon.owner_id,coupon_id:couponId,transaction_type:"stake",amount:stake,
+   balance_after:null,occurred_at:coupon.created_at||now,note:"Stawka kuponu "+coupon.name
+  });
+ }
  let payout:number|null=null;
- if(settled&&!lost){
-  const odds=(legs||[]).filter((x:any)=>x.status!=="void").map((x:any)=>x.odds==null?null:Number(x.odds));
-  if(odds.length===0)payout=Number(coupon.stake);
-  else if(odds.every((x:any)=>x!=null&&x>1))payout=Math.round(Number(coupon.stake)*odds.reduce((v:number,x:any)=>v*Number(x),1)*100)/100;
-  else if(coupon.combined_odds!=null&&Number(coupon.combined_odds)>1)payout=Math.round(Number(coupon.stake)*Number(coupon.combined_odds)*100)/100;
+ if(settled&&!hasLost){
+  if(allVoid)payout=stake;
+  else if(oddsComplete)payout=potential;
  }
  if(payout!=null){
   const row={owner_id:coupon.owner_id,coupon_id:couponId,transaction_type:"return",amount:payout,balance_after:null,occurred_at:now,note:"Automatyczne rozliczenie MONEYBALL: "+coupon.name};
-  if(returnTx)await db("bankroll_transactions?id=eq."+returnTx.id,"PATCH",row);else await db("bankroll_transactions","POST",row);
- }else if(returnTx)await db("bankroll_transactions?id=eq."+returnTx.id,"DELETE");
+  if(returnTx)await db("bankroll_transactions?id=eq."+returnTx.id,"PATCH",row);
+  else await db("bankroll_transactions","POST",row);
+ }else if(returnTx){
+  await db("bankroll_transactions?id=eq."+returnTx.id,"DELETE");
+ }
+ // Rebuild running balances from the immutable transaction history.
  const ledger=await db("bankroll_transactions?select=id,transaction_type,amount,balance_after,occurred_at&owner_id=eq."+encodeURIComponent(String(coupon.owner_id))+"&order=occurred_at.asc,id.asc");
  let balance=0;
  for(const item of ledger||[]){
-  const amount=Math.abs(Number(item.amount)||0);
-  balance=Math.round((balance+(item.transaction_type==="deposit"||item.transaction_type==="return"?amount:item.transaction_type==="adjustment"?Number(item.amount):-amount))*100)/100;
+  const amount=Number(item.amount)||0;
+  balance=Math.round((balance+(item.transaction_type==="deposit"||item.transaction_type==="return"?Math.abs(amount):item.transaction_type==="adjustment"?amount:-Math.abs(amount)))*100)/100;
   if(Number(item.balance_after)!==balance)await db("bankroll_transactions?id=eq."+item.id,"PATCH",{balance_after:balance});
  }
 }
