@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp, Pencil, Plus, Target } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConfirmDelete, EmptyState, PageHeader, SelectionBadge, SettlementBadge, StatCard } from "@/components/app/ui-bits";
@@ -8,7 +8,7 @@ import { PredictionForm } from "@/components/forms/PredictionForm";
 import { deleteRow, fetchPredictionsPage, updateRow, type PredictionPageCursor } from "@/lib/db";
 import { impliedProbability, MARKET_LABELS, PICK_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
-import { useAction, useTable } from "@/lib/queries";
+import { predictionMatchesQuery, tableQuery, useAction } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
 import type { Market, Prediction } from "@/lib/types";
 
@@ -67,8 +67,9 @@ function oddsFreshnessLabel(coverage?: Record<string, unknown> | null) {
 }
 
 export function PredictionsView({ market }: { market: Market }) {
-  const matches = useTable("matches");
-  const couponLegs = useTable("coupon_legs");
+  const couponLegsQuery = useQuery(tableQuery("coupon_legs"));
+  const couponLegs = couponLegsQuery.data ?? [];
+  const couponLegsReady = !couponLegsQuery.isPending && !couponLegsQuery.isError;
   const [verdictFilter, setVerdictFilter] = useState<"all" | "WYBRANY" | "ODRZUCONY">("all");
   const [modelScope, setModelScope] = useState<"current" | "all">("current");
   const [query, setQuery] = useState("");
@@ -95,6 +96,11 @@ export function PredictionsView({ market }: { market: Market }) {
     () => pageQuery.data?.pages.flatMap((page) => page.rows) ?? [],
     [pageQuery.data],
   );
+  const visibleMatchIds = useMemo(() => [...new Set(list.map((prediction) => prediction.match_id))], [list]);
+  const pageMatchesQuery = useQuery(predictionMatchesQuery(visibleMatchIds));
+  const byId = useMemo(() => new Map((pageMatchesQuery.data ?? []).map((match) => [match.id, match])), [pageMatchesQuery.data]);
+  const formMatchesQuery = useQuery({ ...tableQuery("matches"), enabled: open });
+  const formMatches = formMatchesQuery.data ?? [];
   const stats = pageQuery.data?.pages[0];
   const rate = stats && stats.settled > 0
     ? { rate: (stats.won / stats.settled) * 100, won: stats.won, settled: stats.settled }
@@ -105,6 +111,7 @@ export function PredictionsView({ market }: { market: Market }) {
     }),
   );
   const remove = useAction(async (id: string) => {
+    if (!couponLegsReady) throw new Error("Nie udało się sprawdzić powiązań z kuponami. Odśwież stronę i spróbuj ponownie.");
     if (couponLegs.some((leg) => leg.prediction_id === id))
       throw new Error("Nie można usunąć prognozy użytej w kuponie. Zachowaj historię i zmień werdykt na ODRZUCONY.");
     await deleteRow("predictions", id);
@@ -116,7 +123,7 @@ export function PredictionsView({ market }: { market: Market }) {
         eyebrow={market === "DOUBLE_CHANCE" ? "1X · X2 · 12" : market === "GOALS" ? "BTTS · OVER / UNDER" : "1 · X · 2"}
         title={MARKET_LABELS[market] === "Gole / BTTS" ? "Prognozy goli" : market === "DOUBLE_CHANCE" ? "Double Chance" : "Prognozy 1X2"}
         description="Prawdopodobieństwo modelu jest oddzielone od kursu bukmachera. Skuteczność obejmuje wyłącznie zweryfikowane rozliczenia."
-        actions={<Button onClick={() => { setEditing(null); setOpen(true); }} disabled={matches.length === 0}><Plus /> Dodaj prognozę</Button>}
+        actions={<Button onClick={() => { setEditing(null); setOpen(true); }}><Plus /> Dodaj prognozę</Button>}
       />
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Skuteczność WYBRANE" value={fmtPct(rate.rate)} hint={`${rate.won}/${rate.settled} zweryfikowanych`} tone="primary" />
@@ -144,7 +151,7 @@ export function PredictionsView({ market }: { market: Market }) {
           <Button size="sm" variant="outline" onClick={() => pageQuery.refetch()}>Spróbuj ponownie</Button>
         </div>
       ) : list.length === 0 ? (
-        <EmptyState icon={Target} title="Brak prognoz" description={matches.length === 0 ? "Najpierw dodaj mecze lub zaimportuj skan w Terminarzu." : "Dodaj prognozę lub zmień filtry."} />
+        <EmptyState icon={Target} title="Brak prognoz" description="Dodaj prognozę lub zmień filtry." />
       ) : (
         <div className="grid gap-2">
           {list.map((prediction) => {
@@ -198,8 +205,8 @@ export function PredictionsView({ market }: { market: Market }) {
                     <Button variant="outline" size="sm" onClick={() => setExpandedId(expandedId === prediction.id ? null : prediction.id)}>
                       {expandedId === prediction.id ? <ChevronUp /> : <ChevronDown />} Szczegóły
                     </Button>
-                    <Button variant="ghost" size="icon" aria-label="Edytuj" title={couponLegs.some((leg) => leg.prediction_id === prediction.id) ? "Prognoza jest użyta w kuponie" : "Edytuj"} disabled={couponLegs.some((leg) => leg.prediction_id === prediction.id)} onClick={() => { setEditing(prediction); setOpen(true); }}><Pencil /></Button>
-                    {!couponLegs.some((leg) => leg.prediction_id === prediction.id) && <ConfirmDelete onConfirm={() => remove.mutate(prediction.id)} />}
+                    <Button variant="ghost" size="icon" aria-label="Edytuj" title={!couponLegsReady ? "Sprawdzanie powiązań kuponów" : couponLegs.some((leg) => leg.prediction_id === prediction.id) ? "Prognoza jest użyta w kuponie" : "Edytuj"} disabled={!couponLegsReady || couponLegs.some((leg) => leg.prediction_id === prediction.id)} onClick={() => { setEditing(prediction); setOpen(true); }}><Pencil /></Button>
+                    {couponLegsReady && !couponLegs.some((leg) => leg.prediction_id === prediction.id) && <ConfirmDelete onConfirm={() => remove.mutate(prediction.id)} />}
                   </div>
                 </div>
                 {expandedId === prediction.id && (
@@ -251,7 +258,7 @@ export function PredictionsView({ market }: { market: Market }) {
           )}
         </div>
       )}
-      <PredictionForm open={open} onOpenChange={setOpen} market={market} prediction={editing} matches={matches} />
+      <PredictionForm open={open} onOpenChange={setOpen} market={market} prediction={editing} matches={formMatches} matchesLoading={open && formMatchesQuery.isPending} />
     </div>
   );
 }
