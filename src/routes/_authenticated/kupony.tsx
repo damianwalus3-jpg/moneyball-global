@@ -111,7 +111,17 @@ function Kupony() {
   };
   const settledCoupons = coupons.filter((coupon) => ["won", "lost", "void"].includes(coupon.status));
   const settledStake = settledCoupons.reduce((sum, coupon) => sum + Number(coupon.stake ?? 0), 0);
-  const payoutRows = settledCoupons.map((coupon) => couponPayout(coupon.stake, legs.filter((leg) => leg.coupon_id === coupon.id)));
+  const payoutRows = settledCoupons.map((coupon) => {
+    const couponLegs = legs
+      .filter((leg) => leg.coupon_id === coupon.id)
+      .map((leg) => ({
+        ...leg,
+        // Recover the exact odds saved with the selected prediction when the
+        // coupon leg's own odds column was not populated.
+        odds: leg.odds ?? predictionById.get(leg.prediction_id)?.odds ?? null,
+      }));
+    return couponPayout(coupon.stake, couponLegs);
+  });
   const knownPayouts = payoutRows.filter((value): value is number => value != null);
   const payoutIncomplete = knownPayouts.length !== settledCoupons.length;
   const settledReturn = knownPayouts.reduce((sum, value) => sum + value, 0);
