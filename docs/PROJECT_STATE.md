@@ -525,3 +525,44 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 4. Add tests for active/all model scopes, market filters, verdict filters, cursor boundaries, duplicate prevention and historical aggregate equivalence.
 5. Run CI/build, deploy to the existing Cloudflare Worker, then compare cold and cached navigation in an authenticated session. Do not mark the menu-speed issue fixed without measured signed-in timings.
 6. Keep monitoring the 5-minute results-sync schedule and inspect stage summaries, result settlement counts and exactly-once coupon ledger writes. Never fabricate outcomes or mutate historical coupons.
+
+
+## Prediction screen server pagination — 2026-11-16
+
+### Root cause
+- `PredictionsView` loaded `useTable("predictions")`, downloading the complete 18,563-row table even though each view displays one market at a time.
+- The full-history fetch used four UUID partitions and repeated keyset reads. PostgreSQL logs showed 11 prediction-table statement timeouts on Nov 15–16.
+- The existing `predictions_verdict_idx` was selected for a representative owner+market+active-model query. It filtered owner/model after scanning rows and sorting.
+
+### Database changes applied and verified
+- Added `moneyball_predictions_page` as a SECURITY INVOKER RPC, explicitly scoped to `auth.uid()`, with validated market/model/verdict inputs, max page size 100, cursor pagination, and server-side totals/hit-rate stats.
+- Added `moneyball_predictions_owner_market_created_idx` on `(owner_id, market, created_at DESC, id DESC)`, including model/verdict/settlement fields.
+- First query-plan comparison for the representative page read:
+  - Before composite index: 1,716.830 ms, 2,103 shared blocks.
+  - After composite index: 3.666 ms, 44 shared hits + 3 reads, index-only scan.
+- Initial full RPC plan materialized the shared CTE and spilled to temp blocks (270.183 ms). Replaced it with NOT MATERIALIZED CTEs and a bounded page CTE; latest full RPC EXPLAIN ANALYZE: 38.086 ms, 3,938 shared hits, zero temp reads/writes.
+- Authenticated functional test:
+  - Current 1X2 total 2,458; first and second pages each 50 rows; zero duplicate IDs.
+  - pending 1,122; selected verified won/settled 2/2.
+  - Current Double Chance 5,142; current Goals 8,312; all-version 1X2 3,324.
+- No prediction, match, coupon, bankroll, or result rows were modified by these tests.
+
+### Frontend changes in PR #63
+- New `fetchPredictionsPage` client calls the RPC with 50-row pages.
+- `PredictionsView` uses `useInfiniteQuery`; market/model/verdict/search filters are server-side; “Wczytaj kolejne 50” loads archive incrementally.
+- Hit rate and counts come from the full database scope, not the loaded page.
+- The three prediction routes no longer preload the full predictions table; they still preload matches and coupon legs needed by the UI.
+- Successful and failed mutations invalidate the new `prediction-pages` cache.
+- New migrations in repo:
+  - `20261116183000_moneyball_predictions_server_pagination.sql`
+  - `20261116183500_moneyball_predictions_page_composite_index.sql`
+  - `20261116184000_optimize_moneyball_predictions_page_ctes.sql`
+- PR: https://github.com/damianwalus3-jpg/moneyball-global/pull/63
+- CI is not triggered on pull_request by the current workflow configuration; production deploy runs only on push to main. Do not merge/deploy until code validation is complete. After merge, verify CI and Cloudflare deployment before calling the frontend fix live.
+
+### Remaining checks before release
+1. Validate TypeScript and production build for PR #63.
+2. Add/execute regression checks for page cursor ordering, verdict/search filters, current/all model scope, and full-scope hit-rate parity.
+3. Merge only after checks pass; confirm production deploy success.
+4. Measure authenticated navigation timings after deployment; public Worker root timings are not a substitute.
+5. Recheck all other full-history consumers (History, Results, Statistics, Matches, Coupons and scan deduplication) separately; this PR only fixes prediction screens.
