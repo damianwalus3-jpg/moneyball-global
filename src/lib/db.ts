@@ -90,10 +90,17 @@ export interface CouponFinancePeriod {
   net: number | null;
   incomplete: number;
 }
+export interface CouponFinanceTypePeriod extends CouponFinancePeriod {
+  won: number;
+  lost: number;
+  void: number;
+}
 export interface CouponFinanceSummary {
   day: CouponFinancePeriod;
   week: CouponFinancePeriod;
   month: CouponFinancePeriod;
+  all: CouponFinancePeriod;
+  by_type: Record<string, CouponFinanceTypePeriod>;
   history: CouponFinanceRow[];
 }
 export async function fetchCouponFinanceSummary(): Promise<CouponFinanceSummary> {
