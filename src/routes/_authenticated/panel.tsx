@@ -193,25 +193,49 @@ function Panel() {
                     <div className="rounded-lg border border-border bg-card/60 p-2"><p className="text-xs text-muted-foreground">Pewność modelu</p><p className="text-base font-bold">{prediction.confidence ?? "Nie zapisana"}</p></div>
                     <div className="rounded-lg border border-border bg-card/60 p-2"><p className="text-xs text-muted-foreground">Wynik meczu</p><p className="text-base font-bold">{score ?? (match.status === "finished" ? "Brak wyniku" : "Oczekuje")}</p></div>
                   </div>
-                  <div className="mt-3 rounded-lg border border-primary/25 bg-card/70 p-3">
-                    <p className="text-sm font-bold text-primary">Dlaczego model wybrał ten typ?</p>
+                  <div className="mt-3 rounded-lg border border-primary/35 bg-primary/5 p-3">
+                    <p className="text-sm font-bold text-primary">DLACZEGO MODEL WYBRAŁ TEN TYP?</p>
                     <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
-                      {prediction.rationale?.trim() || "Szczegółowe uzasadnienie nie zostało zapisane dla tego typu. Nie będziemy dopisywać powodów, których model nie zapisał."}
+                      {prediction.rationale?.trim() || "Model nie zapisał opisowego uzasadnienia. Poniżej pokazujemy wyłącznie kryteria i dane, które faktycznie zostały zapisane."}
                     </p>
-                  </div>
-                  {prediction.data_coverage && Object.keys(prediction.data_coverage).length > 0 && (
-                    <div className="mt-2 rounded-lg border border-border bg-card/50 p-3">
-                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Dane wykorzystane / dostępność danych</p>
-                      <div className="mt-2 grid gap-1.5">
-                        {Object.entries(prediction.data_coverage).slice(0, 8).map(([key, value]) => (
-                          <div key={key} className="flex items-start justify-between gap-3 text-xs">
-                            <span className="break-words text-muted-foreground">{key.replace(/_/g, " ")}</span>
-                            <span className="max-w-[60%] break-words text-right font-medium">{typeof value === "object" && value !== null ? JSON.stringify(value) : String(value)}</span>
-                          </div>
-                        ))}
+                    <div className="mt-3 border-t border-primary/20 pt-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-primary">Warunki zatwierdzenia typu</p>
+                      <div className="mt-2 grid gap-2 text-sm">
+                        <div className="flex items-center justify-between gap-3"><span>Prawdopodobieństwo powyżej 75%</span><strong className={Number(prediction.probability)>75?"text-success":"text-warning"}>{prediction.probability == null ? "Brak danych" : Number(prediction.probability).toFixed(1)+"%"}</strong></div>
+                        <div className="flex items-center justify-between gap-3"><span>Pokrycie danych modelu (min. 55%)</span><strong className={Number(prediction.confidence)>=55?"text-success":"text-warning"}>{prediction.confidence == null ? "Nie podano" : prediction.confidence+"%"}</strong></div>
+                        <div className="flex items-center justify-between gap-3"><span>Kurs dla wybranego rynku</span><strong className={prediction.odds && Number(prediction.odds)>1?"text-success":"text-warning"}>{fmtOdds(prediction.odds)}</strong></div>
+                        <div className="flex items-center justify-between gap-3"><span>Decyzja modelu</span><strong className="text-success">WYBRANY</strong></div>
                       </div>
                     </div>
-                  )}
+                  </div>
+                  {prediction.data_coverage && Object.keys(prediction.data_coverage).length > 0 && (() => {
+                    const data = prediction.data_coverage as Record<string, any>;
+                    const formLine = (form: any) => {
+                      if (!form) return "Brak potwierdzonej formy";
+                      const w = Number(form.w ?? 0), d = Number(form.d ?? 0), l = Number(form.l ?? 0);
+                      const matches = Number(form.matches ?? form.last10?.length ?? (w+d+l));
+                      const goals = form.goals_for != null && form.goals_against != null ? " · gole "+form.goals_for+":"+form.goals_against : "";
+                      return matches ? `${w}W · ${d}R · ${l}P z ${matches}${goals}` : "Dane formy bez bilansu W/R/P";
+                    };
+                    const rows: [string,string][] = [
+                      ["Źródło modelu", String(data.model_source ?? data.history_source ?? prediction.data_source ?? "Nie zapisano")],
+                      ["Źródło kursu", [data.odds_source, data.odds_bookmaker].filter(Boolean).join(" · ") || "Nie zapisano"],
+                      ["Ostatnie mecze gospodarzy", formLine(data.home_form)],
+                      ["Ostatnie mecze gości", formLine(data.away_form)],
+                      ["Liczba meczów w historii gospodarzy / gości", `${data.home_history_matches ?? data.home_form?.matches ?? "—"} / ${data.away_history_matches ?? data.away_form?.matches ?? "—"}`],
+                      ["xG wykorzystane w modelu", data.historical_xg_used ? "Tak" : "Nie — brak wymaganych świeżych danych"],
+                      ["Źródła xG", Array.isArray(data.historical_xg_sources) && data.historical_xg_sources.length ? data.historical_xg_sources.join(", ") : "Brak"],
+                      ["Rating Elo gospodarzy / gości", data.elo_used ? `${data.home_elo ?? "—"} / ${data.away_elo ?? "—"} (różnica ${data.elo_diff ?? "—"})` : "Nie wykorzystano"],
+                      ["Składy i kontuzje", data.squad_note ?? "Brak potwierdzonej informacji o składzie meczowym."],
+                      ["Kontuzje gospodarzy / gości", `${data.home_injuries_available ? (data.home_injury_count ?? "potwierdzone") : "brak danych"} / ${data.away_injuries_available ? (data.away_injury_count ?? "potwierdzone") : "brak danych"}`],
+                    ];
+                    return <div className="mt-2 rounded-lg border border-border bg-card/50 p-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Szczegóły analizy i dane źródłowe</p>
+                      <div className="mt-2 grid gap-2">
+                        {rows.map(([label,value]) => <div key={label} className="grid grid-cols-1 gap-0.5 border-b border-border/60 pb-2 last:border-0"><span className="text-xs text-muted-foreground">{label}</span><span className="break-words text-sm font-medium">{value}</span></div>)}
+                      </div>
+                    </div>;
+                  })()}
                 </article>
               );
             })}
