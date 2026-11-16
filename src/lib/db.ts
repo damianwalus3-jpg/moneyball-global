@@ -59,10 +59,42 @@ export function ownerColumn() {
   return OWNER_COLUMN;
 }
 
+let cachedCurrentUserId: string | null = null;
+let cachedCurrentUserExpiresAt = 0;
+let currentUserIdRequest: Promise<string> | null = null;
+let authListenerClient: ReturnType<typeof requireSupabase> | null = null;
+
 export async function currentUserId(): Promise<string> {
-  const { data, error } = await withRequestTimeout(requireSupabase().auth.getUser(), "Weryfikacja sesji", 8_000);
-  if (error || !data.user?.id) throw new Error("Sesja wygasła. Zaloguj się ponownie.");
-  return data.user.id;
+  const sb = requireSupabase();
+  // All table reads start together. Reuse one verified identity lookup instead
+  // of sending a separate auth.getUser() request for every table.
+  if (authListenerClient !== sb) {
+    authListenerClient = sb;
+    sb.auth.onAuthStateChange(() => {
+      cachedCurrentUserId = null;
+      cachedCurrentUserExpiresAt = 0;
+      currentUserIdRequest = null;
+      rawTableCache.clear();
+    });
+  }
+  if (cachedCurrentUserId && cachedCurrentUserExpiresAt > Date.now()) {
+    return cachedCurrentUserId;
+  }
+  if (currentUserIdRequest) return currentUserIdRequest;
+
+  const request = withRequestTimeout(sb.auth.getUser(), "Weryfikacja sesji", 8_000)
+    .then(({ data, error }) => {
+      if (error || !data.user?.id) throw new Error("Sesja wygasła. Zaloguj się ponownie.");
+      cachedCurrentUserId = data.user.id;
+      // Short cache only: session changes are also handled by onAuthStateChange.
+      cachedCurrentUserExpiresAt = Date.now() + 15_000;
+      return data.user.id;
+    })
+    .finally(() => {
+      if (currentUserIdRequest === request) currentUserIdRequest = null;
+    });
+  currentUserIdRequest = request;
+  return request;
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
