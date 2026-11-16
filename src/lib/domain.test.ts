@@ -107,6 +107,12 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("SCO", "Football League - Lowland League")).toBe(false);
     expect(isEuropeanTopTwoLeague("Türkiye", "2. Lig")).toBe(false);
     expect(isEuropeanTopTwoLeague("Türkiye", "1. Lig")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Bosnia", "Premijer Liga")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Bosnia", "1st League - FBiH")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Macedonia", "First League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Macedonia", "Second League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga 2")).toBe(true);
     expect(isEuropeanTopTwoLeague("TUR", "2. Lig")).toBe(false);
     expect(isEuropeanTopTwoLeague("DNK", "2. Division")).toBe(false);
     expect(isEuropeanTopTwoLeague("SWE", "Division 1")).toBe(false);
