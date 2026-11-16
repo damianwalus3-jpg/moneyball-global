@@ -83,7 +83,7 @@ export function resultsPagesQuery(filters: {
     initialPageParam: null as ResultsPageCursor | null,
     getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor ?? undefined : undefined,
     staleTime: 120_000,
-    gcTime: 60_000,
+    gcTime: 600_000,
     refetchInterval: (query) => (query.state.data?.pages.length ?? 0) > 1 ? false : 5 * 60_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: false,
