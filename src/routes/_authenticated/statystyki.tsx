@@ -3,7 +3,7 @@ import { BarChart3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
-import { couponPayout, groupHitRates, hitRate, isActivePredictionVersion, modelHitRate, type HitRate } from "@/lib/domain";
+import { couponPayout, groupHitRates, hitRate, isActivePredictionVersion, isEuropeanTopTwoLeague, modelHitRate, type HitRate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { ensureTables, useTable } from "@/lib/queries";
 import type { Market, Prediction } from "@/lib/types";
@@ -42,7 +42,22 @@ function Statystyki() {
   const preds = useTable("predictions");
   const coupons = useTable("coupons");
   const legs = useTable("coupon_legs");
-  const activePreds = preds.filter((prediction) => isActivePredictionVersion(prediction.model_version));
+  const scopedMatchIds = new Set(matches
+    .filter((match) => isEuropeanTopTwoLeague(match.country, match.competition ?? match.league))
+    .map((match) => match.id));
+  const activePreds = preds.filter((prediction) =>
+    isActivePredictionVersion(prediction.model_version) && scopedMatchIds.has(prediction.match_id),
+  );
+  const legsByCoupon = new Map<string, typeof legs>();
+  for (const leg of legs) {
+    const current = legsByCoupon.get(leg.coupon_id) ?? [];
+    current.push(leg);
+    legsByCoupon.set(leg.coupon_id, current);
+  }
+  const scopedCoupons = coupons.filter((coupon) => {
+    const couponLegRows = legsByCoupon.get(coupon.id) ?? [];
+    return couponLegRows.length > 0 && couponLegRows.every((leg) => scopedMatchIds.has(leg.match_id));
+  });
   const settledSinglePicks = activePreds.filter((p) => p.verdict === "WYBRANY" && p.verified && (p.settlement_status === "won" || p.settlement_status === "lost" || p.settlement_status === "void"));
   const singlePickProfitRows = settledSinglePicks.map((p) => {
     if (p.profit_loss != null && Number.isFinite(Number(p.profit_loss))) return Number(p.profit_loss);
@@ -61,10 +76,10 @@ function Statystyki() {
   const singleRoi = singleStakeSum > 0 && !singleProfitIncomplete ? Math.round((singlePickProfit / singleStakeSum) * 1000) / 10 : null;
   const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
 
-  const settledCoupons = coupons.filter((c) => c.status === "won" || c.status === "lost" || c.status === "void");
+  const settledCoupons = scopedCoupons.filter((c) => c.status === "won" || c.status === "lost" || c.status === "void");
   const staked = settledCoupons.filter((c) => c.stake != null);
   const stakeSum = staked.reduce((s, c) => s + Number(c.stake), 0);
-  const couponPayoutRows = staked.map((coupon) => couponPayout(coupon.stake, legs.filter((leg) => leg.coupon_id === coupon.id)));
+  const couponPayoutRows = staked.map((coupon) => couponPayout(coupon.stake, legsByCoupon.get(coupon.id) ?? []));
   const knownCouponPayouts = couponPayoutRows.filter((value): value is number => value != null);
   const couponPayoutIncomplete = knownCouponPayouts.length !== staked.length;
   const payoutSum = knownCouponPayouts.reduce((sum, value) => sum + value, 0);
