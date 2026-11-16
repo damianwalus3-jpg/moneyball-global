@@ -16,7 +16,7 @@ Polish-language football data and prediction tracking application. The app uses 
 - Separate 1X2 and Double Chance predictions
 - Three-leg coupon generation using only active-model or manual candidates above 75%
 - Result settlement and coupon settlement
-- Fixed €5 analytical stake for every selected single pick and generated coupon; the app does not place cash bets or use a bankroll ledger
+- Fixed €4 virtual analytical stake for every selected single pick and generated coupon; the app does not place real-money bets
 - Tracking of bookmaker odds, gross potential return and settled net profit/loss when the required data is available
 - CSV/JSON import, export and backup
 
