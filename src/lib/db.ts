@@ -348,6 +348,27 @@ export async function fetchPredictionsPage(args: {
   return data as PredictionPageResult;
 }
 
+/** Fetch only the match rows referenced by the currently visible prediction pages. */
+export async function fetchMatchesByIds(matchIds: string[]): Promise<TableRows["matches"][]> {
+  const ids = [...new Set(matchIds.filter(Boolean))];
+  if (ids.length === 0) return [];
+  const uid = await currentUserId();
+  const sb = requireSupabase();
+  const rows = await fetchInChunks<TableRows["matches"]>(ids, 100, async (chunk) => {
+    const { data, error } = await withRequestTimeout(
+      sb.from("matches").select(READ_COLUMNS.matches.join(",")).eq(OWNER_COLUMN, uid).in("id", chunk),
+      "Pobieranie meczów widocznych na stronie prognoz",
+    );
+    if (error) throw new Error(humanizeError(error, "matches"));
+    return (data ?? []) as unknown as TableRows["matches"][];
+  });
+  return rows.map((match) => ({
+    ...match,
+    competition: match.competition ?? match.league ?? null,
+    league: match.league ?? match.competition ?? null,
+  }));
+}
+
 export interface ResultsPageCursor {
   kickoff_at: string;
   id: string;
