@@ -198,6 +198,8 @@ function MarketBlock({ type, preds, leagueOf, matchOf }: { type: Market; preds: 
               <StatCard label="Log Loss ↓" value={row.logLoss == null ? "—" : row.logLoss.toFixed(3)} />
             </div>
             <p className="mt-2 text-xs text-muted-foreground">Prognoza {fmtPct(row.averageProbability == null ? null : row.averageProbability * 100)} · wynik {fmtPct(row.observedRate == null ? null : row.observedRate * 100)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Różnica kalibracji: {fmtPct(row.calibrationGap == null ? null : row.calibrationGap * 100)}</p>
+            <p className={`mt-1 text-xs font-medium ${row.sample < 30 ? "text-destructive" : row.sample < 100 ? "text-warning" : "text-muted-foreground"}`}>{row.sample < 30 ? "Próba bardzo mała — nie wyciągaj wniosków" : row.sample < 100 ? "Próba wstępna — wymaga dalszej obserwacji" : "Większa próba — nadal nie dowodzi przewagi nad rynkiem"}</p>
           </div>)}
         </div> : <p className="text-sm text-muted-foreground">Brak wystarczających, zweryfikowanych rozliczeń dla aktywnego modelu.</p>}
         <p className="mt-2 text-xs text-muted-foreground">
