@@ -1,13 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, RefreshCw, Search } from "lucide-react";
+import { CheckCircle2, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataError, EmptyState, PageHeader, PageLoader, SelectionBadge, SettlementBadge, TypeBadge } from "@/components/app/ui-bits";
 import { isActivePredictionVersion } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { ensureTables, useAction, useTable } from "@/lib/queries";
-import { brusselsDayKey, fmtDateTime, fmtTime } from "@/lib/time";
+import { brusselsDayKey, fmtTime } from "@/lib/time";
 import { getSupabase } from "@/lib/supabase";
 import type { Prediction } from "@/lib/types";
 
@@ -20,12 +20,6 @@ export const Route = createFileRoute("/_authenticated/wyniki")({
 });
 
 type Filter = "all" | "final" | "rejected" | "jackpot";
-function resultText(p: Prediction) {
-  if (p.settlement_status === "won") return "Trafiony";
-  if (p.settlement_status === "lost") return "Nietrafiony";
-  if (p.settlement_status === "void") return "Zwrot";
-  return "Oczekuje";
-}
 function profitFor(p: Prediction): number | null {
   if (p.profit_loss != null && Number.isFinite(Number(p.profit_loss))) return Number(p.profit_loss);
   const stake = Number(p.stake ?? 4);
