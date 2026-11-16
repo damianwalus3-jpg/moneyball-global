@@ -4,6 +4,7 @@ import {
   BarChart3,
   CalendarDays,
   History,
+  ListOrdered,
   LayoutDashboard,
   LogOut,
   MoreHorizontal,
@@ -28,6 +29,7 @@ type NavTo =
   | "/prognozy-gole"
   | "/kupony"
   | "/historia"
+  | "/wyniki"
   | "/statystyki"
   | "/ustawienia";
 
@@ -38,11 +40,12 @@ const NAV: { to: NavTo; label: string; short: string; icon: LucideIcon }[] = [
   { to: "/double-chance", label: "Double Chance", short: "DC", icon: ShieldHalf },
   { to: "/prognozy-gole", label: "Gole / BTTS", short: "Gole", icon: Target },
   { to: "/kupony", label: "Kupony", short: "Kupony", icon: Ticket },
+  { to: "/wyniki", label: "Wyniki", short: "Wyniki", icon: ListOrdered },
   { to: "/historia", label: "Historia / Rozliczenia", short: "Historia", icon: History },
   { to: "/statystyki", label: "Statystyki", short: "Statystyki", icon: BarChart3 },
   { to: "/ustawienia", label: "Ustawienia", short: "Ustawienia", icon: Settings },
 ];
-const MOBILE_MAIN: NavTo[] = ["/panel", "/mecze", "/prognozy-1x2", "/double-chance", "/kupony"];
+const MOBILE_MAIN: NavTo[] = ["/panel", "/mecze", "/wyniki", "/kupony", "/historia"];
 
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
