@@ -368,6 +368,7 @@ export function multiclass1X2Quality(
     const winners = (["1", "X", "2"] as const).filter((key) => bySelection.get(key)!.settlement_status === "won");
     if (winners.length !== 1) continue;
     const actual = winners[0];
+    if (!actual) continue;
     let matchBrier = 0;
     for (const key of ["1", "X", "2"] as const) {
       const p = Number(bySelection.get(key)!.probability) / 100;
