@@ -309,6 +309,62 @@ export async function fetchPredictionsPage(args: {
   return data as PredictionPageResult;
 }
 
+export interface ResultsPageCursor {
+  kickoff_at: string;
+  id: string;
+}
+
+export interface ResultsPageRow {
+  match: TableRows["matches"];
+  result: TableRows["match_results"] | null;
+  picks: TableRows["predictions"][];
+}
+
+export interface ResultsPageResult {
+  rows: ResultsPageRow[];
+  has_more: boolean;
+  next_cursor: ResultsPageCursor | null;
+  matches_count: number;
+  picks_count: number;
+  selected_picks: number;
+  verified: number;
+  needs_result: number;
+}
+
+/** Paginated results view: server filters the rolling window and returns only
+ * one page of matches with their active-model picks and aggregate counters. */
+export async function fetchResultsPage(args: {
+  filter: "all" | "final" | "rejected" | "jackpot";
+  search: string;
+  cursor: ResultsPageCursor | null;
+}): Promise<ResultsPageResult> {
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().rpc("moneyball_results_page", {
+      p_filter: args.filter,
+      p_search: args.search,
+      p_before_kickoff: args.cursor?.kickoff_at ?? null,
+      p_before_id: args.cursor?.id ?? null,
+      p_page_size: 30,
+    }),
+    "Pobieranie strony wyników",
+  );
+  if (error) throw new Error(humanizeError(error));
+  return data as ResultsPageResult;
+}
+
+/** Only predictions belonging to the match currently being settled. */
+export async function fetchPredictionsForMatch(matchId: string): Promise<TableRows["predictions"][]> {
+  if (!matchId) return [];
+  const uid = await currentUserId();
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().from("predictions").select(READ_COLUMNS.predictions.join(","))
+      .eq(OWNER_COLUMN, uid).eq("match_id", matchId).order("created_at", { ascending: true }),
+    "Pobieranie prognoz wybranego meczu",
+  );
+  if (error) throw new Error(humanizeError(error, "predictions"));
+  return (data ?? []) as unknown as TableRows["predictions"][];
+}
+
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const { data, error } = await withRequestTimeout(requireSupabase().rpc("moneyball_dashboard_summary"), "Pobieranie podsumowania panelu");
   if (error) throw new Error(humanizeError(error));

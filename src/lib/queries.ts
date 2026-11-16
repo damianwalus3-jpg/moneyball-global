@@ -1,6 +1,7 @@
-import { queryOptions, useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun, fetchCouponPageData, fetchMatchPageData } from "./db";
+import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun, fetchCouponPageData, fetchMatchPageData, fetchResultsPage } from "./db";
+import type { ResultsPageCursor } from "./db";
 import type { TableName, TableRows } from "./types";
 
 /** Small live summaries refresh frequently; large table reads use a slower cadence. */
@@ -65,6 +66,26 @@ export function tableQuery<K extends TableName>(table: K) {
     queryKey: ["table", table] as const,
     queryFn: () => fetchAll(table),
     ...refresh,
+  });
+}
+
+export function resultsPagesQuery(filters: {
+  filter: "all" | "final" | "rejected" | "jackpot";
+  search: string;
+}) {
+  return infiniteQueryOptions({
+    queryKey: ["results-pages", filters.filter, filters.search] as const,
+    queryFn: ({ pageParam }) => fetchResultsPage({
+      filter: filters.filter,
+      search: filters.search,
+      cursor: pageParam,
+    }),
+    initialPageParam: null as ResultsPageCursor | null,
+    getNextPageParam: (lastPage) => lastPage.has_more ? lastPage.next_cursor ?? undefined : undefined,
+    staleTime: 30_000,
+    gcTime: 600_000,
+    refetchInterval: 5 * 60_000,
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -156,13 +177,13 @@ export function useAction<TArgs, TResult = unknown>(
   return useMutation({
     mutationFn: fn,
     onSuccess: async (r) => {
-      await Promise.all([qc.invalidateQueries({ queryKey: ["table"] }), qc.resetQueries({ queryKey: ["prediction-pages"] }), qc.invalidateQueries({ queryKey: ["dashboard-summary"] }), qc.invalidateQueries({ queryKey: ["coupon-page-data"] }), qc.invalidateQueries({ queryKey: ["match-page-data"] })]);
+      await Promise.all([qc.invalidateQueries({ queryKey: ["table"] }), qc.resetQueries({ queryKey: ["prediction-pages"] }), qc.invalidateQueries({ queryKey: ["dashboard-summary"] }), qc.invalidateQueries({ queryKey: ["coupon-page-data"] }), qc.invalidateQueries({ queryKey: ["match-page-data"] }), qc.resetQueries({ queryKey: ["results-pages"] }), qc.invalidateQueries({ queryKey: ["match-predictions"] })]);
       const msg = typeof opts.success === "function" ? opts.success(r) : opts.success;
       if (msg) toast.success(msg);
       opts.onDone?.(r);
     },
     onError: async (e: Error) => {
-      await Promise.all([qc.invalidateQueries({ queryKey: ["table"] }), qc.resetQueries({ queryKey: ["prediction-pages"] }), qc.invalidateQueries({ queryKey: ["coupon-page-data"] })]);
+      await Promise.all([qc.invalidateQueries({ queryKey: ["table"] }), qc.resetQueries({ queryKey: ["prediction-pages"] }), qc.invalidateQueries({ queryKey: ["coupon-page-data"] }), qc.resetQueries({ queryKey: ["results-pages"] }), qc.invalidateQueries({ queryKey: ["match-predictions"] })]);
       toast.error(e.message);
     },
   });

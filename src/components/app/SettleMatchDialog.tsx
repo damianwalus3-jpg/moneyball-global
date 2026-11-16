@@ -1,11 +1,19 @@
+import { useQuery } from "@tanstack/react-query";
 import { ResultForm } from "@/components/forms/SimpleForms";
+import { fetchPredictionsForMatch } from "@/lib/db";
 import { useAction, useTable } from "@/lib/queries";
 import { settleMatch, type SettleMode } from "@/lib/settlement";
 import type { Match } from "@/lib/types";
 
 /** Enter / correct a match result and settle all predictions, legs and coupons for it. */
 export function SettleMatchDialog({ match, onClose }: { match: Match | null; onClose: () => void }) {
-  const predictions = useTable("predictions");
+  const predictionsQuery = useQuery({
+    queryKey: ["match-predictions", match?.id ?? null],
+    queryFn: () => match ? fetchPredictionsForMatch(match.id) : Promise.resolve([]),
+    enabled: Boolean(match?.id),
+    staleTime: 15_000,
+  });
+  const predictions = predictionsQuery.data ?? [];
   const legs = useTable("coupon_legs");
   const coupons = useTable("coupons");
   const results = useTable("match_results");
@@ -14,6 +22,7 @@ export function SettleMatchDialog({ match, onClose }: { match: Match | null; onC
   const settle = useAction(
     (mode: SettleMode) => {
       if (!match) throw new Error("Nie wybrano meczu.");
+      if (predictionsQuery.isPending || predictionsQuery.isError) throw new Error("Nie udało się bezpiecznie pobrać prognoz tego meczu. Odśwież okno i spróbuj ponownie.");
       return settleMatch({ match, existingResult: existing, predictions, legs, coupons }, mode);
     },
     {
@@ -28,7 +37,7 @@ export function SettleMatchDialog({ match, onClose }: { match: Match | null; onC
       onOpenChange={(o) => !o && onClose()}
       match={match}
       result={existing}
-      pending={settle.isPending}
+      pending={settle.isPending || predictionsQuery.isPending}
       onSave={(v) => settle.mutate(v)}
     />
   );
