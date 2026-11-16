@@ -633,3 +633,12 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Ręczne wywołanie scheduled prediction endpointu z aktualną wersją v234 zwróciło HTTP 200 i `skipped=true, reason=cooldown, next_scan_at=2026-11-17T07:00:00Z` (08:00 Europe/Brussels). Nie wymuszać skanu przed tym terminem.
 - Obecne dwa kwalifikujące się mecze Northern Ireland Championship mają prognozy 1X2, DOUBLE_CHANCE i GOALS; wszystkie 26 typów są ODRZUCONY, 0 WYBRANY. Nie ma podstaw do tworzenia kuponu.
 - Dla dzisiejszych niekwalifikujących się meczów wykryto 196 istniejących wierszy prognoz (France National 2, Scotland Lowland League, UEFA Nations League); wszystkie są ODRZUCONY/pending i nie mają żadnych coupon_legs. Zachować je bez kasowania; aktualne RPC i filtry scope mają je wykluczać z głównego widoku.
+
+
+## Potwierdzenie pełnego deployu frontendu Cloudflare — 2026-11-17
+- Dodano nieinwazyjny meta fingerprint do `src/routes/__root.tsx`: `league-scope-version=europe-top-two-2026-11-17-51case`, commit `67b907108fe49bf7eea09a58b1d83d6a126c5e90`. Znacznik umożliwia weryfikację konkretnego builda produkcyjnego bez dostępu do zalogowanego panelu.
+- GitHub Actions Cloudflare workflow run **#620**, ID `43980246198`, dla dokładnego commita `67b907108fe49bf7eea09a58b1d83d6a126c5e90`: **SUCCESS**. Kroki: install dependencies, Deno check wszystkich Edge Functions, Vitest, TypeScript, Cloudflare build i Deploy to Cloudflare Workers — wszystkie SUCCESS.
+- Produkcyjny Worker `https://moneyball-global.damianwalus3.workers.dev/?scope_check=europe-top-two-2026-11-17-51case`: HTTP 200; w odpowiedzi HTML znaleziono dokładny fingerprint `europe-top-two-2026-11-17-51case` (pozycja 691). To potwierdza, że nowy frontend faktycznie działa na produkcji.
+- Nie użyto ani nie przywrócono Vercel; właściwym workflow jest `.github/workflows/deploy-cloudflare.yml`.
+- Status prac: filtry i aliasy są wdrożone na produkcji; Supabase Edge Functions ACTIVE v81/v38/v234; produkcyjny cache ma 2 kwalifikujące się spotkania i 0 false-positive rows; SQL scope 51/51 PASS. Pełny dzienny prediction scan dla kolejnej partii pozostaje zgodny z cooldown do 08:00 Europe/Brussels.
+- Issue #76 pozostaje otwarte wyłącznie jako ciągły audit kompletności aliasów/katalogu FootyNomad; nie powtarzać już wdrożonych poprawek, migracji ani testów bez nowej regresji. Punkt startowy dalszej pracy: issue #76 i ten dziennik.
