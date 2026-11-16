@@ -10,7 +10,7 @@ import {
   groupHitRates,
   isCouponCandidate,
   modelHitRate,
-  probabilityQuality,
+  probabilityQuality,\n  probabilityQualityBySelection,
   isKickoffToday,
   isEuropeanTopTwoLeague,
   stakeBalances,
@@ -113,6 +113,21 @@ describe("probability quality", () => {
       { probability: 120, settlement_status: "won", verified: true },
     ] as never);
     expect(quality.sample).toBe(0);
+  });
+});
+
+describe("probability quality by selection", () => {
+  it("keeps selections separate so different markets are not pooled into one misleading score", () => {
+    const rows = [
+      { selection: "1X", probability: 80, settlement_status: "won", verified: true },
+      { selection: "1X", probability: 60, settlement_status: "lost", verified: true },
+      { selection: "X2", probability: 70, settlement_status: "won", verified: true },
+      { selection: "—", probability: 99, settlement_status: "won", verified: true },
+    ] as const;
+    const grouped = probabilityQualityBySelection(rows as never);
+    expect(grouped).toHaveLength(2);
+    expect(grouped.find((row) => row.selection === "1X")?.sample).toBe(2);
+    expect(grouped.find((row) => row.selection === "X2")?.sample).toBe(1);
   });
 });
 
