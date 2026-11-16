@@ -592,3 +592,41 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - The prediction screen page uses created_at/id cursor order; if later changing sort order to kickoff date, redesign the cursor and add duplicate/missing-row regression tests before shipping.
 - After each release, compare full-scope totals and hit rates against SQL, test first/next pages for duplicate IDs, and verify all three market filters.
 - Keep the authenticated menu-speed issue open until actual signed-in P50/P95 navigation measurements are available.
+
+
+## Next performance wave — Results and match settlement — 2026-11-16
+
+### Results screen root cause and implementation
+- The Results screen previously loaded all `matches`, `predictions` and `match_results`, then filtered to a rolling 96-hour window in the browser.
+- A DB count showed 1,035 fixtures and 6,624 predictions in that window, so merely applying a date filter after downloading all history was not enough.
+- Added owner-scoped `moneyball_results_page` SECURITY INVOKER RPC:
+  - filters rolling 72-hours-back / 24-hours-forward window in SQL;
+  - applies FINAL / rejected / JACKPOT and search filters on the server;
+  - returns 30 matches per page with only required match/result/pick fields;
+  - calculates total match/pick/selected/verified/missing-result counters over the complete filtered scope;
+  - stable cursor `(kickoff_at,id)`, capped at 50 rows;
+  - active model + MANUAL scope preserved.
+- SQL plan work found that serial correlated count subqueries caused high cost. Replaced them with a single active-predictions-per-match aggregate. Then reduced payload to only fields used by the Results UI.
+- Final function EXPLAIN ANALYZE: 71.369 ms; no temp spill. Earlier full-row JSON payload measured 3.36 s, which was rejected and replaced before frontend release.
+- Authenticated DB regression tests:
+  - first/second pages: 30 + 30 rows, zero duplicate match IDs;
+  - 972 filtered matches, 6,616 active predictions, 26 selected picks, 262 verified results at latest sample;
+  - FINAL=13 matches, rejected=972, JACKPOT=0, search Chernihiv=1;
+  - requested page size 100 is capped to 50.
+- Migrations applied:
+  - `20261116190000_moneyball_results_server_pagination.sql`
+  - `20261116190500_optimize_moneyball_results_page_aggregation.sql`
+  - `20261116191500_reduce_results_page_payload.sql`
+
+### Match settlement dialog
+- Removed its dependency on full `useTable("predictions")`.
+- Added owner-scoped `fetchPredictionsForMatch(matchId)`; only predictions belonging to the selected match are fetched.
+- Save is blocked with a clear error if that match's prediction query fails, avoiding an unsafe partial settlement.
+- Existing full coupon-leg, coupon and result inputs remain unchanged; no settlement rules, transactions, or history are altered.
+
+### Frontend release status
+- Branch: `perf/scoped-results-and-settlement`.
+- Results UI now uses `useInfiniteQuery`, with 30-match “load more” pages and server-side filters.
+- `useAction` resets result pages after result sync/settlement to refresh only the first page, instead of refetching every loaded page.
+- This wave still requires GitHub CI, TypeScript, production build and Cloudflare deployment before release.
+- History and Statistics still need their own safe full-history refactors; do not mark all menu screens optimized.
