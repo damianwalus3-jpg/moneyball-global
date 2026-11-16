@@ -19,9 +19,8 @@ describe("selectEspnLeagues", () => {
   });
 
   it("keeps women's competitions separate from men's leagues", () => {
-    expect(selectEspnLeagues([{ country: "England", league: "Women's Super League", gender: "women" }])).toEqual([
-      "eng.w.1", "eng.w.fa", "eng.w.league_cup", "eng.w.promotion.relegation",
-    ]);
+    expect(selectEspnLeagues([{ country: "England", league: "Women's Super League", gender: "women" }])).toEqual(["eng.w.1"]);
+    expect(selectEspnLeagues([{ country: "England", league: "Women's FA Cup", gender: "women" }])).toEqual(["eng.w.fa"]);
   });
 
   it("selects only the matching UEFA competition", () => {
