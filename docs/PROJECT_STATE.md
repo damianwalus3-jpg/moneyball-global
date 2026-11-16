@@ -462,3 +462,28 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 2. Compare before/after authenticated match and coupon page load timings across repeated visits. Do not claim the UI is faster solely because code now issues parallel requests.
 3. Continue removing full-table history reads from legacy screens, preserving all-history financial totals through existing summary RPCs and using scoped/cursor reads where appropriate.
 4. Continue monitoring results-sync cycle metrics and verify real match -> prediction -> coupon leg -> exactly-once €4 ledger settlement without synthetic scores.
+
+
+## Prediction-page loader waterfall and production verification — 2026-11-16
+
+- Follow-up audit found a concrete missing preload: `PredictionsView` calls `useTable("matches")`, `useTable("predictions")` and `useTable("coupon_legs")`, while the three route loaders (1X2, Double Chance, Goals) preloaded only matches and predictions. Because these are Suspense queries, the missing coupon-leg query could suspend after the first two reads. The route loaders now preload all three tables together through the existing `ensureTables()` Promise.all.
+- Changed files: `src/routes/_authenticated/prognozy-1x2.tsx`, `src/routes/_authenticated/double-chance.tsx`, `src/routes/_authenticated/prognozy-gole.tsx`. The latest combined code commit is `40fc4dba402c4c787276c6201cdc456d3f2fe76b`.
+- CI `#790` for SHA `40fc4db` succeeded (43 seconds). Cloudflare production deploy `#393` for the same SHA succeeded (1m 6s). Workflow run IDs: CI `43922433729`; deploy `43922433719`. All build/type-check/test/deploy steps shown in the jobs completed successfully.
+- The production Worker root was rechecked and returns the Moneyball Global 2.0 public shell with the fixed €4 analytical stake. The root is not an authenticated panel performance test.
+- The database contains 2,596 matches, 18,563 predictions, 877 match_results, 9 coupons, 22 coupon legs, 8 odds snapshots and 7 bankroll transactions at the time of inspection. No rows were modified by this audit.
+- Reviewed indexes on the principal tables. The predictions unique index `(owner_id, match_id, model_version, market, selection)` already has the `(owner_id, match_id)` prefix used by today's prediction reads. The matches table already has owner/kickoff indexes; coupon legs and odds snapshots have owner/prediction indexes. No speculative duplicate indexes were added. This follows Supabase's guidance to inspect query plans and avoid over-indexing.
+- Official technical references used:
+  - TanStack Query request waterfalls: https://tanstack.com/query/latest/docs/framework/react/guides/request-waterfalls
+  - TanStack Query parallel queries: https://tanstack.com/query/latest/docs/framework/react/guides/parallel-queries
+  - Cloudflare Workers metrics and request duration: https://developers.cloudflare.com/workers/observability/metrics-and-analytics/
+  - Cloudflare Workers Logs: https://developers.cloudflare.com/workers/observability/logs/workers-logs/
+  - Supabase query optimization/index advisor and over-indexing guidance: https://supabase.com/docs/guides/database/query-optimization
+- Latest results-sync measurement observed at 17:50:13 UTC was 13.510 seconds and HTTP 200. The recent 15-cycle sample ranges roughly 4.8–16.1 seconds, so the scheduled results sync remains operational but latency is variable; do not mark timeout prevention fully proven.
+- The two active €4 test coupons remain pending. MONEYBALL #1 has two live legs (Lithuania–Liechtenstein and Iceland–Luxembourg) and one scheduled leg (Gibraltar–Malta). MONEYBALL #2 has one scheduled leg (Greece–Serbia), one legacy ODRZUCONY leg (Switzerland–Scotland) retained unchanged for audit, and one won leg (Faroe Islands–Moldova 1:0). Each coupon still has exactly one €4 stake transaction and zero return transactions. Do not settle either coupon until all legs have verified final outcomes; do not rewrite the legacy rejected leg.
+- No authenticated panel navigation timing has been captured. It remains necessary to measure menu changes and first-load timings from a real signed-in session or Cloudflare/Browser telemetry; public root latency is not a substitute.
+
+### Next verification / optimization queue
+1. Collect repeated authenticated timings for Panel, 1X2, Double Chance, Goals, Matches, Coupons, History, Statistics and Bankroll, separating cold load from cached navigation.
+2. Consider paginated/history-specific reads for the 18,563-row predictions table only after preserving all-history filters and Brier/Log Loss calculations; do not simply truncate records.
+3. Monitor results-sync internal structured logs and real match settlements, including exactly-once bankroll returns.
+4. Keep route preloading and bounded parallel reads; do not add duplicate indexes without EXPLAIN/Index Advisor evidence.
