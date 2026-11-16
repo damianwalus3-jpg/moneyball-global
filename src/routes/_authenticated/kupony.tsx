@@ -10,14 +10,15 @@ import { EmptyState, Field, NoGuarantee, PageHeader, PageLoader, SettlementBadge
 import { cancelCoupon, saveCouponBatch } from "@/lib/coupons";
 import { buildCouponBatch, couponPayout, effectiveOdds, hasFreshConfirmedOdds, isActivePredictionVersion, isCouponCandidate, isKickoffToday, MARKET_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
-import { ensureTables, useAction, useTable } from "@/lib/queries";
+import { ensureTables, latestScanRunQuery, useAction, useTable } from "@/lib/queries";
+import { useQuery } from "@tanstack/react-query";
 import { fmtDateTime } from "@/lib/time";
 import type { Coupon, CouponStatus, CouponType, Prediction } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/kupony")({
   head: () => ({ meta: [{ title: "Kupony — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Generator kuponów z dzisiejszych meczów: 3 różne spotkania, prawdopodobieństwo powyżej 75%." }, { property: "og:title", content: "Kupony — MONEYBALL GLOBAL 2.0" }, { property: "og:description", content: "Generuj i zapisuj kupony z dzisiejszych meczów." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
   loader: ({ context }) =>
-    ensureTables(context.queryClient, ["matches", "predictions", "coupons", "coupon_legs", "scan_runs", "bankroll_transactions", "match_results"]),
+    Promise.all([ensureTables(context.queryClient, ["matches", "predictions", "coupons", "coupon_legs", "match_results"]), context.queryClient.ensureQueryData(latestScanRunQuery())]),
   pendingComponent: PageLoader,
   component: Kupony,
 });
@@ -40,7 +41,7 @@ function Kupony() {
   const coupons = useTable("coupons");
   const legs = useTable("coupon_legs");
   const results = useTable("match_results");
-  const scans = useTable("scan_runs");
+  const latestScanQuery = useQuery(latestScanRunQuery());
   const matchById = useMemo(() => new Map(matches.map((match) => [match.id, match])), [matches]);
   const predictionById = useMemo(() => new Map(predictions.map((prediction) => [prediction.id, prediction])), [predictions]);
   const resultByMatch = useMemo(() => new Map(results.map((result) => [result.match_id, result])), [results]);
@@ -85,7 +86,7 @@ function Kupony() {
     (batch: Prediction[][]) => saveCouponBatch(batch, {
       namePrefix: namePrefix.trim() || "MONEYBALL",
       couponType,
-      scanRunId: [...scans].sort((a, b) => b.started_at.localeCompare(a.started_at))[0]?.id ?? null,
+      scanRunId: latestScanQuery.data?.id ?? null,
       stake: stakeValue,
       targetLegs: 3,
       recordStake,
