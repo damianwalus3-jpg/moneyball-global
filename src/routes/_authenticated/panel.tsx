@@ -171,26 +171,48 @@ function Panel() {
                 : prediction.settlement_status === "lost" ? "PRZEGRANY"
                 : prediction.settlement_status === "void" ? "ZWROT" : "OCZEKUJE";
               return (
-                <div key={prediction.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-secondary/20 p-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-semibold">{match.home_team} – {match.away_team}</div>
-                    <div className="text-xs text-muted-foreground">{match.competition ?? match.league ?? "Liga Narodów"} · {match.kickoff_at ? new Date(match.kickoff_at).toLocaleString("pl-BE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : match.kickoff_date ?? "Termin nieznany"}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold">{market}: {prediction.selection}</div>
-                    <div className="text-xs text-muted-foreground">Prawdopodobieństwo: {prediction.probability == null ? "—" : `${Number(prediction.probability).toFixed(1)}%`} · Kurs: {fmtOdds(prediction.odds)}</div>
-                  </div>
-                  <div className="flex min-w-[86px] flex-col items-end gap-1">
-                    {score ? <span className="num text-base font-bold">{score}</span> : <span className="text-xs text-muted-foreground">{match.status === "finished" ? "Brak wyniku" : "Bez wyniku"}</span>}
+                <article key={prediction.id} className="rounded-xl border border-primary/25 bg-secondary/15 p-3 sm:p-4">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <Badge variant="success">TYP WYBRANY PRZEZ MODEL</Badge>
                     <Badge variant={settlement === "WYGRANY" ? "success" : settlement === "PRZEGRANY" ? "danger" : settlement === "ZWROT" ? "muted" : "warning"}>{settlement}</Badge>
                   </div>
-                  <div className="w-full border-t border-border pt-2">
-                    <p className="text-xs font-semibold text-primary">Dlaczego model wybrał ten typ?</p>
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                      {prediction.rationale?.trim() || "Model wskazał ten wariant na podstawie dostępnych danych przedmeczowych. Szczegółowe uzasadnienie nie zostało zapisane."}
+                  <h3 className="break-words text-base font-bold leading-snug">{match.home_team} – {match.away_team}</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">{match.competition ?? match.league ?? "Rozgrywki niepodane"} · {match.kickoff_at ? new Date(match.kickoff_at).toLocaleString("pl-BE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : match.kickoff_date ?? "Termin nieznany"}</p>
+                  <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-primary">Dokładnie wybrany typ</p>
+                    <p className="mt-1 text-xl font-extrabold">{market} · {prediction.selection}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {prediction.market === "1X2" ? (prediction.selection === "1" ? "Zwycięstwo gospodarzy" : prediction.selection === "X" ? "Remis" : "Zwycięstwo gości")
+                        : prediction.market === "DOUBLE_CHANCE" ? (prediction.selection === "1X" ? "Gospodarze wygrają lub będzie remis" : prediction.selection === "X2" ? "Remis lub zwycięstwo gości" : "Nie będzie remisu")
+                        : ({ BTTS_YES: "Obie drużyny strzelą gola", BTTS_NO: "Nie obie drużyny strzelą gola", OVER_1.5: "Powyżej 1,5 gola", UNDER_1.5: "Poniżej 1,5 gola", OVER_2.5: "Powyżej 2,5 gola", UNDER_2.5: "Poniżej 2,5 gola", OVER_3.5: "Powyżej 3,5 gola", UNDER_3.5: "Poniżej 3,5 gola" } as Record<string,string>)[prediction.selection] ?? prediction.selection}
                     </p>
                   </div>
-                </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <div className="rounded-lg border border-border bg-card/60 p-2"><p className="text-xs text-muted-foreground">Prawdopodobieństwo modelu</p><p className="num text-lg font-bold">{prediction.probability == null ? "—" : `${Number(prediction.probability).toFixed(1)}%`}</p></div>
+                    <div className="rounded-lg border border-border bg-card/60 p-2"><p className="text-xs text-muted-foreground">Kurs zapisany przy typie</p><p className="num text-lg font-bold">{fmtOdds(prediction.odds)}</p></div>
+                    <div className="rounded-lg border border-border bg-card/60 p-2"><p className="text-xs text-muted-foreground">Pewność modelu</p><p className="text-base font-bold">{prediction.confidence ?? "Nie zapisana"}</p></div>
+                    <div className="rounded-lg border border-border bg-card/60 p-2"><p className="text-xs text-muted-foreground">Wynik meczu</p><p className="text-base font-bold">{score ?? (match.status === "finished" ? "Brak wyniku" : "Oczekuje")}</p></div>
+                  </div>
+                  <div className="mt-3 rounded-lg border border-primary/25 bg-card/70 p-3">
+                    <p className="text-sm font-bold text-primary">Dlaczego model wybrał ten typ?</p>
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+                      {prediction.rationale?.trim() || "Szczegółowe uzasadnienie nie zostało zapisane dla tego typu. Nie będziemy dopisywać powodów, których model nie zapisał."}
+                    </p>
+                  </div>
+                  {prediction.data_coverage && Object.keys(prediction.data_coverage).length > 0 && (
+                    <div className="mt-2 rounded-lg border border-border bg-card/50 p-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Dane wykorzystane / dostępność danych</p>
+                      <div className="mt-2 grid gap-1.5">
+                        {Object.entries(prediction.data_coverage).slice(0, 8).map(([key, value]) => (
+                          <div key={key} className="flex items-start justify-between gap-3 text-xs">
+                            <span className="break-words text-muted-foreground">{key.replace(/_/g, " ")}</span>
+                            <span className="max-w-[60%] break-words text-right font-medium">{typeof value === "object" && value !== null ? JSON.stringify(value) : String(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </article>
               );
             })}
           </div>
