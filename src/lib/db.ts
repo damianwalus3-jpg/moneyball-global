@@ -308,8 +308,15 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
       fetchRawAll("predictions"),
     ]);
     const byId = new Map(predictions.map((prediction) => [prediction.id, prediction]));
+    // Group once instead of scanning every coupon leg for every coupon (O(n²)).
+    const legsByCoupon = new Map<string, typeof legs>();
+    for (const leg of legs) {
+      const group = legsByCoupon.get(leg.coupon_id);
+      if (group) group.push(leg);
+      else legsByCoupon.set(leg.coupon_id, [leg]);
+    }
     return coupons.map((coupon) => {
-      const couponLegs = legs.filter((leg) => leg.coupon_id === coupon.id);
+      const couponLegs = legsByCoupon.get(coupon.id) ?? [];
       const probabilities = couponLegs.map((leg) => byId.get(leg.prediction_id)?.probability ?? null);
       const prices = couponLegs.map((leg) => leg.odds ?? byId.get(leg.prediction_id)?.odds ?? null);
       const validProbability = probabilities.length === coupon.target_legs && probabilities.every((p) => p != null);
