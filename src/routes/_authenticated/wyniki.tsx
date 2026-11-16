@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { CheckCircle2, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,12 @@ function profitFor(p: Prediction): number | null {
 function Wyniki() {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
-  const pageQuery = useInfiniteQuery(resultsPagesQuery({ filter, search }));
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => window.clearTimeout(handle);
+  }, [search]);
+  const pageQuery = useInfiniteQuery(resultsPagesQuery({ filter, search: debouncedSearch }));
   const rows = pageQuery.data?.pages.flatMap((page) => page.rows) ?? [];
   const summary = pageQuery.data?.pages[0];
   const refresh = useAction(async () => {
