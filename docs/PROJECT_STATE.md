@@ -674,3 +674,17 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Authenticated read-only regression: 30+30 rows, 0 duplicate match IDs, 6,538 active predictions across 966 matches at sample time, 26 selected, 0 missing `note` keys. Counts vary with the rolling time window.
 - Existing two test coupons still have exactly three legs each; this check did not alter either coupon or any transaction.
 - This follow-up must pass a fresh CI run on its exact PR head. Do not merge if CI cannot be confirmed.
+
+
+## Statistics screen scoped prediction reads — 2026-11-16
+
+- Root cause: Statistics used `useTable("predictions")`, downloading all 18,563 predictions before filtering to active model/manual entries and top-two European domestic leagues.
+- Authenticated SQL baseline at implementation time: 2,596 matches, 18,563 predictions, 344 eligible top-two European matches, 1,141 active-model/manual predictions attached to those matches; 9 coupons and 22 coupon legs.
+- Added `fetchStatisticsPageData`:
+  - loads matches, coupons and coupon legs through the existing keyset-paginated `fetchAll` loader (important: direct PostgREST SELECT would silently cap at 1,000 rows);
+  - applies the exact existing `isEuropeanTopTwoLeague` function in the domain layer, avoiding a second, subtly different SQL copy of the league rules;
+  - requests predictions only for eligible match IDs and only active model 3.8 / MANUAL versions, in 100-match chunks with bounded parallel waves.
+- Statistics calculations and UI remain unchanged: selected/rejected/settled counts, 1X2/DC/Goals separation, Brier, Log Loss, calibration, multiclass 1X2, league/bucket hit rates, coupon ROI and incomplete-payout safeguards are still computed by the existing domain functions.
+- Route loader prefetches the scoped dataset; query cache is invalidated after mutations.
+- No DB migration or data writes required. This reduces prediction payload from 18,563 to about 1,141 rows (about 93.9% fewer) while preserving full active-model history for the supported league scope.
+- Branch: `perf/stats-scoped-predictions`. Await fresh CI before merge; production Cloudflare deploy only after successful checks.
