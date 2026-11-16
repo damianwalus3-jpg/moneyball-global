@@ -66,7 +66,7 @@ function FinanceDashboard({ finance, loading, error, retry }: {
           <div className="rounded-xl border border-border bg-secondary/25 p-3"><div className="text-xs text-muted-foreground">Zwrot brutto</div><div className="num mt-1 text-2xl font-bold">{fmtMoney(period.payout)}</div><div className="text-xs text-muted-foreground">Stawki: {fmtMoney(period.stake)}</div></div>
         </div>
         {period.incomplete>0 && <p className="mb-3 rounded-lg border border-warning/30 bg-warning/10 p-2 text-xs text-warning">Niepełne dane finansowe: {period.incomplete}. Wynik netto jest ukryty, aby nie zaniżać ani nie zawyżać symulacji.</p>}
-        <div className="mb-2 flex items-center justify-between"><h3 className="font-display font-bold">WYNIKI SEKCJI</h3><span className="text-xs text-muted-foreground">wszystkie rozliczone</span></div>
+        <div className="mb-2 flex items-center justify-between"><h3 className="font-display font-bold">WYNIKI SEKCJI · CAŁA HISTORIA</h3><span className="text-xs text-muted-foreground">wszystkie rozliczone</span></div>
         <div className="grid grid-cols-2 gap-2">
           {types.map(([key,value]) => <div key={key} className="rounded-lg border border-border bg-secondary/20 p-3">
             <div className="flex justify-between gap-2 text-sm font-semibold"><span>{typeLabels[key] ?? key}</span><span className="text-muted-foreground">{value.won}/{value.count} wygrane</span></div>
