@@ -336,7 +336,8 @@ export function probabilityQualityBySelection(
   return [...groups.entries()].map(([selection, rows]) => ({ selection, ...probabilityQuality(rows) }))
     .sort((a, b) => a.selection.localeCompare(b.selection));
 }
-\nexport interface HitRate {
+
+export interface HitRate {
   total: number;
   won: number;
   lost: number;
