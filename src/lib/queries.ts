@@ -220,7 +220,7 @@ export function useAction<TArgs, TResult = unknown>(
       opts.onDone?.(r);
     },
     onError: async (e: Error) => {
-      await Promise.all([qc.invalidateQueries({ queryKey: ["table"] }), qc.resetQueries({ queryKey: ["prediction-pages"] }), qc.invalidateQueries({ queryKey: ["coupon-page-data"] }), qc.resetQueries({ queryKey: ["results-pages"] }), qc.resetQueries({ queryKey: ["history-pages"] }), qc.invalidateQueries({ queryKey: ["match-predictions"] })]);
+      await Promise.all([qc.invalidateQueries({ queryKey: ["table"] }), qc.resetQueries({ queryKey: ["prediction-pages"] }), qc.invalidateQueries({ queryKey: ["coupon-page-data"] }), qc.resetQueries({ queryKey: ["results-pages"] }), qc.resetQueries({ queryKey: ["history-pages"] }), qc.invalidateQueries({ queryKey: ["match-predictions"] }), qc.invalidateQueries({ queryKey: ["match-settlement-context"] }), qc.invalidateQueries({ queryKey: ["statistics-page-data"] })]);
       toast.error(e.message);
     },
   });
