@@ -263,12 +263,12 @@ describe("coupon generator rules", () => {
     expect(isKickoffToday("2026-11-15T12:00:00Z", now)).toBe(false);
     expect(isKickoffToday(null, now)).toBe(false);
   });
-  it("records a 5 EUR stake per coupon and continues the existing balance", () => {
+  it("records a fixed 4 EUR stake per coupon and continues the existing balance", () => {
     const ledger = [
       { id: "t1", owner_id: "o", transaction_type: "deposit", amount: 100, balance_after: 100, coupon_id: null, occurred_at: "2026-11-01T10:00:00Z", note: null },
     ] as BankrollTransaction[];
-    expect(stakeBalances(ledger, 5, 2)).toEqual([95, 90]);
-    expect(stakeBalances([], 5, 1)).toEqual([-5]);
+    expect(stakeBalances(ledger, 4, 2)).toEqual([96, 92]);
+    expect(stakeBalances([], 4, 1)).toEqual([-4]);
   });
   it("builds coupons of 3 distinct matches with no reuse across coupons", () => {
     const batch = buildCouponBatch(
