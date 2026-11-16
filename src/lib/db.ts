@@ -192,11 +192,10 @@ const READ_COLUMNS: Record<TableName, readonly string[]> = {
   matches: [...COLUMNS.matches, "league", "kickoff_date"],
 };
 
-// Supabase's default PostgREST row cap is 1,000. Fetch at that ceiling and
-// fan out several pages together: large history tables previously needed
-// dozens of sequential 250-row requests, delaying route navigation.
+// Supabase's default PostgREST row cap is 1,000. Use keyset pagination
+// (id > lastId) rather than OFFSET: deep offsets on the 18k-row predictions
+// table were hitting PostgreSQL statement_timeout during navigation.
 const PAGE = 1_000;
-const MAX_PARALLEL_PAGES = 6;
 const RAW_CACHE_MS = 45_000;
 const inFlightTableReads = new Map<string, Promise<unknown>>();
 const rawTableCache = new Map<string, { expiresAt: number; rows: unknown[] }>();
@@ -205,30 +204,27 @@ async function fetchRawAllUncached<K extends TableName>(table: K, uid: string): 
   const sb = requireSupabase();
   const columns = READ_COLUMNS[table].join(",");
   const rows: TableRows[K][] = [];
-  // Read the first page alone: most operational tables fit in one page.
-  // Only fan out to parallel pages when the first page is full.
-  for (let firstPage = 0; ; ) {
-    const pageCount = firstPage === 0 ? 1 : MAX_PARALLEL_PAGES;
-    const batch = await Promise.all(
-      Array.from({ length: pageCount }, (_, offset) => {
-        const page = firstPage + offset;
-        return sb
-          .from(table)
-          .select(columns)
-          .eq(OWNER_COLUMN, uid)
-          .order("id", { ascending: true })
-          .range(page * PAGE, (page + 1) * PAGE - 1);
-      }),
-    );
-    let hasMore = true;
-    for (const result of batch) {
-      if (result.error) throw new Error(humanizeError(result.error, table));
-      const pageRows = (result.data ?? []) as unknown as TableRows[K][];
-      rows.push(...pageRows);
-      if (pageRows.length < PAGE) hasMore = false;
+  // Keyset pagination keeps each page index-backed even for deep history.
+  // The UUID id is unique and ordered, so no row is skipped or duplicated.
+  let lastId: string | null = null;
+  for (;;) {
+    let query = sb
+      .from(table)
+      .select(columns)
+      .eq(OWNER_COLUMN, uid)
+      .order("id", { ascending: true })
+      .limit(PAGE);
+    if (lastId) query = query.gt("id", lastId);
+    const result = await query;
+    if (result.error) throw new Error(humanizeError(result.error, table));
+    const pageRows = (result.data ?? []) as unknown as TableRows[K][];
+    rows.push(...pageRows);
+    if (pageRows.length < PAGE) break;
+    const nextId = (pageRows[pageRows.length - 1] as { id?: unknown })?.id;
+    if (typeof nextId !== "string" || nextId === lastId) {
+      throw new Error("Nie udało się bezpiecznie stronicować tabeli " + table + " po identyfikatorze.");
     }
-    if (!hasMore) break;
-    firstPage += pageCount;
+    lastId = nextId;
   }
   return rows;
 }
