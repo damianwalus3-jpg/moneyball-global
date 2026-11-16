@@ -373,3 +373,41 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - The product is not abandoned: database, Worker shell, FootyNomad refresh and result-sync scheduling are responding.
 - It is not production-ready as a betting workflow: current odds feed is empty, prediction scheduling is paused, and settlement writes were not observed in the latest result-sync run.
 - Next engineering work: (1) restore a bounded non-overlapping prediction batch scheduler, (2) audit result matching and verify at least one real finished match through prediction/coupon settlement, (3) activate a properly authorized odds feed, (4) unblock CI/build and confirm deployment, (5) authenticated E2E performance test.
+
+
+## Professional production audit — 2026-11-16 (follow-up)
+
+### Fresh database checks
+- Current Brussels-day canonical fixture count: 34.
+- Current Brussels-day prediction rows: 296; 186 have no numeric odds.
+- Fresh mapped, unsuspended prematch provider quotes (captured within six hours): 0.
+- All 864 rows in `match_results` have verified=true and both scores populated.
+- All 864 matches with status=finished have a corresponding match_results row.
+- There are 9 coupons total: 5 settled and 2 pending (the remaining 2 have other statuses).
+- There are 6 pending coupon legs.
+- 9,860 predictions across the database currently have settlement_status=pending. This is not, by itself, proof of a settlement bug: a separate check found zero pending predictions attached to matches currently marked finished, and zero pending predictions joined to verified result rows. Most pending predictions may belong to future/scheduled fixtures. Must break this down by match status and date before bulk reconciliation; do not bulk-settle blindly.
+- Match statuses in the whole database: scheduled 1,439; finished 864; live 156; unknown 118; postponed 19.
+- Result-source observations: FootyNomad 664 (latest 2026-11-15 22:51 UTC); ESPN 155 (latest 2026-11-16 14:10 UTC); TheSportsDB 17 (latest 14:10 UTC); OpenMatchday 13 (latest 2026-11-14 16:50 UTC). Secondary sources are therefore reaching the result-observation table.
+
+### Scheduler diagnosis
+- Active cron job 1 runs `moneyball-free-feed` at minutes 1,16,31,46 (every 15 minutes).
+- Active cron job 2 runs `moneyball-results-sync?days=1` every 5 minutes.
+- Odds cron job 10 is inactive.
+- Prediction cron job 11 is inactive. Its old schedule was every minute and its request used a growing offset derived from elapsed minutes since 08:00, with batch_size=10. This is not a safe resumable queue: offset-based pagination can skip/repeat rows when the eligible fixture set changes, and the one-minute schedule was previously paused to prevent overlapping heavy requests. Do not simply reactivate it.
+- Database has one active auth user, so current data is primarily scoped to one owner.
+
+### Code-level findings
+- `moneyball-results-sync` reads current-day FootyNomad fixtures and a set of alternate results providers. It first maps FootyNomad IDs, then uses exact normalized team order and a guarded date/time fallback. It deliberately refuses to settle ambiguous men's/women's duplicates and flags conflicting scores rather than guessing.
+- The settlement routine writes a verified match result, marks the match finished, settles supported prediction markets, updates linked coupon legs and coupon status, and reconciles the coupon financial ledger. Unsupported market selections are skipped rather than force-settled.
+- The production function currently has no demonstrated full end-to-end proof in this audit that a real newly-finished fixture progresses through source match -> verified result -> prediction -> coupon leg -> coupon financial ledger. Existing database totals show verified historical result rows, but that is not the same as a fresh live settlement test.
+- `moneyball-predict` is active (version 210) and JWT-protected. It creates 1X2 and Double Chance records, plus independent Poisson goal-market rows. It stores selected prediction stake as €4.00. Its output explicitly marks missing odds/data as rejected and does not auto-create coupons. This function is expensive: it performs multiple external form/history lookups and batches DB writes. It needs a bounded, idempotent scheduler with a lock/lease and stable cursor before regular automation resumes.
+- The function's generated 1X2/DC and GOALS rows are not evidence of calibrated probabilities or profitable performance. A historical backtest and calibration report are still required before any claim about hit rate/ROI.
+
+### Current go/no-go
+- Infrastructure: partial pass (database healthy; feed/result jobs scheduled; result observations and verified historical results exist).
+- Prediction automation: fail/not active (cron paused; no safe replacement deployed).
+- Bookmaker odds: fail/not active (zero fresh mapped prematch quotes; MoviOdds credential absent; odds cron disabled).
+- Settlement: partial pass (historical verified results exist and no currently-finished match has pending predictions in the quick integrity checks; a fresh end-to-end settlement proof is still missing).
+- Coupon accounting: partial pass (coupon records and settled states exist; 6 legs remain pending; full ledger audit and fresh controlled coupon settlement proof still required).
+- Performance/build/deployment: not certified in this pass. Previous Vercel build-rate-limit remains a deployment blocker; protected authenticated screens were not tested.
+- Decision: continue the project, but keep it in simulation/test mode. Do not enable real-money coupon eligibility or reactivate the old prediction cron. The next implementation must add an idempotent leased prediction queue, and the next test must exercise one real finished fixture through the entire result/settlement/ledger chain without fabricating scores. Odds remain a separate external credential/coverage dependency.
