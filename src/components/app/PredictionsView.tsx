@@ -42,6 +42,19 @@ function coverageLabel(coverage?: Record<string, unknown> | null) {
   ].join(" · ");
 }
 
+function oddsFreshnessLabel(coverage?: Record<string, unknown> | null) {
+  if (!coverage?.["odds_source"]) return "kurs: brak potwierdzonego źródła";
+  const source = String(coverage["odds_source"]);
+  const bookmaker = coverage["odds_bookmaker"] ? " / " + String(coverage["odds_bookmaker"]) : "";
+  const capturedAt = coverage["odds_captured_at"] ? String(coverage["odds_captured_at"]) : "";
+  if (!capturedAt) return `kurs ${source}${bookmaker} · brak czasu pobrania`;
+  const stamp = Date.parse(capturedAt);
+  if (!Number.isFinite(stamp)) return `kurs ${source}${bookmaker} · nieznana aktualność`;
+  const ageHours = (Date.now() - stamp) / 3_600_000;
+  const freshness = ageHours < 0 ? "czas nieprawidłowy" : ageHours > 6 ? "NIEAKTUALNY (>6 h)" : "aktualny (≤6 h)";
+  return `kurs ${source}${bookmaker} · ${new Date(stamp).toLocaleString("pl-BE", { timeZone: "Europe/Brussels" })} · ${freshness}`;
+}
+
 export function PredictionsView({ market }: { market: Market }) {
   const matches = useTable("matches");
   const all = useTable("predictions");
@@ -149,7 +162,8 @@ export function PredictionsView({ market }: { market: Market }) {
                   <div className="text-xs text-muted-foreground">
                     {match?.competition ?? match?.league ?? "—"} · {match?.kickoff_at ? fmtDateTime(match.kickoff_at) : match?.kickoff_date ? match.kickoff_date + " · godzina nieznana" : "brak daty"}
                   </div>
-                  <div className="break-words text-xs text-muted-foreground">Dane: {coverageLabel(prediction.data_coverage)}{prediction.data_coverage?.["odds_source"] ? ` · kurs ${String(prediction.data_coverage["odds_source"])}${prediction.data_coverage["odds_bookmaker"] ? " / " + String(prediction.data_coverage["odds_bookmaker"]) : ""}` : prediction.data_source ? ` · kurs/źródło rynkowe ${sourceLabel(prediction.data_source)}` : ""}</div>
+                  <div className="break-words text-xs text-muted-foreground">Dane modelu: {coverageLabel(prediction.data_coverage)}</div>
+                  <div className="break-words text-xs text-muted-foreground">{oddsFreshnessLabel(prediction.data_coverage)}</div>
                   {fairOdds && <div className="text-xs text-muted-foreground">Kurs fair dla typu: {fmtOdds(fairSelectionOdds)} · 1/X/2: {fmtOdds(fairOdds.home)} / {fmtOdds(fairOdds.draw)} / {fmtOdds(fairOdds.away)} · <a href="https://tipsaudit.com" target="_blank" rel="noreferrer" className="underline">Data: TipsAudit</a> (bez marży, nie jest ofertą bukmachera)</div>}
                   {prediction.probability == null && <div className="text-xs text-warning">Brak wystarczających potwierdzonych danych — prawdopodobieństwo nie zostało wygenerowane.</div>}
                   {prediction.rationale && <div className="text-xs text-muted-foreground">Uzasadnienie: {prediction.rationale}</div>}
