@@ -49,16 +49,20 @@ function coverageLabel(coverage?: Record<string, unknown> | null, dataSource?: s
 }
 
 function oddsFreshnessLabel(coverage?: Record<string, unknown> | null) {
-  if (!coverage?.["odds_source"]) return "kurs: brak potwierdzonego źródła";
-  const source = String(coverage["odds_source"]);
-  const bookmaker = coverage["odds_bookmaker"] ? " / " + String(coverage["odds_bookmaker"]) : "";
-  const capturedAt = coverage["odds_captured_at"] ? String(coverage["odds_captured_at"]) : "";
-  if (!capturedAt) return `kurs ${source}${bookmaker} · brak czasu pobrania`;
-  const stamp = Date.parse(capturedAt);
-  if (!Number.isFinite(stamp)) return `kurs ${source}${bookmaker} · nieznana aktualność`;
-  const ageHours = (Date.now() - stamp) / 3_600_000;
-  const freshness = ageHours < 0 ? "czas nieprawidłowy" : ageHours > 6 ? "NIEAKTUALNY (>6 h)" : "aktualny (≤6 h)";
-  return `kurs ${source}${bookmaker} · ${new Date(stamp).toLocaleString("pl-BE", { timeZone: "Europe/Brussels" })} · ${freshness}`;
+  const status = String(coverage?.["odds_status"] ?? "");
+  const source = coverage?.["odds_source"] ? String(coverage["odds_source"]) : "";
+  const bookmaker = coverage?.["odds_bookmaker"] ? " / " + String(coverage["odds_bookmaker"]) : "";
+  const capturedAt = coverage?.["odds_captured_at"] ? String(coverage["odds_captured_at"]) : "";
+  const stamp = capturedAt ? Date.parse(capturedAt) : NaN;
+  const ageHours = Number.isFinite(stamp) ? (Date.now() - stamp) / 3_600_000 : Number.POSITIVE_INFINITY;
+  if (status === "SUSPENDED") return `kurs zawieszony${source ? " · " + source + bookmaker : ""}`;
+  if (status === "STALE" || (Number.isFinite(ageHours) && (ageHours < 0 || ageHours > 6))) {
+    return `kurs nieaktualny${source ? " · " + source + bookmaker : ""}${Number.isFinite(stamp) ? " · " + new Date(stamp).toLocaleString("pl-BE", { timeZone: "Europe/Brussels" }) : ""}`;
+  }
+  if (status === "MISSING" || (!source && !status)) return "kurs: brak potwierdzonego źródła";
+  if (!source || !Number.isFinite(stamp)) return "kurs: brak potwierdzonego czasu pobrania";
+  if (ageHours < 0) return `kurs ${source}${bookmaker} · nieprawidłowy czas źródła`;
+  return `kurs potwierdzony ${source}${bookmaker} · ${new Date(stamp).toLocaleString("pl-BE", { timeZone: "Europe/Brussels" })} · aktualny (≤6 h)`;
 }
 
 export function PredictionsView({ market }: { market: Market }) {
