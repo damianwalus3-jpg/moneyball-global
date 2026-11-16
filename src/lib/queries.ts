@@ -5,7 +5,7 @@ import type { TableName } from "./types";
 
 /** Read-only refresh: results are synced by the backend, the browser only re-reads them. */
 export const LIVE_REFRESH = {
-  staleTime: 15_000,
+  staleTime: 60_000,
   gcTime: 600_000,
   refetchInterval: 120_000,
   refetchIntervalInBackground: false,
