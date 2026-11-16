@@ -166,6 +166,15 @@ export function isEuropeanTopTwoLeague(country: string | null | undefined, compe
   const c = normalize(String(country ?? ""));
   const league = normalize(String(competition ?? ""));
   if (!league) return false;
+  // Country-specific third-tier labels that otherwise match generic aliases.
+  if ((c === "scotland" && /\\b(lowland league|highland league)\\b/.test(league))
+    || (c === "turkey" && /\\b2 lig\\b/.test(league))
+    || (["denmark", "norway", "belarus"].includes(c) && /\\b2 division\\b/.test(league))
+    || (c === "sweden" && /\\bdivision [12]\\b/.test(league))
+    || (c === "albania" && /\\b2nd division\\b/.test(league))
+    || (c === "croatia" && /\\bsecond nl\\b/.test(league))
+    || (c === "estonia" && /\\besiliiga b\\b/.test(league))
+    || (c === "greece" && /\\bfootball league\\b/.test(league))) return false;
   if (/\bserie c\b|\blega pro\b|\bserie c1\b|\bserie c2\b/.test(league)) return false;
   if (/\bleague one\b|\bleague two\b|\bleague three\b/.test(league)) return false;
   if (!EUROPEAN_COUNTRIES.has(c)) return false;
