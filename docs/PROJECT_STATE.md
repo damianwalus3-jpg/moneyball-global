@@ -661,3 +661,16 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Paginated query polling stops when more than one page is loaded, avoiding sequentially refetching every page; focus/reconnect refetch is disabled for this large list. This follows TanStack Query guidance that infinite-query refetches fetch stored pages sequentially and that limiting refetches reduces network work: https://tanstack.com/query/latest/docs/framework/react/guides/infinite-queries
 - Still requires CI, TypeScript/build, merge and Cloudflare deploy validation.
 - Statistics remains the last major full-history consumer and needs a separate aggregate/detail design; do not mark all screens optimized yet.
+
+
+## Settlement-context follow-up on current main — 2026-11-16
+
+- Main now contains the previously separate History pagination work and the Results pagination implementation. This follow-up branch is based on the current main SHA `95d0359d55bdc5794c0fb9ee31aed1b920f620a4`; it does not replace or revert the History work.
+- Results page first-page preloading added to the route loader and server search debounced by 250 ms. Existing results page cache remains at 10 minutes.
+- SettleMatchDialog still had three whole-table reads (`coupon_legs`, `coupons`, `match_results`) even after the History change had scoped predictions to one match.
+- Added `fetchMatchSettlementContext`: query predictions and latest result for one match; discover affected coupons through those prediction IDs; then load **all legs** for those coupons and only the affected coupon rows. This is essential because coupon status and combined odds must use all three legs, not only the current fixture.
+- `useAction` invalidates `match-settlement-context` after mutations.
+- The live `moneyball_results_page` function now also includes the required `note` key in each prediction JSON object. Added migration `20261116195000_moneyball_results_page_include_prediction_note.sql` to keep the repository schema history aligned with the live DB.
+- Authenticated read-only regression: 30+30 rows, 0 duplicate match IDs, 6,538 active predictions across 966 matches at sample time, 26 selected, 0 missing `note` keys. Counts vary with the rolling time window.
+- Existing two test coupons still have exactly three legs each; this check did not alter either coupon or any transaction.
+- This follow-up must pass a fresh CI run on its exact PR head. Do not merge if CI cannot be confirmed.

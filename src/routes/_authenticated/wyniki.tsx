@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { CheckCircle2, RefreshCw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { getSupabase } from "@/lib/supabase";
 import type { Prediction } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/wyniki")({
+  loader: ({ context }) => context.queryClient.ensureInfiniteQueryData(resultsPagesQuery({ filter: "all", search: "" })),
   head: () => ({ meta: [{ title: "Wyniki · MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Chronologiczna historia wyników meczów i rozliczeń typów." }] }),
   pendingComponent: PageLoader,
   errorComponent: DataError,
@@ -31,7 +32,12 @@ function profitFor(p: Prediction): number | null {
 function Wyniki() {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
-  const pageQuery = useInfiniteQuery(resultsPagesQuery({ filter, search }));
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => window.clearTimeout(handle);
+  }, [search]);
+  const pageQuery = useInfiniteQuery(resultsPagesQuery({ filter, search: debouncedSearch }));
   const rows = pageQuery.data?.pages.flatMap((page) => page.rows) ?? [];
   const summary = pageQuery.data?.pages[0];
   const refresh = useAction(async () => {
