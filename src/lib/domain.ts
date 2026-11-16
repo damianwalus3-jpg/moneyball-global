@@ -175,6 +175,18 @@ export function isEuropeanTopTwoLeague(country: string | null | undefined, compe
   return /\b(?:premier league|premiership|championship|super league 2|super league|superliga|super lig|pro league|jupiler pro league|challenger pro league|bundesliga|austrian 2 liga|2 liga|ligue 1|ligue 2|serie a|serie b|la liga|laliga|primera division|segunda division|segunda liga|segunda divisao|liga portugal 2|liga portugal|eredivisie|eerste divisie|keuken kampioen divisie|primeira liga|ekstraklasa|i liga|1 lig|2 lig|1 liga|2 liga|liga i|liga ii|liga 1|liga 2|liga e pare|prva liga|first league|second league|fnl|first division|second division|division 1|division 2|div 1|div 2|1st division|2nd division|1st league|2nd league|a lyga|i lyga|virsliga|meistriliiga|esiliiga|veikkausliiga|ykkosliiga|allsvenskan|superettan|eliteserien|obos ligaen|1 divisjon|premier division|league of ireland premier|league of ireland first|scottish championship|challenge league|tff first league|national football league|football league|nb i|nb ii|nemzeti bajnoksag i|nemzeti bajnoksag ii|kategoria superiore|kategoria e pare|premyer liqa|i liqa|1 deild|cymru premier|cymru north|cymru south|erovnuli liga 2|first nl|prva nl|2 snl|first professional football league|second professional football league|bulgarian second league|first division a|first division b|1 division|2 division|divizia nationala|divizia a)\b/.test(league);
 }
 
+/** True only for senior men's first/second-tier fixtures, excluding reserve/B teams. */
+export function isEligibleEuropeanMatch(match: Pick<Match, "country" | "competition" | "league" | "gender" | "home_team" | "away_team">): boolean {
+  if (!isEuropeanTopTwoLeague(match.country, match.competition ?? match.league)) return false;
+  if (match.gender && match.gender !== "men") return false;
+  const isReserve = (value: string | null | undefined) => {
+    const team = String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    return /\\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico)\\b/.test(team)
+      || /(^| )(ii|iii|b)$/.test(team);
+  };
+  return !isReserve(match.home_team) && !isReserve(match.away_team);
+}
+
 export function isFinishedStatus(status: string | null | undefined) {
   return status === "finished" || status === "cancelled" || status === "postponed";
 }
