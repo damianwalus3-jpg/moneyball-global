@@ -711,3 +711,14 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Supabase PostgreSQL log audit for 10:07–19:30 UTC found 23 PostgREST statement-timeout events involving the old unscoped `predictions` keyset scans, between 12:13:49 and 12:36:27 UTC. These all predate the current 18:43 UTC production deploy; no later PostgREST prediction timeout was observed in the queried window.
 - Results-sync function version 68 continued returning HTTP 200 every 5 minutes. Recent execution times between 18:50 and 19:15 UTC ranged 4.859–9.496 seconds; earlier 17:55 UTC peak was 20.238 seconds. No 5xx response was observed in the queried logs. Latency remains variable, so timeout elimination is not claimed.
 - Next: monitor logs after this deployment for recurrence of prediction timeouts and obtain a real authenticated Statistics / Results / History / menu timing measurement. Public root latency is not a substitute for authenticated measurements.
+
+
+## CSV scan import deduplication — 2026-11-16
+
+- Remaining code search found `src/lib/scan-import-service.ts` still calling `fetchAll("predictions")` during every CSV scan import just to detect duplicates.
+- Replaced that full-history read with `fetchExistingPredictionKeysForMatches`: it receives only match IDs present in the import, deduplicates IDs, reads only the four identity columns (`match_id, model_version, market, selection`), scopes by the current owner, and batches 100 match IDs per request using the existing bounded chunk loader.
+- Duplicate identity semantics are unchanged: same match + model version + market + selection is skipped; different model versions remain distinct; existing predictions are never overwritten.
+- New predictions are still inserted in the existing 500-row batches; match reuse and scan-run status handling are unchanged.
+- No existing data, coupon, bankroll or transaction rows were modified.
+- This removes the last known explicit `fetchAll("predictions")` call from the CSV import service; still review all code paths and measure authenticated UI.
+- Await exact-head CI before merge/deploy.
