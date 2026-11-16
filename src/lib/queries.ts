@@ -1,13 +1,13 @@
 import { queryOptions, useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary } from "./db";
+import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary } from "./db";
 import type { TableName } from "./types";
 
 /** Read-only refresh: results are synced by the backend, the browser only re-reads them. */
 export const LIVE_REFRESH = {
   staleTime: 15_000,
   gcTime: 600_000,
-  refetchInterval: 30_000,
+  refetchInterval: 120_000,
   refetchIntervalInBackground: false,
   refetchOnWindowFocus: true,
 } as const;
@@ -21,7 +21,7 @@ export function tableQuery<K extends TableName>(table: K) {
 }
 
 
-export function dashboardSummaryQuery() {
+export function couponFinanceQuery() {\n  return queryOptions({\n    queryKey: ["coupon-finance-summary"] as const,\n    queryFn: fetchCouponFinanceSummary,\n    retry: false,\n    staleTime: 60_000,\n    gcTime: 600_000,\n    refetchInterval: 60_000,\n    refetchIntervalInBackground: false,\n    refetchOnWindowFocus: true,\n  });\n}\n\nexport function dashboardSummaryQuery() {
   return queryOptions({
     queryKey: ["dashboard-summary"] as const,
     queryFn: fetchDashboardSummary,
