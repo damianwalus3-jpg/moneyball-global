@@ -204,28 +204,48 @@ async function fetchRawAllUncached<K extends TableName>(table: K, uid: string): 
   const sb = requireSupabase();
   const columns = READ_COLUMNS[table].join(",");
   const rows: TableRows[K][] = [];
-  // Keyset pagination keeps each page index-backed even for deep history.
-  // The UUID id is unique and ordered, so no row is skipped or duplicated.
-  let lastId: string | null = null;
-  for (;;) {
-    let query = sb
-      .from(table)
-      .select(columns)
-      .eq(OWNER_COLUMN, uid)
-      .order("id", { ascending: true })
-      .limit(PAGE);
-    if (lastId) query = query.gt("id", lastId);
-    const result = await query;
-    if (result.error) throw new Error(humanizeError(result.error, table));
-    const pageRows = (result.data ?? []) as unknown as TableRows[K][];
-    rows.push(...pageRows);
-    if (pageRows.length < PAGE) break;
-    const nextId = (pageRows[pageRows.length - 1] as { id?: unknown })?.id;
-    if (typeof nextId !== "string" || nextId === lastId) {
-      throw new Error("Nie udało się bezpiecznie stronicować tabeli " + table + " po identyfikatorze.");
+  // Large operational tables are split into four disjoint UUID ranges.
+  // Each range uses keyset pagination, so requests can run concurrently without
+  // expensive OFFSET scans or skipped/duplicated rows.
+  const ranges: { lower: string; upper?: string }[] =
+    table === "predictions" || table === "matches"
+      ? [
+          { lower: "00000000-0000-0000-0000-000000000000", upper: "40000000-0000-0000-0000-000000000000" },
+          { lower: "40000000-0000-0000-0000-000000000000", upper: "80000000-0000-0000-0000-000000000000" },
+          { lower: "80000000-0000-0000-0000-000000000000", upper: "c0000000-0000-0000-0000-000000000000" },
+          { lower: "c0000000-0000-0000-0000-000000000000" },
+        ]
+      : [{ lower: "00000000-0000-0000-0000-000000000000" }];
+
+  const readRange = async (range: { lower: string; upper?: string }) => {
+    const rangeRows: TableRows[K][] = [];
+    let lastId: string | null = null;
+    for (;;) {
+      let query = sb
+        .from(table)
+        .select(columns)
+        .eq(OWNER_COLUMN, uid)
+        .gte("id", range.lower)
+        .order("id", { ascending: true })
+        .limit(PAGE);
+      if (range.upper) query = query.lt("id", range.upper);
+      if (lastId) query = query.gt("id", lastId);
+      const result = await query;
+      if (result.error) throw new Error(humanizeError(result.error, table));
+      const pageRows = (result.data ?? []) as unknown as TableRows[K][];
+      rangeRows.push(...pageRows);
+      if (pageRows.length < PAGE) break;
+      const nextId = (pageRows[pageRows.length - 1] as { id?: unknown })?.id;
+      if (typeof nextId !== "string" || nextId === lastId) {
+        throw new Error("Nie udało się bezpiecznie stronicować tabeli " + table + " po identyfikatorze.");
+      }
+      lastId = nextId;
     }
-    lastId = nextId;
-  }
+    return rangeRows;
+  };
+  const partitions = await Promise.all(ranges.map(readRange));
+  for (const partition of partitions) rows.push(...partition);
+  rows.sort((a, b) => String((a as { id: string }).id).localeCompare(String((b as { id: string }).id)));
   return rows;
 }
 
