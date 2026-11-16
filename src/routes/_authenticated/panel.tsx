@@ -3,10 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, ChevronRight, ScanLine, Ticket, Trophy, type LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { fmtOdds } from "@/lib/format";
-import { dashboardSelectedPicksQuery, dashboardSummaryQuery } from "@/lib/queries";
+import { fmtMoney, fmtOdds } from "@/lib/format";
+import { couponFinanceQuery, dashboardSelectedPicksQuery, dashboardSummaryQuery } from "@/lib/queries";
 import { EmptyState, NoGuarantee, PageHeader, StatCard } from "@/components/app/ui-bits";
 import { fmtPct } from "@/lib/format";
+import { fmtDateTime } from "@/lib/time";
 
 export const Route = createFileRoute("/_authenticated/panel")({
   head: () => ({ meta: [{ title: "Panel — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Podsumowanie prognoz, kuponów i bankrolla." }, { property: "og:title", content: "Panel — MONEYBALL" }, { property: "og:description", content: "Podsumowanie prognoz." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -39,6 +40,7 @@ function Panel() {
   // Dashboard sections load independently: a slow summary RPC must not hide the whole panel.
   const summaryQuery = useQuery(dashboardSummaryQuery());
   const selectedQuery = useQuery(dashboardSelectedPicksQuery());
+  const financeQuery = useQuery(couponFinanceQuery());
   const summary = summaryQuery.data ?? { matches_today: 0, bankroll: null, coupons_in_play: 0, candidates: 0, to_settle: 0, hit_rates: { "1X2": { won: 0, settled: 0, rate: null }, DOUBLE_CHANCE: { won: 0, settled: 0, rate: null }, GOALS: { won: 0, settled: 0, rate: null } } };
   const selectedRows = selectedQuery.data ?? [];
   const selectedPicks = selectedRows.map((row) => ({
@@ -91,6 +93,64 @@ function Panel() {
           <Button className="mt-2" size="sm" variant="outline" onClick={() => void summaryQuery.refetch()}>Ponów statystyki</Button>
         </div>
       )}
+      <section className="mb-5 rounded-xl border border-border bg-card p-3 sm:p-4">
+        <div className="mb-3">
+          <h2 className="font-display text-lg font-bold uppercase">Wynik finansowy kuponów</h2>
+          <p className="text-xs text-muted-foreground">Rzeczywiste rozliczenia · stawki i zwroty · czas Europe/Brussels</p>
+        </div>
+        {financeQuery.isLoading ? (
+          <p className="rounded-lg bg-secondary/30 p-3 text-sm text-muted-foreground">Ładowanie historii finansowej…</p>
+        ) : financeQuery.isError ? (
+          <div className="rounded-lg bg-secondary/30 p-3 text-sm">
+            <p className="text-destructive">Nie udało się pobrać wyniku finansowego kuponów.</p>
+            <Button className="mt-2" size="sm" variant="outline" onClick={() => void financeQuery.refetch()}>Ponów</Button>
+          </div>
+        ) : financeQuery.data ? (
+          <>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {([
+                ["Dzisiaj", financeQuery.data.day],
+                ["Ten tydzień", financeQuery.data.week],
+                ["Ten miesiąc", financeQuery.data.month],
+              ] as const).map(([label, period]) => (
+                <div key={label} className="rounded-lg border border-border bg-secondary/20 p-3">
+                  <div className="text-xs font-semibold uppercase text-muted-foreground">{label}</div>
+                  <div className={`num mt-1 text-xl font-bold ${period.net == null ? "" : period.net > 0 ? "text-success" : period.net < 0 ? "text-destructive" : ""}`}>
+                    {period.net == null ? "—" : (period.net > 0 ? "+" : "") + fmtMoney(period.net)}
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">{period.count} rozliczonych · stawki {fmtMoney(period.stake)}</div>
+                  <div className="text-xs text-muted-foreground">Zwroty {fmtMoney(period.payout)}</div>
+                  {period.incomplete > 0 && <div className="mt-1 text-xs text-amber-500">Brak danych finansowych: {period.incomplete}</div>}
+                </div>
+              ))}
+            </div>
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-bold uppercase">Ostatnio rozliczone kupony</h3>
+                <Link to="/kupony" className="text-xs font-semibold text-primary">Pełna historia <ChevronRight className="inline size-3" /></Link>
+              </div>
+              {financeQuery.data.history.length ? (
+                <div className="grid gap-2">
+                  {financeQuery.data.history.slice(0, 8).map((coupon) => (
+                    <div key={coupon.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{coupon.name}</div>
+                        <div className="text-xs text-muted-foreground">{fmtDateTime(coupon.settled_at)} · {coupon.status === "won" ? "Wygrany" : coupon.status === "lost" ? "Przegrany" : "Zwrot"}</div>
+                      </div>
+                      <div className="text-right text-xs text-muted-foreground">Stawka {coupon.stake == null ? "—" : fmtMoney(coupon.stake)}</div>
+                      <div className={`num min-w-20 text-right font-semibold ${coupon.net == null ? "" : coupon.net > 0 ? "text-success" : coupon.net < 0 ? "text-destructive" : ""}`}>
+                        {coupon.net == null ? "brak danych" : (coupon.net > 0 ? "+" : "") + fmtMoney(coupon.net)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-lg bg-secondary/30 p-3 text-sm text-muted-foreground">Historia pojawi się po pierwszym rozliczeniu kuponu.</p>
+              )}
+            </div>
+          </>
+        ) : null}
+      </section>
       <section className="mb-5 rounded-xl border border-primary/25 bg-card p-3 sm:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
