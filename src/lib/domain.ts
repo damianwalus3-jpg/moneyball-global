@@ -175,7 +175,7 @@ export function isEuropeanTopTwoLeague(country: string | null | undefined, compe
 /** Deduplicate the same fixture imported under different provider IDs. Prefer FootyNomad, then the most recently updated row. */
 export function dedupeEuropeanMatches(matches: Match[]): Match[] {
   const normalize = (value: string | null | undefined) =>
-    String(value ?? "").normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+    String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "");
   const keyOf = (match: Match) => [
     match.kickoff_at ? brusselsDayKey(match.kickoff_at) : match.kickoff_date ?? "",
     normalize(match.home_team),
