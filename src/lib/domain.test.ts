@@ -82,6 +82,30 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Dasta")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "1. Division")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "2. Division")).toBe(true);
+    // Country-specific third-tier labels must not pass broad generic aliases.
+    expect(isEuropeanTopTwoLeague("Scotland", "Football League - Lowland League")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Scotland", "Football League - Highland League")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Turkey", "2. Lig")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Denmark", "2. Division")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Norway", "2. Division - Group 1")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Sweden", "Division 1")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Sweden", "Division 2 - Norra Götaland")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Belarus", "2. Division")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Albania", "2nd Division - Group A")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Croatia", "Second NL")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Estonia", "Esiliiga B")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Greece", "Football League")).toBe(false);
+    // The actual tier-two names in those countries remain eligible.
+    expect(isEuropeanTopTwoLeague("Scotland", "Championship")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Turkey", "1. Lig")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Denmark", "1. Division")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Norway", "1. Division")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Sweden", "Superettan")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Belarus", "1. Division")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Albania", "1st Division")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Croatia", "First NL")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Estonia", "Esiliiga A")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Greece", "Super League 2")).toBe(true);
     expect(isEuropeanTopTwoLeague("Ukraine", "Druha Liga")).toBe(false);
     expect(isEuropeanTopTwoLeague("Italy", "Serie C - Girone B")).toBe(false);
     expect(isEuropeanTopTwoLeague("England", "Premier League Cup")).toBe(false);
