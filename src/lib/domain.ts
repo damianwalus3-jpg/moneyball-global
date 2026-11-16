@@ -166,9 +166,6 @@ export function isEuropeanTopTwoLeague(country: string | null | undefined, compe
   const c = normalize(String(country ?? ""));
   const league = normalize(String(competition ?? ""));
   if (!league) return false;
-  // UEFA Nations League is a European national-team competition, not a domestic league tier.
-  // FootyNomad labels its country as "World", so allow this exact competition explicitly.
-  if (/^uefa nations league.*$/.test(league)) return true;
   if (!EUROPEAN_COUNTRIES.has(c)) return false;
   if (/\b(premier league 2|pl2|professional development league|u(?:17|18|19|20|21|23)|under ?(?:17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend|reserves?|b team|cup|copa|trophy|play-?offs?|women|woman|female|frauen|damen|feminine|femminile|femenina|ladies|girls)\b/.test(league)) return false;
   if (/\bdruha liga\b|\b(3|4|5|6|7|8|9|iii|iv|v|vi)\s*\.?\s*(liga|league|division|div|bundesliga|serie|snl|hnl|federal|federation)\b|\b(third|fourth|fifth|regional|regionalliga|oberliga|national league north|national league south|non league|non-league)\b/.test(league)) return false;
