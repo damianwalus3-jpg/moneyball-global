@@ -688,3 +688,17 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Route loader prefetches the scoped dataset; query cache is invalidated after mutations.
 - No DB migration or data writes required. This reduces prediction payload from 18,563 to about 1,141 rows (about 93.9% fewer) while preserving full active-model history for the supported league scope.
 - Branch: `perf/stats-scoped-predictions`. Await fresh CI before merge; production Cloudflare deploy only after successful checks.
+
+
+## Statistics scoped-prediction read — 2026-11-16
+
+- Root cause: `Statystyki` previously loaded the complete `predictions` table (18,563 rows) and then discarded historical model versions and predictions outside European domestic first/second-tier leagues in the browser.
+- Authenticated baseline: 2,596 matches, 18,563 predictions, 344 eligible top-two European matches, 1,141 active-model/manual predictions attached to those matches; 9 coupons and 22 coupon legs.
+- Added `fetchStatisticsPageData`:
+  - loads matches, coupons and coupon legs through the existing keyset-paginated `fetchAll` loader (important: direct PostgREST SELECT would silently cap at 1,000 rows);
+  - applies the exact existing `isEuropeanTopTwoLeague` function in the domain layer, avoiding a second, subtly different SQL copy of the league rules;
+  - requests predictions only for eligible match IDs and only active model 3.8 / MANUAL versions, in 100-match chunks with bounded parallel waves.
+- Statistics calculations and UI remain unchanged: selected/rejected/settled counts, 1X2/DC/Goals separation, Brier, Log Loss, calibration, multiclass 1X2, league/bucket hit rates, coupon ROI and incomplete-payout safeguards are still computed by the existing domain functions.
+- Route loader prefetches the scoped dataset; query cache is invalidated after mutations.
+- This change reduces prediction rows requested from 18,563 to 1,141 (about 93.9% fewer) at the baseline snapshot; it does not reduce or delete historical data.
+- Must pass fresh CI for the exact PR head before merge/deploy. The authenticated page itself still requires a real logged-in UI speed measurement after deployment.
