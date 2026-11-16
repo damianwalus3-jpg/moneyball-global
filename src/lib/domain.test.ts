@@ -17,6 +17,7 @@ import {
   probabilityQualityBySelection,
   isKickoffToday,
   isEuropeanTopTwoLeague,
+  isEligibleEuropeanMatch,
   stakeBalances,
   settlePick,
   settleGoalsPick,
@@ -81,6 +82,12 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("World", "UEFA Nations League")).toBe(true);
     expect(isEuropeanTopTwoLeague("World", "UEFA Nations League - League B")).toBe(true);
     expect(isEuropeanTopTwoLeague("World", "UEFA U21 Championship - Qualification")).toBe(false);
+    const eligibleBase = { country: "Ukraine", competition: "Persha Liga", league: null, gender: "men" as const, home_team: "UCSA", away_team: "Polissya" };
+    expect(isEligibleEuropeanMatch(eligibleBase)).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya II" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya B" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: "women" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, competition: "Serie C" })).toBe(false);
     expect(isEuropeanTopTwoLeague("Austria", "Austrian 2. Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Netherlands", "Eerste Divisie")).toBe(true);
     expect(isEuropeanTopTwoLeague("Turkey", "TFF First League")).toBe(true);
