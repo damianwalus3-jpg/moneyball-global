@@ -181,11 +181,11 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
         verified: true,
         stake: Number(prediction.stake ?? 4),
         potential_return: prediction.odds != null && Number(prediction.odds) > 1
-          ? Math.round(Number(prediction.stake ?? 5) * Number(prediction.odds) * 100) / 100
+          ? Math.round(Number(prediction.stake ?? 4) * Number(prediction.odds) * 100) / 100
           : null,
         profit_loss: status === "won" && prediction.odds != null && Number(prediction.odds) > 1
-          ? Math.round(Number(prediction.stake ?? 5) * (Number(prediction.odds) - 1) * 100) / 100
-          : status === "lost" ? -Number(prediction.stake ?? 5)
+          ? Math.round(Number(prediction.stake ?? 4) * (Number(prediction.odds) - 1) * 100) / 100
+          : status === "lost" ? -Number(prediction.stake ?? 4)
           : status === "void" ? 0
           : null,
       });
