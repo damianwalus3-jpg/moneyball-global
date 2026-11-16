@@ -462,3 +462,7 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Zastosowano produkcyjną migrację `20261116222413_add_north_macedonia_2_mfl_alias`; test SQL rozszerzony do 24/24 PASS.
 - Edge Functions wdrożone po tej poprawce: footynomad-sync v74, moneyball-free-feed v31, moneyball-predict v228 — ACTIVE.
 - Źródła do porównania nazw poziomów: Stat-Football, OpenFootball leagues, FBref domestic second-tier list oraz UEFA competition landscape. Lista aliasów jest mapowaniem nazw używanych przez źródła, a nie dowodem, że każdy kraj ma w FootyNomad mecze każdego dnia.
+## Deduplication of same fixture under different FootyNomad IDs — 2026-11-16
+- Audyt aktualnej bazy wykrył duplikat tego samego meczu Kosovo Liga E Pare: `Trepça Mitrovicë – 2 Korriku`, ten sam kickoff, ale external_id `1572681-trep-a-mitrovic-vs-2-korriku` i `1572681`. Oba rekordy mają historię prognoz (12 i 13), więc nie wolno ich kasować ani scalać bez audytu referencji.
+- Produkcyjny RPC prediction scan już deduplikuje fixture po dniu Brussels + znormalizowanych nazwach home/away + gender, wybierając rekord FootyNomad z najnowszym updated_at. Dodano analogiczne deduplikowanie na ekranie Mecze, aby nie pokazywać tego samego meczu dwa razy; wybór preferuje FootyNomad, następnie najnowszy rekord. Dane źródłowe i predykcje pozostają zachowane.
+- Dodano test regresyjny, który potwierdza, że dwa ID jednego meczu są wyświetlane jako jeden rekord i wybierany jest rekord kanoniczny/nowszy. Wymagane: CI + Cloudflare deploy po tym commicie.
