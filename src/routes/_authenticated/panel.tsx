@@ -103,7 +103,7 @@ function Panel() {
     const sb = getSupabase();
     if (!sb) { setScanError("Brak połączenia z Supabase. Zaloguj się ponownie."); return; }
     setScanRunning(true); setScanError(""); setScanSummary(null);
-    const date = brusselsDayKey();
+    const date = brusselsDayKey(new Date());
     let offset = 0, batches = 0, matches = 0, predictions = 0, selected = 0;
     try {
       while (batches < 100) {
