@@ -46,8 +46,8 @@ function Kupony() {
 
   const [couponCount, setCouponCount] = useState("2");
   const [couponSize, setCouponSize] = useState<1 | 3>(3);
-  const [stake, setStake] = useState("5");
-  const [recordStake, setRecordStake] = useState(true);
+  const [stake, setStake] = useState("4");
+  const recordStake = true;
   const [couponType, setCouponType] = useState<CouponType>("TEST");
   const [namePrefix, setNamePrefix] = useState("MONEYBALL");
   const [excludeActive, setExcludeActive] = useState(true);
@@ -192,7 +192,7 @@ function Kupony() {
             Pomiń mecze z aktywnych kuponów
           </label>
           <label className="flex items-center gap-2">
-            <Checkbox checked={recordStake} onCheckedChange={(value) => setRecordStake(value === true)} />
+            <Checkbox checked={recordStake} disabled />
             Zapisz stawkę każdego kuponu w bankrollu
           </label>
 
@@ -279,6 +279,7 @@ function Kupony() {
           {list.map((coupon) => {
             const couponLegs = legs.filter((leg) => leg.coupon_id === coupon.id);
             const payout = couponPayout(coupon.stake, couponLegs);
+            const net = payout == null || coupon.stake == null ? null : Math.round((payout - Number(coupon.stake)) * 100) / 100;
             return (
               <div key={coupon.id} className="surface-card p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -309,10 +310,11 @@ function Kupony() {
                     <p className="text-xs text-amber-300">Brak potwierdzonych kursów — kupon służy do testowania skuteczności, nie jest potwierdzonym kuponem bukmacherskim.</p>
                   )}
                 </div>
-                <div className="num mt-3 grid grid-cols-3 gap-2 border-t border-border pt-3 text-sm">
+                <div className="num mt-3 grid grid-cols-4 gap-2 border-t border-border pt-3 text-sm">
                   <div><div className="eyebrow">Stawka</div>{fmtMoney(coupon.stake)}</div>
                   <div><div className="eyebrow">Kurs</div>{fmtOdds(coupon.combined_odds)}</div>
-                  <div><div className="eyebrow">Zwrot</div>{fmtMoney(payout)}</div>
+                  <div><div className="eyebrow">Zwrot brutto</div>{fmtMoney(payout)}</div>
+                <div><div className="eyebrow">Zysk / strata</div><span className={net == null ? "" : net > 0 ? "text-success" : net < 0 ? "text-destructive" : ""}>{fmtMoney(net)}</span></div>
                 </div>
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
                   {coupon.status === "pending" && (
