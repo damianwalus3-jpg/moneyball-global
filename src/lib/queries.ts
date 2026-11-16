@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun, fetchCouponPageData, fetchMatchPageData, fetchResultsPage, fetchHistoryPage } from "./db";
+import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun, fetchCouponPageData, fetchMatchPageData, fetchResultsPage, fetchHistoryPage, fetchStatisticsPageData } from "./db";
 import type { HistoryPageCursor, ResultsPageCursor } from "./db";
 import type { TableName, TableRows } from "./types";
 
@@ -67,6 +67,21 @@ export function tableQuery<K extends TableName>(table: K) {
     queryFn: () => fetchAll(table),
     ...refresh,
   });
+}
+
+export function statisticsPageDataQuery() {
+  return queryOptions({
+    queryKey: ["statistics-page-data"] as const,
+    queryFn: fetchStatisticsPageData,
+    retry: false,
+    staleTime: 60_000,
+    gcTime: 600_000,
+    refetchInterval: false,
+  });
+}
+
+export function useStatisticsPageData() {
+  return useSuspenseQuery(statisticsPageDataQuery()).data;
 }
 
 export function historyPagesQuery(filters: {
@@ -199,7 +214,7 @@ export function useAction<TArgs, TResult = unknown>(
   return useMutation({
     mutationFn: fn,
     onSuccess: async (r) => {
-      await Promise.all([qc.invalidateQueries({ queryKey: ["table"] }), qc.resetQueries({ queryKey: ["prediction-pages"] }), qc.invalidateQueries({ queryKey: ["dashboard-summary"] }), qc.invalidateQueries({ queryKey: ["coupon-page-data"] }), qc.invalidateQueries({ queryKey: ["match-page-data"] }), qc.resetQueries({ queryKey: ["results-pages"] }), qc.resetQueries({ queryKey: ["history-pages"] }), qc.invalidateQueries({ queryKey: ["match-predictions"] }), qc.invalidateQueries({ queryKey: ["match-settlement-context"] })]);
+      await Promise.all([qc.invalidateQueries({ queryKey: ["table"] }), qc.resetQueries({ queryKey: ["prediction-pages"] }), qc.invalidateQueries({ queryKey: ["dashboard-summary"] }), qc.invalidateQueries({ queryKey: ["coupon-page-data"] }), qc.invalidateQueries({ queryKey: ["match-page-data"] }), qc.resetQueries({ queryKey: ["results-pages"] }), qc.resetQueries({ queryKey: ["history-pages"] }), qc.invalidateQueries({ queryKey: ["match-predictions"] }), qc.invalidateQueries({ queryKey: ["match-settlement-context"] }), qc.invalidateQueries({ queryKey: ["statistics-page-data"] })]);
       const msg = typeof opts.success === "function" ? opts.success(r) : opts.success;
       if (msg) toast.success(msg);
       opts.onDone?.(r);
