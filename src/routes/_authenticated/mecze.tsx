@@ -639,12 +639,12 @@ function Mecze() {
                           return details.length ? (
                             <div className="grid gap-3 md:grid-cols-2">
                               {details.map((p) => (
-                                <div key={p.id} className="rounded-lg border border-border p-3">
+                                <div key={p.id} className="rounded-xl border border-border bg-card p-3 sm:p-4">
                                   <div className="flex flex-wrap items-center justify-between gap-2">
                                     <span className="font-semibold">{p.market === "DOUBLE_CHANCE" ? "Double Chance" : p.market === "GOALS" ? "Gole / BTTS" : "1X2"} · {p.selection}</span>
                                     <Badge variant={p.verdict === "WYBRANY" ? "success" : "muted"}>{p.verdict}</Badge>
                                   </div>
-                                  <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                                  <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg bg-secondary/25 p-3 text-sm">
                                     <div><div className="text-xs text-muted-foreground">Prawdopodobieństwo</div><strong>{p.probability == null ? "Brak" : Number(p.probability).toFixed(1) + "%"}</strong></div>
                                     <div><div className="text-xs text-muted-foreground">Kurs wybranego typu</div><strong>{fmtOdds(p.odds)}{p.odds != null && asObject(p.data_coverage)["odds_bookmaker"] ? ` · ${String(asObject(p.data_coverage)["odds_bookmaker"])}` : ""}</strong></div>
                                     <div><div className="text-xs text-muted-foreground">Pewność</div><strong>{p.confidence ?? "—"}</strong></div>
@@ -722,13 +722,13 @@ function Mecze() {
                                     const rejected = p.verdict === "ODRZUCONY";
                                     return (
                                       <div className="mt-3 grid gap-3">
-                                        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-                                          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-primary">{rejected ? "Dlaczego typ odrzucono" : "Dlaczego taka prognoza? · w skrócie"}</div>
-                                          <p className="text-sm leading-relaxed">{reason}</p>
+                                        <div className={rejected ? "rounded-xl border border-amber-500/25 bg-amber-500/5 p-4" : "rounded-xl border border-emerald-500/25 bg-emerald-500/5 p-4"}>
+                                          <div className={rejected ? "mb-2 text-sm font-bold uppercase tracking-wide text-amber-500" : "mb-2 text-sm font-bold uppercase tracking-wide text-emerald-500"}>{rejected ? "Dlaczego typ odrzucono?" : "Dlaczego model wybrał ten typ?"}</div>
+                                          <p className="text-sm leading-relaxed sm:text-base">{reason}</p>
                                           {rejected && p.rejection_reason && (
-                                            <div className="mt-2 rounded-md border border-amber-500/25 bg-amber-500/5 p-2">
-                                              <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-600">Rzeczywisty powód odrzucenia</div>
-                                              <p className="mt-1 text-xs leading-relaxed">{p.rejection_reason}</p>
+                                            <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                                              <div className="mb-1 text-xs font-bold uppercase tracking-wide text-amber-500">Rzeczywisty powód odrzucenia</div>
+                                              <p className="text-sm leading-relaxed">{p.rejection_reason}</p>
                                             </div>
                                           )}
                                           {typeof p.data_source === "string" && p.data_source.length > 0 && <p className="mt-2 text-[11px] text-muted-foreground">Źródło prognozy / kursu: {p.data_source}</p>}
@@ -745,7 +745,7 @@ function Mecze() {
                                             : <p className="mt-2 text-[11px] text-muted-foreground">Dla tego meczu nie było wiarygodnych danych xG — prognoza opiera się na wynikach, skuteczności i formie obu drużyn.</p>}
                                         </div>
                                         <div>
-                                          <div className="mb-2 text-sm font-semibold">Ostatnie 5 meczów każdej drużyny</div>
+                                          <div className="mb-2 text-base font-bold">Ostatnie 5 meczów każdej drużyny</div>
                                           <div className="grid gap-2 md:grid-cols-2">
                                             <RecentFormCard title={m.home_team} form={homeForm} />
                                             <RecentFormCard title={m.away_team} form={awayForm} />
@@ -814,7 +814,7 @@ function Mecze() {
           <DialogHeader><DialogTitle className="font-display text-xl uppercase">Zapisz pojedynczy zakład</DialogTitle></DialogHeader>
           {singleBetPrediction && (() => {
             const match = matches.find((item) => item.id === singleBetPrediction.match_id);
-            const stake = parseDecimal(singleBetStake);
+            const stake = 4;
             const oddsValue = Number(singleBetPrediction.odds);
             const potentialReturn = stake != null && stake > 0 ? stake * oddsValue : null;
             return (
@@ -825,8 +825,8 @@ function Mecze() {
                   <div className="mt-2 text-sm">Kurs zapisany: <strong className="num">{fmtOdds(singleBetPrediction.odds)}</strong></div>
                 </div>
                 <label className="grid gap-1 text-sm">
-                  <span className="font-medium">Stała stawka analityczna</span>
-                  <div className="num rounded-md border border-border bg-secondary/30 px-3 py-2">5,00 €</div>
+                  <span className="font-medium">Stała stawka symulacji</span>
+                  <div className="num rounded-md border border-border bg-secondary/30 px-3 py-2">4,00 €</div>
                 </label>
                 {potentialReturn != null && (
                   <div className="rounded-md bg-secondary/40 p-3 text-sm">
