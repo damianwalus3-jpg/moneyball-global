@@ -7,6 +7,9 @@ export interface OpenFootballFeed {
 }
 export interface OpenFootballFixture {
   id: string;
+  feedId: string;
+  homeGoals: number | null;
+  awayGoals: number | null;
   competition: string;
   countryCode: string;
   date: string;
@@ -71,28 +74,31 @@ function dateFromLine(line: string, seasonStartYear: number): string | null {
   const year=match[3] ? Number(match[3]) : month>=7 ? seasonStartYear : seasonStartYear+1;
   return `${year}-${String(month).padStart(2,"0")}-${String(Number(match[2])).padStart(2,"0")}`;
 }
-export function parseOpenFootballFixtures(text: string, feed: OpenFootballFeed, targetDate: string): OpenFootballFixture[] {
+export function parseOpenFootballMatches(text: string, feed: OpenFootballFeed, targetDate?: string): OpenFootballFixture[] {
   const seasonYear=seasonStart(targetDate);
   let currentDate="";
   const output: OpenFootballFixture[]=[];
   for (const raw of text.replace(/^\uFEFF/,"").split(/\r?\n/)) {
     const parsedDate=dateFromLine(raw,seasonYear);
     if (parsedDate) { currentDate=parsedDate; continue; }
-    if (!currentDate || currentDate!==targetDate) continue;
+    if (!currentDate || (targetDate && currentDate!==targetDate)) continue;
     const line=raw.trim();
     if (!line || line.startsWith("#") || line.startsWith("=") || line.startsWith("▪") || line.startsWith("(")) continue;
-    let time="—", home="", away="";
-    const withV=line.match(/^(?:(\d{1,2}:\d{2})\s+)?(.+?)\s+v\s+(.+?)(?:\s{2,}\d+-\d+(?:\s+\([^)]+\))?.*)?$/);
+    let time="—", home="", away="", homeGoals:number|null=null, awayGoals:number|null=null;
+    const withV=line.match(/^(?:(\d{1,2}:\d{2})\s+)?(.+?)\s+v\s+(.+?)(?:\s{2,}(\d+)-(\d+)(?:\s+\([^)]+\))?.*)?$/);
     const withScore=line.match(/^(?:(\d{1,2}:\d{2})\s+)?(.+?)\s+(\d+)-(\d+)(?:\s+\([^)]+\))?\s+(.+?)\s*$/);
     if (withV) {
       time=withV[1] ?? "—"; home=withV[2].trim(); away=withV[3].trim();
+      if (withV[4] !== undefined && withV[5] !== undefined) { homeGoals=Number(withV[4]); awayGoals=Number(withV[5]); }
     } else if (withScore) {
-      time=withScore[1] ?? "—"; home=withScore[2].trim(); away=withScore[5].trim();
+      time=withScore[1] ?? "—"; home=withScore[2].trim(); homeGoals=Number(withScore[3]); awayGoals=Number(withScore[4]); away=withScore[5].trim();
     } else continue;
     if (!home || !away || home.length>90 || away.length>90) continue;
     const kickoff=localKickoffToBrussels(currentDate,time,feed.timeZone);
     output.push({
       id:`openfootball|${feed.id}|${kickoff.date}|${time}|${home}|${away}`,
+      feedId:feed.id,
+      homeGoals,awayGoals,
       competition:feed.competition,
       countryCode:feed.countryCode,
       date:kickoff.date,
@@ -103,6 +109,9 @@ export function parseOpenFootballFixtures(text: string, feed: OpenFootballFeed, 
     });
   }
   return output;
+}
+export function parseOpenFootballFixtures(text: string, feed: OpenFootballFeed, targetDate: string): OpenFootballFixture[] {
+  return parseOpenFootballMatches(text, feed, targetDate);
 }
 async function fetchText(url: string): Promise<string> {
   const response=await fetch(url,{headers:{Accept:"text/plain"}});
