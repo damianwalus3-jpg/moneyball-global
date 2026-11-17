@@ -87,15 +87,18 @@ export function auditOddsFixtureMatches(
     const id = item.matches[0].game.gameId;
     gameUseCount.set(id, (gameUseCount.get(id) ?? 0) + 1);
   }
+  const reusedGameIds = new Set([...gameUseCount].filter(([, count]) => count > 1).map(([id]) => id));
+  const reusedFixtureIds = uniqueCandidates.filter(item => reusedGameIds.has(item.matches[0].game.gameId)).map(item => item.fixture.id);
+  const allAmbiguousFixtureIds = [...new Set([...ambiguousFixtureIds, ...reusedFixtureIds])];
   const matched = uniqueCandidates.flatMap(item => {
     const candidate = item.matches[0];
     if (gameUseCount.get(candidate.game.gameId) !== 1) return [];
     return [{ fixtureId: item.fixture.id, gameId: candidate.game.gameId, kickoffDifferenceMinutes: candidate.difference }];
   });
   const matchedFixtureIds = new Set(matched.map(item => item.fixtureId));
-  const ambiguous = new Set(ambiguousFixtureIds);
+  const ambiguous = new Set(allAmbiguousFixtureIds);
   const unmatchedFixtureIds = fixtures.filter(item => !matchedFixtureIds.has(item.id) && !ambiguous.has(item.id)).map(item => item.id);
   const matchedGameIds = new Set(matched.map(item => item.gameId));
   const unmatchedProviderGameIds = games.filter(item => !matchedGameIds.has(item.gameId)).map(item => item.gameId);
-  return { matched, unmatchedFixtureIds, ambiguousFixtureIds, unmatchedProviderGameIds };
+  return { matched, unmatchedFixtureIds, ambiguousFixtureIds: allAmbiguousFixtureIds, unmatchedProviderGameIds };
 }
