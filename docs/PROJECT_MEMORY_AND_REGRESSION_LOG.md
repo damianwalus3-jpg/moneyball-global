@@ -671,3 +671,22 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Bezpośrednia kontrola produkcyjnego Workera `https://moneyball-global.damianwalus3.workers.dev/?audit=final-fingerprint-regexfix-czechliga`: HTTP 200; HTML zawiera dokładny fingerprint `europe-top-two-2026-11-17-regexfix-czechliga`; bundle JS `/assets/index-BVeDORqf.js`. To potwierdza wdrożenie właściwej wersji na produkcji Cloudflare.
 - Edge Functions ACTIVE: `footynomad-sync v82`, `moneyball-free-feed v39`, `moneyball-predict v235`. Migracja SQL zastosowana; nowa macierz 14/14 PASS.
 - Ostateczny stan: poprawka regexu i alias Czech Liga są wdrożone na MAIN/Cloudflare; issue #76 pozostaje otwarte do dalszego audytu pełnej listy europejskich lig. Nie oznacza to zakończenia całego projektu MONEYBALL.
+
+
+## Dalszy audyt katalogu FootyNomad — 6 brakujących nazw tier 1/2 — 2026-11-17
+- Wznowiono audyt od katalogu `https://footynomad.com/browse` i odczytano bezpośrednie linki do krajowych lig. Wykryto 6 brakujących nazw, które canonical SQL scope odrzucał mimo że są rozgrywkami pierwszego lub drugiego poziomu:
+  1. Croatia — `HNL` (tier 1); `First NL` (tier 2; istniejący alias już działał).
+  2. Finland — `Ykkösliiga` (tier 2; normalizowane do `ykkosliiga`; `Ykkönen/Kakkonen` nie są dodawane jako tier 2).
+  3. Kosovo — `Liga e Parë` (tier 2; po normalizacji `liga e pare`).
+  4. Lithuania — `1 Lyga` (tier 2).
+  5. San Marino — `Campionato` (tier 1; alias dokładny i ograniczony do kraju San Marino).
+  6. Slovenia — `1. SNL` (tier 1) i `2. SNL` (tier 2); `3. SNL` pozostaje wykluczone.
+- Zweryfikowano też istniejące nazwy providerowe w macierzy 104 przypadków; przed tą poprawką 98/104 przechodziło SQL scope, 6/104 wymagało uzupełnienia. Źródła katalogu: https://footynomad.com/browse (bezpośrednie linki do lig i krajów). Klasyfikację HNL/Prva NL, Ykkösliiga i litewskiej I Lyga potwierdzono w zewnętrznym przeglądzie struktury lig.
+- Frontend `src/lib/domain.ts` otrzymał dokładne wyjątki krajowe dla `Croatia/HNL` i `San Marino/Campionato`, oraz aliasy `1 lyga`, `1 snl`; istniejące `ykkosliiga`, `liga e pare`, `first nl` i `2 snl` zostały zachowane.
+- Te same zasady zsynchronizowano w `footynomad-sync`, `moneyball-free-feed` i `moneyball-predict`. Nowe testy Vitest obejmują 6 brakujących nazw oraz negatywne przypadki: Croatia Second NL, Finland Kakkonen/Ykkönen i Slovenia 3. SNL East.
+- SQL canonical helper znormalizowano dodatkowo o znaki `öäåë` (m.in. Ykkösliiga i Parë) i dodano aliasy `1 lyga`, `1 snl`. `HNL` i `Campionato` są dopuszczane wyłącznie przy odpowiednim kraju, aby nie poszerzać globalnej allowlisty.
+- W trakcie migracji wykryto problem w pierwszym dynamicznym wstawieniu country-specific aliasów do SQL (dotknęło też wcześniejszych klauzul wykluczeń). Nie pozostawiono tej wersji: canonical helper został odbudowany z oryginalnymi 12 warunkami wykluczającymi i końcową allowlistą; finalna migracja źródłowa: `20261117034000_rebuild_european_scope_sql_allowlist.sql`, commit `7f7517e8f5425e463871dbe4a7ba0705b8aa62b9`. Po odbudowie testy SQL: **20/20 PASS**, w tym HNL=true, Campionato=true, Ykkösliiga=true, Liga e Parë=true, 1 Lyga=true, 1./2. SNL=true; Croatia Second NL=false, Finland Ykkönen/Kakkonen=false, Slovenia 3. SNL=false, Czech 3. Liga=false, Belgian Provincial=false, France National 2=false, Scotland Lowland=false, Spain RFEF tier 3=false i Swiss 1. Liga Classic=false.
+- Edge Functions wdrożone i ACTIVE po synchronizacji: `footynomad-sync v83`, `moneyball-free-feed v40`, `moneyball-predict v236`.
+- Commity aplikacyjne: frontend `04cbd45df7811c155604fcacb7d854898f12f71f`; testy `40b1b43f6506e5533a4e66f8d792cee20d96437f`; FootyNomad sync `ad4e16c9e062f2e094715d9a376d571bd6cfe0d5`; free feed `eaf8ab461ff3b817cd17658af815300f9770f85c`; prediction `1e5a5aeac63768026b5374cbbb18cfbb634f99b4`. SQL source migration rebuild: `7f7517e8f5425e463871dbe4a7ba0705b8aa62b9`.
+- **Status wdrożenia frontendu:** testy GitHub Actions dla najnowszego zestawu zmian wymagają potwierdzenia. Przed zakończeniem pracy zmienić fingerprint w `src/routes/__root.tsx`, poczekać na zielony workflow Cloudflare, a następnie odczytać Worker produkcyjny i sprawdzić fingerprint. Nie uznawać frontendu za wdrożony przed tym testem.
+- Następny krok po potwierdzeniu deployu: kontynuować audit brakujących krajów/lig z katalogu FootyNomad; nie powtarzać naprawionych aliasów. Nie uruchamiać ręcznie skanera poza cooldownem scheduler'a. Issue #76 pozostaje otwarte.
