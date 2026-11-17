@@ -561,3 +561,11 @@
 - GitHub Actions Rebuild Checks dla commita Worker `a6cd74c18d20a63b1c9ed6b2f81edd096fd20270` uruchomił się jako run `44187285622`; w chwili zapisu był IN_PROGRESS. Końcowy status CI i deploy należy potwierdzić po zakończeniu workflow.
 - Nie potwierdzono obecności sekretów w Cloudflare przez API; endpoint `/api/odds/status` po deployu będzie właściwą metodą sprawdzenia. Nie wykonano jeszcze rzeczywistych zapytań do providerów ani nie potwierdzono coverage.
 - Ograniczenie: StrikerAPI wymaga jego własnego game_id. Nie wolno przekazywać do niego lokalnego fixture ID, jeśli nie jest to zgodny identyfikator dostawcy.
+
+### Stage 52 — walidacja CI i deployment
+- Commit dokumentacyjny po implementacji: `dbd612e68f31569b3536d6b35f36f2f3b608d9eb`; aktualny branch HEAD w chwili weryfikacji.
+- Legacy MONEYBALL rebuild CI run `44187392610`: SUCCESS — bun install, typecheck, testy i build.
+- Rebuild Checks run `44187392532`: SUCCESS — instalacja, TypeScript, wszystkie testy i production build.
+- Cloudflare deployment run `44187392628`: SUCCESS — krok deploy oddzielnego Worker zakończony powodzeniem.
+- Live smoke test endpointu `/api/odds/status` nie został potwierdzony: dostępne narzędzia nie mogły odczytać publicznego endpointu. Nie twierdzić, że Worker odpowiada ani że sekrety są skonfigurowane, dopóki endpoint nie zostanie sprawdzony z przeglądarki.
+- Kod/testy są wdrożone według statusu GitHub Actions, ale realne wywołanie dostawców, konfiguracja sekretów i coverage nadal czekają na smoke test.
