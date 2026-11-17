@@ -20,6 +20,17 @@ describe("tracker model audit", () => {
     expect(audit.buckets[0].averageConfidence).toBeCloseTo(0.8);
     expect(audit.buckets[0].observedAccuracy).toBe(1);
   });
+  it("audits Double Chance markets separately from 1X2", () => {
+    const withDoubleChance: TrackerRecord = {
+      ...prediction,
+      details: { fixtureId: "f1", p1: 0.8, px: 0.1, p2: 0.1, dc1x: 0.9, dcx2: 0.2, dc12: 0.9 },
+    };
+    const audit = auditTrackerPredictions([withDoubleChance, result]);
+    expect(audit.metrics?.count).toBe(1);
+    expect(audit.doubleChance?.count).toBe(3);
+    expect(audit.doubleChance?.accuracy).toBe(1);
+    expect(audit.doubleChance?.brierScore).toBeCloseTo((0.1 ** 2 + 0.2 ** 2 + 0.1 ** 2) / 3);
+  });
   it("does not count predictions without a matching result", () => {
     const audit = auditTrackerPredictions([prediction]);
     expect(audit.metrics).toBeNull();

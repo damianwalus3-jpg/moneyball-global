@@ -458,3 +458,11 @@
 - The note distinguishes successful source retrieval from completeness of the underlying datasets; zero feed errors must not be interpreted as full European coverage.
 - No source coverage has been artificially inflated and no unsupported completeness claim is made.
 - CI and Cloudflare deployment required before marking deployed.
+
+
+## Stage 43 — separate Double Chance market audit
+- Intelligence now evaluates Double Chance as a separate binary-market set (1X, X2, 12), independently from the official 1X2 accuracy/Brier/log-loss metrics.
+- For each verified fixture with valid stored DC probabilities, the audit evaluates three binary outcomes and reports sample count, accuracy, Brier score and log loss. Missing/invalid DC fields are excluded without contaminating 1X2 metrics.
+- Added a regression test proving the DC sample and scores are calculated separately; added a dedicated UI section with explicit three-markets-per-fixture sample labeling.
+- DC probabilities remain derived from the current 1X2 model; this audit does not claim an independently trained DC model.
+- CI and Cloudflare deployment required before marking deployed.

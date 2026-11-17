@@ -7,8 +7,15 @@ export interface CalibrationBucket {
   averageConfidence: number;
   observedAccuracy: number;
 }
+export interface BinaryMarketMetrics {
+  count: number;
+  brierScore: number;
+  logLoss: number;
+  accuracy: number;
+}
 export interface ModelAudit {
   metrics: PredictionMetrics | null;
+  doubleChance: BinaryMarketMetrics | null;
   buckets: CalibrationBucket[];
   unmatchedPredictions: number;
   settledPredictions: number;
@@ -39,11 +46,29 @@ export function auditTrackerPredictions(records: TrackerRecord[]): ModelAudit {
     const sum = (d.p1 as number) + (d.px as number) + (d.p2 as number);
     if (Math.abs(sum - 1) > 0.0001) return [];
     return [{
+      fixtureId: d.fixtureId as string,
       probabilities: { home: d.p1 as number, draw: d.px as number, away: d.p2 as number },
       actual,
     }];
   });
   const metrics = evaluatePredictions(settled);
+  const doubleChanceRows = settled.flatMap(row => {
+    const d = predictionByFixture.get(row.fixtureId)?.details;
+    if (!d) return [];
+    const probabilities = [d.dc1x, d.dcx2, d.dc12];
+    if (probabilities.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) return [];
+    return [
+      { probability: d.dc1x as number, actual: row.actual !== "2" },
+      { probability: d.dcx2 as number, actual: row.actual !== "1" },
+      { probability: d.dc12 as number, actual: row.actual !== "X" },
+    ];
+  });
+  const doubleChance = doubleChanceRows.length ? {
+    count: doubleChanceRows.length,
+    brierScore: doubleChanceRows.reduce((sum, row) => sum + (row.probability - (row.actual ? 1 : 0)) ** 2, 0) / doubleChanceRows.length,
+    logLoss: doubleChanceRows.reduce((sum, row) => sum - Math.log(Math.max(row.actual ? row.probability : 1 - row.probability, 1e-15)), 0) / doubleChanceRows.length,
+    accuracy: doubleChanceRows.filter(row => (row.probability >= 0.5) === row.actual).length / doubleChanceRows.length,
+  } : null;
   const buckets: CalibrationBucket[] = [];
   for (let index = 0; index < 5; index++) {
     const lower = index * 0.2;
@@ -63,6 +88,7 @@ export function auditTrackerPredictions(records: TrackerRecord[]): ModelAudit {
   }
   return {
     metrics,
+    doubleChance,
     buckets,
     unmatchedPredictions: predictions.length - settled.length,
     settledPredictions: settled.length,
