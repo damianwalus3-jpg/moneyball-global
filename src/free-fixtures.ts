@@ -41,7 +41,7 @@ const COUNTRY_NAMES = [
 ];
 const EUROPEAN_SHORTCUT_PREFIXES = [
   "bl","dfb","rl","ol","vl","ll","kl","kreisliga","oberliga","landesliga","verbandsliga","bezirksliga",
-  "eng","esp","ita","fra","ned","por","bel","sco","aut","sui","tur","gre","den","swe","nor","rou","rus","irl","pol","wal","nir","cro","cze","ukr","cyp","svk","svn","fin","kaz","alb","srb","bih","bul","hun","isl","lux","mlt","est","lva","ltu","mda","geo","arm","aze","mkd","mne","and","fro","gib","isr","kos","uefa","ucl","uel","uecl"
+  "eng","esp","ita","fra","ned","por","bel","sco","aut","sui","tur","gre","den","swe","nor","rou","rus","irl","pol","wal","nir","cro","cze","ukr","cyp","svk","svn","fin","kaz","alb","srb","bih","bul","hun","isl","lux","mlt","est","lva","ltu","mda","geo","arm","aze","mkd","mne","and","fro","gib","isr","kos","uefa","ucl","uel","uecl","premierleague","laliga","ligue1","eredivisie","primeiraliga","championsleague","europaleague","conferenceleague","proleague"
 ];
 
 function parseCsvLine(line: string): string[] {
@@ -93,14 +93,14 @@ async function pooled<T, R>(items: T[], limit: number, fn: (item: T) => Promise<
   }));
   return results;
 }
-function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
+export function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
   const shortcut = (league.leagueShortcut ?? "").toLowerCase();
   const name = (league.leagueName ?? "").toLowerCase();
   if (league.sport?.sportName && !league.sport.sportName.toLowerCase().includes("football") && !league.sport.sportName.toLowerCase().includes("fußball")) return false;
   if (COUNTRY_NAMES.some(country => name.includes(country))) return true;
   return EUROPEAN_SHORTCUT_PREFIXES.some(prefix => shortcut === prefix || shortcut.startsWith(prefix));
 }
-function fixtureKey(date: string, home: string, away: string): string {
+export function fixtureKey(date: string, home: string, away: string): string {
   const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   return `${date}|${normalize(home)}|${normalize(away)}`;
 }
