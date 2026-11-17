@@ -38,7 +38,7 @@ const FEEDS: OpenFootballFeed[] = [
 ];
 const MONTHS: Record<string, number> = { Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12 };
 const CACHE_KEY = "moneyball.openfootball.v1:";
-const CACHE_MS = 6 * 60 * 60 * 1000;
+const CACHE_MS = 15 * 60 * 1000;
 
 function seasonStart(date: string): number {
   const year = Number(date.slice(0,4)), month = Number(date.slice(5,7));
