@@ -409,3 +409,10 @@
 - Added regression coverage for malformed legacy result followed by verified result and a repeated verified insert.
 - Implementation commit: `13ba2dfaf9cc04e3830d076342a3b33a5faa102e`; test commit: `53d70ca157be88ecf8b670e5d566d8be3a4b8626`.
 - CI and deployment pending for the final log commit.
+
+
+### Stage 37 — CI regression correction (2026-11-17)
+- The first Stage 37 CI run exposed a pre-existing test-fixture timing assumption in the Stage 35 backup-order test, not a TypeScript or application runtime failure.
+- The test used the current wall-clock time for the existing Tracker row but a fixed earlier timestamp for the imported backup row, while asserting that the imported row must sort first. On the CI runner the existing row was correctly newer.
+- Corrected the test fixture to use a deterministic future timestamp for the imported newest row. Production sorting behavior is unchanged.
+- Stage 37 implementation remains in place; final CI and Cloudflare deployment must pass on the corrected branch HEAD before marking this stage deployed.
