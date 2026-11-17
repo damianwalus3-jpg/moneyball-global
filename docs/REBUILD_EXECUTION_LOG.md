@@ -620,3 +620,12 @@
 - Production smoke test after deployment confirmed the app shell responds, `/api/odds/status` returns both provider keys configured and `pilotEnabled:false`, and unauthenticated `/api/odds/pilot` returns HTTP 503 without contacting providers.
 - Intermediate commits had failed/cancelled workflow runs while test fixtures and the kickoff helper regex were corrected. Only the final successful run/deployment above is the accepted release evidence.
 - No existing Tracker, prediction, coupon, settlement, bankroll or historical record was changed.
+
+
+## Stage 56 — coupon candidate probability integrity — 2026-11-17 (verified)
+- Audit found that imported or malformed Tracker prediction rows could be admitted to the three-leg coupon pool when each probability was individually in range but the 1X2 distribution did not sum to 1, or when the stored selection was not the model's highest-probability outcome.
+- Coupon candidate creation now rejects non-finite/out-of-range probabilities, non-normalized 1X2 distributions (tolerance 0.0001), and selections that do not match the highest 1X2 probability.
+- Added regression tests for invalid probability sums and inconsistent selections.
+- Final commit: `f87a0b44eabcf454c8ad0df7a07379b8f8da0a27`.
+- CI `44191380721`, rebuild checks `44191380973`, and Cloudflare deployment `44191380659` all completed successfully. TypeScript, production build and all 92 tests across 17 test files passed.
+- No existing Tracker rows, coupons, settlements, bankroll or historical records were rewritten.
