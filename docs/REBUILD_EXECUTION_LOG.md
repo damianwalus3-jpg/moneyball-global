@@ -127,3 +127,16 @@
 - Cloudflare rebuild deployment run `44112255634`: SUCCESS — deploy step and workflow completed.
 - Stage 07 is COMPLETE/DEPLOYED. It now allows the user to generate audit records for the whole discovered daily fixture list without opening each match one by one.
 - Coverage limitation remains: bulk analysis can only process fixtures discovered by the current public feeds; it does not establish complete coverage of every European amateur/youth/women's competition.
+
+## 2026-11-17 — Stage 08: model audit and calibration dashboard
+- Added an audit layer joining prediction records to result records by exact `fixtureId`.
+- Added Brier score, log loss and 1X2 accuracy calculations using the existing validated prediction evaluator.
+- Added five confidence buckets (0–20%, …, 80–100%) comparing average top-outcome confidence with observed hit rate; empty buckets are omitted.
+- Added the Intelligence screen with settled sample count, pending predictions and calibration details.
+- Added a separate Typ dnia summary with counts of saved predictions and strong candidates.
+- Tests cover result joining, accuracy, calibration and predictions without matching results.
+- Important: automatic result collection/settlement is NOT implemented yet. The dashboard correctly shows no metrics until actual results are recorded with the matching fixture ID; no synthetic performance is shown.
+- Final code commit: `6c49f6920398da8f0911d217d9ad5ca177a32d0d` (`style(rebuild): add calibration and model metrics layout`).
+- CI run `44112642412`: SUCCESS — TypeScript, all tests and production build passed.
+- Cloudflare deployment run `44112642302`: deploy step SUCCESS — separate rebuild Worker deployed.
+- Stage 08 is COMPLETE/DEPLOYED as an evaluation framework. Automatic result retrieval, settlement and bankroll reconciliation remain the next implementation stage.
