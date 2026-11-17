@@ -26,6 +26,23 @@ describe("bet settlement",()=>{
     expect(settlements[0].details.profitLoss).toBe(4);
     expect(settlements[1].details.profitLoss).toBe(0);
   });
+  it("does not settle selected bets with invalid odds or stakes",()=>{
+    const records=[
+      row("bet","bad-odds",{fixtureId:"f1",decision:"SELECTED",selection:"1",stake:5,odds:1}),
+      row("bet","bad-stake",{fixtureId:"f2",decision:"SELECTED",selection:"1",stake:-5,odds:2}),
+      row("result","r1",{fixtureId:"f1",actual:"1"}),
+      row("result","r2",{fixtureId:"f2",actual:"1"}),
+    ];
+    expect(buildBetSettlementRows(records)).toHaveLength(0);
+  });
+  it("uses the newest valid fixture result regardless of Tracker array order",()=>{
+    const records=[
+      row("result","old",{fixtureId:"f",actual:"1"}),
+      { ...row("result","new",{fixtureId:"f",actual:"2"}), createdAt:"2026-01-02T00:00:00.000Z" },
+      row("bet","b",{fixtureId:"f",decision:"SELECTED",selection:"2",stake:5,odds:2}),
+    ];
+    expect(buildBetSettlementRows(records)[0].status).toBe("WON");
+  });
   it("does not create duplicate settlements or settle unknown results",()=>{
     const records=[
       row("bet","b",{fixtureId:"f",decision:"SELECTED",selection:"1",stake:5,odds:2}),
