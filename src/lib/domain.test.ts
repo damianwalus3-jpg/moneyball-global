@@ -175,6 +175,8 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("World", "UEFA U21 Championship - Qualification")).toBe(false);
     const eligibleBase = { country: "Ukraine", competition: "Persha Liga", league: null, gender: "men" as const, home_team: "UCSA", away_team: "Polissya" };
     expect(isEligibleEuropeanMatch(eligibleBase)).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bulgaria", competition: "efbet League" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Lithuania", competition: "TOPLYGA" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya II" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya B" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Real Madrid Castilla" })).toBe(false);
@@ -271,6 +273,8 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Kazakhstan", "First Division")).toBe(true);
     expect(isEuropeanTopTwoLeague("Bosnia and Herzegovina", "Prva Liga Republike Srpske")).toBe(true);
     expect(isEuropeanTopTwoLeague("Bulgaria", "Second Professional Football League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Bulgaria", "efbet League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Lithuania", "TOPLYGA")).toBe(true);
     expect(isEuropeanTopTwoLeague("Cyprus", "Cyprus Second Division")).toBe(true);
     expect(isEuropeanTopTwoLeague("Ireland", "League of Ireland First Division")).toBe(true);
     expect(isEuropeanTopTwoLeague("Northern Ireland", "NIFL Championship")).toBe(true);

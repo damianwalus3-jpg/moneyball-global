@@ -31,7 +31,7 @@ function isTopTwoTierLeague(competition: unknown, country?: unknown): boolean {
  if (/\b(uefa|nations league|champions league|europa league|conference league|world cup|international|national [2-5])\b/.test(comp)) return false;
  if(/\b(premier league 2|pl2|professional development league|u(?:17|18|19|20|21|23)|under ?(?:17|18|19|20|21|23)|youth|junior(?:s)?|academy|juvenil|jugend|reserve|reserves|b team|damallsvenskan|wsl|liga f|summer series)\b/.test(comp))return false;
  if(/\b(?:3|4|5|6|7|8|9|iii|iv|v|vi)\s*(?:\.\s*)?(?:liga|league|division|div|bundesliga|serie|snl|hnl|federal|federation)\b|\b(?:third|fourth|fifth|regional|regionalliga|oberliga|national league north|national league south|non league|non-league)\b/.test(comp))return false;
- return /\b(?:premier league|premiership|championship|super league 2|super league|superliga|super lig|pro league|jupiler pro league|challenger pro league|bundesliga|2 bundesliga|austrian 2 liga|2 liga|ligue 1|ligue 2|serie a|serie b|la liga|laliga|primera division|segunda division|segunda liga|segunda divisao|liga portugal 2|liga portugal|eredivisie|eerste divisie|keuken kampioen divisie|primeira liga|ekstraklasa|i liga|1 lig|2 lig|1 liga|2 liga|liga i|liga ii|liga 1|liga 2|liga e pare|prva liga|first league|second league|fnl|first division|second division|division 1|division 2|div 1|div 2|1st division|2nd division|1st league|2nd league|a lyga|1 lyga|i lyga|1 snl|virsliga|meistriliiga|esiliiga|veikkausliiga|ykkosliiga|allsvenskan|superettan|eliteserien|obos ligaen|1 divisjon|premier division|league of ireland premier|league of ireland first|scottish championship|challenge league|tff first league|national football league|football league|nb i|nb ii|nemzeti bajnoksag i|nemzeti bajnoksag ii|kategoria superiore|kategoria e pare|premyer liqa|i liqa|p1 liga|1 deild|cymru premier|cymru north|cymru south|e rovnuli liga|erovnuli liga|erovnuli liga 2|persha liga|first nl|prva nl|2 snl|first professional football league|second professional football league|bulgarian second league|first division a|first division b|1 division|2 division|divizia nationala|divizia a|1a divisio|2a divisio|primera divisio|segunda divisio|albanian superliga|armenian premier league|belarusian premier league|belarusian first league|premijer liga|first professional league|meistaradeildin|besta deild|urvalsdeild|national division|super liga|super liga 2|super liga Srbije|superliga kosovo|campionato sammarinese|2 mfl|vtora mfl|prva makedonska|super league greece|super liga romania|liga 1 romania|liga 2 romania|montenegro first league|azerbaijan premier league|premyer liqasi|super league albania|czech liga|liga nacional|liga i|liga ii|vysshaya liga|pervaya liga|birinci dasta|birinci liqa|azerbaijan first division|azerbaijan first league|liga leumit|ligat haal|ligat ha al|israeli national league|kazakhstan first division|kazakhstan first league|qazaqstan first league|division d honneur|luxembourg division of honour|division of honour|moldovan super liga|moldova liga 1|liga 1 moldova|montenegrin second league|second league montenegro|first league federation of bih|first league of the federation of bih|first league of republika srpska|prva liga federacije bih|prva liga republike srpske|efbet liga|cyprus second division|cypriot second division|cyprus league b|league b cyprus|1 deild karla|league of ireland first division|league of ireland premier division|nifl championship|nifl premiership|gibraltar football league|gibraltar second division|malta challenge league|challenge league malta|premier league malta|superliga e shqiperise|armenian first league|bosnian premier league|premijer liga bih|croatian first football league|first football league croatia|prva nogometna liga|czech first league|chance liga|dansk superliga|superligaen|danish 1st division|danish first division|finnish first division|greek super league|premier division ireland|island premier league|israeli premier league|liga leumit|lithuanian a lyga|lithuanian i lyga|latvian higher league|latvian first league|maltese premier league|maltese challenge league|norwegian first division|serbian super liga|slovak first football league|nike liga|prva slovenska nogometna liga|druga slovenska nogometna liga|swiss super league|swiss challenge league|turkish first league|ukrainian premier league|welsh premier league)\b/.test(comp);
+ return /\b(?:premier league|premiership|championship|super league 2|super league|superliga|super lig|pro league|jupiler pro league|challenger pro league|bundesliga|2 bundesliga|austrian 2 liga|2 liga|ligue 1|ligue 2|serie a|serie b|la liga|laliga|primera division|segunda division|segunda liga|segunda divisao|liga portugal 2|liga portugal|eredivisie|eerste divisie|keuken kampioen divisie|primeira liga|ekstraklasa|i liga|1 lig|2 lig|1 liga|2 liga|liga i|liga ii|liga 1|liga 2|liga e pare|prva liga|first league|second league|fnl|first division|second division|division 1|division 2|div 1|div 2|1st division|2nd division|1st league|2nd league|a lyga|1 lyga|i lyga|1 snl|virsliga|meistriliiga|esiliiga|veikkausliiga|ykkosliiga|allsvenskan|superettan|eliteserien|obos ligaen|1 divisjon|premier division|league of ireland premier|league of ireland first|scottish championship|challenge league|tff first league|national football league|football league|nb i|nb ii|nemzeti bajnoksag i|nemzeti bajnoksag ii|kategoria superiore|kategoria e pare|premyer liqa|i liqa|p1 liga|1 deild|cymru premier|cymru north|cymru south|e rovnuli liga|erovnuli liga|erovnuli liga 2|persha liga|first nl|prva nl|2 snl|first professional football league|second professional football league|bulgarian second league|first division a|first division b|1 division|2 division|divizia nationala|divizia a|1a divisio|2a divisio|primera divisio|segunda divisio|albanian superliga|armenian premier league|belarusian premier league|belarusian first league|premijer liga|first professional league|meistaradeildin|besta deild|urvalsdeild|national division|super liga|super liga 2|super liga Srbije|superliga kosovo|campionato sammarinese|2 mfl|vtora mfl|prva makedonska|super league greece|super liga romania|liga 1 romania|liga 2 romania|montenegro first league|azerbaijan premier league|premyer liqasi|super league albania|czech liga|liga nacional|liga i|liga ii|vysshaya liga|pervaya liga|birinci dasta|birinci liqa|azerbaijan first division|azerbaijan first league|liga leumit|ligat haal|ligat ha al|israeli national league|kazakhstan first division|kazakhstan first league|qazaqstan first league|division d honneur|luxembourg division of honour|division of honour|moldovan super liga|moldova liga 1|liga 1 moldova|montenegrin second league|second league montenegro|first league federation of bih|first league of the federation of bih|first league of republika srpska|prva liga federacije bih|prva liga republike srpske|efbet liga|efbet league|toplyga|cyprus second division|cypriot second division|cyprus league b|league b cyprus|1 deild karla|league of ireland first division|league of ireland premier division|nifl championship|nifl premiership|gibraltar football league|gibraltar second division|malta challenge league|challenge league malta|premier league malta|superliga e shqiperise|armenian first league|bosnian premier league|premijer liga bih|croatian first football league|first football league croatia|prva nogometna liga|czech first league|chance liga|dansk superliga|superligaen|danish 1st division|danish first division|finnish first division|greek super league|premier division ireland|island premier league|israeli premier league|liga leumit|lithuanian a lyga|lithuanian i lyga|latvian higher league|latvian first league|maltese premier league|maltese challenge league|norwegian first division|serbian super liga|slovak first football league|nike liga|prva slovenska nogometna liga|druga slovenska nogometna liga|swiss super league|swiss challenge league|turkish first league|ukrainian premier league|welsh premier league)\b/.test(comp);
 }
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const SUPABASE_URL="https://gzgeklcukrclgwbsmbsp.supabase.co";
@@ -78,6 +78,52 @@ async function readFixtures(date:string){
  const total=fixtures.length;
  return {date,total_found:total,fixtures_count:fixtures.length,fixtures};
 }
+const FOOTBALL_CHARTS_BASE = "https://footballcharts-backend.onrender.com/api/v1";
+const FOOTBALL_CHARTS_LEAGUES = [
+ {code:"azer",country:"Azerbaijan",competition:"Premier League"},
+ {code:"bulgaria1",country:"Bulgaria",competition:"efbet League"},
+ {code:"estonia",country:"Estonia",competition:"Meistriliiga"},
+ {code:"hungary1",country:"Hungary",competition:"NB I."},
+ {code:"hungary2",country:"Hungary",competition:"NB II."},
+ {code:"latvia",country:"Latvia",competition:"Virsliga"},
+ {code:"lithuania",country:"Lithuania",competition:"TOPLYGA"},
+ {code:"serbia1",country:"Serbia",competition:"Mozzart Bet Super Liga"},
+] as const;
+const FOOTBALL_CHARTS_CACHE = new Map<string,{at:number,result:any}>();
+async function readFootballChartsFixtures(date:string){
+ const cached=FOOTBALL_CHARTS_CACHE.get(date);
+ if(cached&&Date.now()-cached.at<(cached.result.ok?12*60*60*1000:30*60*1000))return {...cached.result,cache:"hit"};
+ const results=await Promise.allSettled(FOOTBALL_CHARTS_LEAGUES.map(async league=>{
+  const response=await fetch(FOOTBALL_CHARTS_BASE+"/leagues/"+league.code+"/fixtures/",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/1.0"},signal:AbortSignal.timeout(12000)});
+  if(!response.ok)throw new Error(league.code+" HTTP "+response.status);
+  const payload=await response.json(),matches=Array.isArray(payload?.matches)?payload.matches:[];
+  const fixtures=matches.flatMap((match:any)=>{
+   const matchDate=String(match?.match_date||""),time=String(match?.time||"");
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(matchDate)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return [];
+   const parsed=new Date(matchDate+"T"+time+":00Z");
+   if(!Number.isFinite(parsed.getTime()))return [];
+   const localDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(parsed);
+   if(localDate!==date)return [];
+   const home=String(match?.home_team||"").trim(),away=String(match?.away_team||"").trim();
+   if(!home||!away)return [];
+   const statusRaw=String(match?.status||"scheduled").toLowerCase();
+   const status=/postpon/.test(statusRaw)?"postponed":/cancel/.test(statusRaw)?"cancelled":/live|in.progress/.test(statusRaw)?"live":/finished|complete|^ft$/.test(statusRaw)?"finished":"scheduled";
+   return [{external_id:"footballcharts:"+String(match?.slug||[league.code,matchDate,home,away].join(":")),source:"FootballCharts",date,competition:league.competition,country:league.country,gender:"men",home_team:home,away_team:away,kickoff_at:parsed.toISOString(),status,source_url:String(payload?.source_url||""),attribution:"Data by football-charts.com",provider_model_ignored:true}];
+  });
+  return {code:league.code,country:league.country,competition:league.competition,fixtures,received:matches.length,source_url:String(payload?.source_url||""),next_fixture_date:payload?.next_fixture_date||null,note:payload?.note||null};
+ }));
+ const fixtures:any[]=[],errors:any[]=[],leagueStatus:any[]=[];
+ for(let i=0;i<results.length;i++){
+  const result=results[i],league=FOOTBALL_CHARTS_LEAGUES[i];
+  if(result.status==="fulfilled"){fixtures.push(...result.value.fixtures);leagueStatus.push({code:league.code,ok:true,received:result.value.received,for_date:result.value.fixtures.length,next_fixture_date:result.value.next_fixture_date});}
+  else{errors.push({code:league.code,error:String(result.reason)});leagueStatus.push({code:league.code,ok:false,error:String(result.reason)});}
+ }
+ const result={ok:errors.length===0,source:"FootballCharts",api_key_required:false,requests:FOOTBALL_CHARTS_LEAGUES.length,leagues_checked:FOOTBALL_CHARTS_LEAGUES.length,fixtures_count:fixtures.length,fixtures,errors,league_status:leagueStatus,attribution:"Data by football-charts.com",licence:"Free tier: personal/private use with attribution; no raw-data redistribution. Commercial plan required if other people use the app.",model_predictions_imported:false,stats_imported:false,odds_available:false};
+ FOOTBALL_CHARTS_CACHE.set(date,{at:Date.now(),result});
+ while(FOOTBALL_CHARTS_CACHE.size>3){const oldest=FOOTBALL_CHARTS_CACHE.keys().next().value;if(oldest)FOOTBALL_CHARTS_CACHE.delete(oldest);else break;}
+ return {...result,cache:"miss"};
+}
+
 function isOpenMatchdayTopTwoFixture(f:any):boolean {
  const folder=String(f?.source_competition_id||"");
  const tier=folder.match(/^([A-Z]{3})_([12])_[A-Za-z0-9-]+$/i);
@@ -122,6 +168,13 @@ Deno.serve(async(req)=>{
    const pj=JSON.parse(pt);publicFixtures=Array.isArray(pj.fixtures)?pj.fixtures.filter(isEligiblePublicFixture):[];
    publicSourceStatus={ok:true,source_count:pj.source_count,raw_fixtures:pj.raw_fixtures,unique_fixtures:pj.unique_fixtures,sources:pj.sources};
   }catch(e){publicSourceStatus={ok:false,error:String(e)};}
+  let footballChartsStatus:any={ok:false,error:"not_called"};
+  try{
+   const footballCharts=await readFootballChartsFixtures(date);
+   const eligible=footballCharts.fixtures.filter(isEligiblePublicFixture);
+   publicFixtures.push(...eligible);
+   footballChartsStatus={ok:footballCharts.ok,requests:footballCharts.requests,leagues_checked:footballCharts.leagues_checked,fixtures_count:footballCharts.fixtures_count,eligible_for_date:eligible.length,errors:footballCharts.errors,league_status:footballCharts.league_status,cache:footballCharts.cache,attribution:footballCharts.attribution,model_predictions_imported:false,stats_imported:false,odds_available:false};
+  }catch(e){footballChartsStatus={ok:false,error:String(e)};}
   const normTeam=(v:any)=>{const key=String(v||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();return ({"turkiye":"turkey"} as Record<string,string>)[key]||key;};
   const localDay=(v:any)=>{const raw=String(v||"");if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const d=new Date(raw);return Number.isNaN(d.getTime())?raw.slice(0,10):new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);};
   const fixtureDate=(f:any)=>{const explicit=String(f.date||"").slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(explicit))return explicit;const fromTime=localDay(f.kickoff_at);if(fromTime)return fromTime;return /:([0-9]{4}-[0-9]{2}-[0-9]{2}):/.exec(String(f.external_id||""))?.[1]||"";};
@@ -175,7 +228,7 @@ Deno.serve(async(req)=>{
     const fixtureCandidates=(existingByFixture.get(fixtureBaseKey(f))||[]).filter((x:any)=>genderCompatible(x,f)).sort((a:any,b:any)=>fixturePriority(b)-fixturePriority(a));
     const byFixture=fixtureCandidates[0],exact=existingBySourceId.get(key),existing=exact||byFixture;
     if(!exact&&byFixture)matchedByFixture++;
-    const noteData={integration:"MONEYBALL_PUBLIC_AGGREGATOR",sources:(f as any).public_data?.sources||[source],home_form:(f as any).home_form||(f as any).public_data?.home_form||null,away_form:(f as any).away_form||(f as any).public_data?.away_form||null,public_data:(f as any).public_data||null};
+    const noteData={integration:"MONEYBALL_PUBLIC_AGGREGATOR",sources:(f as any).public_data?.sources||[source],home_form:(f as any).home_form||(f as any).public_data?.home_form||null,away_form:(f as any).away_form||(f as any).public_data?.away_form||null,source_url:(f as any).source_url||null,attribution:(f as any).attribution||null,provider_model_ignored:(f as any).provider_model_ignored===true,public_data:(f as any).public_data||null};
     publicDataByKey.set(key,noteData);
     const row={owner_id:ownerId,scan_run_id:run.id,external_id:sourceId,source,competition:f.competition||f.league||null,country:f.country||null,gender:f.gender||"unknown",home_team:f.home_team,away_team:f.away_team,kickoff_at:f.kickoff_at||null,status:f.status||"scheduled"};
     if(existing){
@@ -196,6 +249,7 @@ Deno.serve(async(req)=>{
     const homeForm=data.home_form,awayForm=data.away_form;
     const validForm=(v:any)=>v&&Number.isFinite(Number(v.w))&&Number.isFinite(Number(v.d))&&Number.isFinite(Number(v.l))&&Number(v.w)+Number(v.d)+Number(v.l)===5;
     const capturedAt=new Date().toISOString(),provider_data:any={footynomad_sync:data};
+     if(source==="FootballCharts")provider_data.football_charts={source_url:data.source_url,attribution:data.attribution,provider_model_ignored:data.provider_model_ignored===true,fetched_at:capturedAt};
     const cacheSource=validForm(homeForm)&&validForm(awayForm)?"FootyNomad":"MONEYBALL_PUBLIC_AGGREGATOR";
     if(cacheSource==="FootyNomad")provider_data.footy_nomad_form={home_name:f.home_team,away_name:f.away_team,home:homeForm,away:awayForm,fetched_at:capturedAt};
     cacheRows.push({owner_id:ownerId,match_id:match.id,source:cacheSource,provider_data,captured_at:capturedAt});
@@ -217,7 +271,7 @@ Deno.serve(async(req)=>{
      for(const p of ps||[]){const won=p.market==="1X2"?p.selection===outcome:(p.selection==="1X"?outcome!=="2":p.selection==="X2"?outcome!=="1":outcome!=="X");await db("predictions?id=eq."+p.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{settlement_status:won?"won":"lost",verified:true});settled++;}
     }
    });
-   await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"completed",completed_at:new Date().toISOString(),matches_found:combined.length,notes:"FootyNomad "+result.fixtures.length+"; public fixtures "+publicFixtures.length+"; enriched "+enriched+"; public-only "+publicOnly+"; inserted "+inserted+"; updated "+updated+"; settled "+settled+"; matched by fixture "+matchedByFixture+"; promoted "+promotedToPrimary+"; public source status "+JSON.stringify(publicSourceStatus).slice(0,900)});
+   await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"completed",completed_at:new Date().toISOString(),matches_found:combined.length,notes:"FootyNomad "+result.fixtures.length+"; public fixtures "+publicFixtures.length+"; FootballCharts "+JSON.stringify(footballChartsStatus).slice(0,700)+"; enriched "+enriched+"; public-only "+publicOnly+"; inserted "+inserted+"; updated "+updated+"; settled "+settled+"; matched by fixture "+matchedByFixture+"; promoted "+promotedToPrimary+"; public source status "+JSON.stringify(publicSourceStatus).slice(0,900)});
   }catch(e){await db("scan_runs?id=eq."+run.id+"&owner_id=eq."+encodeURIComponent(ownerId),token,"PATCH",{status:"partial",completed_at:new Date().toISOString(),notes:"Import częściowy: "+String(e)});throw e;}
   // Run the same verified result settlement pipeline used by the scheduled synchronizer.
   // This ensures match results, predictions, coupon legs and coupon statuses stay consistent
@@ -233,6 +287,6 @@ Deno.serve(async(req)=>{
    try{resultSync=syncText?JSON.parse(syncText):{ok:false,error:"Empty result-sync response"};}catch(_){resultSync={ok:false,error:syncText.slice(0,500)};}
    if(!syncResponse.ok)resultSync={...resultSync,ok:false,http_status:syncResponse.status};
   }catch(e){resultSync={ok:false,error:String(e)};}
-  return new Response(JSON.stringify({ok:true,date,total_found:result.total_found,fixtures_count:result.fixtures.length,combined_count:combined.length,public_fixtures:publicFixtures.length,openmatchday_fixtures:publicFixtures.filter((f:any)=>String(f.source||"").toLowerCase()==="openmatchday").length,enriched,public_only:publicOnly,public_source_status:publicSourceStatus,inserted,updated,settled,matched_by_fixture:matchedByFixture,promoted_to_primary:promotedToPrimary,scan_run_id:run.id,result_sync:resultSync}),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
+  return new Response(JSON.stringify({ok:true,date,total_found:result.total_found,fixtures_count:result.fixtures.length,combined_count:combined.length,public_fixtures:publicFixtures.length,openmatchday_fixtures:publicFixtures.filter((f:any)=>String(f.source||"").toLowerCase()==="openmatchday").length,enriched,public_only:publicOnly,public_source_status:publicSourceStatus,football_charts_status:footballChartsStatus,football_charts_fixtures:publicFixtures.filter((f:any)=>String(f.source)==="FootballCharts").length,inserted,updated,settled,matched_by_fixture:matchedByFixture,promoted_to_primary:promotedToPrimary,scan_run_id:run.id,result_sync:resultSync}),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
  }catch(e){return new Response(JSON.stringify({error:String(e)}),{status:400,headers:{...cors,"Content-Type":"application/json"}});}
 });
