@@ -56,7 +56,9 @@ export function stamp() {
 }
 
 /** Validate the complete payload before the first database write. */
-export function validateBackup(data: unknown): { backup: Backup; counts: Partial<Record<TableName, number>> } {
+export type BackupPreviewCounts = Partial<Record<TableName, number>> & { tracker_source_audit?: number };
+
+export function validateBackup(data: unknown): { backup: Backup; counts: BackupPreviewCounts } {
   if (!data || typeof data !== "object" || Array.isArray(data))
     throw new Error("Nieprawidłowy format kopii zapasowej.");
   const candidate = data as Partial<Backup>;
@@ -65,7 +67,7 @@ export function validateBackup(data: unknown): { backup: Backup; counts: Partial
     throw new Error("To nie jest obsługiwana kopia zapasowa MONEYBALL GLOBAL 2.0.");
 
   const allowed = new Set<string>(TABLES_IN_ORDER);
-  const counts: Partial<Record<TableName, number>> = {};
+  const counts: BackupPreviewCounts = {};
   for (const [tableName, rows] of Object.entries(candidate.tables)) {
     if (!allowed.has(tableName))
       throw new Error(`Kopia zawiera nieobsługiwaną tabelę: ${tableName}.`);
@@ -88,6 +90,7 @@ export function validateBackup(data: unknown): { backup: Backup; counts: Partial
   }
   if (candidate.tracker_source_audit !== undefined) {
     if (!Array.isArray(candidate.tracker_source_audit)) throw new Error("Rejestr audytu w kopii musi być listą.");
+    counts.tracker_source_audit = candidate.tracker_source_audit.length;
     const auditIds = new Set<string>();
     for (const [index, row] of candidate.tracker_source_audit.entries()) {
       if (!row || typeof row !== "object" || Array.isArray(row)) {
