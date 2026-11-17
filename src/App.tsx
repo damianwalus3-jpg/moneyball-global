@@ -402,7 +402,7 @@ export default function App() {
                   <span>{Number(row.details.odds).toFixed(2)}</span>
                   <span>{currency(Number(row.details.stake)||0)}</span>
                   <span>{settlement?.status ?? row.status}{typeof settlement?.details.profitLoss === "number" ? ` · ${currency(settlement.details.profitLoss)}` : ""}</span>
-                </div>)}
+                </div>; })}
                 {!bets.length && <div className="tracker-empty">Nie ma jeszcze zapisanych decyzji. Wygeneruj prognozy, a następnie oznacz typ jako wybrany lub odrzucony w tym panelu.</div>}
               </div>
               <h3>Typy gotowe do decyzji</h3>
