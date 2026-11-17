@@ -49,10 +49,10 @@ const COUNTRY_NAMES = [
   "england","scotland","wales","northern ireland","ireland","france","germany","italy","spain","portugal","netherlands","belgium","austria","switzerland","turkey","greece","denmark","sweden","norway","romania","poland","croatia","czech","ukraine","cyprus","slovakia","slovenia","finland","kazakhstan","albania","serbia","bosnia","bulgaria","hungary","iceland","luxembourg","malta","estonia","latvia","lithuania","moldova","georgia","armenia","azerbaijan","macedonia","montenegro","andorra","faroe","gibraltar","israel","kosovo","belarus","liechtenstein","san marino","monaco","vatican","uefa","deutschland","österreich"
 ];
 const OPENLIGA_EXCLUDED_SHORTCUTS = new Set(["bl1test", "blclaude", "bl12026"]);
-const EUROPEAN_TWO_LETTER_SHORTCUTS = new Set(["fr","nl","pt","gr","ch","cz","tr","at","dk","se","no","ro","ie","hr","ua","cy","sk","si","fi","hu","bg","rs","ba","is","lu","mt","ee","lv","lt","md","ge","am","az","mk","me","ad","fo","gi","il","ko","by","li","sm"]);
+const EUROPEAN_COUNTRY_SHORTCUTS = new Set(["eng","esp","ita","fra","ned","por","bel","sco","aut","sui","tur","gre","den","swe","nor","rou","rus","irl","pol","wal","nir","cro","cze","ukr","cyp","svk","svn","fin","kaz","alb","srb","bih","bul","hun","isl","lux","mlt","est","lva","ltu","mda","geo","arm","aze","mkd","mne","and","fro","gib","isr","kos","blr","lie","smr","mco","vat","fr","nl","pt","gr","ch","cz","tr","at","dk","se","no","ro","ie","hr","ua","cy","sk","si","fi","hu","bg","rs","ba","is","lu","mt","ee","lv","lt","md","ge","am","az","mk","me","ad","fo","gi","il","ko","by","li","sm"]);
 const EUROPEAN_SHORTCUT_PREFIXES = [
   "bl","dfb","rl","ol","vl","ll","kl","kreisliga","oberliga","landesliga","verbandsliga","bezirksliga",
-  "eng","esp","ita","fra","ned","por","bel","sco","aut","sui","tur","gre","den","swe","nor","rou","rus","irl","pol","wal","nir","cro","cze","ukr","cyp","svk","svn","fin","kaz","alb","srb","bih","bul","hun","isl","lux","mlt","est","lva","ltu","mda","geo","arm","aze","mkd","mne","and","fro","gib","isr","kos","blr","lie","smr","mco","vat","uefa","ucl","uel","uecl","premierleague","laliga","ligue1","eredivisie","primeiraliga","championsleague","europaleague","conferenceleague","proleague","nofv","regio","thüli","ffb","ere","öbl","oh","pl","wsc","la1","nla","unl","u21dfb","fna","wcl"
+  "uefa","ucl","uel","uecl","premierleague","laliga","ligue1","eredivisie","primeiraliga","championsleague","europaleague","conferenceleague","proleague","nofv","regio","thüli","ffb","ere","öbl","oh","pl","wsc","la1","nla","unl","u21dfb","fna","wcl"
 ];
 
 function parseCsvLine(line: string): string[] {
@@ -121,7 +121,7 @@ export function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
   const name = (league.leagueName ?? "").toLowerCase();
   if (league.sport?.sportName && !league.sport.sportName.toLowerCase().includes("football") && !league.sport.sportName.toLowerCase().includes("fußball") && !league.sport.sportName.toLowerCase().includes("fussball")) return false;
   if (COUNTRY_NAMES.some(country => name.includes(country))) return true;
-  const countryCodeFeed = [...EUROPEAN_TWO_LETTER_SHORTCUTS].some(code => new RegExp("^" + code + "[0-9]").test(shortcut));
+  const countryCodeFeed = [...EUROPEAN_COUNTRY_SHORTCUTS].some(code => new RegExp("^" + code + "(?:[0-9]|[-_])").test(shortcut));
   return countryCodeFeed || EUROPEAN_SHORTCUT_PREFIXES.some(prefix => shortcut === prefix || shortcut.startsWith(prefix));
 }
 export function fixtureKey(date: string, home: string, away: string): string {
