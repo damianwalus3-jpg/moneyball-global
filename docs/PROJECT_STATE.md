@@ -753,3 +753,13 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Cloudflare Main deploy run #410 passed all steps: https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/43945533638.
 - Deployed production Worker version: `aac45b87-2a60-47a8-8c4b-c376e125b476` at https://moneyball-global.damianwalus3.workers.dev.
 - No database migration or data writes were made.
+
+
+## 2026-11-17 — MONEYBALL GLOBAL MAIN: import and scan pipeline repair
+- Production remains Cloudflare Worker MAIN and branch `main`; do not switch to TEST or Vercel.
+- OpenMatchday's technical folder IDs now supply explicit tier metadata. The public-source parser normalizes league/country labels while preserving the provider folder in the external ID. The manual sync, scheduled predictor and frontend use consistent European men's tier-1/tier-2 eligibility.
+- The scheduled predictor now imports today's FootyNomad global feed and public-source fixtures into `matches` before the first prediction page, then deduplicates by Brussels date and ordered team pair. The scheduled response includes `scheduled_import` counters.
+- Active Edge Function versions: `moneyball-public-sources v61`, `footynomad-sync v86`, `moneyball-predict v240`. Cloudflare deploy #680 and CI #1094 passed; 61 tests passed, including European league scope regressions.
+- OpenMatchday's current index has 75 competitions overall and only 38 eligible European domestic tier-1/tier-2 competitions. This is a source coverage ceiling, not complete Europe. Finding additional free, reliable sources for missing European first/second divisions remains open.
+- Existing out-of-scope/historical rows were not deleted. The display and prediction filters exclude them.
+- The 17 Nov 2026 runtime audit after the 08:00 Brussels scan is still pending; verify scheduled import counters, XGoalsPro cache writes, historical form usage, coverage delta, league scope and non-empty source/rationale before marking this repair validated.
