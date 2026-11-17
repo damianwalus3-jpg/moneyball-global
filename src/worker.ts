@@ -7,11 +7,14 @@ export default {
     const url = new URL(request.url);
     const leagues = url.pathname.match(/^\/api\/openligadb\/leagues\/(\d{4})$/);
     const matches = url.pathname.match(/^\/api\/openligadb\/matches\/([a-z0-9._-]+)\/(\d{4})$/i);
+    const teamMatches = url.pathname.match(/^\/api\/openligadb\/team-matches\/([a-z0-9._-]+)\/(\d{4})\/([^/]+)$/i);
 
-    if (leagues || matches) {
+    if (leagues || matches || teamMatches) {
       const upstreamPath = leagues
         ? `/getavailableleagues/${leagues[1]}`
-        : `/getmatchdata/${matches![1]}/${matches![2]}`;
+         : teamMatches
+          ? `/getmatchdata/${teamMatches[1]}/${teamMatches[2]}/${encodeURIComponent(decodeURIComponent(teamMatches[3]))}`
+          : `/getmatchdata/${matches![1]}/${matches![2]}`;
       const cacheKey = new Request(url.toString(), { method: "GET" });
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
       const cached = await cache.match(cacheKey);
