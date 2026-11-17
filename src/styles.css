@@ -18,3 +18,8 @@
 .team-form-panel small { font-size: 11px; color: var(--muted, #9aa4b2); }
 .team-form-panel p { grid-column: 1 / -1; font-size: 10px; color: var(--muted, #9aa4b2); margin: 0; }
 @media (max-width: 640px) { .fixture-row-expanded { grid-template-columns: 48px 1fr auto; } .fixture-row-expanded > small { grid-column: 2; } .fixture-row-expanded .form-button { grid-column: 3; grid-row: 1 / span 2; } .team-form-panel { grid-template-columns: 1fr; } }
+
+.form-prediction { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 12px; border: 1px solid rgba(112,223,182,.25); border-radius: 8px; background: rgba(39,100,79,.10); }
+.form-prediction b { width: 100%; color: #8ce6bf; font-size: 12px; }
+.form-prediction span { color: #d5e0ed; font-size: 11px; }
+.form-prediction small { width: 100%; color: #8798ad; font-size: 10px; line-height: 1.5; }
