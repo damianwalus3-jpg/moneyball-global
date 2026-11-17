@@ -106,6 +106,7 @@ function TrackerPage() {
   const scanRow = scan.data;
   const categoryRows = categories.data ?? [];
   const newCategoryKey = (() => { try { return makeTrackerCategoryKey(newCategoryName); } catch { return ""; } })();
+  const categoryKeyExists = categoryRows.some((category) => category.category_key === newCategoryKey);
   const jackpotRows = jackpot.data ?? [];
   const couponRows = coupons.data ?? [];
   const couponById = new Map(couponRows.map((coupon) => [coupon.id, coupon]));
@@ -198,9 +199,8 @@ function TrackerPage() {
                 </select>
                 <Button
                   variant="outline"
-                  disabled={!newCategoryName.trim() || !newCategoryKey || addCategory.isPending}
+                  disabled={!newCategoryName.trim() || !newCategoryKey || categoryKeyExists || addCategory.isPending}
                   onClick={() => {
-                    if (categoryRows.some((category) => category.category_key === newCategoryKey)) return;
                     addCategory.mutate({
                       name: newCategoryName.trim(),
                       key: newCategoryKey,
