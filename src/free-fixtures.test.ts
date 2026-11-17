@@ -81,5 +81,6 @@ describe("OpenLigaDB European country shortcut coverage", () => {
 
   it("does not admit arbitrary words that merely start with a country prefix", () => {
     expect(isEuropeanOpenLiga({ leagueId: 101, leagueName: "Latin American Cup", leagueShortcut: "latam-cup", sport: { sportName: "Fußball" } })).toBe(false);
+    expect(isEuropeanOpenLiga({ leagueId: 102, leagueName: "Franchise Cup", leagueShortcut: "franchise", sport: { sportName: "Fußball" } })).toBe(false);
   });
 });
