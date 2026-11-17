@@ -194,7 +194,11 @@ export default function App() {
     } catch (error) { setScanError(error instanceof Error ? error.message : "Nie udało się pobrać terminarza."); }
     finally { setScanLoading(false); }
   };
-  useEffect(() => { void runFixtureScan(); }, []);
+  useEffect(() => {
+    void runFixtureScan();
+    const refreshId = window.setInterval(() => void runFixtureScan(true), 15 * 60 * 1000);
+    return () => window.clearInterval(refreshId);
+  }, []);
   const fileRef = useRef<HTMLInputElement>(null);
   const modelAudit = useMemo(() => auditTrackerPredictions(records), [records]);
   const visibleRecords = useMemo(() => records.filter(row => (active === "tracker" ? true : row.kind === (active === "matches" ? "match" : active === "coupons" ? "coupon" : active === "pick" ? "prediction" : "scan")) && (row.title.toLowerCase().includes(query.toLowerCase()) || row.status.toLowerCase().includes(query.toLowerCase()))), [records, active, query]);
