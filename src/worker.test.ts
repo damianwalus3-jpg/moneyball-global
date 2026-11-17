@@ -142,7 +142,7 @@ describe("odds provider pilot proxy", () => {
   it("does not call a provider when its Worker secret is missing", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?fixtureId=fixture-123"), { ASSETS: { fetch: vi.fn() }, ODDS_PILOT_TOKEN: "test-pilot-token" }, { waitUntil: vi.fn() });
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?fixtureId=fixture-123", { headers: { Authorization: "Bearer test-pilot-token" } }), { ASSETS: { fetch: vi.fn() }, ODDS_PILOT_TOKEN: "test-pilot-token" }, { waitUntil: vi.fn() });
     const body = await response.json() as { results: { oddspapi: { status: string } } };
     expect(body.results.oddspapi.status).toBe("not_configured");
     expect(fetchMock).not.toHaveBeenCalled();
