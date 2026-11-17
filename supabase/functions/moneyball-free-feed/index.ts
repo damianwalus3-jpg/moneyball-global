@@ -49,7 +49,8 @@ function isTopTwoTierLeague(competition: unknown, country?: unknown): boolean {
     || (["albania", "alb"].includes(scopeCountry) && /\b2nd division\b/.test(scopeLabel))
     || (["croatia", "cro"].includes(scopeCountry) && /\bsecond nl\b/.test(scopeLabel))
     || (["estonia", "est"].includes(scopeCountry) && /\besiliiga b\b/.test(scopeLabel))
-    || (["greece", "gre", "grc"].includes(scopeCountry) && /\bfootball league\b/.test(scopeLabel))) return false;
+    || (["greece", "gre", "grc"].includes(scopeCountry) && /\bfootball league\b/.test(scopeLabel))
+    || (["poland", "pol"].includes(scopeCountry) && /\b(ii|2) liga\b/.test(scopeLabel))) return false;
   const comp = String(competition ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   if (!comp) return false;
   if (/\bserie c\b|\blega pro\b|\bserie c1\b|\bserie c2\b/.test(comp)) return false;

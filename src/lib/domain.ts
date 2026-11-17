@@ -180,7 +180,8 @@ export function isEuropeanTopTwoLeague(country: string | null | undefined, compe
     || (["albania", "alb"].includes(c) && /\b2nd division\b/.test(league))
     || (["croatia", "cro"].includes(c) && /\bsecond nl\b/.test(league))
     || (["estonia", "est"].includes(c) && /\besiliiga b\b/.test(league))
-    || (["greece", "gre", "grc"].includes(c) && /\bfootball league\b/.test(league))) return false;
+    || (["greece", "gre", "grc"].includes(c) && /\bfootball league\b/.test(league))
+    || (["poland", "pol"].includes(c) && /\b(ii|2) liga\b/.test(league))) return false;
   if (/\bserie c\b|\blega pro\b|\bserie c1\b|\bserie c2\b/.test(league)) return false;
   if (/\bleague one\b|\bleague two\b|\bleague three\b/.test(league)) return false;
   if (/\b(uefa|nations league|champions league|europa league|conference league|world cup|international|national [2-5])\b/.test(league)) return false;
