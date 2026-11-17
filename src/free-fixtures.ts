@@ -14,10 +14,35 @@ interface LeagueIndex {
   generated_utc: string;
   leagues: Array<{ league: string; folder: string; fixtures: number; errors?: string[] }>;
 }
+interface OpenLigaLeague {
+  leagueId: number;
+  leagueName?: string | null;
+  leagueShortcut?: string | null;
+  leagueSeason?: string | null;
+  sport?: { sportName?: string | null; sportId?: number };
+}
+interface OpenLigaMatch {
+  matchID?: number;
+  matchDateTime?: string | null;
+  matchDateTimeUTC?: string | null;
+  leagueName?: string | null;
+  leagueShortcut?: string | null;
+  team1?: { teamName?: string | null };
+  team2?: { teamName?: string | null };
+}
 const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
-const SOURCE = "open-matchday (public CSV; non-commercial terms)";
-const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","UEFA"]);
-const CACHE_KEY = "moneyball.free-fixtures.v2";
+const OPENLIGA = "https://api.openligadb.de";
+const SOURCE = "open-matchday + OpenLigaDB (darmowe źródła publiczne)";
+const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","ISR","KOS","UEFA"]);
+const CACHE_KEY = "moneyball.free-fixtures.v3";
+const CACHE_MS = 30 * 60 * 1000;
+const COUNTRY_NAMES = [
+  "england","scotland","wales","northern ireland","ireland","france","germany","italy","spain","portugal","netherlands","belgium","austria","switzerland","turkey","greece","denmark","sweden","norway","romania","poland","croatia","czech","ukraine","cyprus","slovakia","slovenia","finland","kazakhstan","albania","serbia","bosnia","bulgaria","hungary","iceland","luxembourg","malta","estonia","latvia","lithuania","moldova","georgia","armenia","azerbaijan","macedonia","montenegro","andorra","faroe","gibraltar","israel","kosovo","uefa"
+];
+const EUROPEAN_SHORTCUT_PREFIXES = [
+  "bl","dfb","rl","ol","vl","ll","kl","kreisliga","oberliga","landesliga","verbandsliga","bezirksliga",
+  "eng","esp","ita","fra","ned","por","bel","sco","aut","sui","tur","gre","den","swe","nor","rou","rus","irl","pol","wal","nir","cro","cze","ukr","cyp","svk","svn","fin","kaz","alb","srb","bih","bul","hun","isl","lux","mlt","est","lva","ltu","mda","geo","arm","aze","mkd","mne","and","fro","gib","isr","kos","uefa","ucl","uel","uecl"
+];
 
 function parseCsvLine(line: string): string[] {
   const out: string[] = [];
@@ -41,15 +66,21 @@ function parseCsv(text: string): Array<Record<string,string>> {
     return Object.fromEntries(headers.map((header, i) => [header, values[i] ?? ""]));
   });
 }
-function brusselsDate(now = new Date()): string {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
-  const part = (key: string) => parts.find(p => p.type === key)?.value ?? "";
-  return `${part("year")}-${part("month")}-${part("day")}`;
+function brusselsParts(date: Date): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
+  const get = (key: string) => parts.find(p => p.type === key)?.value ?? "";
+  return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
 }
+function brusselsDate(now = new Date()): string { return brusselsParts(now).date; }
 async function fetchText(url: string): Promise<string> {
   const response = await fetch(url, { headers: { Accept: "text/plain" } });
-  if (!response.ok) throw new Error(`Źródło zwróciło HTTP ${response.status}: ${url.split("/").slice(-2).join("/")}`);
+  if (!response.ok) throw new Error(`HTTP ${response.status}: ${url.split("/").slice(-2).join("/")}`);
   return response.text();
+}
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(`HTTP ${response.status}: OpenLigaDB`);
+  return response.json() as Promise<T>;
 }
 async function pooled<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
@@ -61,6 +92,17 @@ async function pooled<T, R>(items: T[], limit: number, fn: (item: T) => Promise<
     }
   }));
   return results;
+}
+function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
+  const shortcut = (league.leagueShortcut ?? "").toLowerCase();
+  const name = (league.leagueName ?? "").toLowerCase();
+  if (league.sport?.sportName && !league.sport.sportName.toLowerCase().includes("football") && !league.sport.sportName.toLowerCase().includes("fußball")) return false;
+  if (COUNTRY_NAMES.some(country => name.includes(country))) return true;
+  return EUROPEAN_SHORTCUT_PREFIXES.some(prefix => shortcut === prefix || shortcut.startsWith(prefix));
+}
+function fixtureKey(date: string, home: string, away: string): string {
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return `${date}|${normalize(home)}|${normalize(away)}`;
 }
 export interface FixtureScan {
   date: string;
@@ -78,40 +120,118 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       const cached = localStorage.getItem(CACHE_KEY);
       if (cached) {
         const data = JSON.parse(cached) as FixtureScan & { cachedAt: number };
-        if (data.date === date && Date.now() - data.cachedAt < 30 * 60 * 1000) return { ...data, cache: true };
+        if (data.date === date && Date.now() - data.cachedAt < CACHE_MS) return { ...data, cache: true };
       }
     } catch { /* ignore invalid cache */ }
   }
-  const index = JSON.parse(await fetchText(`${ROOT}/build_summary.json`)) as LeagueIndex;
-  const leagues = index.leagues.filter(league => {
-    const code = league.folder.split("/").pop()?.split("_")[0] ?? "";
-    const isDomesticLeague = !league.folder.includes("_CUP_") && !league.folder.includes("_U21_") && code !== "UEFA";
-    return EUROPE.has(code) && isDomesticLeague && league.fixtures > 0;
-  });
-  const responses = await pooled(leagues, 8, async league => {
-    const folder = league.folder.replace(/^data\//, "");
-    try {
-      const csv = await fetchText(`${ROOT}/${league.folder}/fixtures_2627.csv`);
-      const fixtures = parseCsv(csv).filter(row => row.date === date).map(row => ({
-        id: `${folder}|${row.gw}|${row.date}|${row.time}|${row.home}|${row.away}`,
-        competition: league.league,
-        countryCode: folder.split("_")[0],
-        leagueFolder: folder,
-        date: row.date,
-        time: row.time,
-        home: row.home,
-        away: row.away,
-        source: SOURCE,
-        sourceUpdatedAt: index.generated_utc,
-      }));
-      return { fixtures, error: "" };
-    } catch (error) {
-      return { fixtures: [] as FreeFixture[], error: `${league.league}: ${error instanceof Error ? error.message : "błąd źródła"}` };
+
+  const errors: string[] = [];
+  const byKey = new Map<string, FreeFixture>();
+  let generatedAt = new Date().toISOString();
+  let openMatchdayChecked = 0;
+  let openLigaChecked = 0;
+
+  // Source 1: every European folder in open-matchday, including cups and youth competitions.
+  try {
+    const index = JSON.parse(await fetchText(`${ROOT}/build_summary.json`)) as LeagueIndex;
+    generatedAt = index.generated_utc;
+    const leagues = index.leagues.filter(league => {
+      const folder = league.folder.split("/").pop() ?? "";
+      const code = folder.split("_")[0];
+      return EUROPE.has(code) && league.fixtures > 0;
+    });
+    openMatchdayChecked = leagues.length;
+    const responses = await pooled(leagues, 8, async league => {
+      const folder = league.folder.replace(/^data\//, "");
+      try {
+        const csv = await fetchText(`${ROOT}/${league.folder}/fixtures_2627.csv`);
+        const fixtures = parseCsv(csv).filter(row => row.date === date && row.home && row.away).map(row => ({
+          id: `open-matchday|${folder}|${row.gw}|${row.date}|${row.time}|${row.home}|${row.away}`,
+          competition: league.league,
+          countryCode: folder.split("_")[0],
+          leagueFolder: folder,
+          date: row.date,
+          time: row.time || "—",
+          home: row.home,
+          away: row.away,
+          source: "open-matchday",
+          sourceUpdatedAt: index.generated_utc,
+        } satisfies FreeFixture));
+        return { fixtures, error: "" };
+      } catch (error) {
+        return { fixtures: [] as FreeFixture[], error: `open-matchday · ${league.league}: ${error instanceof Error ? error.message : "błąd źródła"}` };
+      }
+    });
+    for (const response of responses) {
+      if (response.error) errors.push(response.error);
+      for (const fixture of response.fixtures) byKey.set(fixtureKey(fixture.date, fixture.home, fixture.away), fixture);
     }
-  });
-  const fixtures = responses.flatMap(row => row.fixtures).sort((a,b) => a.time.localeCompare(b.time) || a.competition.localeCompare(b.competition));
-  const failed = responses.flatMap(row => row.error ? [row.error] : []);
-  const result: FixtureScan = { date, generatedAt: index.generated_utc, fixtures, leaguesChecked: leagues.length, leaguesFailed: failed, source: SOURCE, cache: false };
+  } catch (error) {
+    errors.push(`open-matchday · ${error instanceof Error ? error.message : "indeks niedostępny"}`);
+  }
+
+  // Source 2: OpenLigaDB's season catalogue and match feeds. Respect its 60 req/min fair-use limit.
+  try {
+    const year = Number(date.slice(0, 4));
+    const leagues = (await fetchJson<OpenLigaLeague[]>(`${OPENLIGA}/getavailableleagues/${year}`)).filter(isEuropeanOpenLiga);
+    let nextRequestAt = 0;
+    const throttledMatches = await pooled(leagues, 4, async league => {
+      const wait = Math.max(0, nextRequestAt - Date.now());
+      nextRequestAt = Math.max(Date.now(), nextRequestAt) + 1050;
+      if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+      const shortcut = league.leagueShortcut ?? "";
+      const season = league.leagueSeason ?? String(year);
+      try {
+        const matches = await fetchJson<OpenLigaMatch[]>(`${OPENLIGA}/getmatchdata/${encodeURIComponent(shortcut)}/${encodeURIComponent(season)}`);
+        const fixtures = matches.flatMap(match => {
+          const kickoff = match.matchDateTimeUTC || match.matchDateTime;
+          const home = match.team1?.teamName?.trim();
+          const away = match.team2?.teamName?.trim();
+          if (!kickoff || !home || !away) return [];
+          const local = brusselsParts(new Date(kickoff));
+          if (local.date !== date) return [];
+          return [{
+            id: `openligadb|${match.matchID ?? shortcut + "|" + kickoff + "|" + home + "|" + away}`,
+            competition: match.leagueName || league.leagueName || shortcut,
+            countryCode: "EU",
+            leagueFolder: "",
+            date: local.date,
+            time: local.time,
+            home,
+            away,
+            source: "OpenLigaDB",
+            sourceUpdatedAt: new Date().toISOString(),
+          } satisfies FreeFixture];
+        });
+        return { fixtures, error: "" };
+      } catch (error) {
+        return { fixtures: [] as FreeFixture[], error: `OpenLigaDB · ${league.leagueName || shortcut}: ${error instanceof Error ? error.message : "błąd źródła"}` };
+      }
+    });
+    openLigaChecked = leagues.length;
+    for (const response of throttledMatches) {
+      if (response.error) errors.push(response.error);
+      for (const fixture of response.fixtures) {
+        const key = fixtureKey(fixture.date, fixture.home, fixture.away);
+        const existing = byKey.get(key);
+        if (existing) existing.source = `${existing.source} + OpenLigaDB`;
+        else byKey.set(key, fixture);
+      }
+    }
+  } catch (error) {
+    errors.push(`OpenLigaDB · ${error instanceof Error ? error.message : "katalog niedostępny"}`);
+  }
+
+  const fixtures = [...byKey.values()].sort((a,b) => a.time.localeCompare(b.time) || a.competition.localeCompare(b.competition));
+  const result: FixtureScan = {
+    date,
+    generatedAt,
+    fixtures,
+    leaguesChecked: openMatchdayChecked + openLigaChecked,
+    leaguesFailed: errors,
+    source: SOURCE,
+    cache: false,
+  };
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ...result, cachedAt: Date.now() })); } catch { /* storage may be full */ }
   return result;
 }
