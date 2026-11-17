@@ -50,7 +50,7 @@ const COUNTRY_NAMES = [
 ];
 const EUROPEAN_SHORTCUT_PREFIXES = [
   "bl","dfb","rl","ol","vl","ll","kl","kreisliga","oberliga","landesliga","verbandsliga","bezirksliga",
-  "eng","esp","ita","fra","ned","por","bel","sco","aut","sui","tur","gre","den","swe","nor","rou","rus","irl","pol","wal","nir","cro","cze","ukr","cyp","svk","svn","fin","kaz","alb","srb","bih","bul","hun","isl","lux","mlt","est","lva","ltu","mda","geo","arm","aze","mkd","mne","and","fro","gib","isr","kos","blr","lie","smr","mco","vat","uefa","ucl","uel","uecl","premierleague","laliga","ligue1","eredivisie","primeiraliga","championsleague","europaleague","conferenceleague","proleague","nofv","regio","thüli","ffb","ere","öbl","oh"
+  "eng","esp","ita","fra","ned","por","bel","sco","aut","sui","tur","gre","den","swe","nor","rou","rus","irl","pol","wal","nir","cro","cze","ukr","cyp","svk","svn","fin","kaz","alb","srb","bih","bul","hun","isl","lux","mlt","est","lva","ltu","mda","geo","arm","aze","mkd","mne","and","fro","gib","isr","kos","blr","lie","smr","mco","vat","uefa","ucl","uel","uecl","premierleague","laliga","ligue1","eredivisie","primeiraliga","championsleague","europaleague","conferenceleague","proleague","nofv","regio","thüli","ffb","ere","öbl","oh","pl","wsc"
 ];
 
 function parseCsvLine(line: string): string[] {
