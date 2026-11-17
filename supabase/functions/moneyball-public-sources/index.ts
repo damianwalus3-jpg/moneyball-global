@@ -171,15 +171,15 @@ async function openMatchday(date: string) {
   const index = await safeText(LEAGUE_INDEX);
   // OpenMatchday folders encode the official competition tier: <COUNTRY>_<TIER>_<slug>.
   // Use human-readable league/country labels downstream, while retaining the folder ID.
-  const indexRows = [...index.matchAll(/^\\|\\s*`([A-Za-z0-9_-]+)`\\s*\\|\\s*([^|]+)\\|\\s*([^|]+)\\|/gm)];
+  const indexRows = [...index.matchAll(/^\|\s*`([A-Za-z0-9_-]+)`\s*\|\s*([^|]+)\|\s*([^|]+)\|/gm)];
   const leagueNameByFolder = new Map(indexRows.map(m => [m[1], m[2].trim()]));
   const countryNameByFolder = new Map(indexRows.map(m => [m[1], m[3].trim()]));
   const eligibleIndexRows = indexRows.filter(m => {
     const folder = m[1], tier = folder.match(/^([A-Z]{3})_([12])_[A-Za-z0-9-]+$/i);
-    const country = m[3].trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+    const country = m[3].trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const league = m[2].trim();
     return !!tier && EUROPE_COUNTRIES.has(country) && !["europe", "uefa"].includes(country)
-      && !/\\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\\b/i.test(folder + " " + league);
+      && !/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\b/i.test(folder + " " + league);
   });
   const folders = eligibleIndexRows.map(m => m[1]);
   const unique = [...new Set(folders)];
