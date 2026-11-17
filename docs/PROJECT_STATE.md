@@ -1227,3 +1227,14 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - Verified live metadata after deployment: function `footynomad-sync` status ACTIVE, version 99, `verify_jwt=true`, entrypoint `source/index.ts`, single deployed file `index.ts`. The bundle includes the corrected Bearer extraction and M49 country filter. No auth setting was weakened and no database rows were deleted/rewritten.
 - Cloudflare MAIN remains deployed at commit `5ff5fc72050dc3265d5203c6226d86061ffa960a`; CI #1233 and Cloudflare deploy #819 succeeded. Documentation was updated on MAIN after the live activation.
 - **Still required for end-to-end proof:** a real authenticated POST scan from the app after v99 and inspection of its function logs plus `scan_runs`/matches results. The most recent database scan rows inspected pre-deployment were not a post-v99 test. Do not claim the user's button is fully verified until a post-deploy scan returns 2xx and stores the expected eligible European fixtures.
+
+
+## All-tier European domestic fixture scope — 2026-11-17
+
+- Latest user request expands match discovery from first/second tier only to ALL senior men's domestic league tiers in geographic Europe (UN M49).
+- Still exclude cups/knockouts, international and national-team competitions, youth/U teams, women's competitions, reserve/B/II/III teams, and all non-European countries.
+- Root cause of the low count: the previous tier allowlist explicitly rejected lower divisions. The 11:45 Brussels manual request was healthy after footynomad-sync v99 (HTTP 200, completed scan, two stored matches); the count reflected the old scope, not a truncated response.
+- Independent FootyNomad review identified previously rejected senior domestic fixtures in France National 2, Czech 3. liga, England National League North/South and Non-League Premier, and Scotland Lowland League. Ukraine Persha Liga fixture UCSA–Polissya II remains excluded as a reserve side.
+- Source changes on MAIN: shared domestic-league-scope helper and Deno tests; all-tier filters in footynomad-sync, moneyball-free-feed, moneyball-predict and OpenMatchday catalogue discovery; frontend eligibility and match-screen text updated; SQL migration 20261117150000_expand_european_leagues_to_all_senior_tiers.sql.
+- Geographic M49 country boundary is unchanged: Albania included; Israel, Armenia, Azerbaijan, Cyprus, Georgia, Kazakhstan and Türkiye excluded.
+- End-to-end verification is still required: CI and Cloudflare MAIN deploy, SQL migration, four Edge Function deployments, then authenticated manual scan checking lower-tier inclusion and cup/international/youth/women/reserve/non-European exclusions. Do not call the task complete until those checks pass.
