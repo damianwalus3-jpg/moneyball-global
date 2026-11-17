@@ -20,6 +20,7 @@ describe("Tracker legacy normalization", () => {
     expect(resolveTrackerCategory("MEGA")).toBe("MEGA");
     expect(resolveTrackerCategory("some new label")).toBe("UNCLASSIFIED");
     expect(resolveTrackerCategory(null)).toBe("UNCLASSIFIED");
+    expect(resolveTrackerCategory("__NULL__")).toBe("UNCLASSIFIED");
   });
 
   it("maps only explicit legacy decision states", () => {
