@@ -496,3 +496,12 @@
 - This is a model-ranked candidate, not a guaranteed bet. Double Chance probabilities remain mathematically derived from the 1X2 model and are not independently calibrated.
 - European fixture coverage audit: the scanner queries all non-empty European folders listed in open-matchday's public build index, all catalogue entries accepted by its OpenLigaDB Europe classifier, and the current OpenFootball Europe feed list. It merges duplicate team/date matches. It cannot prove that every European fixture exists in these feeds: source catalogues are incomplete, OpenLigaDB classification uses league-name/shortcut heuristics, and deduplication currently keys by date+normalized teams (not competition/kickoff). The UI must not claim 100% coverage; source counts and fetch failures are the verifiable coverage evidence.
 - CI and Cloudflare deployment required before marking this stage deployed. Country-by-country independent fixture reconciliation remains outstanding.
+
+
+## Stage 48 — selected/rejected odds and stake ledger
+- Added a dedicated Stawki workspace for manual tracking of model predictions as selected or rejected decisions.
+- Both decision types retain market, decimal odds, fixture, competition and decision history. Selected entries require a positive stake and calculate potential return/profit; rejected entries always carry zero stake and remain hypothetical.
+- Added summary metrics for selected count, settled count, wins/losses, net P/L, ROI, average odds and rejected-pick hit rate once settlement data is available.
+- The current UI records decisions and odds locally in the existing Tracker store. Automatic settlement/P&L and rejected-pick counterfactual grading are the next implementation gate; until then open records must not be counted as realized profit/loss.
+- Existing Tracker history and backup format remain preserved; new record kind is additive.
+- CI and Cloudflare deployment required before marking this stage complete.
