@@ -5,7 +5,7 @@ import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadOpenLigaRecentTe
 import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
 import { buildThreeLegCandidates } from "./coupon-engine";
 import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from "./openfootball";
-import { evaluatePaperCoupon } from "./coupon-settlement";
+import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
 import { shouldAppendPrediction } from "./prediction-record";
@@ -220,25 +220,7 @@ export default function App() {
         && !latest.some(item => item.kind === "coupon" && item.details.parentCouponId === row.id));
       const settlementRows = coupons.flatMap(coupon => {
         const settlement = evaluatePaperCoupon(coupon, latest);
-        return settlement ? [{
-          kind: "coupon" as const,
-          title: `${coupon.title} · ${settlement.correctLegs}/3`,
-          status: settlement.status,
-          details: {
-            parentCouponId: coupon.id,
-            correctLegs: settlement.correctLegs,
-            totalLegs: settlement.totalLegs,
-            legResultsJson: JSON.stringify(settlement.legResults),
-            bookmaker: coupon.details.bookmaker ?? null,
-            odds: typeof coupon.details.odds === "number" ? coupon.details.odds : null,
-            stake: typeof coupon.details.stake === "number" ? coupon.details.stake : null,
-            profitLoss: typeof coupon.details.odds === "number" && typeof coupon.details.stake === "number"
-              ? (settlement.status === "PAPER_HIT" ? coupon.details.stake * (coupon.details.odds - 1) : -coupon.details.stake)
-              : null,
-            potentialReturn: typeof coupon.details.odds === "number" && typeof coupon.details.stake === "number" && settlement.status === "PAPER_HIT"
-              ? coupon.details.stake * coupon.details.odds : 0,
-          },
-        }] : [];
+        return settlement ? [buildPaperCouponSettlementRecord(coupon, settlement)] : [];
       });
       addRecordsIfMissing(settlementRows, "parentCouponId");
       addRecordsIfMissing(buildBetSettlementRows(latest), "parentBetId");
