@@ -776,3 +776,13 @@
 - Added tests for priced win, priced loss, unpriced legacy coupon and invalid price/stake.
 - Commits: helper 931c1f4ffde9a1e47007a75e67f27ad13889b9f7; App integration dae0748baee6d5ef1685aefd6796809cece2f9ea; tests d6acb2964858fe6380a3bf7db42cbf2462ff7bf6.
 - Validation and deployment for Stage 63 are pending the latest CI and Cloudflare workflow results.
+
+
+- Stage 63 validation: GitHub Actions on commit f796b532e34f1bf94c4c91cd05943ff1e5926916 reported MONEYBALL rebuild CI success; the deployment workflow reached successful build, typecheck, test, production build and Cloudflare deploy steps. The Stage 63 changes are validated and deployed on the separate REBUILD Worker.
+
+## Stage 64 — latest prediction controls coupon eligibility (2026-11-18)
+- Deeper coupon-engine audit found a separate stale-candidate bug: candidate generation filtered out rejected/weak prediction rows BEFORE choosing the newest row per fixture. Consequently, an older KANDYDAT at 75%+ could remain in a coupon even after a newer ODRZUCONY or weak prediction existed.
+- Changed the order of operations: first choose the newest prediction record per fixture/date regardless of status/eligibility, then apply the KANDYDAT, strongCandidate, normalized-probability, top-selection and 75% rules. Newer rejected/weak rows now invalidate old candidates.
+- Added regression tests for a newer rejected prediction and a newer weak prediction superseding an older strong candidate.
+- Commits: implementation 5fc3d8470089d1c01a2cad0f8b7d3175fc883d7b; tests 1ee2f7d9aef18e12ab19a4b486410aab3e0a3d9d.
+- Validation/deployment: pending latest branch workflow results. Existing Tracker rows are read-only; no records or bankroll values were changed.
