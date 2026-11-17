@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { scanTodayEuropeanFixtures, type FixtureScan } from "./free-fixtures";
+import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
 import { addRecord, exportBackup, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { loadOpenLigaRecentTeamForm, loadRecentTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
@@ -33,6 +33,39 @@ function Metric({ label, value, note, icon: Icon }: { label: string; value: stri
   return <article className="metric-card"><div className="metric-top"><span>{label}</span><Icon size={17} /></div><strong>{value}</strong><small>{note}</small></article>;
 }
 
+function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, reason?: string): TrackerRecord[] {
+  const model = "recent-form-goals-poisson-v1";
+  const existing = readRecords().some(row => row.kind === "prediction" && row.details.fixtureId === match.id && row.details.model === model);
+  if (existing) return readRecords();
+  const probabilities = prediction?.prediction.probabilities;
+  const dc = prediction?.prediction.doubleChance;
+  addRecord({
+    kind: "prediction",
+    title: `${match.date} · ${match.home} vs ${match.away}`,
+    status: prediction?.strongCandidate ? "KANDYDAT" : "ODRZUCONY",
+    details: {
+      fixtureId: match.id,
+      competition: match.competition,
+      model,
+      market: "1X2",
+      selection: prediction?.pick ?? null,
+      p1: probabilities?.home ?? null,
+      px: probabilities?.draw ?? null,
+      p2: probabilities?.away ?? null,
+      dc1x: dc?.oneX ?? null,
+      dcx2: dc?.xTwo ?? null,
+      dc12: dc?.oneTwo ?? null,
+      expectedGoalsHome: prediction?.prediction.expectedGoals.home ?? null,
+      expectedGoalsAway: prediction?.prediction.expectedGoals.away ?? null,
+      topProbability: prediction?.topProbability ?? null,
+      strongCandidate: prediction?.strongCandidate ?? false,
+      source: match.source,
+      reason: reason ?? (prediction && !prediction.strongCandidate ? "Najwyższe prawdopodobieństwo poniżej progu 75%." : null),
+    },
+  });
+  return readRecords();
+}
+
 export default function App() {
   const [active, setActive] = useState<Tab>("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -59,11 +92,23 @@ export default function App() {
       try { prediction = predictFromRecentForm(home, away); }
       catch (error) { predictionError = error instanceof Error ? error.message : "Za mało danych do prognozy."; }
       setTeamForms(current => ({ ...current, [match.id]: { home, away, prediction, predictionError, loading: false } }));
+      setRecords(savePredictionRecord(match, prediction, predictionError));
     } catch (error) {
-      setTeamForms(current => ({ ...current, [match.id]: { loading: false, error: error instanceof Error ? error.message : "Nie udało się pobrać formy." } }));
+      const message = error instanceof Error ? error.message : "Nie udało się pobrać formy.";
+      setTeamForms(current => ({ ...current, [match.id]: { loading: false, error: message } }));
+      setRecords(savePredictionRecord(match, undefined, message));
     }
   };
-  const runFixtureScan = async (force = false) => { setScanLoading(true); setScanError(""); try { setFixtureScan(await scanTodayEuropeanFixtures(force)); } catch (error) { setScanError(error instanceof Error ? error.message : "Nie udało się pobrać terminarza."); } finally { setScanLoading(false); } };
+  const runFixtureScan = async (force = false) => {
+    setScanLoading(true); setScanError("");
+    try {
+      const scan = await scanTodayEuropeanFixtures(force);
+      setFixtureScan(scan);
+      addRecord({ kind: "scan", title: `Skan europejski ${scan.date}`, status: scan.leaguesFailed.length ? "WITH_WARNINGS" : "OK", details: { fixtures: scan.fixtures.length, catalogueEntries: scan.leaguesChecked, errors: scan.leaguesFailed.length, source: scan.source } });
+      setRecords(readRecords());
+    } catch (error) { setScanError(error instanceof Error ? error.message : "Nie udało się pobrać terminarza."); }
+    finally { setScanLoading(false); }
+  };
   useEffect(() => { void runFixtureScan(); }, []);
   const fileRef = useRef<HTMLInputElement>(null);
   const visibleRecords = useMemo(() => records.filter(row => (active === "tracker" ? true : row.kind === (active === "matches" ? "match" : active === "coupons" ? "coupon" : active === "pick" ? "prediction" : "scan")) && (row.title.toLowerCase().includes(query.toLowerCase()) || row.status.toLowerCase().includes(query.toLowerCase()))), [records, active, query]);
@@ -102,7 +147,7 @@ export default function App() {
         {active === "dashboard" && <>
           <section className="welcome-panel"><div className="welcome-glow"/><div className="welcome-copy"><div className="welcome-tag"><Sparkles size={14}/> NOWY ROZDZIAŁ</div><h2>Najpierw dane.<br/><em>Potem decyzje.</em></h2><p>Nowa platforma analityczna budowana od podstaw. Bez fikcyjnych statystyk i bez ukrywania brakujących informacji.</p><button className="primary-button" onClick={() => changeTab("tracker")}>Otwórz Tracker <ChevronRight size={16}/></button></div><div className="welcome-visual"><div className="orb orb-one"/><div className="orb orb-two"/><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="visual-center"><Activity size={36}/><span>MB</span></div><div className="visual-label label-top">DATA FIRST</div><div className="visual-label label-bottom">MODEL VERIFIED</div></div></section>
           <div className="section-title"><div><h3>Stan systemu</h3><p>Nowa instalacja — brak zaimportowanych danych</p></div><span className="neutral-tag">INITIALIZING</span></div>
-          <section className="metrics-grid"><Metric label="Dzisiejsze mecze" value={fixtureScan ? String(fixtureScan.fixtures.length) : "—"} note={fixtureScan ? `Europa · ${fixtureScan.leaguesChecked} pozycji katalogu` : scanError ? "Źródło chwilowo niedostępne" : "Pobieranie darmowego terminarza"} icon={CalendarDays}/><Metric label="Prognozy" value="0" note="Nowy rejestr prognoz" icon={Gauge}/><Metric label="Aktywne kupony" value="0" note="Brak zapisanych kuponów" icon={Ticket}/><Metric label="Tracker" value={String(records.length)} note="Wpisy zapisane lokalnie na urządzeniu" icon={Database}/></section>
+          <section className="metrics-grid"><Metric label="Dzisiejsze mecze" value={fixtureScan ? String(fixtureScan.fixtures.length) : "—"} note={fixtureScan ? `Europa · ${fixtureScan.leaguesChecked} pozycji katalogu` : scanError ? "Źródło chwilowo niedostępne" : "Pobieranie darmowego terminarza"} icon={CalendarDays}/><Metric label="Prognozy" value={String(records.filter(row => row.kind === "prediction").length)} note="Zapisane typy i odrzucone analizy" icon={Gauge}/><Metric label="Aktywne kupony" value="0" note="Brak zapisanych kuponów" icon={Ticket}/><Metric label="Tracker" value={String(records.length)} note="Wpisy zapisane lokalnie na urządzeniu" icon={Database}/></section>
           <section className="matches-preview"><div className="panel-heading"><div><h3>Dzisiaj w Europie</h3><p>{fixtureScan ? `Źródło danych: ${new Date(fixtureScan.generatedAt).toLocaleString("pl-BE")}` : "Terminarz publiczny, bez klucza API"}</p></div><button onClick={() => void runFixtureScan(true)} disabled={scanLoading}>{scanLoading ? "Pobieranie…" : "Odśwież"}</button></div>{scanError && <p className="scan-error">{scanError}</p>}{fixtureScan?.fixtures.slice(0,6).map(match => <div className="match-preview-row" key={match.id}><time>{match.time}</time><b>{match.home}</b><span>vs</span><b>{match.away}</b><small>{match.competition}</small></div>)}{fixtureScan && fixtureScan.fixtures.length === 0 && <div className="empty-state"><b>Brak zaplanowanych meczów dzisiaj</b><span>W pobranych źródłach nie wykazano spotkań na tę datę; to nie potwierdza braku meczów we wszystkich rozgrywkach Europy.</span></div>}<div className="source-note">Źródła: open-matchday + OpenLigaDB · katalogi i terminarze aktualizowane przez dostawców; brak danych nie jest uzupełniany fikcyjnymi meczami.</div><button className="text-link" onClick={() => changeTab("matches")}>Pokaż wszystkie mecze <ChevronRight size={14}/></button></section>
           <section className="lower-grid"><article className="panel"><div className="panel-heading"><div><h3>Ostatnia aktywność</h3><p>Zdarzenia w nowym systemie</p></div><Activity size={18}/></div><div className="empty-state"><div className="empty-icon"><Activity size={21}/></div><b>To początek historii</b><span>Po uruchomieniu źródeł pojawią się tu skany, prognozy i rozliczenia.</span></div></article><article className="panel"><div className="panel-heading"><div><h3>Etapy uruchomienia</h3><p>Postęp budowy platformy</p></div><Trophy size={18}/></div><div className="check-list"><div className="check-row done"><span>01</span><div><b>Nowy fundament aplikacji</b><small>Utworzono czystą gałąź i strukturę PWA</small></div><i>DONE</i></div><div className="check-row"><span>02</span><div><b>Model danych i Tracker</b><small>Projekt schematu i walidacji</small></div><i>NEXT</i></div><div className="check-row"><span>03</span><div><b>Źródła i silnik prognoz</b><small>Integracje i testy modeli</small></div><i>WAIT</i></div><div className="check-row"><span>04</span><div><b>Bezpieczeństwo i publikacja</b><small>Testy końcowe i wdrożenie</small></div><i>WAIT</i></div></div></article></section>
         </>}
