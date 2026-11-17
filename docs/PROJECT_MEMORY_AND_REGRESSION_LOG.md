@@ -661,3 +661,13 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - GitHub Actions Cloudflare run #627, ID `44010100845`, dla commita migracji `4a74c73a4c161f30943272d0f4e21d64afb00fba` był w trakcie wykonywania podczas zapisu. Poprzedni run #623 został anulowany przez concurrency po nowszych commitach. **Nie uznawać jeszcze frontendu za wdrożony**: wymagane zielone CI/Vitest/TypeScript/build/deploy i ponowny test produkcyjnego Workera po zakończeniu najnowszego runu.
 - Produkcyjny Worker nadal zwracał poprzedni fingerprint `europe-top-two-2026-11-17-51case` przy ostatnim odczycie przed zakończeniem runu; to oczekiwane przed nowym deployem. Nie zmieniać ani nie odtwarzać Vercel.
 - Issue #76 pozostaje OPEN. Następny krok: sprawdzić wynik najnowszego Cloudflare workflow po commicie dokumentacji, zweryfikować fingerprint nowego buildu i kontynuować audyt wszystkich pozostałych nazw tier 1/2 z FootyNomad. Nie powtarzać już tej poprawki, migracji ani testu 14-case bez nowej regresji.
+
+
+### Końcowa weryfikacja wdrożenia — 2026-11-17 03:30 UTC
+- Korekta statusu z notatki powyżej: Cloudflare workflow #627 zakończył się **SUCCESS** (run ID `44010100845`) i wdrożył wszystkie zmiany aplikacyjne. Wszystkie kroki, w tym Vitest, TypeScript, Deno check i Deploy to Cloudflare Workers, zakończone SUCCESS.
+- Workflow #628 (dokumentacyjny commit) został anulowany przez mechanizm concurrency; nie wpływa to na udany deploy #627.
+- Fingerprint produkcyjny zaktualizowano w `src/routes/__root.tsx` do `europe-top-two-2026-11-17-regexfix-czechliga`, commit `770262f7078660df80eca40d642f874902bbae83`.
+- Cloudflare workflow #629, run ID `44010260708`, dla tego commita zakończył się **SUCCESS**. Wszystkie kroki: Deno, Vitest, TypeScript, Cloudflare build i Deploy — SUCCESS.
+- Bezpośrednia kontrola produkcyjnego Workera `https://moneyball-global.damianwalus3.workers.dev/?audit=final-fingerprint-regexfix-czechliga`: HTTP 200; HTML zawiera dokładny fingerprint `europe-top-two-2026-11-17-regexfix-czechliga`; bundle JS `/assets/index-BVeDORqf.js`. To potwierdza wdrożenie właściwej wersji na produkcji Cloudflare.
+- Edge Functions ACTIVE: `footynomad-sync v82`, `moneyball-free-feed v39`, `moneyball-predict v235`. Migracja SQL zastosowana; nowa macierz 14/14 PASS.
+- Ostateczny stan: poprawka regexu i alias Czech Liga są wdrożone na MAIN/Cloudflare; issue #76 pozostaje otwarte do dalszego audytu pełnej listy europejskich lig. Nie oznacza to zakończenia całego projektu MONEYBALL.
