@@ -359,3 +359,10 @@
 - Regression tests cover duplicate prediction rows, already-settled fixtures and malformed rows.
 - Commits: initial integration `06a0ff05952fc4e0c9b73055f0cac2257ec38526`; selector `ae8bd4e050ccf9c9e7cbeb1d27ec1484ac7126a6`; tests `945803fc9d97982c8c1a60ebaa6318e236339a41`; tested selector wiring `e483dc244a677b5753bce410c939c8c8ceb2e146`.
 - CI and Cloudflare deployment are pending on the latest branch state; do not mark this stage deployed until both succeed.
+
+## Stage 31 — Tracker CSV export
+- Added a CSV export containing every Tracker row and all details as a JSON cell, with proper CSV quote escaping and UTF-8 BOM for spreadsheet compatibility.
+- Added an explicit Eksport CSV action next to the versioned JSON backup; JSON remains the validated restore format and is not replaced.
+- Added a regression test for the CSV header, text fields and fixture identifiers.
+- Commits: implementation `a1bdda97535a5354c72c72098b76a9d90b3ca35f`; test `82225fe3b2af70f876220ebaaa08806acb5b8c6e`; UI `975b36eb779e0a68479a82705568f95e6f17780b`.
+- CI and Cloudflare deployment are pending; this stage is not complete until both pass.
