@@ -33,3 +33,14 @@
 .settle-button{margin:12px 0;border:1px solid #315347;background:#17352e;color:#8ce6bf;padding:9px 12px;border-radius:7px;font-size:11px}.settle-button:disabled{opacity:.55;cursor:wait}
 
 .source-note a{color:#79dfbd;text-decoration:underline;text-underline-offset:2px}.source-note a:hover{color:#a2f4d4}
+
+
+/* Stage 47 — one transparent safest candidate and readable rejection states */
+.dashboard-safest-pick { display: flex; align-items: flex-start; gap: 16px; margin: 18px 0; }
+.dashboard-safest-pick h2, .safest-pick-card h3 { margin: 8px 0; }
+.safest-pick-label { display: inline-block; font-size: 10px; letter-spacing: .12em; font-weight: 800; color: var(--accent, #8fe3c0); }
+.safest-pick-market { display: inline-block; margin: 8px 0; font-size: 20px; }
+.safest-pick-card { padding: 18px; border: 1px solid rgba(143,227,192,.28); border-radius: 14px; background: rgba(143,227,192,.06); }
+.safest-pick-card p, .dashboard-safest-pick p { margin: 6px 0 10px; }
+.safest-pick-card small, .dashboard-safest-pick small { display: block; line-height: 1.5; opacity: .82; }
+.fixture-row .scan-error { grid-column: 1 / -1; margin: 6px 0; }
