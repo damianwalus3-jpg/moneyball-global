@@ -33,3 +33,13 @@
 4. Complete authenticated visual click-through of Matches and Predictions. Keep issue #77 OPEN until this passes.
 
 No match, prediction, coupon, settlement, bankroll, or historical data was changed during this audit.
+
+
+## Follow-up deployment and live-feed verification — 2026-11-17 19:05 Europe/Brussels
+
+- Commit `13e72a479299da3ce2324786912e556728514901` (Azerbaijan replaced with Austria 2. Liga) passed Moneyball CI run `44153149957` and Cloudflare MAIN deployment run `44153150085`.
+- Deployed exact MAIN `footynomad-sync` source to Supabase as version `105`, ACTIVE, `verify_jwt=true`. Retrieved deployed source and verified concurrency 2, 12-hour partial expiry, Austria 2. Liga, and no Azerbaijan entry.
+- Supabase project remains ACTIVE_HEALTHY. No FootballCharts cache rows yet; an authenticated owner POST scan is still required to create and verify the row and subsequent cache hit.
+- Production FootyNomad shared feed for 2026-11-17 currently contains 31 eligible fixtures across 4 countries and 9 domestic senior men's leagues: England 21 across 6 leagues; France National 2 1; Northern Ireland Championship 2; Scotland Lowland League 7. All 31 currently have scheduled status. The excluded eighth Scotland fixture is Celtic II (reserve team). This matches the independent FootyCheck public page after excluding cups, youth and reserves; FootyCheck remains a manual reconciliation source, not an automated adapter.
+- The scheduled `moneyball-global-free-footynomad` cron is active every 15 minutes; the last ten recorded executions succeeded.
+- Cloudflare deployment is complete, but the signed-in UI acceptance test remains blocked by the absence of a saved MONEYBALL MAIN browser login. Keep issue #77 open until the user signs in and the Matches/Predictions screens are checked.
