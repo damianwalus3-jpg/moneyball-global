@@ -1238,3 +1238,10 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - Source changes on MAIN: shared domestic-league-scope helper and Deno tests; all-tier filters in footynomad-sync, moneyball-free-feed, moneyball-predict and OpenMatchday catalogue discovery; frontend eligibility and match-screen text updated; SQL migration 20261117150000_expand_european_leagues_to_all_senior_tiers.sql.
 - Geographic M49 country boundary is unchanged: Albania included; Israel, Armenia, Azerbaijan, Cyprus, Georgia, Kazakhstan and Türkiye excluded.
 - End-to-end verification is still required: CI and Cloudflare MAIN deploy, SQL migration, four Edge Function deployments, then authenticated manual scan checking lower-tier inclusion and cup/international/youth/women/reserve/non-European exclusions. Do not call the task complete until those checks pass.
+
+
+### All-tier implementation CI follow-up — 2026-11-17
+- First CI attempt caught a source-edit regression in footynomad-sync: a scripted removal also removed importer constants/configuration. This was not deployed; Cloudflare deployment was blocked by CI as intended.
+- Restored footynomad-sync from the pre-change MAIN source and applied the scope changes without deleting configuration. SUPABASE_URL, KEY, CORS and runtime imports are present again.
+- Tightened cup exclusion aliases to include Supercopa/Supercoppa/Supercup. Removed unnecessary SECURITY DEFINER from the shared eligibility predicate; existing legacy wrapper permissions remain unchanged.
+- Re-run full CI and Cloudflare MAIN deployment before any Edge Function or database activation.
