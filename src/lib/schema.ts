@@ -16,7 +16,7 @@ export const COLUMNS: Record<TableName, readonly string[]> = {
   match_results: ["id", "owner_id", "match_id", "home_score", "away_score", "outcome_1x2", "verified", "source", "finished_at", "verified_at", "created_at"],
   odds_snapshots: ["id", "owner_id", "prediction_id", "bookmaker", "odds", "captured_at", "source_url"],
   bankroll_transactions: ["id", "owner_id", "transaction_type", "amount", "balance_after", "coupon_id", "occurred_at", "note"],
-  moneyball_tracker_categories: ["id", "owner_id", "category_key", "display_name", "description", "category_group", "sort_order", "is_system", "include_in_official_finance", "created_at"],
+  moneyball_tracker_categories: ["id", "owner_id", "category_key", "display_name", "description", "category_group", "sort_order", "is_system", "is_active", "include_in_official_finance", "created_at"],
   moneyball_jackpot_entries: ["id", "owner_id", "sequence_no", "coupon_id", "title", "notes", "created_at"],
 };
 
