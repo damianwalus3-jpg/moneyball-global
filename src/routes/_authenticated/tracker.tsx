@@ -387,6 +387,7 @@ function TrackerPage() {
           <div>
             <h2 className="font-display text-xl font-bold uppercase">Klasyfikacja historii · USER / MODEL / PAPER</h2>
             <p className="text-xs text-muted-foreground">Wybierz rekordy jednego rodzaju i przypisz im źródło. Każda zmiana jest zapisywana w nieusuwalnym rejestrze audytowym.</p>
+            <p className="mt-1 text-xs text-amber-600">Kuponów z istniejącymi transakcjami bankrolla nie można oznaczyć jako PAPER — chroni to historyczne saldo i rejestr finansowy.</p>
           </div>
           <span className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground">bez automatycznych zgadywanek</span>
         </div>
