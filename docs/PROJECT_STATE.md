@@ -1361,3 +1361,14 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - This confirms the frontend fingerprint is live on the production Worker. It does NOT independently prove that an authenticated scan has ingested all eligible fixtures or that the user-authenticated Tracker UI/backup round-trip has passed.
 - Previous docs-only commit `c3922e0a9000a513d590ec6f3e984e93c0c6825f`: CI run `44098323507` SUCCESS; Cloudflare run `44098323620` SUCCESS.
 - Continue from this exact HEAD and these verified results. Do not rerun completed deployment checks unless a new commit, regression, or production discrepancy requires it.
+
+
+## Daily Europe scope and prediction audit — 2026-11-17
+- Read-only production DB audit for the Brussels-local date 2026-11-17 using `moneyball_is_eligible_european_match`.
+- 32 distinct eligible senior men's European domestic matches are stored; 31 scheduled and 1 postponed. No live or finished match in this scoped set at audit time.
+- Coverage by eligible competition includes English National League North/South and Non-League Premier regional divisions, French National 2, Northern Ireland Championship and Scottish Lowland League. These lower-tier competitions are now admitted by the all-tier scope.
+- Prediction rows are not the same as match count: there are 421 prediction rows across 32 distinct matches because multiple markets/selection records exist.
+- 1X2 audit: 32 rows for 32 matches with a probability-bearing current record; 30 rejected because the selected probability did not exceed the >75% coupon threshold, one rejected for no confirmed current market odds, and one inactive/postponed status. Older superseded NULL-probability rows remain in history and are not counted as current model forecasts.
+- Double Chance has 93 probability-bearing rows across 31 matches, all currently rejected; Goals has 256 probability-bearing rows across 32 matches, currently rejected under the >75% candidate threshold. Do not misrepresent these as strong picks or create coupons from them.
+- This is a successful scope-ingestion/recording check, not proof that every European country has a source on every date. Continue coverage-gap checks and inspect the authenticated UI/scan run metrics separately.
+- No production data was modified during this audit.
