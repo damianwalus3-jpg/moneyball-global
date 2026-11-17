@@ -311,3 +311,5 @@
 - The pipeline installs Node 22 dependencies and runs TypeScript typecheck, the full Vitest suite and the production Vite build.
 - The workflow does not deploy or modify the production `main` branch. Cloudflare deployment remains a separate gated release step.
 - Validation status: workflow committed; waiting for the first Actions run and its actual job result.
+
+- Follow-up hardening: offline navigation fallback now reads only the active MONEYBALL cache, and the 192px SVG icon declares matching intrinsic dimensions.
