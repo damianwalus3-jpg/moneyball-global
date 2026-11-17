@@ -51,3 +51,7 @@ CI #1231/#1232 and Cloudflare deploy #818 completed SUCCESS. The deployed Cloudf
 - Verified live metadata after deployment: function `footynomad-sync` status ACTIVE, version 99, `verify_jwt=true`, entrypoint `source/index.ts`, single deployed file `index.ts`. The bundle includes the corrected Bearer extraction and M49 country filter. No auth setting was weakened and no database rows were deleted/rewritten.
 - Cloudflare MAIN remains deployed at commit `5ff5fc72050dc3265d5203c6226d86061ffa960a`; CI #1233 and Cloudflare deploy #819 succeeded. Documentation was updated on MAIN after the live activation.
 - **Still required for end-to-end proof:** a real authenticated POST scan from the app after v99 and inspection of its function logs plus `scan_runs`/matches results. The most recent database scan rows inspected pre-deployment were not a post-v99 test. Do not claim the user's button is fully verified until a post-deploy scan returns 2xx and stores the expected eligible European fixtures.
+
+
+## League-level scope update — 2026-11-17
+The geographic country boundary above remains unchanged. The latest user instruction expands domestic league coverage from tiers 1-2 to all senior men's domestic league levels. Cups, national-team/international competitions, youth, women's and reserve sides remain excluded. See FOOTBALL_SCOPE_ALL_TIERS_2026-11-17.md and migration 20261117150000_expand_european_leagues_to_all_senior_tiers.sql.
