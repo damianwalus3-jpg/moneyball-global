@@ -81,10 +81,10 @@ async function readFixtures(date:string){
 function isOpenMatchdayTopTwoFixture(f:any):boolean {
  const folder=String(f?.source_competition_id||"");
  const tier=folder.match(/^([A-Z]{3})_([12])_[A-Za-z0-9-]+$/i);
- const country=String(f?.country||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().trim();
+ const country=String(f?.country||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
  const competition=String(f?.competition||f?.league||"");
  if(String(f?.source||"").toLowerCase()!=="openmatchday"||!tier||!country||!isEuropeanFixture(country,competition,f?.home_team||f?.home,f?.away_team||f?.away))return false;
- if(/\\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\\b/i.test(folder+" "+competition))return false;
+ if(/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\b/i.test(folder+" "+competition))return false;
  return true;
 }
 function isEligiblePublicFixture(f:any):boolean {
