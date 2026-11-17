@@ -614,7 +614,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    const publicRows=Array.isArray(publicForImport.fixtureRows)?publicForImport.fixtureRows:[];
    const candidates=[...feedRows,...publicRows];
    const fixtureDay=(f:any)=>brusselsFixtureDay(f.kickoff_at)||String(f.scan_date||f.date||f.kickoff_date||"").slice(0,10);
-   const eligible=candidates.filter((f:any)=>fixtureDay(f)===date&&isEligibleScheduledFixture(f)&&String(f.external_id||"")&&String(f.home_team||f.home||"")&&String(f.away_team||f.away||""));
+   const eligible=candidates.filter((f:any)=>fixtureDay(f)===date&&isEligibleScheduledFixture(f)&&String(f.source||"").trim()&&String(f.external_id||"").trim()&&String(f.competition||f.league||"").trim()&&String(f.home_team||f.home||"").trim()&&String(f.away_team||f.away||"").trim());
    const existingRows=await db("matches?select=source,external_id,country,competition,league,gender,home_team,away_team,kickoff_at,kickoff_date&owner_id=eq."+encodeURIComponent(ownerId)+"&or=(and(kickoff_at.gte."+encodeURIComponent(fromUtc)+",kickoff_at.lt."+encodeURIComponent(toUtc)+"),kickoff_date.eq."+date+")",token);
    const identity=(f:any)=>normTeam(f.home_team||f.home)+"|"+normTeam(f.away_team||f.away)+"|"+fixtureDay(f);
    const existingKeys=new Set((existingRows||[]).filter((f:any)=>isEligibleScheduledFixture(f)).map(identity));
@@ -629,7 +629,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
     else selected.set(key,f);
    }
    const rows=[...selected.values()].map((f:any)=>({
-    owner_id:ownerId,scan_run_id:null,external_id:String(f.external_id),source:String(f.source||"OpenMatchday"),
+    owner_id:ownerId,scan_run_id:null,external_id:String(f.external_id),source:String(f.source),
     competition:f.competition||f.league||null,league:f.league||f.competition||null,country:f.country||null,
     gender:"men",home_team:String(f.home_team||f.home),away_team:String(f.away_team||f.away),
     kickoff_at:f.kickoff_at||null,kickoff_date:date,status:String(f.status||"scheduled").toLowerCase()
