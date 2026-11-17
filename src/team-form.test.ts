@@ -1,0 +1,43 @@
+import { describe, expect, it, vi, afterEach } from "vitest";
+import { loadRecentTeamForm } from "./team-form";
+
+const csv = `gw,date,time,home,away,ft_home,ft_away,ft_result
+1,2026-08-01,15:00,Club A,Club B,2,0,H
+2,2026-08-08,15:00,Club C,Club A,1,1,D
+3,2026-08-15,15:00,Club A,Club D,0,1,A
+4,2026-08-22,15:00,Club E,Club A,0,2,A
+5,2026-08-29,15:00,Club A,Club F,3,1,H
+6,2026-09-05,15:00,Club G,Club A,1,0,H
+7,2026-09-12,15:00,Club A,Club H,2,2,D`;
+afterEach(() => { vi.unstubAllGlobals(); });
+
+describe("historical team form", () => {
+  it("returns five most recent completed matches before fixture date", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => ({ generated_utc: "2026-11-17T00:00:00Z" }),
+      text: async () => csv,
+      status: 200,
+    })));
+    const form = await loadRecentTeamForm("BEL_1_pro-league", "Club A", "2026-09-10");
+    expect(form.matches).toHaveLength(5);
+    expect(form.matches[0].date).toBe("2026-09-05");
+    expect(form.matches[0].result).toBe("L");
+    expect(form.matches.every(match => match.date < "2026-09-10")).toBe(true);
+  });
+  it("separates home and away form and calculates points", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
+      ok: true,
+      json: async () => ({ generated_utc: "2026-11-17T00:00:00Z" }),
+      text: async () => csv,
+      status: 200,
+    })));
+    const form = await loadRecentTeamForm("BEL_1_pro-league", "Club A", "2026-09-10");
+    expect(form.home.every(match => match.venue === "H")).toBe(true);
+    expect(form.away.every(match => match.venue === "A")).toBe(true);
+    expect(form.matches.find(match => match.result === "W")?.points).toBe(3);
+  });
+  it("rejects invalid league folder identifiers", async () => {
+    await expect(loadRecentTeamForm("../etc", "Club A", "2026-09-10")).rejects.toThrow();
+  });
+});
