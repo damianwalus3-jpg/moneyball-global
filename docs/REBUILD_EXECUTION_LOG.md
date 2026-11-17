@@ -505,3 +505,11 @@
 - The current UI records decisions and odds locally in the existing Tracker store. Automatic settlement/P&L and rejected-pick counterfactual grading are the next implementation gate; until then open records must not be counted as realized profit/loss.
 - Existing Tracker history and backup format remain preserved; new record kind is additive.
 - CI and Cloudflare deployment required before marking this stage complete.
+
+
+### Stage 48 — automatic result settlement and P/L comparison
+- Added outcome evaluation for 1, X, 2 and Double Chance selections (1X, X2, 12) against verified final result rows.
+- Selected entries are settled once: win profit is stake × (decimal odds − 1); loss is negative stake. Rejected entries receive a separate hypothetical hit/miss status and never affect bankroll/P&L.
+- Settlement events are append-only child rows keyed by parentBetId, preventing repeated 15-minute refreshes from duplicating settlement outcomes.
+- Added unit tests for 1X2/DC grading, win/loss accounting, rejected hypothetical grading and idempotency.
+- CI and Cloudflare deployment required before this feature is considered live.
