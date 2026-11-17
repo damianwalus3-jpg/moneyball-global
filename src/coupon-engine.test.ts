@@ -55,6 +55,30 @@ describe("three-leg coupon candidates", () => {
   });
 
 
+  it("does not reuse an older strong candidate after a newer rejected prediction", () => {
+    const old = prediction("a", 0.92);
+    const rejected = {
+      ...prediction("a", 0.92),
+      id: "a-rejected",
+      status: "ODRZUCONY",
+      createdAt: "2026-11-17T13:00:00Z",
+      details: { ...prediction("a", 0.92).details, strongCandidate: false },
+    };
+    const rows = [old, prediction("b", 0.85), prediction("c", 0.86), rejected];
+    expect(buildThreeLegCandidates(rows, "2026-11-17")).toHaveLength(0);
+  });
+
+  it("uses the newest row even when the latest prediction is weak but still marked KANDYDAT", () => {
+    const old = prediction("a", 0.92);
+    const weak = {
+      ...prediction("a", 0.70),
+      id: "a-weak",
+      createdAt: "2026-11-17T13:00:00Z",
+      details: { ...prediction("a", 0.70).details, strongCandidate: false },
+    };
+    expect(buildThreeLegCandidates([old, prediction("b", 0.85), prediction("c", 0.86), weak], "2026-11-17")).toHaveLength(0);
+  });
+
   it("rejects non-normalized probabilities and a selection that is not the model's top outcome", () => {
     const validB = prediction("b", 0.85);
     const validC = prediction("c", 0.86);
