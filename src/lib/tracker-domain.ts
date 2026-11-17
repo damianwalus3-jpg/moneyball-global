@@ -95,6 +95,7 @@ export function formatJackpotSequence(sequence: number): string {
 /** Build a collision-resistant, owner-local key for a custom category. */
 export function makeTrackerCategoryKey(label: string): string {
   const slug = label
+    .replace(/[łŁ]/g, (letter) => letter === "Ł" ? "L" : "l")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toUpperCase()
