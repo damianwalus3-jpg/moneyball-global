@@ -825,3 +825,5 @@
 - Added a separate Cloudflare Worker proxy route /api/espn/scoreboard/YYYYMMDD, with strict date validation, upstream timeout, JSON validation, CORS and five-minute cache. The app now queries this as source four, deduplicates it against the existing sources, records per-source counts/errors and invalidates its old scan cache.
 - Updated Tracker scan diagnostics and the matches-tab source coverage line to show ESPN counts/errors. Existing Tracker history, coupon records, settlement history and bankroll values are untouched. No paid provider API was called.
 - Stage 67 CI and deployment pending.
+
+- CI caught an over-escaped slash in the new Worker route regex on the first pass; corrected the matcher before deployment. No production release was made from the failing revision.
