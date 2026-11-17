@@ -1231,3 +1231,8 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - CI #1219 and Cloudflare workflow #805 both reached the test stage and correctly failed before build/deploy. The failures were test assumptions, not a TypeScript/runtime failure: one stale positive assertion still accepted Türkiye 1. Lig; the 110-entry FootyNomad test fixture was explicitly a UEFA catalogue and still treated Armenia as a required European country.
 - Repaired the test contract rather than weakening/disabling tests: removed Armenia, Azerbaijan, Cyprus, Georgia, Israel/ISR, Kazakhstan and Turkey provider labels from the accepted fixture catalogue; renamed the suite to geographic Europe (UN M49); changed Türkiye 1. Lig to rejected. Separate targeted regressions continue to assert Albania/ALB accepted and Israel/ISR plus other Asian countries rejected.
 - The first failed CI prevented the Cloudflare deploy, so commit 6467831 was NOT deployed. Follow-up commit contains the corrected tests; await a fresh successful CI and Cloudflare MAIN deploy before treating the frontend change as live.
+
+
+## 17.11.2026 — follow-up regression pass 2
+- CI #1220 / Cloudflare #806 passed the broad provider catalogue after removing the Asia/UEFA-only fixtures, but one remaining direct `isEligibleEuropeanMatch(Georgia, Erovnuli Liga 2)` assertion still expected true. This was the last stale positive test found by the suite (73/74 tests passed).
+- Changed that assertion to false, aligning both the top-two helper and the full match eligibility helper with the same M49 country gate. No tests were disabled. A new CI/Cloudflare run is required; the failed run did not deploy.
