@@ -1,6 +1,6 @@
 # MONEYBALL GLOBAL 2.0 — durable project state
 
-Last verified: 2026-11-16 (Europe/Brussels)
+Last verified: 2026-11-17 (Europe/Brussels)
 
 This file is the continuity ledger for maintenance work. Read it before changing the same area again. Do not repeat completed diagnostics or overwrite working changes without checking the latest commit and live deployment.
 
@@ -1184,3 +1184,12 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - Production parser GET for 21 Nov returned 301 fixtures across 43 countries; all 301/301 passed the canonical SQL `moneyball_is_eligible_european_match` predicate. Belarus's 14 returned fixtures also all pass.
 - Combined source-discovery evidence is therefore 54/55 UEFA associations, not 53/55. Liechtenstein is the sole association without a national league; its clubs play in the Swiss pyramid, and the national cup is out of scope.
 - This validates the dated source response and eligibility parser only; the authenticated POST/import into the owner's database remains unverified after the latest `footynomad-sync` deployment.
+
+## 2026-11-17 — geographic Europe frontend scope deployed
+
+- Adopted the UN Statistics Division M49 regional classification for the meaning of geographic Europe. Albania is included (Southern Europe); Israel, Armenia, Azerbaijan, Cyprus, Georgia and Türkiye are excluded (Western Asia); Kazakhstan is excluded (Central Asia). UEFA membership is not used as a substitute for geography.
+- Canonical frontend helper in `src/lib/domain.ts` is used by Matches, Statistics and coupon candidate selection. Follow-up guards were added to MAIN dashboard selected picks, Predictions, Results, History/settlement and saved coupon data. The match page and coupon candidate query filter today's fixtures before loading associated predictions.
+- Regression tests initially exposed stale positive assumptions from the old UEFA-based catalogue (110-row accepted fixture set, Georgia/Israel/Türkiye assertions, and explicit OpenMatchday ISR slug). These were corrected without disabling tests. Final CI #1226 passed tests, Deno type-check, TypeScript and build.
+- Cloudflare MAIN deploy #812 succeeded for commit `8a3f98665a416a28ba277304680931dec394e103`; Worker version `44c4f0cd-ca34-4c30-b61a-53d621f72125`. Live root and /login fetch succeeded; protected /panel returned `login_required` without an authenticated session.
+- No historical match, prediction, coupon, settlement or bankroll data was deleted or rewritten.
+- **Critical boundary:** this was a Cloudflare frontend/client-side data-scope deployment. Supabase automatic importers, SQL eligibility functions and aggregate RPCs were not deployed with the M49 change. Backend ingestion/aggregate isolation is not yet proven. The app filters visible rows, but non-European records may still be stored or included in some backend aggregates until the backend runtime is separately updated and verified. Keep issue #77 OPEN; do not claim full project completion.
