@@ -451,3 +451,10 @@
 - Added regression tests for halftime-only rows in both team-form history and settlement lookup.
 - This intentionally favors a delayed verified settlement over a false result. Existing Tracker history remains untouched.
 - CI and Cloudflare deployment required before marking deployed.
+
+
+## Stage 42 — transparent European coverage disclosure
+- Added an explicit note beside live source-coverage counters explaining that the public feeds do not guarantee exhaustive coverage of every European league, regional tier, women's competition or youth competition.
+- The note distinguishes successful source retrieval from completeness of the underlying datasets; zero feed errors must not be interpreted as full European coverage.
+- No source coverage has been artificially inflated and no unsupported completeness claim is made.
+- CI and Cloudflare deployment required before marking deployed.
