@@ -283,6 +283,23 @@ export function isCouponCandidate(prediction: Prediction, match: Match | undefin
   return prediction.selection !== "—" && isValidPick(prediction.market, prediction.selection);
 }
 
+
+/** A manual price may unlock a model pick only when the model already passed every non-odds gate. */
+export function canPromoteManualOdds(prediction: Prediction, match: Match | undefined, nowMs: number): boolean {
+  const coverage = prediction.data_coverage;
+  if (!coverage || prediction.verdict !== "ODRZUCONY") return false;
+  if (!String(prediction.rejection_reason ?? "").includes("Brak aktualnego, potwierdzonego kursu")) return false;
+  if (prediction.probability == null || !Number.isFinite(Number(prediction.probability)) || Number(prediction.probability) <= CANDIDATE_MIN_PROBABILITY) return false;
+  const modelCoverage = Number(coverage["model_coverage"]);
+  const homeMatches = Number(coverage["home_history_matches"]);
+  const awayMatches = Number(coverage["away_history_matches"]);
+  const modelSource = String(coverage["model_source_type"] ?? "");
+  if (!Number.isFinite(modelCoverage) || modelCoverage < 55 || homeMatches < 3 || awayMatches < 3) return false;
+  if (coverage["baseline_only"] === true || modelSource === "BASELINE_ONLY" || modelSource === "BEYONDELO_ONLY") return false;
+  if (!prediction.data_source || !prediction.rationale?.trim()) return false;
+  return isCouponCandidate({ ...prediction, verdict: "WYBRANY" }, match, nowMs);
+}
+
 /** Coupons are built only from matches kicking off today (Europe/Brussels calendar day). */
 /** Persistence-boundary rule: only live selected predictions above 75% may enter a coupon. */
 export function isEligibleCouponPrediction(prediction: Pick<Prediction, "verdict" | "settlement_status" | "probability">): boolean {
