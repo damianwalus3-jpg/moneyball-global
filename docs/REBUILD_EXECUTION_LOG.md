@@ -480,3 +480,9 @@
 - Recorded the exact production branch, Worker, release commit and workflow evidence.
 - Explicitly documented remaining platform/data boundaries: non-exhaustive public fixture coverage, no xG-trained model, DC derived from 1X2, no bookmaker odds/EV, browser-local Tracker, no Web Push, and no physical-device or authenticated end-to-end smoke test.
 - The release is complete for the implemented scope; the documented boundaries remain future work rather than being falsely marked as delivered.
+
+
+## Stage 46 — specialist product, UX and engineering audit
+- Performed a source-level review of the full rebuild branch, product/domain specifications, CI/deploy workflows, PWA service worker and live production page content.
+- Added `docs/REBUILD_SPECIALIST_AUDIT_2026-11-17.md` with prioritized P0/P1/P2 findings, product/UX recommendations, source-compliance concerns and acceptance gates.
+- The audit is analysis only: no application behavior was changed in this stage. Interactive physical-device smoke testing and a reproducible historical backtest remain unperformed and are explicitly called out.
