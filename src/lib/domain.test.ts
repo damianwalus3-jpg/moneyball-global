@@ -877,6 +877,9 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
   ["Macedonia", "Cup"],
   ["World", "UEFA Nations League"],
   ["England", "FA Cup"],
+  ["England", "Premier League Cup"],
+  ["England", "EFL Trophy"],
+  ["England", "Championship Playoffs"],
   ["Spain", "Copa del Rey"],
   ["Belgium", "Reserve Pro League"],
   ["England", "Premier League 2 Division One"]
@@ -886,6 +889,11 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
     for (const [country, competition] of accepted) {
       expect(isEuropeanTopTwoLeague(country, competition), `${country}: ${competition}`).toBe(true);
     }
+  });
+
+  it("rejects youth teams even when the competition label resembles a senior league", () => {
+    expect(isEligibleEuropeanMatch({ country: "England", competition: "Premier League", gender: "men", home_team: "Swansea City U21", away_team: "Gillingham FC U21" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ country: "Germany", competition: "Bundesliga", gender: "men", home_team: "Bayern II", away_team: "Borussia Dortmund" })).toBe(false);
   });
 
   it("does not infer a competition from a country with no league heading", () => {
