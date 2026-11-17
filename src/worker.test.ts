@@ -3,6 +3,44 @@ import worker from "./worker";
 
 afterEach(() => vi.unstubAllGlobals());
 
+
+describe("Cloudflare ESPN scoreboard proxy", () => {
+  it("proxies the requested date, validates JSON and caches successful responses", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({ events: [{ id: "1" }] }), { status: 200 }));
+    vi.stubGlobal("fetch", upstream);
+    const waitUntil = vi.fn();
+    const response = await worker.fetch(new Request("https://moneyball.example/api/espn/scoreboard/20261118", { headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil });
+    expect(upstream).toHaveBeenCalledWith("https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates=20261118&limit=1000", expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("X-MONEYBALL-SOURCE")).toBe("ESPN");
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=300");
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://moneyball-global-rebuild.damianwalus3.workers.dev");
+    expect(cache.put).toHaveBeenCalledTimes(1);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects impossible dates without contacting ESPN", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/espn/scoreboard/20261131"), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "invalid_date" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not cache invalid upstream JSON", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn() };
+    vi.stubGlobal("caches", { default: cache });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("<html>not json</html>", { status: 200 })));
+    const response = await worker.fetch(new Request("https://moneyball.example/api/espn/scoreboard/20261118"), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(502);
+    expect(await response.json()).toEqual({ error: "espn_invalid_json" });
+    expect(cache.put).not.toHaveBeenCalled();
+  });
+});
+
 describe("Cloudflare OpenLigaDB proxy", () => {
   it("proxies fixture requests, labels the source and caches successful responses", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
