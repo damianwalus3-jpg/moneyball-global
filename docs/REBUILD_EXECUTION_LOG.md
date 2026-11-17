@@ -707,3 +707,17 @@
 - Code commits: coupon settlement support `61733339efde2b4d0c8f4fd349a577e18aefa93c`; UI integration `88310ec99573371a405773383a53bb2f083f1460`; settlement regression test `2bcc5a594d283f20140bc3e1069658d065e189a4`.
 - No existing Tracker records were rewritten; the new status applies only to coupons saved after this deployment.
 - CI and Cloudflare deployment validation remain pending. Do not claim this workflow is live until those checks pass.
+
+
+## Continuity checkpoint — 2026-11-17 (chat handoff)
+- Active project: **MONEYBALL REBUILD**, repository `damianwalus3-jpg/moneyball-global`, branch `moneyball-rebuild`, isolated Worker `https://moneyball-global-rebuild.damianwalus3.workers.dev/`.
+- Hard exclusions: do not modify branch `main` or the MAIN Worker; do not use Vercel, TEST, Lovable, Supabase or paid database services for this rebuild. Preserve existing local Tracker records and coupon/result history.
+- Execution log is the canonical task history: this file contains the rebuild stages and their code commits, validation state, source limitations and next steps. Append a dated entry for every implementation/audit step.
+- Stage 19 strong pilot token hardening is committed but not validated by the required Cloudflare CI/deploy. Latest related code commits: `a1d97fdf18c09d10977f0e1980bdbd99e06dac1d`, `26576025587354f4d5a67f0581ea02f2b1c8ee9d`, test-fixture correction `c89db32c15af9630c151862acc7b1c9d18ca05be`. A short Worker secret is rejected before provider calls; minimum length is 32 characters.
+- Stage 20 odds valuation module: `7391f33b490b1539ea2d41e0c29f42743eb8f7df`; tests `9d22aeed105ae8bde764ea281588515e9a13be15`.
+- Stage 21 three-leg coupon valuation: `99e386923f10b79450700ee37bd4355a24d6e33a`; tests `33eacdbeed43423bd79b41fb0d20c124cd5d6fc3`.
+- Stage 22 coupon UI and priced paper settlement: settlement support `61733339efde2b4d0c8f4fd349a577e18aefa93c`; UI `88310ec99573371a405773383a53bb2f083f1460`; regression test `2bcc5a594d283f20140bc3e1069658d065e189a4`.
+- Latest docs checkpoint commit: `57b091b362739a2f45025dadfaae7e0f7cdc26d5`.
+- GitHub combined status for recent commits currently reports only a failing Vercel build-rate-limit context; that is not accepted as proof of a Cloudflare build/deployment. Do not deploy to Vercel. CI/typecheck/test/build and Cloudflare deployment for Stages 19–22 remain pending independent verification.
+- No actual OddsPapi/StrikerAPI request was made, no credits consumed, and no provider secret was requested in chat. Do not run paid provider requests without the user explicitly enabling the Worker pilot and initiating the intended request.
+- Next actions: (1) obtain a valid branch build/test and isolated Cloudflare deploy signal; (2) fix any TypeScript/test regressions; (3) verify priced coupon settlement and financial ledger/bankroll effects without mutating old history; (4) add cross-tab server-side odds-fetch protection if feasible without introducing paid infrastructure; (5) continue fixture coverage, source reliability and model calibration audits. Do not mark overall rebuild complete while any of these remain open.
