@@ -65,7 +65,7 @@ AS $function$
      AND public.moneyball_is_european_top_two_league_pre_m49(p_country,p_competition);
 $function$;
 
-REVOKE ALL ON FUNCTION public.moneyball_is_european_top_two_league_pre_m49(text,text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.moneyball_is_european_top_two_league_pre_m49(text,text) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.moneyball_is_european_top_two_league(text,text) TO anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.moneyball_is_geographic_europe_country(text) TO anon, authenticated, service_role;
 
