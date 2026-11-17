@@ -620,10 +620,13 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    const existingKeys=new Set((existingRows||[]).filter((f:any)=>isEligibleScheduledFixture(f)).map(identity));
    const sourceRank=(f:any)=>String(f.source||"").toLowerCase()==="footynomad"?0:String(f.source||"").toLowerCase()==="openmatchday"?1:2;
    const selected=new Map<string,any>();
+   let skippedExisting=0,deduplicatedCandidates=0;
    for(const f of eligible){
-    const key=identity(f);if(existingKeys.has(key))continue;
+    const key=identity(f);
+    if(existingKeys.has(key)){skippedExisting++;continue;}
     const previous=selected.get(key);
-    if(!previous||sourceRank(f)<sourceRank(previous))selected.set(key,f);
+    if(previous){deduplicatedCandidates++;if(sourceRank(f)<sourceRank(previous))selected.set(key,f);}
+    else selected.set(key,f);
    }
    const rows=[...selected.values()].map((f:any)=>({
     owner_id:ownerId,scan_run_id:null,external_id:String(f.external_id),source:String(f.source||"OpenMatchday"),
@@ -635,7 +638,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    if(rows.length)saved=await db("matches?on_conflict=owner_id,source,external_id",token,"POST",rows,"resolution=ignore-duplicates,return=representation");
    const sourceCounts:Record<string,number>={};
    for(const f of eligible){const key=String(f.source||"unknown");sourceCounts[key]=(sourceCounts[key]||0)+1;}
-   scheduledImport={ok:true,attempted:true,feed_rows:feedRows.length,public_rows:publicRows.length,eligible_rows:eligible.length,inserted:Array.isArray(saved)?saved.length:0,source_counts:sourceCounts,feed_error:feedError,public_source_error:publicForImport.error||null};
+   scheduledImport={ok:!feedError||!publicForImport.error,attempted:true,feed_rows:feedRows.length,public_rows:publicRows.length,eligible_rows:eligible.length,inserted:Array.isArray(saved)?saved.length:0,skipped_existing:skippedExisting,deduplicated_candidates:deduplicatedCandidates,source_counts:sourceCounts,feed_error:feedError,public_source_error:publicForImport.error||null};
   }catch(e){scheduledImport={ok:false,attempted:true,error:String(e)};}
  }
  let scheduledPage:any=null;
