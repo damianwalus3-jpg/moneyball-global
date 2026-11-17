@@ -1,0 +1,11 @@
+{
+  "name": "MONEYBALL — Trust the Process",
+  "short_name": "MONEYBALL",
+  "description": "Football analytics and prediction tracker",
+  "lang": "pl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d18",
+  "theme_color": "#090d18",
+  "orientation": "portrait-primary"
+}
