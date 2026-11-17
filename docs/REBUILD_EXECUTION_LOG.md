@@ -234,3 +234,16 @@
 - Cloudflare deploy run `44117588677`: SUCCESS — separate rebuild Worker deployment passed.
 - Live smoke test: the rebuild Worker returned the app HTML shell with the expected MONEYBALL title and Polish metadata. This does not verify client-side rendering or browser data fetching; visual/mobile E2E remains outstanding.
 - Stage 16 is COMPLETE/DEPLOYED.
+
+## 2026-11-17 — Stage 17: verified OpenLigaDB domestic and UEFA competition expansion
+- Audited the live OpenLigaDB 2026 catalogue: 88 entries, with multiple sports, test feeds, friendlies and synthetic entries mixed together. Applied the app's football-sport guard and Europe-oriented name/shortcut filter rather than trusting the full catalogue.
+- The accepted snapshot includes Spanish LaLiga, English Premier League, German 1./2./3. Bundesliga and selected regional leagues, DFB cup and national-team feeds, UEFA Champions/Europa/Conference League, Nations League, Dutch Eredivisie, Austrian Bundesliga and selected women's competitions.
+- Added the UEFA Women's Champions League shortcut (WCL) after confirming its catalogue entry is marked Frauenfußball and therefore passes the football sport guard.
+- Narrowed the generic la prefix to the verified LaLiga shortcut la1, preventing arbitrary Latin-American la* feeds from being treated as European.
+- Added regression tests for LaLiga, UEFA women's competition, DFB national/youth competitions and rejection of a synthetic Latin-American shortcut, non-football entries and known test Bundesliga feeds.
+- An intermediate test exposed the LaLiga regression after narrowing the prefix; corrected it by adding the verified la1 shortcut and reran the full suite successfully.
+- Final code commit: dd4e0c609c05a95f23d4a9f64b9a893915217389 (fix(rebuild): explicitly recognize verified LaLiga shortcut la1).
+- CI run 44118446492: SUCCESS — TypeScript, all tests and production build passed.
+- Cloudflare deployment run 44118446658: SUCCESS — separate rebuild Worker deployment passed.
+- The catalogue is still community-maintained and incomplete. This stage improves the set of recognized European feeds; it does not establish exhaustive coverage of every European country, division, women's/youth league or amateur competition.
+- Stage 17 is COMPLETE/DEPLOYED.
