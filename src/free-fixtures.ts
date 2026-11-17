@@ -36,15 +36,15 @@ interface OpenLigaMatch {
 const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const OPENLIGA = "/api/openligadb";
 const SOURCE = "open-matchday + OpenLigaDB (darmowe źródła publiczne)";
-const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","ISR","KOS","UEFA"]);
+const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","ISR","KOS","BLR","LIE","SMR","MCO","VAT","UEFA"]);
 const CACHE_KEY = "moneyball.free-fixtures.v4";
 const CACHE_MS = 30 * 60 * 1000;
 const COUNTRY_NAMES = [
-  "england","scotland","wales","northern ireland","ireland","france","germany","italy","spain","portugal","netherlands","belgium","austria","switzerland","turkey","greece","denmark","sweden","norway","romania","poland","croatia","czech","ukraine","cyprus","slovakia","slovenia","finland","kazakhstan","albania","serbia","bosnia","bulgaria","hungary","iceland","luxembourg","malta","estonia","latvia","lithuania","moldova","georgia","armenia","azerbaijan","macedonia","montenegro","andorra","faroe","gibraltar","israel","kosovo","uefa"
+  "england","scotland","wales","northern ireland","ireland","france","germany","italy","spain","portugal","netherlands","belgium","austria","switzerland","turkey","greece","denmark","sweden","norway","romania","poland","croatia","czech","ukraine","cyprus","slovakia","slovenia","finland","kazakhstan","albania","serbia","bosnia","bulgaria","hungary","iceland","luxembourg","malta","estonia","latvia","lithuania","moldova","georgia","armenia","azerbaijan","macedonia","montenegro","andorra","faroe","gibraltar","israel","kosovo","belarus","liechtenstein","san marino","monaco","vatican","uefa"
 ];
 const EUROPEAN_SHORTCUT_PREFIXES = [
   "bl","dfb","rl","ol","vl","ll","kl","kreisliga","oberliga","landesliga","verbandsliga","bezirksliga",
-  "eng","esp","ita","fra","ned","por","bel","sco","aut","sui","tur","gre","den","swe","nor","rou","rus","irl","pol","wal","nir","cro","cze","ukr","cyp","svk","svn","fin","kaz","alb","srb","bih","bul","hun","isl","lux","mlt","est","lva","ltu","mda","geo","arm","aze","mkd","mne","and","fro","gib","isr","kos","uefa","ucl","uel","uecl","premierleague","laliga","ligue1","eredivisie","primeiraliga","championsleague","europaleague","conferenceleague","proleague"
+  "eng","esp","ita","fra","ned","por","bel","sco","aut","sui","tur","gre","den","swe","nor","rou","rus","irl","pol","wal","nir","cro","cze","ukr","cyp","svk","svn","fin","kaz","alb","srb","bih","bul","hun","isl","lux","mlt","est","lva","ltu","mda","geo","arm","aze","mkd","mne","and","fro","gib","isr","kos","blr","lie","smr","mco","vat","uefa","ucl","uel","uecl","premierleague","laliga","ligue1","eredivisie","primeiraliga","championsleague","europaleague","conferenceleague","proleague"
 ];
 
 function parseCsvLine(line: string): string[] {
@@ -102,6 +102,11 @@ export function openLigaSeasonYears(date: string): number[] {
   return month < 7 ? [year, year - 1] : [year];
 }
 
+export function isEuropeanCompetitionFolder(folder: string): boolean {
+  const name = folder.split("/").pop() ?? folder;
+  return EUROPE.has(name.split("_")[0]);
+}
+
 export function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
   const shortcut = (league.leagueShortcut ?? "").toLowerCase();
   const name = (league.leagueName ?? "").toLowerCase();
@@ -145,9 +150,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     const index = JSON.parse(await fetchText(`${ROOT}/build_summary.json`)) as LeagueIndex;
     generatedAt = index.generated_utc;
     const leagues = index.leagues.filter(league => {
-      const folder = league.folder.split("/").pop() ?? "";
-      const code = folder.split("_")[0];
-      return EUROPE.has(code) && league.fixtures > 0;
+      return isEuropeanCompetitionFolder(league.folder) && league.fixtures > 0;
     });
     openMatchdayChecked = leagues.length;
     const responses = await pooled(leagues, 8, async league => {
