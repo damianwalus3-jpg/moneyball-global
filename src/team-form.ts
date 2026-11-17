@@ -1,3 +1,4 @@
+import { seasonCode } from "./season";
 export interface FormMatch {
   date: string;
   opponent: string;
@@ -54,7 +55,7 @@ async function loadLeagueResults(folder: string): Promise<{ rows: CsvRow[]; gene
   const indexResponse = await fetch(`${ROOT}/build_summary.json`);
   if (!indexResponse.ok) throw new Error(`Indeks wyników niedostępny (HTTP ${indexResponse.status})`);
   const index = await indexResponse.json() as { generated_utc: string };
-  const response = await fetch(`${ROOT}/data/${folder}/results_2627.csv`);
+  const response = await fetch(`${ROOT}/data/${folder}/results_${seasonCode(new Date().toISOString().slice(0, 10))}.csv`);
   if (!response.ok) throw new Error(`Brak pliku wyników dla ligi (HTTP ${response.status})`);
   const rows = parseResults(await response.text());
   const value = { rows, generatedAt: index.generated_utc, cachedAt: Date.now() };
@@ -94,7 +95,7 @@ export async function loadRecentTeamForm(folder: string, team: string, beforeDat
     matches: matches.slice(0, 5),
     home: matches.filter(row => row.venue === "H").slice(0, 5),
     away: matches.filter(row => row.venue === "A").slice(0, 5),
-    source: "open-matchday results_2627.csv",
+    source: `open-matchday results_${seasonCode(beforeDate)}.csv`,
     sourceUpdatedAt: generatedAt,
   };
 }
