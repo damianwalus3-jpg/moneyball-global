@@ -5,9 +5,9 @@ import { valueThreeLegCoupon } from "./coupon-value";
 
 const now = "2026-11-17T20:00:00.000Z";
 const candidate: ThreeLegCandidate = {
-  date: "2026-11-17", combinedProbability: 0.125, averageProbability: 0.5, oddsAvailable: false,
+  date: "2026-11-17", combinedProbability: 0.512, averageProbability: 0.8, oddsAvailable: false,
   legs: [
-    { fixtureId: "f1", title: "A vs B", competition: "League", selection: "1", probability: 0.5, source: "model", model: "v1" },
+    { fixtureId: "f1", title: "A vs B", competition: "League", selection: "1", probability: 0.8, source: "model", model: "v1" },
     { fixtureId: "f2", title: "C vs D", competition: "League", selection: "X", probability: 0.5, source: "model", model: "v1" },
     { fixtureId: "f3", title: "E vs F", competition: "League", selection: "2", probability: 0.5, source: "model", model: "v1" },
   ],
@@ -17,9 +17,9 @@ function row(kind: "prediction" | "odds", fixtureId: string, details: Record<str
 }
 function fullRecords(): TrackerRecord[] {
   const predictions = [
-    row("prediction", "f1", { p1: 0.5, px: 0.25, p2: 0.25 }, "KANDYDAT"),
-    row("prediction", "f2", { p1: 0.25, px: 0.5, p2: 0.25 }, "KANDYDAT"),
-    row("prediction", "f3", { p1: 0.25, px: 0.25, p2: 0.5 }, "KANDYDAT"),
+    row("prediction", "f1", { p1: 0.8, px: 0.1, p2: 0.1, selection: "1", strongCandidate: true }, "KANDYDAT"),
+    row("prediction", "f2", { p1: 0.1, px: 0.8, p2: 0.1, selection: "X", strongCandidate: true }, "KANDYDAT"),
+    row("prediction", "f3", { p1: 0.1, px: 0.1, p2: 0.8, selection: "2", strongCandidate: true }, "KANDYDAT"),
   ];
   const odds = ["f1", "f2", "f3"].map((id, index) => row("odds", id, {
     bookmaker: "Book A", market: "1X2", complete1X2: true,
@@ -32,7 +32,7 @@ describe("three-leg coupon odds valuation", () => {
   it("calculates combined odds, expected value and €4 paper return", () => {
     const value = valueThreeLegCoupon(candidate, fullRecords(), "Book A", now);
     expect(value?.combinedOdds).toBeCloseTo(2.2 ** 3);
-    expect(value?.expectedValue).toBeCloseTo(0.331);
+    expect(value?.expectedValue).toBeCloseTo(0.512 * 2.2 ** 3 - 1);
     expect(value?.stake).toBe(4);
     expect(value?.potentialReturn).toBeCloseTo(4 * 2.2 ** 3);
     expect(value?.potentialProfit).toBeCloseTo(4 * (2.2 ** 3 - 1));
@@ -42,6 +42,20 @@ describe("three-leg coupon odds valuation", () => {
     const records = fullRecords().filter(row => row.details.fixtureId !== "f3" || row.kind !== "odds");
     expect(valueThreeLegCoupon(candidate, records, "Book A", now)).toBeNull();
     expect(valueThreeLegCoupon(candidate, fullRecords(), "Other Book", now)).toBeNull();
+  });
+
+  it("refuses pricing when a newer prediction has been rejected", () => {
+    const records = [...fullRecords(), row("prediction", "f1", {
+      p1: 0.8, px: 0.1, p2: 0.1, selection: "1", strongCandidate: false,
+    }, "ODRZUCONY")];
+    expect(valueThreeLegCoupon(candidate, records, "Book A", now)).toBeNull();
+  });
+
+  it("refuses pricing when the current probabilities no longer match the coupon", () => {
+    const records = fullRecords().map(record => record.kind === "prediction" && record.details.fixtureId === "f1"
+      ? { ...record, details: { ...record.details, p1: 0.79, px: 0.11, p2: 0.1 } }
+      : record);
+    expect(valueThreeLegCoupon(candidate, records, "Book A", now)).toBeNull();
   });
 
   it("rejects invalid stake and stale price data", () => {
