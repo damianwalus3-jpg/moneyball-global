@@ -21,7 +21,7 @@ function fullRecords(): TrackerRecord[] {
     row("prediction", "f2", { p1: 0.1, px: 0.8, p2: 0.1, selection: "X", strongCandidate: true }, "KANDYDAT"),
     row("prediction", "f3", { p1: 0.1, px: 0.1, p2: 0.8, selection: "2", strongCandidate: true }, "KANDYDAT"),
   ];
-  const odds = ["f1", "f2", "f3"].map((id, index) => row("odds", id, {
+  const odds = ["f1", "f2", "f3"].map(id => row("odds", id, {
     bookmaker: "Book A", market: "1X2", complete1X2: true,
     odds1: 2.2, oddsX: 2.2, odds2: 2.2, capturedAt: "2026-11-17T19:30:00.000Z",
   }, "COMPLETE_1X2"));
