@@ -2,7 +2,7 @@ import { useState } from "react";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
-  ShieldCheck, Sparkles, Ticket, Trophy, Wallet, X
+  ShieldCheck, Sparkles, Ticket, Trophy, X
 } from "lucide-react";
 
 type Tab = "dashboard" | "matches" | "pick" | "coupons" | "intelligence" | "tracker";
