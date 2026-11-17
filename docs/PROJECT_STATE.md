@@ -948,3 +948,32 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Reschedule reconciliation skipped in 80ms; parallel discovery 207ms; ESPN selection 53ms; TheSportsDB 22ms; OpenMatchday 67ms; alternate total 353ms; main match load 343ms; financial reconciliation checked 7 coupons in 128ms with 0 failures.
 - 173 FootyNomad fixtures fetched, 3 alternate observations matched/persisted, 0 results matched/saved and 0 predictions/coupon legs settled. No error; absence of settlement reflects no new verified result for the currently due matches, not a failed sync.
 - This is a fourth sample only; retain monitoring and compare p50/p95 after a full 24h on v72.
+
+## Production repair checkpoint — 2026-11-17 08:15–08:30 UTC
+
+### Source authorization and prediction scan
+- Root cause of the two public-source HTTP 401s at 07:00:05 UTC was Supabase rejecting conflicting API keys: apikey used the publishable key while Authorization carried a secret key. The final fix in commit bb9bf0d4d569319f262501c71df925558ce35a75 explicitly sends matching keys in both headers from the server-side moneyball-predict function. Supabase Edge Function version 245 deployed.
+- Direct pg_net request with the exact matching headers returned HTTP 200, source_count=4, raw_fixtures=11, european_fixtures=8, and form coverage for 8/8 fixtures. After the fix, scheduled_import logged public_source_error=null.
+- Manual prediction scan previously paginated raw matches before eligibility filtering. The two eligible fixtures were at raw row positions 80 and 94 of 99, so the first 8 pages were empty and the client had to traverse out-of-scope rows.
+- Added owner-scoped RPC moneyball_manual_prediction_scan_page(date, integer, integer) in migration 20261117090000_add_authenticated_manual_prediction_scan_page.sql (commit 9d9c621ed2f59679877becb2ab17e232f6fa2cb9). Manual branch in moneyball-predict now uses this RPC (commit bf4a797f91649ee34f51aa6cf274add939969b66); Supabase Edge Function version 246 deployed.
+- RPC test with the actual owner context returned 2 rows, count=2, has_more=false. Cross-owner test returned 0 rows. RPC does not accept owner_id from the client and derives it from auth.uid().
+- Re-run of today's scheduled scan on version 246 completed successfully: matches=2, predictions=24, updated=24, covered=2, missing=0, selected=0, couponCreated=false. Import metrics: feed_rows=2, public_rows=8, eligible_rows=2, inserted=0, skipped_existing=2, feed_error=null, public_source_error=null. Next scheduled scan remains 15:00 Europe/Brussels.
+
+### Scope predicate and regression fixes
+- Shared eligibility helper did not reject named reserve teams such as Real Madrid Castilla, Celta Fortuna, Valencia Mestalla, Betis Deportivo and Sevilla Atletico. Added these exclusions to moneyball_is_eligible_european_match in migration 20261117093000_exclude_named_reserve_sides_from_shared_eligibility.sql (commit 264726ce3ef40c04b3f2b03a8cb4ae74f5c30539).
+- SQL alias audit found a prefix-match bug: NB III could match the NB I/NB II aliases in moneyball_is_european_top_two_league. Added a negative rule for roman numeral tier III+ aliases in migration 20261117094000_exclude_hungarian_third_tier_nb_iii.sql (commits d42089df130bbab04f84af35fe3ff6783fe58383 and cdd5be949dbe8ac4b2ba943f5c96f097a12e2722).
+- Regression checks: NB I and NB II remain allowed; NB III, NB IV and Romania Liga III are rejected. Named Spanish reserve teams are rejected by the shared helper. The 100+ tested expected European tier-one/tier-two labels remained accepted; issue #77 remains open pending the complete source-catalogue comparison.
+- Frontend regression tests for NB I/II vs NB III/IV and named reserve teams added in commit e82719edd24d9fcdf8cc7953ad83e76dd8380632.
+
+### Coupon finance and bankroll audit
+- Finance summary previously counted a zero-stake test coupon with unknown odds as an incomplete financial settlement. Migration 20261117100000_ignore_zero_stake_coupons_in_finance_summary.sql (commit 5658bacaeb8079df9e691635aee523286010f39b) now treats stake=0 as payout=0 for financial aggregation.
+- Finance summary now has one incomplete historical coupon, not two: a 5 EUR test coupon marked won but with no recorded odds/potential return. Do not invent or backfill a payout without verified historical odds.
+- Ledger audit: opening deposit 91.60 EUR, total stakes 23.00 EUR, recorded returns 15.68 EUR, current ledger balance 84.28 EUR; no duplicate coupon transactions and no balance_after mismatches. The incomplete historical 5 EUR coupon has no recorded return, so final historical net remains incomplete. New coupons retain the 4 EUR rule; historical 5 EUR stakes are not rewritten.
+
+### Production verification and remaining blockers
+- GitHub CI run 44046719711 and Cloudflare deploy run 44046719759 for commit e82719ed: SUCCESS.
+- Public Worker root and /login load. /panel correctly returns login_required to an unauthenticated browser; no authenticated user session was available, so logged-in UI/E2E is still unverified.
+- Production logs 00:00–09:00 UTC: moneyball-predict v246 7 requests, all HTTP 200 (avg 2.76s, p95 7.06s, max 9.17s); moneyball-results-sync v72 13 requests, all HTTP 200 (avg 5.05s, p95 7.87s, max 8.83s); moneyball-free-feed v42 14 requests, all HTTP 200; moneyball-public-sources v62 10 requests, all HTTP 200; MoviOdds v7 5 requests, all HTTP 200/skipped because no key. The two 401s occurred before the auth fix at 07:00:05 UTC; no v246 public-source 401 or 5xx was observed in the post-fix scan.
+- Today's Brussels scope: FootyNomad reports 173 total fixtures; DB contains 99 rows for today, only 2 meet the actual Europe domestic senior men's tier 1/2 rule. The other source entries include international competitions, cups, youth, reserves and lower tiers. Do not treat 173 as 173 eligible fixtures.
+- Fresh odds remain unavailable: 0 active provider_odds records in the last 6 hours; latest stored MoviOdds capture 2026-11-16 02:11:13 UTC. MoviOdds requires an API key and Bwin partner API access is restricted. Do not use stale, synthetic or non-Belgian prices as current bookmaker odds. MAIN/MEGA/EXTRA remain blocked until a verified current odds source is available.
+- Do not close issue #77, claim full league coverage, or declare the complete project finished. No Vercel/TEST deployment, no historical data deletion, no real-money betting.
