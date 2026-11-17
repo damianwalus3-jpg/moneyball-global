@@ -78,6 +78,23 @@ async function readFixtures(date:string){
  const total=fixtures.length;
  return {date,total_found:total,fixtures_count:fixtures.length,fixtures};
 }
+function isOpenMatchdayTopTwoFixture(f:any):boolean {
+ const folder=String(f?.source_competition_id||"");
+ const tier=folder.match(/^([A-Z]{3})_([12])_[A-Za-z0-9-]+$/i);
+ const country=String(f?.country||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().trim();
+ const competition=String(f?.competition||f?.league||"");
+ if(String(f?.source||"").toLowerCase()!=="openmatchday"||!tier||!country||!isEuropeanFixture(country,competition,f?.home_team||f?.home,f?.away_team||f?.away))return false;
+ if(/\\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\\b/i.test(folder+" "+competition))return false;
+ return true;
+}
+function isEligiblePublicFixture(f:any):boolean {
+ const country=f?.country,competition=f?.league||f?.competition,home=f?.home_team||f?.home,away=f?.away_team||f?.away;
+ return isEuropeanFixture(country,competition,home,away)
+  && (isOpenMatchdayTopTwoFixture(f)||isTopTwoTierLeague(competition,country))
+  && (!f.gender||String(f.gender).toLowerCase()==="men")
+  && !isExcludedSeniorTeam(home)&&!isExcludedSeniorTeam(away);
+}
+
 async function db(path:string,token:string,method="GET",body?:unknown,prefer="return=representation"){
  const r=await fetch(SUPABASE_URL+"/rest/v1/"+path,{method,headers:{apikey:KEY,Authorization:"Bearer "+token,"Content-Type":"application/json",Prefer:prefer},body:body===undefined?undefined:JSON.stringify(body)});
  const txt=await r.text();let data:any;try{data=txt?JSON.parse(txt):null}catch{data=txt}
@@ -102,7 +119,7 @@ Deno.serve(async(req)=>{
    const pr=await fetch("https://gzgeklcukrclgwbsmbsp.supabase.co/functions/v1/moneyball-public-sources?date="+date,{headers:{"Accept":"application/json","apikey":KEY,"Authorization":req.headers.get("Authorization")||""},signal:AbortSignal.timeout(18000)});
    const pt=await pr.text();
    if(!pr.ok)throw new Error("Public sources HTTP "+pr.status+": "+pt.slice(0,300));
-   const pj=JSON.parse(pt);publicFixtures=Array.isArray(pj.fixtures)?pj.fixtures.filter((f:any)=>isEuropeanFixture(f.country,f.league||f.competition,f.home_team||f.home,f.away_team||f.away)&&isTopTwoTierLeague(f.league||f.competition,f.country)&&(!f.gender||String(f.gender).toLowerCase()==="men")&&!isExcludedSeniorTeam(f.home_team||f.home)&&!isExcludedSeniorTeam(f.away_team||f.away)):[];
+   const pj=JSON.parse(pt);publicFixtures=Array.isArray(pj.fixtures)?pj.fixtures.filter(isEligiblePublicFixture):[];
    publicSourceStatus={ok:true,source_count:pj.source_count,raw_fixtures:pj.raw_fixtures,unique_fixtures:pj.unique_fixtures,sources:pj.sources};
   }catch(e){publicSourceStatus={ok:false,error:String(e)};}
   const normTeam=(v:any)=>{const key=String(v||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();return ({"turkiye":"turkey"} as Record<string,string>)[key]||key;};
