@@ -1,3 +1,4 @@
+import { cacheOpenLigaTeamForms } from "./team-form";
 import { seasonCode } from "./season";
 export interface FreeFixture {
   id: string;
@@ -28,6 +29,9 @@ interface OpenLigaMatch {
   matchID?: number;
   matchDateTime?: string | null;
   matchDateTimeUTC?: string | null;
+  matchIsFinished?: boolean;
+  lastUpdateDateTime?: string | null;
+  matchResults?: Array<{ resultTypeID?: number; resultName?: string | null; resultOrderID?: number; pointsTeam1?: number; pointsTeam2?: number }> | null;
   leagueName?: string | null;
   leagueShortcut?: string | null;
   team1?: { teamName?: string | null };
@@ -230,6 +234,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
             sourceUpdatedAt: new Date().toISOString(),
           } satisfies FreeFixture];
         });
+        cacheOpenLigaTeamForms(matches, fixtures.flatMap(fixture => [fixture.home, fixture.away]), shortcut, season, date);
         return { fixtures, error: "" };
       } catch (error) {
         return { fixtures: [] as FreeFixture[], error: `OpenLigaDB · ${league.leagueName || shortcut}: ${error instanceof Error ? error.message : "błąd źródła"}` };
