@@ -14,3 +14,10 @@
 - Confirmed steps: dependency install, TypeScript typecheck, Vitest suite, production Vite build.
 - Core domain tests cover 1X2 probability normalization, derived Double Chance, duplicate fixture suppression, three-leg coupon constraints and return calculation.
 - Initial SQL migrations are authored but deliberately not applied: a separate clean Supabase project must first be provisioned and its cost/organization confirmed.
+
+## Zero-cost decision
+- User confirmed that no paid services may be used.
+- Removed unused Supabase/Postgres migrations from the clean branch. No new database or paid resource was created.
+- Tracker now runs locally in browser storage with versioned JSON export/import; backups merge only missing IDs.
+- Added daily Europe/Brussels fixture retrieval from open-matchday's free public CSV dataset, restricted to European domestic league folders. Source is non-commercial and coverage limitations must be shown.
+- Added a separate Cloudflare Worker static-assets deployment workflow. It uses the existing repository Cloudflare secrets and a distinct Worker name; it does not bind the production D1 database or alter the existing production Worker.
