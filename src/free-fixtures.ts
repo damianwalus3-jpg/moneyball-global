@@ -103,7 +103,7 @@ export function openLigaSeasonYears(date: string): number[] {
 export function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
   const shortcut = (league.leagueShortcut ?? "").toLowerCase();
   const name = (league.leagueName ?? "").toLowerCase();
-  if (league.sport?.sportName && !league.sport.sportName.toLowerCase().includes("football") && !league.sport.sportName.toLowerCase().includes("fußball")) return false;
+  if (league.sport?.sportName && !league.sport.sportName.toLowerCase().includes("football") && !league.sport.sportName.toLowerCase().includes("fußball") && !league.sport.sportName.toLowerCase().includes("fussball")) return false;
   if (COUNTRY_NAMES.some(country => name.includes(country))) return true;
   return EUROPEAN_SHORTCUT_PREFIXES.some(prefix => shortcut === prefix || shortcut.startsWith(prefix));
 }
