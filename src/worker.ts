@@ -7,6 +7,7 @@ interface Env {
 
 const APP_ORIGIN = "https://moneyball-global-rebuild.damianwalus3.workers.dev";
 const OPENLIGA_API = "https://api.openligadb.de";
+const ESPN_API = "https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard";
 const ODDSPAPI_API = "https://api.oddspapi.io";
 const STRIKER_API = "https://mcp.strikerapi.com";
 const UPSTREAM_TIMEOUT_MS = 10_000;
@@ -154,6 +155,34 @@ export default {
         results,
         warning: "StrikerAPI date lookups use UTC; convert startsAt to Europe/Brussels before matching. Provider IDs must be matched independently. This endpoint does not write odds to Tracker or P/L.",
       }, 200, origin);
+    }
+
+    const espnScoreboard = url.pathname.match(/^\\/api\\/espn\\/scoreboard\\/(\\d{8})$/);
+    if (espnScoreboard) {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      const date = espnScoreboard[1];
+      const year = Number(date.slice(0,4)), month = Number(date.slice(4,6)), day = Number(date.slice(6,8));
+      const parsed = new Date(Date.UTC(year, month - 1, day));
+      if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return json({ error: "invalid_date" }, 400, origin);
+      const cacheKey = new Request(url.toString(), { method: "GET" });
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+      try {
+        const upstream = await fetch(`${ESPN_API}?dates=${date}&limit=1000`, { headers: { Accept: "application/json", "User-Agent": "MONEYBALL-Rebuild/1.0 (fixture aggregation)" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+        const body = await upstream.text();
+        if (!upstream.ok) return json({ error: "espn_upstream_http_" + upstream.status }, upstream.status, origin);
+        try { JSON.parse(body); } catch { return json({ error: "espn_invalid_json" }, 502, origin); }
+        const headers = corsHeaders(origin);
+        headers.set("Content-Type", "application/json; charset=utf-8");
+        headers.set("Cache-Control", "public, max-age=300");
+        headers.set("X-MONEYBALL-SOURCE", "ESPN");
+        const response = new Response(body, { status: 200, headers });
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "espn_upstream_error" }, 502, origin);
+      }
     }
 
     const leagues = url.pathname.match(/^\/api\/openligadb\/leagues\/(\d{4})$/);
