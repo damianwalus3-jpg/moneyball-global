@@ -28,3 +28,10 @@ This is a whole-country classification. Türkiye is transcontinental geographica
 ## Authoritative source
 
 UN Statistics Division, Standard Country or Area Codes for Statistical Use (M49): https://unstats.un.org/unsd/methodology/m49/overview
+
+
+## Backend remediation status — 2026-11-17
+
+A source-level correction now centralizes the geographic country boundary in `supabase/functions/_shared/geographic-europe.ts` and applies it to the five ingestion/prediction/result functions: `footynomad-sync`, `moneyball-free-feed`, `moneyball-results-sync`, `moneyball-public-sources`, and `moneyball-predict`. OpenMatchday's league index now uses the same country helper. A SQL migration wraps the existing top-two-tier predicate with the geographic check, without deleting historical rows.
+
+Regression tests were added and wired into GitHub CI and the Cloudflare workflow. However, these workflows do not deploy Supabase functions or SQL migrations. The backend source changes are committed but **not live in Supabase**. Full end-to-end exclusion remains unverified until an authorized Supabase deployment path is available and live importer/database checks pass.

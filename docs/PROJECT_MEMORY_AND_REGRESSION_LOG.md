@@ -1276,3 +1276,16 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - Cloudflare MAIN deploy #812 succeeded for commit `8a3f98665a416a28ba277304680931dec394e103`; Worker version `44c4f0cd-ca34-4c30-b61a-53d621f72125`. Live root and /login fetch succeeded; protected /panel returned `login_required` without an authenticated session.
 - No historical match, prediction, coupon, settlement or bankroll data was deleted or rewritten.
 - **Critical boundary:** this was a Cloudflare frontend/client-side data-scope deployment. Supabase automatic importers, SQL eligibility functions and aggregate RPCs were not deployed with the M49 change. Backend ingestion/aggregate isolation is not yet proven. The app filters visible rows, but non-European records may still be stored or included in some backend aggregates until the backend runtime is separately updated and verified. Keep issue #77 OPEN; do not claim full project completion.
+
+
+## Regression log — backend M49 country gate (2026-11-17)
+
+**Bug:** Frontend geographic Europe filter and Supabase ingestion/database rules diverged. Five backend functions retained the old UEFA-based allowlist, including Asian countries and a competition-name fallback that could bypass country geography.
+
+**Fix in source:** Shared helper `supabase/functions/_shared/geographic-europe.ts`; updated `footynomad-sync`, `moneyball-free-feed`, `moneyball-results-sync`, `moneyball-public-sources`, and `moneyball-predict`; OpenMatchday league-index filter now uses the same helper. Added `geographic-europe.test.ts` and wired `deno test --no-check supabase/functions/_shared/geographic-europe.test.ts` into CI and Cloudflare deployment validation. Added SQL migration `20261117130000_enforce_geographic_europe_m49_scope.sql` with database regression assertions.
+
+**Country policy:** UN M49 is the geographic reference. Albania remains included. Israel, Armenia, Azerbaijan, Cyprus, Georgia, Kazakhstan and Türkiye are excluded. UK football associations and Kosovo are explicit provider aliases; Kosovo is not a separate M49 country code. Generic `Europe` and `UEFA` labels are not accepted as country evidence.
+
+**Commits:** `b7d32c841195a9d6fddd756fac1ba22186f4420e`, `1d0479af049cc27f0184c8044e7ae3f7964e2f47`, `7edd8668d6f4a1f269c64b21d302708a62e499b0`, `63a5edaa6cf99a2894aa90e67ff1f04e8c153e0d`.
+
+**Not yet done:** The Supabase Edge Functions and SQL migration have not been deployed to the live Supabase project. The Cloudflare workflow is not a Supabase deploy. Live importer/database verification remains open; do not repeat the earlier overclaim that frontend filtering means source ingestion is fully geographic. Existing historical rows remain untouched.
