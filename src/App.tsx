@@ -9,7 +9,7 @@ import { evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
 import { shouldAppendPrediction } from "./prediction-record";
-import { getSafestPick } from "./safest-pick";
+import { getSafestPick, hasKickoffPassed } from "./safest-pick";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
@@ -101,8 +101,7 @@ export default function App() {
   const [scanError, setScanError] = useState("");
   const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
   const loadFixtureForms = async (match: NonNullable<typeof fixtureScan>["fixtures"][number]) => {
-    const kickoff = new Date(`${match.date}T${match.time}:00+01:00`);
-    if (match.time !== "—" && Number.isFinite(kickoff.getTime()) && kickoff.getTime() <= Date.now()) {
+    if (hasKickoffPassed(match.date, match.time)) {
       const reason = "ODRZUCONY: mecz już się rozpoczął lub zakończył. Nie zapisujemy prognoz jako przedmeczowych.";
       setTeamForms(current => ({ ...current, [match.id]: { loading: false, error: reason } }));
       setRecords(savePredictionRecord(match, undefined, reason));
