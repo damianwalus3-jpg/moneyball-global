@@ -63,10 +63,11 @@ async function readFixtures(date:string){
   const home=textOf((body.match(/<span[^>]*class=["'][^"']*ticket-home[^"']*["'][^>]*>([\s\S]*?)<\/span>/i)||[])[1]||"");
   const away=textOf((body.match(/<span[^>]*class=["'][^"']*ticket-away[^"']*["'][^>]*>([\s\S]*?)<\/span>/i)||[])[1]||"");
   const time=(body.match(/<time[^>]*datetime=["']([^"']+)/i)||[])[1]||null;if(!id||!home||!away)continue;
-  const gs=html.lastIndexOf('<details class="league-group',m.index),se=gs>=0?html.indexOf("</summary>",gs):-1,summary=gs>=0&&se>gs?html.slice(gs,se):"";
-  const league=textOf((summary.match(/href=["']\/league\/[^"']+["'][^>]*>([\s\S]*?)<\/a>/i)||[])[1]||"");
   const cs=html.lastIndexOf('<h2 class="section-title',m.index),ce=cs>=0?html.indexOf("</h2>",cs):-1;
   const country=cs>=0&&ce>cs?textOf(html.slice(cs,ce)).replace(/\s+\d+$/,"").trim():null;
+  // Never inherit a league-group from the previous country if this section has no competition heading.
+  const gs=html.lastIndexOf('<details class="league-group',m.index),se=gs>=0?html.indexOf("</summary>",gs):-1,summary=gs>cs&&se>gs?html.slice(gs,se):"";
+  const league=textOf((summary.match(/href=["']\/league\/[^"']+["'][^>]*>([\s\S]*?)<\/a>/i)||[])[1]||"");
   if(!isEuropeanFixture(country,league,home,away)||!isTopTwoTierLeague(league,country))continue;
     if (isExcludedSeniorTeam(home) || isExcludedSeniorTeam(away)) continue;
   const cls=(attrs.match(/class=["']([^"']+)/i)||[])[1]||"",status=cls.includes("ticket-live")?"live":cls.includes("ticket-ft")?"finished":cls.includes("ticket-pst")?"postponed":cls.includes("ticket-canc")?"cancelled":"scheduled";

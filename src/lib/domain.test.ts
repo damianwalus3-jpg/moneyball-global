@@ -887,6 +887,11 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
     }
   });
 
+  it("does not infer a competition from a country with no league heading", () => {
+    expect(isEuropeanTopTwoLeague("Moldova", "")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Moldova", " ")).toBe(false);
+  });
+
   it("rejects all 36 tier-3, cup, international, youth, women's and reserve labels", () => {
     for (const [country, competition] of rejected) {
       expect(isEuropeanTopTwoLeague(country, competition), `${country}: ${competition}`).toBe(false);
