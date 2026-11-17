@@ -167,8 +167,8 @@ All 15 Tracker migrations are additive. They do not rewrite historical matches, 
 - 19,201 predictions; 9 coupons; 9 bankroll transactions remained unchanged by the migrations.
 - New tables have RLS enabled with owner/system-specific policies. Tracker-specific RLS initialization-plan warnings and the category-alias foreign-key index warning were remediated. Remaining advisor findings concern pre-existing unrelated objects; the new alias index is naturally reported unused until alias joins exercise it.
 - The aggregate RPC was checked against the authenticated owner scope and its totals matched the 19,201 prediction and 9 coupon records.
-- CI passed: 86 tests, Supabase Edge Function type-check, application type-check and production build.
-- Cloudflare MAIN deployment workflow completed successfully for the current Tracker release.
+- Initial Tracker delivery CI passed: 86 tests, Supabase Edge Function type-check, application type-check and production build. The later audited-classification delivery superseded this with 92 passing tests across 9 files.
+- Cloudflare MAIN deployment workflow completed successfully for the current Tracker code release; the latest documentation-only HEAD is independently rebuilding and deploying.
 - The `/tracker` route remains behind the existing authentication guard; unauthenticated route fetches return `login_required`.
 
 ### Additional delivery — 2026-11-17
