@@ -225,7 +225,7 @@ export function dedupeEuropeanMatches(matches: Match[]): Match[] {
 }
 
 /** OpenMatchday's folder ID is the provider's explicit tier metadata, unlike its display league label. */
-function isOpenMatchdayTopTwoMatch(match: Pick<Match, "country" | "competition" | "source" | "external_id">): boolean {
+function isOpenMatchdayTopTwoMatch(match: Pick<Match, "country" | "competition"> & Partial<Pick<Match, "source" | "external_id">>): boolean {
   if (String(match.source ?? "").toLowerCase() !== "openmatchday") return false;
   const folder = (String(match.external_id ?? "").match(/^om:([^:]+):/) || [])[1] || "";
   if (!/^[A-Z]{3}_[12]_[A-Za-z0-9-]+$/i.test(folder)) return false;
@@ -237,7 +237,7 @@ function isOpenMatchdayTopTwoMatch(match: Pick<Match, "country" | "competition" 
 }
 
 /** True only for senior men's first/second-tier fixtures, excluding reserve/B teams. */
-export function isEligibleEuropeanMatch(match: Pick<Match, "country" | "competition" | "league" | "gender" | "home_team" | "away_team" | "source" | "external_id">): boolean {
+export function isEligibleEuropeanMatch(match: Pick<Match, "country" | "competition" | "league" | "gender" | "home_team" | "away_team"> & Partial<Pick<Match, "source" | "external_id">>): boolean {
   if (!isOpenMatchdayTopTwoMatch(match) && !isEuropeanTopTwoLeague(match.country, match.competition ?? match.league)) return false;
   if (match.gender && match.gender !== "men") return false;
   const isReserve = (value: string | null | undefined) => {
