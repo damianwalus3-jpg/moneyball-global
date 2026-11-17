@@ -59,7 +59,7 @@ describe("odds provider pilot proxy", () => {
   it("reports only whether secrets are configured and never exposes their values", async () => {
     const secret = "do-not-return-this";
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/status"), {
-      ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: secret, STRIKERAPI_API_KEY: secret, ODDS_PILOT_TOKEN: "pilot-secret",
+      ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: secret, STRIKERAPI_API_KEY: secret, ODDS_PILOT_TOKEN: "pilot-secret-0123456789-abcdef",
     }, { waitUntil: vi.fn() });
     const body = await response.text();
     expect(body).toContain('"oddspapi":true');
