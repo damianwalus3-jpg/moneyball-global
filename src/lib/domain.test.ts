@@ -109,6 +109,12 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Türkiye", "1. Lig")).toBe(true);
     expect(isEuropeanTopTwoLeague("Bosnia", "Premijer Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Bosnia", "1st League - FBiH")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Bosnia", "1st League - RS")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Czechia", "Czech Liga")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Czech Republic", "Czech Liga")).toBe(true);
+    // Empty alternatives in an allowlist regex must never admit arbitrary provider labels.
+    expect(isEuropeanTopTwoLeague("Belgium", "Provincial - Oost-Vlaanderen")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Belgium", "Unknown Regional Competition")).toBe(false);
     expect(isEuropeanTopTwoLeague("Macedonia", "First League")).toBe(true);
     expect(isEuropeanTopTwoLeague("Macedonia", "Second League")).toBe(true);
     expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga")).toBe(true);
