@@ -1,5 +1,5 @@
-import { couponPayout, couponStatus, effectiveOdds, outcomeFromScore, settlePick, settleGoalsPick, signedAmount } from "./domain";
-import { deleteRow, fetchAll, insertRow, updateRow } from "./db";
+import { outcomeFromScore, settlePick, settleGoalsPick } from "./domain";
+import { insertRow, reconcileCouponFinanceForOwner, updateRow } from "./db";
 import type { Coupon, CouponLeg, Match, MatchResult, Prediction, Settlement } from "./types";
 
 export interface SettleInput {
@@ -13,80 +13,6 @@ export interface SettleInput {
 export type SettleMode =
   | { kind: "score"; home: number; away: number; source?: string; verified?: boolean }
   | { kind: "void"; status: "cancelled" | "postponed"; source?: string; verified?: boolean };
-
-async function refreshCouponTotals(coupon: Coupon, legs: CouponLeg[], status: Settlement, occurredAt: string) {
-  const odds = effectiveOdds(legs);
-  const combinedOdds = odds ?? coupon.combined_odds;
-  const potentialReturn =
-    coupon.stake != null && combinedOdds != null
-      ? Math.round(coupon.stake * combinedOdds * 100) / 100
-      : coupon.potential_return;
-  const settledAt = status === "pending" ? null : occurredAt;
-  if (
-    coupon.status !== status ||
-    coupon.combined_odds !== combinedOdds ||
-    coupon.potential_return !== potentialReturn ||
-    coupon.settled_at !== settledAt
-  ) {
-    await updateRow("coupons", coupon.id, {
-      status,
-      combined_odds: combinedOdds,
-      potential_return: potentialReturn,
-      settled_at: settledAt,
-    });
-    coupon.status = status;
-    coupon.combined_odds = combinedOdds;
-    coupon.potential_return = potentialReturn;
-    coupon.settled_at = settledAt;
-  }
-}
-
-/** Keep the coupon cash ledger idempotent when results are settled or corrected. */
-async function reconcileCouponLedger(coupon: Coupon, legs: CouponLeg[], occurredAt: string) {
-  const transactions = await fetchAll("bankroll_transactions");
-  const related = transactions.filter((tx) => tx.coupon_id === coupon.id);
-  let stakeTx = related.find((tx) => tx.transaction_type === "stake");
-  let returnTx = related.find((tx) => tx.transaction_type === "return" && (tx.note ?? "").startsWith("Automatyczne rozliczenie MONEYBALL"));
-
-  // Every saved coupon is a virtual stake. Backfill older coupons that were saved
-  // before stake recording was made mandatory.
-  if (!stakeTx && coupon.stake != null && Number(coupon.stake) > 0) {
-    stakeTx = await insertRow("bankroll_transactions", {
-      transaction_type: "stake",
-      amount: Number(coupon.stake),
-      balance_after: null,
-      coupon_id: coupon.id,
-      occurred_at: coupon.created_at || occurredAt,
-      note: `Stawka kuponu ${coupon.name}`,
-    });
-  }
-
-  const payout = couponPayout(coupon.stake, legs);
-  const settled = coupon.status !== "pending" && coupon.status !== "cancelled";
-  const shouldReturn = settled && payout != null && payout > 0 && coupon.status !== "lost";
-
-  if (shouldReturn) {
-    const row = {
-      transaction_type: "return" as const,
-      amount: payout,
-      balance_after: null,
-      coupon_id: coupon.id,
-      occurred_at: occurredAt,
-      note: `Automatyczne rozliczenie MONEYBALL: ${coupon.name}`,
-    };
-    if (returnTx) await updateRow("bankroll_transactions", returnTx.id, row);
-    else returnTx = await insertRow("bankroll_transactions", row);
-  } else if (returnTx) {
-    await deleteRow("bankroll_transactions", returnTx.id);
-  }
-
-  const updated = await fetchAll("bankroll_transactions");
-  let balance = 0;
-  for (const tx of [...updated].sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))) {
-    balance = Math.round((balance + signedAmount(tx)) * 100) / 100;
-    if (tx.balance_after !== balance) await updateRow("bankroll_transactions", tx.id, { balance_after: balance });
-  }
-}
 
 /**
  * Saves a result first. Nothing is settled until the user explicitly verifies it.
@@ -155,11 +81,14 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
       for (const couponId of touchedCouponIds) {
         const coupon = input.coupons.find((item) => item.id === couponId);
         if (!coupon || coupon.status === "cancelled") continue;
-        const couponLegs = input.legs.filter((leg) => leg.coupon_id === couponId);
-        const status = couponStatus(couponLegs.map((leg) => leg.status));
+        const finance = await reconcileCouponFinanceForOwner(couponId);
+        const status = finance.status;
+        if (!status) throw new Error("Brak statusu po uzgodnieniu kuponu.");
         if (coupon.status !== status) changedCoupons++;
-        await refreshCouponTotals(coupon, couponLegs, status, now);
-        await reconcileCouponLedger(coupon, couponLegs, now);
+        coupon.status = status;
+        if (finance.odds != null) coupon.combined_odds = finance.odds;
+        if (finance.potential_return != null) coupon.potential_return = finance.potential_return;
+        coupon.settled_at = status === "pending" ? null : coupon.settled_at ?? now;
       }
       return { changedPredictions: affected.length, changedCoupons, verified: false };
     }
@@ -219,11 +148,14 @@ export async function settleMatch(input: SettleInput, mode: SettleMode) {
   for (const couponId of touchedCouponIds) {
     const coupon = input.coupons.find((item) => item.id === couponId);
     if (!coupon || coupon.status === "cancelled") continue;
-    const couponLegs = input.legs.filter((leg) => leg.coupon_id === couponId);
-    const status = couponStatus(couponLegs.map((leg) => leg.status));
+    const finance = await reconcileCouponFinanceForOwner(couponId);
+    const status = finance.status;
+    if (!status) throw new Error("Brak statusu po uzgodnieniu kuponu.");
     if (coupon.status !== status) changedCoupons++;
-    await refreshCouponTotals(coupon, couponLegs, status, now);
-    await reconcileCouponLedger(coupon, couponLegs, now);
+    coupon.status = status;
+    if (finance.odds != null) coupon.combined_odds = finance.odds;
+    if (finance.potential_return != null) coupon.potential_return = finance.potential_return;
+    coupon.settled_at = status === "pending" ? null : coupon.settled_at ?? now;
   }
 
   return { changedPredictions, changedCoupons, verified: true };

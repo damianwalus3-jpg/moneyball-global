@@ -572,6 +572,55 @@ export async function fetchStatisticsPageData(): Promise<StatisticsPageData> {
   return data as StatisticsPageData;
 }
 
+export interface CouponFinanceReconciliation {
+  ok: boolean;
+  coupon_id?: string;
+  status?: "pending" | "won" | "lost" | "void";
+  legs?: number;
+  pending_legs?: number;
+  odds?: number | null;
+  potential_return?: number | null;
+  payout?: number | null;
+  balance?: number | null;
+}
+
+export interface CancelCouponResult {
+  ok: boolean;
+  coupon_id: string;
+  status: "cancelled";
+  refund: number;
+  balance: number | null;
+}
+
+/** Reconcile one coupon and its ledger atomically, scoped to the signed-in owner. */
+export async function reconcileCouponFinanceForOwner(couponId: string): Promise<CouponFinanceReconciliation> {
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().rpc("moneyball_reconcile_coupon_finance_for_owner", { p_coupon_id: couponId }),
+    "Rozliczanie finansów kuponu",
+    20_000,
+  );
+  if (error) throw new Error(humanizeError(error));
+  if (!data || typeof data !== "object") throw new Error("Brak odpowiedzi rozliczenia kuponu.");
+  const result = data as CouponFinanceReconciliation;
+  if (result.ok !== true || !result.status) throw new Error("Nie udało się uzgodnić finansów kuponu.");
+  return result;
+}
+
+/** Cancel a pending coupon, void its legs and refund its stake once in one database transaction. */
+export async function cancelCouponForOwner(couponId: string): Promise<CancelCouponResult> {
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().rpc("moneyball_cancel_coupon_for_owner", { p_coupon_id: couponId }),
+    "Anulowanie kuponu",
+    20_000,
+  );
+  if (error) throw new Error(humanizeError(error));
+  if (!data || typeof data !== "object") throw new Error("Brak odpowiedzi anulowania kuponu.");
+  const result = data as CancelCouponResult;
+  if (result.ok !== true || result.status !== "cancelled") throw new Error("Nie udało się anulować kuponu.");
+  return result;
+}
+
+
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
   const { data, error } = await withRequestTimeout(requireSupabase().rpc("moneyball_dashboard_summary"), "Pobieranie podsumowania panelu");
   if (error) throw new Error(humanizeError(error));
