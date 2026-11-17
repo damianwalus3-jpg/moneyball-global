@@ -179,3 +179,7 @@ The previous 18-country gap was overstated because it relied too heavily on the 
 
 ## Shared FootyNomad parser and view-scope fixes — 2026-11-17
 Commit 269e85f78b0d7a608fd6d1a1c4c339d646c663a7 adds shared country-safe parser helper used by both automatic moneyball-free-feed and authenticated footynomad-sync; tests cover missing current league group and no cross-country inheritance. Deployed Supabase v45/v90; auto feed HTTP 200 returned two correct Northern Ireland Championship fixtures, updated 2. Commit 6ec923fc adds SQL migration filtering prediction/results read RPCs to canonical European senior-men tier 1/2 scope without deleting legacy data; production RPC tests show zero ineligible rows. CI and Cloudflare MAIN deploys passed. 17 Nov DB snapshot 99 FootyNomad rows, exactly 2 eligible. Authenticated v90 sync still requires end-to-end run from user's session; issue #77 remains open.
+
+
+## Settlement-history scope fix — 2026-11-17
+Migration `20261117111000_filter_history_page_to_european_top_two.sql` applied; `moneyball_history_page` now filters to European senior-men domestic tier 1/2, preserving all underlying records. Auth-context regression: 0 ineligible rows, 80 done eligible history records, 0 pending settlement queue. This aligns history with the already filtered prediction/results/dashboard/statistics/match views.
