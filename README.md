@@ -40,3 +40,7 @@ The daily scan combines two public, keyless feeds:
 - **OpenLigaDB** — public football API with a dynamic season catalogue. It is community-maintained, has no API key, and is used as a complementary source. Requests are throttled and successful responses are cached by the separate Cloudflare Worker for eight hours.
 
 Matches are normalized to Europe/Brussels date and deduplicated across feeds. The app reports provider errors and source counts. No single free feed proves complete coverage of every European senior, women's, youth, regional and amateur match; missing data is never invented. OpenLigaDB data is subject to its ODbL 1.0 and fair-use guidance; open-matchday's non-commercial terms must be respected.
+
+### Additional fixture source: OpenFootball
+
+The rebuild also reads public-domain Football.TXT feeds from OpenFootball for selected 2026/27 European competitions: France, Greece, Netherlands, Portugal, Scotland, Switzerland, Turkey, Czech Republic, Austria, England (top two tiers), Germany (top three tiers and DFB-Pokal), Spain, Italy and Belgium. Kickoff times are converted from the source league's IANA timezone to Europe/Brussels. These are additional feeds, not a complete European competition register; each repository has its own update cadence and missing files are reported.
