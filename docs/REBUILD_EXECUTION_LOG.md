@@ -335,3 +335,12 @@
 - The panel explicitly states that Web Push is not configured and that the app does not currently send background or cross-device alerts. This avoids implying a capability that has not been implemented.
 - Commit: e7d972d8df18e9c18bde476656af3755fb935050.
 - Validation: source committed; CI, browser interaction and deployment checks remain pending.
+
+
+## 2026-11-17 — Stage 28: automatic result refresh and paper settlement
+- Connected the existing result lookup and paper-coupon settlement flow to app startup and the existing 15-minute refresh cycle.
+- Pending predictions now attempt to retrieve final scores automatically at launch and on each refresh; complete three-leg paper coupons are settled when all three fixture results are present.
+- Added an in-component lock to prevent overlapping settlement runs (including duplicate effect invocation) from creating duplicate result/settlement records.
+- Manual Intelligence action remains available for an immediate check.
+- Commit: 3bad5f6f59f25948a8d7e7c53b83417ba5dbc3c8.
+- Validation: pending CI and Cloudflare deployment for this change; no live result-feed completeness claim.
