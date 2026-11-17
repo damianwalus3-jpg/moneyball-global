@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixtureKey, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaSeasonYears } from "./free-fixtures";
+import { fixtureKey, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaSeasonYears, parseEspnEuropeanFixtures } from "./free-fixtures";
 
 describe("European fixture source classification", () => {
   it("accepts known European country names and competition prefixes", () => {
@@ -82,5 +82,39 @@ describe("OpenLigaDB European country shortcut coverage", () => {
   it("does not admit arbitrary words that merely start with a country prefix", () => {
     expect(isEuropeanOpenLiga({ leagueId: 101, leagueName: "Latin American Cup", leagueShortcut: "latam-cup", sport: { sportName: "Fußball" } })).toBe(false);
     expect(isEuropeanOpenLiga({ leagueId: 102, leagueName: "Franchise Cup", leagueShortcut: "franchise", sport: { sportName: "Fußball" } })).toBe(false);
+  });
+});
+
+
+describe("ESPN European daily fixture fallback", () => {
+  it("keeps European venue fixtures and excludes non-European venues", () => {
+    const fixtures = parseEspnEuropeanFixtures({ events: [
+      { id: 401, date: "2026-11-18T17:45:00Z", competitions: [{
+        altGameNote: "UEFA Women's Champions League, League Phase",
+        venue: { address: { country: "Sweden" } },
+        competitors: [{ homeAway: "home", team: { displayName: "BK Häcken" } }, { homeAway: "away", team: { displayName: "Manchester City" } }],
+      }] },
+      { id: 402, date: "2026-11-18T23:30:00Z", competitions: [{
+        altGameNote: "Brazil Serie A", venue: { address: { country: "Brazil" } },
+        competitors: [{ homeAway: "home", team: { displayName: "Coritiba" } }, { homeAway: "away", team: { displayName: "Santos" } }],
+      }] },
+    ] }, "2026-11-18");
+    expect(fixtures).toHaveLength(1);
+    expect(fixtures[0]).toMatchObject({ id: "espn|401", countryCode: "SWE", competition: "UEFA Women's Champions League, League Phase", date: "2026-11-18", time: "18:45", home: "BK Häcken", away: "Manchester City", source: "ESPN" });
+  });
+
+  it("uses Brussels date when an event timestamp crosses UTC midnight", () => {
+    const fixtures = parseEspnEuropeanFixtures({ events: [{
+      id: 403, date: "2026-11-17T23:30:00Z",
+      competitions: [{ altGameNote: "Copa del Rey", venue: { address: { country: "Spain" } }, competitors: [
+        { homeAway: "home", team: { displayName: "Home FC" } }, { homeAway: "away", team: { displayName: "Away FC" } },
+      ] }],
+    }] }, "2026-11-18");
+    expect(fixtures).toHaveLength(1);
+    expect(fixtures[0].time).toBe("00:30");
+  });
+
+  it("rejects malformed scoreboard payloads instead of reporting an empty successful scan", () => {
+    expect(() => parseEspnEuropeanFixtures({ events: null }, "2026-11-18")).toThrow("nieprawidłowa odpowiedź");
   });
 });
