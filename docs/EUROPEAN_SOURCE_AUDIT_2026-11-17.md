@@ -2,10 +2,10 @@
 
 ## Result
 
-Cross-checked the previously unverified UEFA associations against current 2026/27 federation, league and UEFA fixture sources. Combined source evidence is now at least 53 of 55 UEFA member associations. This is source-discovery coverage, NOT a claim that all 53 are already automatically imported by MONEYBALL.
+Cross-checked the previously unverified UEFA associations against current 2026/27 federation, league and UEFA fixture sources. Combined source evidence is now at least 54 of 55 UEFA member associations. This is source-discovery coverage, NOT a claim that all 53 are already automatically imported by MONEYBALL.
 
-- Belarus remains the only UEFA association with a domestic league for which this audit did not verify a current 2026/27 public fixture source.
-- Liechtenstein has no national league; its clubs play in the Swiss league pyramid. Its national competition is the Liechtenstein Cup, which MONEYBALL intentionally excludes.
+- Belarus is now covered by the primary FootyNomad source: the 21 Nov 2026 page lists the senior men's Premier League and 1. Division. The authenticated parser v97 returns 8 Premier League matches and 6 eligible 1. Division matches after excluding reserve-team fixtures.
+- Liechtenstein has no national league; its clubs play in the Swiss league pyramid. Its national competition is the Liechtenstein Cup, which MONEYBALL intentionally excludes. This leaves no UEFA association with an existing domestic league unverified in this source audit.
 - The 16 newly verified associations and their official current sources are listed below.
 
 ## Verified official sources
@@ -32,8 +32,9 @@ Cross-checked the previously unverified UEFA associations against current 2026/2
 ## Existing source coverage and exceptions
 
 - Prior combined source catalogue: at least 37/55 UEFA associations.
-- 16 further associations above now have verified current official source pages, bringing evidence to 53/55.
-- Belarus is the only remaining association with a domestic league for which a current 2026/27 fixture source was not verified in this audit. Its 2026 season is near/at completion; do not claim no league exists.
+- 16 further associations above have verified current official source pages; Belarus is additionally confirmed through FootyNomad, bringing evidence to 54/55.
+- Belarus primary-feed proof: FootyNomad 21 Nov 2026 lists `Premier League` (8 fixtures) and `1. Division` (9 raw fixtures). Production `footynomad-sync` v97 GET returns 8 top-tier fixtures plus 6 senior second-tier fixtures after excluding 3 reserve-team fixtures. All 14 Belarus fixtures returned by the parser pass the production SQL eligibility predicate.
+- Production `footynomad-sync` v97 GET for 21 Nov returns 301 eligible fixtures across 43 countries. All 301/301 pass `moneyball_is_eligible_european_match`; this is a live parser/source check, not yet proof of authenticated database insertion.
 - Liechtenstein has no domestic national league. UEFA confirms its clubs play in the Swiss pyramid; only a national cup exists. Exclude Liechtenstein Cup from MONEYBALL league predictions.
 
 ## MONEYBALL alias coverage updated
@@ -47,3 +48,11 @@ Production migrations applied for these alias additions: `20261117102000` (Bulga
 These official pages prove current league identity and provide fixtures/calendars, but they have NOT all been wired as automated MONEYBALL feed adapters. The live automatic feed remains FootyNomad; Football Charts is an owner-only private-use fallback for eight allowlisted leagues. Official sites above are future adapter candidates only after their access terms, robots policy, data reuse permissions, update frequency and stable page/API structure are checked. Do not copy or scrape them into production merely because pages are publicly readable.
 
 Do not claim 53-country automated import. Current source discovery is 53/55; production importer coverage remains narrower and requires source-by-source integration and authenticated end-to-end verification.
+
+## Belarus and 21 November live parser regression — 2026-11-17
+
+The initial audit incorrectly left Belarus as the remaining country without a verified source. A follow-up read of FootyNomad's actual 21 Nov page found Belarus: `Premier League` (8 fixtures) and `1. Division` (9 raw fixtures). Production `footynomad-sync` v97 GET returns 8 senior top-flight matches and 6 eligible senior second-tier matches; three reserve-team fixtures are excluded. All 14 returned Belarus fixtures pass the production SQL eligibility predicate.
+
+The same live GET for 2026-11-21 returned 301 fixtures across 43 countries; SQL validation found 301 eligible and 0 rejected. This confirms the parser and canonical scope for that dated source response, but does not prove authenticated insertion into the owner's `matches` table.
+
+Updated source discovery evidence: 54/55 UEFA associations. Liechtenstein is the sole association without a domestic national league; its clubs compete in Switzerland and its national cup is excluded. There is no remaining UEFA domestic-league association without at least one verified source in this audit. Automated import coverage remains narrower than source-discovery coverage.

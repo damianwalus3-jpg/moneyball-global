@@ -187,3 +187,7 @@ Migration `20261117111000_filter_history_page_to_european_top_two.sql` applied; 
 
 ## Official European source audit — 2026-11-17
 Source-discovery coverage now 53/55 UEFA associations after verifying current official 2026/27 fixture/competition sources for 16 additional associations. Detailed sources, limitations and alias coverage: docs/EUROPEAN_SOURCE_AUDIT_2026-11-17.md. Belarus remains the only association with a domestic league lacking a verified current public fixture source; Liechtenstein has no national league. MONEYBALL aliases updated across domain, both Edge Functions and SQL. Supabase Edge Functions v50/v97. 53/55 is not a claim of automated importer coverage; no official-site scraping adapters are enabled yet.
+
+
+## Belarus correction — 2026-11-17
+FootyNomad's 21 Nov 2026 page contains Belarus Premier League (8) and 1. Division (9 raw). Production footynomad-sync v97 returned 8 + 6 after reserve exclusion. Live GET returned 301 fixtures / 43 countries; all 301 pass SQL eligibility. Coverage corrected to 54/55; Liechtenstein has no national league. Authenticated DB import still pending.
