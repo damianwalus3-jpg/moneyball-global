@@ -443,3 +443,11 @@
 - Added regression coverage proving identical summaries are deduplicated while changed scan outcomes remain visible.
 - No fixture, prediction, result, coupon or historical Tracker row is deleted or overwritten.
 - CI and Cloudflare deployment required before marking deployed.
+
+
+## Stage 41 — strict final-score validation for OpenLigaDB
+- Audited automatic settlement and historical-form ingestion. Both previously fell back to the last arbitrary OpenLigaDB result row when an explicit final-result row was missing; that could mistake a halftime or other intermediate score for a final score.
+- Centralized final-score selection and now accept only OpenLigaDB resultTypeID 2 or an explicitly named final/end-result row. If no explicit final score exists, the fixture remains pending and can be retried on the next refresh.
+- Added regression tests for halftime-only rows in both team-form history and settlement lookup.
+- This intentionally favors a delayed verified settlement over a false result. Existing Tracker history remains untouched.
+- CI and Cloudflare deployment required before marking deployed.

@@ -28,6 +28,14 @@ describe("OpenLigaDB team form", () => {
     expect(form.matches.every(row => row.date < "2026-08-20")).toBe(true);
   });
 
+  it("does not mistake a halftime-only score for a final result", () => {
+    const form = mapOpenLigaTeamForm([{
+      ...match("2026-08-01", "Club A", "Club B", 1, 0),
+      matchResults: [{ resultTypeID: 1, resultName: "Halbzeitergebnis", resultOrderID: 1, pointsTeam1: 1, pointsTeam2: 0 }],
+    }], "Club A", "2026-08-20");
+    expect(form.matches).toHaveLength(0);
+  });
+
   it("ignores unfinished matches and returns empty form when history is missing", () => {
     const form = mapOpenLigaTeamForm([{
       ...match("2026-08-01", "Club A", "Club B", 1, 0),
@@ -38,6 +46,26 @@ describe("OpenLigaDB team form", () => {
 });
 
 describe("OpenLigaDB result settlement", () => {
+  it("does not settle from a halftime-only result row", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{
+        matchDateTimeUTC: "2026-11-17T18:00:00Z",
+        matchIsFinished: true,
+        team1: { teamName: "Club A" },
+        team2: { teamName: "Club B" },
+        matchResults: [{ resultTypeID: 1, resultName: "Halbzeitergebnis", resultOrderID: 1, pointsTeam1: 2, pointsTeam2: 0 }],
+      }],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const result = await findOpenLigaFixtureResult("bl1", "2026", "Club A", "Club B", "2026-11-17");
+      expect(result).toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("returns a result only for a finished matching fixture", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

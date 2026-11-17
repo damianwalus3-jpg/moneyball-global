@@ -132,6 +132,11 @@ function brusselsDate(value: string): string {
   const get = (key: string) => parts.find(part => part.type === key)?.value ?? "";
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
+function finalOpenLigaScore(results: OpenLigaResultRow[] | null | undefined): OpenLigaResultRow | undefined {
+  // OpenLigaDB may expose halftime, regular-time and penalty results separately.
+  // Never infer a final score from the last arbitrary result row.
+  return results?.find(row => row.resultTypeID === 2 || /endresult|endergebnis|final/i.test(row.resultName ?? ""));
+}
 function normalizeTeam(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
@@ -148,8 +153,7 @@ export function mapOpenLigaTeamForm(matches: OpenLigaHistoryMatch[], team: strin
     const isAway = normalizeTeam(away) === target;
     if (!isHome && !isAway) return [];
     const results = match.matchResults ?? [];
-    const finalResult = results.find(row => row.resultTypeID === 2 || /endresult|endergebnis|final/i.test(row.resultName ?? ""))
-      ?? [...results].sort((a, b) => (b.resultOrderID ?? 0) - (a.resultOrderID ?? 0))[0];
+    const finalResult = finalOpenLigaScore(results);
     if (!finalResult || !Number.isInteger(finalResult.pointsTeam1) || !Number.isInteger(finalResult.pointsTeam2)) return [];
     const homeScore = finalResult.pointsTeam1 as number;
     const awayScore = finalResult.pointsTeam2 as number;
@@ -244,8 +248,7 @@ export async function findOpenLigaFixtureResult(shortcut: string, season: string
       && normalizedName(item.team2?.teamName ?? "") === normalizedName(away);
   });
   if (!match) return null;
-  const finalResult = match.matchResults?.find(row => row.resultTypeID === 2 || /endresult|endergebnis|final/i.test(row.resultName ?? ""))
-    ?? [...(match.matchResults ?? [])].sort((a,b) => (b.resultOrderID ?? 0) - (a.resultOrderID ?? 0))[0];
+  const finalResult = finalOpenLigaScore(match.matchResults);
   const homeGoals = finalResult?.pointsTeam1, awayGoals = finalResult?.pointsTeam2;
   if (!Number.isInteger(homeGoals) || !Number.isInteger(awayGoals) || (homeGoals as number) < 0 || (awayGoals as number) < 0) return null;
   return { actual: (homeGoals as number) > (awayGoals as number) ? "1" : homeGoals === awayGoals ? "X" : "2", homeGoals: homeGoals as number, awayGoals: awayGoals as number, date, source: "OpenLigaDB" };
