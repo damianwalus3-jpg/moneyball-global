@@ -639,3 +639,12 @@
 - Added tests for request body, multi-game normalization, invalid date and conflicting lookup modes. No real provider request was made and no credits were consumed.
 - CI `44191675525` passed TypeScript, tests and production build; all 94 tests across 17 files passed. Cloudflare deployment `44191675193` completed successfully.
 - Current pilot remains disabled until `ODDS_PILOT_TOKEN` is configured; provider keys remain configured. No Tracker, coupon, settlement, bankroll or historical records changed.
+
+
+## Stage 58 — conservative odds-to-fixture matching — 2026-11-17 (verified)
+- Added a reusable provider-to-MONEYBALL fixture matcher using normalized home/away names, exact Europe/Brussels calendar date and a maximum 30-minute kickoff difference.
+- The matcher refuses unknown kickoff times, reversed home/away order, wrong local dates and large kickoff differences.
+- It never guesses when multiple provider games match one fixture or one provider game is claimed by multiple local fixtures; those cases are returned as ambiguous for manual review.
+- Added six regression tests for normalized club names, Brussels timezone conversion, kickoff tolerance, wrong date/order, ambiguity and missing time.
+- CI `44191916368` passed TypeScript, all tests and production build; 100 tests across 18 test files passed. Cloudflare deployment `44191916355` completed successfully.
+- The matcher is a tested module and is not yet connected to the user-facing odds panel or automatic Tracker snapshot creation. No provider request or credits were used.
