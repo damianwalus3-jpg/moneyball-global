@@ -1115,3 +1115,40 @@ export async function upsertSkipExisting(table: TableName, rows: Record<string, 
   }
   return inserted;
 }
+
+
+export interface TrackerUnclassifiedRecord {
+  entity_type: "prediction" | "coupon";
+  entity_id: string;
+  label: string;
+  detail: string;
+  created_at: string;
+}
+
+export async function fetchTrackerUnclassifiedPage(offset = 0, limit = 51): Promise<TrackerUnclassifiedRecord[]> {
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().rpc("moneyball_tracker_unclassified_page", { p_limit: limit, p_offset: offset }),
+    "Pobieranie nieprzypisanych źródeł Trackera",
+  );
+  if (error) throw new Error(humanizeError(error, "moneyball_tracker_unclassified_page"));
+  return (data ?? []) as TrackerUnclassifiedRecord[];
+}
+
+export async function classifyTrackerSource(args: {
+  entityType: "prediction" | "coupon";
+  ids: string[];
+  sourceClass: "USER" | "MODEL" | "PAPER";
+  note?: string;
+}): Promise<number> {
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().rpc("moneyball_tracker_classify_source", {
+      p_entity_type: args.entityType,
+      p_entity_ids: args.ids,
+      p_source_class: args.sourceClass,
+      p_note: args.note?.trim() || null,
+    }),
+    "Zapisywanie klasyfikacji źródeł Trackera",
+  );
+  if (error) throw new Error(humanizeError(error, "moneyball_tracker_classify_source"));
+  return Number(data ?? 0);
+}
