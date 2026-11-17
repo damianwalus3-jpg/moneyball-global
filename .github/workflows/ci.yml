@@ -23,6 +23,8 @@ jobs:
         uses: denoland/setup-deno@v2
       - name: Test geographic Europe scope helper
         run: deno test --no-check supabase/functions/_shared/geographic-europe.test.ts
+      - name: Test bearer token extraction
+        run: deno test --no-check supabase/functions/_shared/bearer-token.test.ts
       - name: Type-check Supabase Edge Functions
         run: deno check --node-modules-dir=auto --no-lock supabase/functions/*/index.ts
       - name: Run tests

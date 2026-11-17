@@ -232,7 +232,26 @@ function Mecze() {
     setPredictionProgress("Pobieram europejski terminarz…");
     try {
       const sync = await sb.functions.invoke("footynomad-sync", { body: { date, skip_result_sync: true } });
-      if (sync.error) throw new Error("Wyszukiwanie meczów nie powiodło się: " + sync.error.message);
+      if (sync.error) {
+        const context = (sync.error as any).context;
+        const status = Number(context?.status ?? (sync.error as any).status ?? 0);
+        let detail = String(sync.error.message || "Błąd Edge Function");
+        try {
+          if (context && typeof context.clone === "function") {
+            const raw = await context.clone().text();
+            if (raw) {
+              try {
+                const payload = JSON.parse(raw);
+                detail = String(payload.error ?? payload.message ?? raw);
+              } catch {
+                detail = raw.slice(0, 1200);
+              }
+            }
+          }
+        } catch { /* zachowaj komunikat SDK */ }
+        throw new Error("Wyszukiwanie meczów nie powiodło się" +
+          (status ? " (HTTP " + status + ")" : "") + ": " + detail);
+      }
       if (sync.data?.error || sync.data?.ok === false)
         throw new Error("Wyszukiwanie meczów nie powiodło się: " + (sync.data?.error ?? "Nieznany błąd źródła."));
       return sync.data;

@@ -1,4 +1,5 @@
 import { footyNomadSectionAt } from "../_shared/footynomad-section.ts";
+import { extractBearerToken } from "../_shared/bearer-token.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 function isExcludedSeniorTeam(value: unknown): boolean {
  const team=String(value??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
@@ -150,7 +151,7 @@ Deno.serve(async(req)=>{
   const result=await readFixtures(date);
   if(req.method==="GET")return new Response(JSON.stringify(result),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
   if(req.method!=="POST")return new Response(JSON.stringify({error:"Method not allowed"}),{status:405,headers:{...cors,"Content-Type":"application/json"}});
-  const token=req.headers.get("Authorization")?.replace(/^Bearer\\s+/i,"");
+  const token=extractBearerToken(req.headers.get("Authorization"));
   if(!token)throw new Error("Brak sesji logowania. Zaloguj się ponownie.");
   const jwtParts=token.split(".");
   const jwtPayload=jwtParts.length>1?JSON.parse(atob(jwtParts[1].replace(/-/g,"+").replace(/_/g,"/"))):{};
