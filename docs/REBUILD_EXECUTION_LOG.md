@@ -395,3 +395,10 @@
 - Added regression coverage for chronological ordering and preservation of an existing record.
 - Commits: implementation `ad83e9112a8d2d15befddc3869c4d39d503d2076`; test `aefa6649637d55d3351fb56a115274a046259349`.
 - CI and Cloudflare deployment pending for the latest branch commit.
+
+## Stage 36 — retry malformed result settlements
+- Pending-result selection previously treated any result row with a fixtureId as settled, even if its actual outcome was malformed. Such a row could permanently suppress future provider retries for that fixture.
+- The settled fixture set now accepts only recognized 1/X/2 outcomes. Invalid result rows no longer block a fresh retrieval attempt.
+- Added a regression test for an invalid result record followed by a valid pending prediction.
+- Commit: `8b9518b0f644636ea1529adbcdef86e81ca44f8a`; test: `fb7dc5913a8320338c89cca72b8ca37b4c73b216`.
+- CI and Cloudflare deployment pending for the next consolidated commit.
