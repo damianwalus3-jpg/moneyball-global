@@ -123,10 +123,13 @@ async function readFootballChartsFixtures(date:string,ownerId:string,token:strin
  if(!ownsRefresh&&row){
   const fresh=Date.parse(String(row.expires_at||""))>now.getTime();
   const locked=Date.parse(String(row.refreshing_until||""))>now.getTime();
-  if(fresh)return footballChartsCacheResult(row,date,row.payload?.state==="ready"?"hit":"pending");
-  if(locked)return footballChartsCacheResult(row,date,row.payload?.state==="ready"?"stale":"pending");
+  const ready=row.payload?.state==="ready";
+  if(fresh&&ready)return footballChartsCacheResult(row,date,"hit");
+  if(locked)return footballChartsCacheResult(row,date,ready?"stale":"pending");
+  // A crashed refresh leaves a pending row with a five-minute lease. Reclaim it
+  // after the lease expires instead of freezing an empty cache for the full day.
   const claimPath=base
-   +"&expires_at=lt."+encodeURIComponent(nowIso)
+   +(fresh?"&payload->>state=eq.pending":"&expires_at=lt."+encodeURIComponent(nowIso))
    +"&or=(refreshing_until.is.null,refreshing_until.lt."+encodeURIComponent(nowIso)+")";
   const claimed=await db(claimPath,token,"PATCH",{refreshing_until:lockUntil,updated_at:nowIso});
   if(claimed?.length){row=claimed[0];ownsRefresh=true;}
