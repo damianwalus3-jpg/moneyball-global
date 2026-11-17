@@ -80,7 +80,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "MONEYBALL GLOBAL 2.0" },
       { name: "description", content: "Śledzenie prognoz piłkarskich 1X2 i Double Chance, kupony i rozliczenia ze stałą stawką analityczną 4 €." },
       { name: "theme-color", content: "#00202b" },
-      { name: "league-scope-version", content: "europe-top-two-2026-11-17-51case" },
+      { name: "league-scope-version", content: "europe-top-two-2026-11-17-regexfix-czechliga" },
       { name: "mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
