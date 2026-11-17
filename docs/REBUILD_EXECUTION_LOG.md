@@ -513,3 +513,15 @@
 - Settlement events are append-only child rows keyed by parentBetId, preventing repeated 15-minute refreshes from duplicating settlement outcomes.
 - Added unit tests for 1X2/DC grading, win/loss accounting, rejected hypothetical grading and idempotency.
 - CI and Cloudflare deployment required before this feature is considered live.
+
+
+## Stage 49 — research automatycznego pobierania kursów i przekazanie do nowego czatu (2026-11-17)
+- Przeprowadzono przegląd publicznych stron dostawców kursów: API-Football, APIfootball.com, The Odds API, Odds-API.io, Sportmonks, football-data.org, Betfair oraz publicznego repozytorium OddsPortal scraper.
+- Wniosek: brak potwierdzonego feedu, który jest równocześnie darmowy, bez klucza API, stabilny i pokrywa wszystkie europejskie ligi. Scraping bukmacherów bez sprawdzenia ToS/licencji nie jest bezpiecznym zamiennikiem.
+- Najlepszy kandydat na ograniczony darmowy pilot: API-Football Free (100 req/day; pre-match/live odds; klucz wymagany; pre-match aktualizowane orientacyjnie co 3h; dostępność zależy od fixture/league/bookmaker). Nie gwarantuje pełnego pokrycia.
+- Alternatywa APIfootball.com Free deklaruje 180 req/h/endpoint i odds 65+ bukmacherów, ale free fixtures ograniczone są do Championship i Ligue 2; wymaga klucza.
+- The Odds API ma 500 kredytów/miesiąc w free planie; Odds-API.io wstrzymało wydawanie nowych darmowych kluczy; Sportmonks free obejmuje dwie ligi, a odds bundle jest płatny; football-data.org ma płatny Odds Add-On; Betfair ma osobne warunki klucza delayed/live i licencji.
+- Zapisano pełny raport: `docs/ODDS_PROVIDER_RESEARCH_2026-11-17.md`.
+- Zapisano przekazanie do nowego czatu: `docs/NEW_CHAT_HANDOFF_2026-11-17.md`, zawierające rozdzielenie środowisk, stan produktu, ograniczenia, etapy 1–48, decyzje i kolejne kroki.
+- Nie wdrożono jeszcze żadnego odds providera, nie dodano sekretu ani klucza API i nie zmieniono kodu aplikacji. Powód: brak potwierdzonego feedu zero-key z wymaganym pokryciem; użytkownik wcześniej preferował rozwiązanie bez kluczy i bez opłat.
+- Następny krok po decyzji o dostępie do klucza: adapter provider-neutral w Workerze, snapshot history append-only, konserwatywne dopasowanie fixture, freshness/status UI, test coverage kilku lig. Bez klucza pozostawić moduł jawnie jako brak automatycznego feedu.
