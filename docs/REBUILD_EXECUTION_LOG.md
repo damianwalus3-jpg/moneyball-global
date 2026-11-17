@@ -827,3 +827,5 @@
 - Stage 67 CI and deployment pending.
 
 - CI caught an over-escaped slash in the new Worker route regex on the first pass; corrected the matcher before deployment. No production release was made from the failing revision.
+
+- Hardened ESPN day boundaries: a Brussels-local calendar day is assembled from both the preceding UTC date and the same UTC date, then filtered by actual Europe/Brussels kickoff date. One scoreboard may fail without discarding the successful day's results; the scan reports partial source errors.
