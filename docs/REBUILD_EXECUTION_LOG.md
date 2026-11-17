@@ -221,3 +221,16 @@
 - Current source set remains open-matchday + OpenLigaDB + OpenFootball. All sources are free/public and no API keys or subscriptions were added.
 - Final code HEAD before this documentation update: `7e2548a47c07190ad1b0a366681710985ae9c659`.
 - 100% Europe coverage remains unprovable and unavailable from the current legal/free sources; the app must continue reporting source coverage honestly.
+
+## 2026-11-17 — Stage 16: expand OpenLigaDB European competition classification
+- Audited OpenLigaDB's live 2026 competition catalogue: 88 entries total, including real football competitions, tests, friendlies and other sports. The app continues to reject non-football sports and non-European/test-only shortcuts rather than importing every catalogue row blindly.
+- Verified current OpenLigaDB fixtures for the `pl` shortcut: 380 Premier League 2026/27 matches with English clubs. Verified `ere` returns Eredivisie season matches.
+- Extended the European filter for verified OpenLigaDB identifiers covering NOFV Oberliga Nord/Süd, Regionalliga Bayern, Thüringenliga, German women's Bundesliga tiers, Eredivisie, Austrian ÖBL, English Premier League (`pl`) and DFB Frauen Supercup (`wsc`).
+- Added classification tests for the newly included competitions and retained the non-football rejection test.
+- Bumped the local fixture cache version to v6 to force reclassification on next scan.
+- Current OpenLigaDB snapshot is not a complete registry of all European leagues; it is community maintained and contains duplicate/test/friendly competitions. Only verified domestic/UEFA competition shortcuts are included.
+- Final code commit: `dcb08f3991f7d893b8a2f6b553cdfa747c53fbef` (`test(rebuild): verify English Premier League and German women's cup classification`).
+- CI run `44117588506`: SUCCESS — TypeScript, all tests and production build passed.
+- Cloudflare deploy run `44117588677`: SUCCESS — separate rebuild Worker deployment passed.
+- Live smoke test: the rebuild Worker returned the app HTML shell with the expected MONEYBALL title and Polish metadata. This does not verify client-side rendering or browser data fetching; visual/mobile E2E remains outstanding.
+- Stage 16 is COMPLETE/DEPLOYED.
