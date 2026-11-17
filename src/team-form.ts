@@ -221,11 +221,22 @@ export async function findOpenMatchdayResult(folder: string, home: string, away:
   if (!Number.isInteger(homeGoals) || !Number.isInteger(awayGoals) || homeGoals < 0 || awayGoals < 0) return null;
   return { actual: homeGoals > awayGoals ? "1" : homeGoals === awayGoals ? "X" : "2", homeGoals, awayGoals, date, source: "open-matchday results CSV" };
 }
+const openLigaResultRequests = new Map<string, Promise<OpenLigaHistoryMatch[]>>();
+async function loadOpenLigaSeasonMatches(shortcut: string, season: string): Promise<OpenLigaHistoryMatch[]> {
+  const key = `${shortcut}:${season}`;
+  const existing = openLigaResultRequests.get(key);
+  if (existing) return existing;
+  const request = (async () => {
+    const response = await fetch(`/api/openligadb/matches/${encodeURIComponent(shortcut)}/${encodeURIComponent(season)}`, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`OpenLigaDB wyniki niedostępne (HTTP ${response.status})`);
+    return await response.json() as OpenLigaHistoryMatch[];
+  })();
+  openLigaResultRequests.set(key, request);
+  try { return await request; } finally { openLigaResultRequests.delete(key); }
+}
 export async function findOpenLigaFixtureResult(shortcut: string, season: string, home: string, away: string, date: string): Promise<VerifiedFixtureResult | null> {
   if (!/^[a-z0-9._-]+$/i.test(shortcut) || !/^\d{4}$/.test(season)) throw new Error("Nieprawidłowe parametry OpenLigaDB");
-  const response = await fetch(`/api/openligadb/matches/${encodeURIComponent(shortcut)}/${encodeURIComponent(season)}`, { headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`OpenLigaDB wyniki niedostępne (HTTP ${response.status})`);
-  const matches = await response.json() as OpenLigaHistoryMatch[];
+  const matches = await loadOpenLigaSeasonMatches(shortcut, season);
   const match = matches.find(item => {
     const kickoff = item.matchDateTimeUTC || item.matchDateTime;
     return item.matchIsFinished === true && kickoff && brusselsDate(kickoff) === date
