@@ -84,39 +84,103 @@ const FOOTBALL_CHARTS_LEAGUES = [
  {code:"lithuania",country:"Lithuania",competition:"TOPLYGA"},
  {code:"serbia1",country:"Serbia",competition:"Mozzart Bet Super Liga"},
 ] as const;
-const FOOTBALL_CHARTS_CACHE = new Map<string,{at:number,result:any}>();
-async function readFootballChartsFixtures(date:string){
- const cached=FOOTBALL_CHARTS_CACHE.get(date);
- if(cached&&Date.now()-cached.at<(cached.result.ok?12*60*60*1000:30*60*1000))return {...cached.result,cache:"hit"};
- const results=await Promise.allSettled(FOOTBALL_CHARTS_LEAGUES.map(async league=>{
-  const response=await fetch(FOOTBALL_CHARTS_BASE+"/leagues/"+league.code+"/fixtures/",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/1.0"},signal:AbortSignal.timeout(12000)});
-  if(!response.ok)throw new Error(league.code+" HTTP "+response.status);
-  const payload=await response.json(),matches=Array.isArray(payload?.matches)?payload.matches:[];
-  const fixtures=matches.flatMap((match:any)=>{
-   const matchDate=String(match?.match_date||""),time=String(match?.time||"");
-   if(!/^\d{4}-\d{2}-\d{2}$/.test(matchDate)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return [];
-   const parsed=new Date(matchDate+"T"+time+":00Z");
-   if(!Number.isFinite(parsed.getTime()))return [];
-   const localDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(parsed);
-   if(localDate!==date)return [];
-   const home=String(match?.home_team||"").trim(),away=String(match?.away_team||"").trim();
-   if(!home||!away)return [];
-   const statusRaw=String(match?.status||"scheduled").toLowerCase();
-   const status=/postpon/.test(statusRaw)?"postponed":/cancel/.test(statusRaw)?"cancelled":/live|in.progress/.test(statusRaw)?"live":/finished|complete|^ft$/.test(statusRaw)?"finished":"scheduled";
-   return [{external_id:"footballcharts:"+String(match?.slug||[league.code,matchDate,home,away].join(":")),source:"FootballCharts",date,competition:league.competition,country:league.country,gender:"men",home_team:home,away_team:away,kickoff_at:parsed.toISOString(),status,source_url:String(payload?.source_url||""),attribution:"Data by football-charts.com",provider_model_ignored:true}];
-  });
-  return {code:league.code,country:league.country,competition:league.competition,fixtures,received:matches.length,source_url:String(payload?.source_url||""),next_fixture_date:payload?.next_fixture_date||null,note:payload?.note||null};
- }));
- const fixtures:any[]=[],errors:any[]=[],leagueStatus:any[]=[];
- for(let i=0;i<results.length;i++){
-  const result=results[i],league=FOOTBALL_CHARTS_LEAGUES[i];
-  if(result.status==="fulfilled"){fixtures.push(...result.value.fixtures);leagueStatus.push({code:league.code,ok:true,received:result.value.received,for_date:result.value.fixtures.length,next_fixture_date:result.value.next_fixture_date});}
-  else{errors.push({code:league.code,error:String(result.reason)});leagueStatus.push({code:league.code,ok:false,error:String(result.reason)});}
+const FOOTBALL_CHARTS_CACHE_KEY = "footballcharts:upcoming-fixtures:v1";
+const FOOTBALL_CHARTS_CACHE_TTL_MS = 24*60*60*1000;
+const FOOTBALL_CHARTS_REFRESH_LOCK_MS = 5*60*1000;
+
+function footballChartsCacheResult(row:any,date:string,cache:string){
+ const payload=row?.payload&&typeof row.payload==="object"?row.payload:{};
+ const allFixtures=Array.isArray(payload.fixtures)?payload.fixtures:[];
+ const fixtures=allFixtures.filter((fixture:any)=>String(fixture.date||"")===date);
+ return {
+  ...payload,
+  fixtures,
+  fixtures_count:fixtures.length,
+  cache,
+  fetched_at:row?.fetched_at||null,
+  cache_expires_at:row?.expires_at||null,
+ };
+}
+
+async function readFootballChartsFixtures(date:string,ownerId:string,token:string){
+ const owner=encodeURIComponent(ownerId),cacheKey=encodeURIComponent(FOOTBALL_CHARTS_CACHE_KEY);
+ const base="moneyball_provider_cache?owner_id=eq."+owner+"&cache_key=eq."+cacheKey;
+ const selectPath=base+"&select=owner_id,cache_key,payload,fetched_at,expires_at,refreshing_until";
+ const now=new Date(),nowIso=now.toISOString(),expiry=new Date(now.getTime()+FOOTBALL_CHARTS_CACHE_TTL_MS).toISOString();
+ const lockUntil=new Date(now.getTime()+FOOTBALL_CHARTS_REFRESH_LOCK_MS).toISOString();
+ let rows=await db(selectPath,token),row=rows?.[0],ownsRefresh=false;
+
+ if(!row){
+  const inserted=await db("moneyball_provider_cache?on_conflict=owner_id,cache_key",token,"POST",{
+   owner_id:ownerId,cache_key:FOOTBALL_CHARTS_CACHE_KEY,provider:"FootballCharts",
+   payload:{state:"pending",source:"FootballCharts",fixtures:[],errors:[]},
+   fetched_at:nowIso,expires_at:expiry,refreshing_until:lockUntil,updated_at:nowIso,
+  },"resolution=ignore-duplicates,return=representation");
+  if(inserted?.length){row=inserted[0];ownsRefresh=true;}
+  else {rows=await db(selectPath,token);row=rows?.[0];}
  }
- const result={ok:errors.length===0,source:"FootballCharts",api_key_required:false,requests:FOOTBALL_CHARTS_LEAGUES.length,leagues_checked:FOOTBALL_CHARTS_LEAGUES.length,fixtures_count:fixtures.length,fixtures,errors,league_status:leagueStatus,attribution:"Data by football-charts.com",licence:"Free tier: personal/private use with attribution; no raw-data redistribution. Commercial plan required if other people use the app.",model_predictions_imported:false,stats_imported:false,odds_available:false};
- FOOTBALL_CHARTS_CACHE.set(date,{at:Date.now(),result});
- while(FOOTBALL_CHARTS_CACHE.size>3){const oldest=FOOTBALL_CHARTS_CACHE.keys().next().value;if(oldest)FOOTBALL_CHARTS_CACHE.delete(oldest);else break;}
- return {...result,cache:"miss"};
+
+ if(!ownsRefresh&&row){
+  const fresh=Date.parse(String(row.expires_at||""))>now.getTime();
+  const locked=Date.parse(String(row.refreshing_until||""))>now.getTime();
+  if(fresh)return footballChartsCacheResult(row,date,row.payload?.state==="ready"?"hit":"pending");
+  if(locked)return footballChartsCacheResult(row,date,row.payload?.state==="ready"?"stale":"pending");
+  const claimPath=base
+   +"&expires_at=lt."+encodeURIComponent(nowIso)
+   +"&or=(refreshing_until.is.null,refreshing_until.lt."+encodeURIComponent(nowIso)+")";
+  const claimed=await db(claimPath,token,"PATCH",{refreshing_until:lockUntil,updated_at:nowIso});
+  if(claimed?.length){row=claimed[0];ownsRefresh=true;}
+  else{
+   rows=await db(selectPath,token);row=rows?.[0];
+   if(row)return footballChartsCacheResult(row,date,row.payload?.state==="ready"?"stale":"pending");
+  }
+ }
+
+ if(!ownsRefresh){
+  return {ok:false,pending:true,source:"FootballCharts",requests:0,leagues_checked:FOOTBALL_CHARTS_LEAGUES.length,fixtures_count:0,fixtures:[],errors:[],cache:"pending",attribution:"Data by football-charts.com",model_predictions_imported:false,stats_imported:false,odds_available:false};
+ }
+
+ let result:any;
+ try{
+  // One durable refresh per owner per 24 hours: eight league requests total, not eight per scan.
+  const results=await Promise.allSettled(FOOTBALL_CHARTS_LEAGUES.map(async league=>{
+   const response=await fetch(FOOTBALL_CHARTS_BASE+"/leagues/"+league.code+"/fixtures/",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/1.0"},signal:AbortSignal.timeout(12000)});
+   if(!response.ok)throw new Error(league.code+" HTTP "+response.status);
+   const payload=await response.json(),matches=Array.isArray(payload?.matches)?payload.matches:[];
+   const fixtures=matches.flatMap((match:any)=>{
+    const matchDate=String(match?.match_date||""),time=String(match?.time||"");
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(matchDate)||!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(time))return [];
+    const parsed=new Date(matchDate+"T"+time+":00Z");
+    if(!Number.isFinite(parsed.getTime()))return [];
+    const localDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(parsed);
+    const home=String(match?.home_team||"").trim(),away=String(match?.away_team||"").trim();
+    if(!home||!away)return [];
+    const statusRaw=String(match?.status||"scheduled").toLowerCase();
+    const status=/postpon/.test(statusRaw)?"postponed":/cancel/.test(statusRaw)?"cancelled":/live|in.progress/.test(statusRaw)?"live":/finished|complete|^ft$/.test(statusRaw)?"finished":"scheduled";
+    return [{external_id:"footballcharts:"+String(match?.slug||[league.code,matchDate,home,away].join(":")),source:"FootballCharts",date:localDate,competition:league.competition,country:league.country,gender:"men",home_team:home,away_team:away,kickoff_at:parsed.toISOString(),status,source_url:String(payload?.source_url||""),attribution:"Data by football-charts.com",provider_model_ignored:true}];
+   });
+   return {code:league.code,country:league.country,competition:league.competition,fixtures,received:matches.length,source_url:String(payload?.source_url||""),next_fixture_date:payload?.next_fixture_date||null,note:payload?.note||null};
+  }));
+  const allFixtures:any[]=[],errors:any[]=[],leagueStatus:any[]=[];
+  for(let i=0;i<results.length;i++){
+   const item=results[i],league=FOOTBALL_CHARTS_LEAGUES[i];
+   if(item.status==="fulfilled"){allFixtures.push(...item.value.fixtures);leagueStatus.push({code:league.code,ok:true,received:item.value.received,fixtures:item.value.fixtures.length,next_fixture_date:item.value.next_fixture_date});}
+   else{errors.push({code:league.code,error:String(item.reason)});leagueStatus.push({code:league.code,ok:false,error:String(item.reason)});}
+  }
+  result={state:"ready",ok:errors.length===0,source:"FootballCharts",api_key_required:false,requests:FOOTBALL_CHARTS_LEAGUES.length,leagues_checked:FOOTBALL_CHARTS_LEAGUES.length,fixtures_count:allFixtures.length,fixtures:allFixtures,errors,league_status:leagueStatus,attribution:"Data by football-charts.com",licence:"Free tier: personal/private use with attribution; no raw-data redistribution. Commercial plan required if other people use the app.",model_predictions_imported:false,stats_imported:false,odds_available:false};
+ }catch(error){
+  result={state:"ready",ok:false,source:"FootballCharts",api_key_required:false,requests:FOOTBALL_CHARTS_LEAGUES.length,leagues_checked:FOOTBALL_CHARTS_LEAGUES.length,fixtures_count:0,fixtures:[],errors:[{code:"provider",error:String(error)}],league_status:[],attribution:"Data by football-charts.com",model_predictions_imported:false,stats_imported:false,odds_available:false};
+ }
+ const fetchedAt=new Date().toISOString(),expiresAt=new Date(Date.now()+FOOTBALL_CHARTS_CACHE_TTL_MS).toISOString();
+ try{
+  await db(base,token,"PATCH",{payload:result,fetched_at:fetchedAt,expires_at:expiresAt,refreshing_until:null,updated_at:fetchedAt});
+ }catch(error){
+  // Keep the refresh lock until it expires; do not hammer a provider if cache persistence fails.
+  result.errors=[...(result.errors||[]),{code:"cache_persist",error:String(error)}];
+  result.ok=false;
+ }
+ const fixtures=result.fixtures.filter((fixture:any)=>String(fixture.date||"")===date);
+ return {...result,fixtures,fixtures_count:fixtures.length,cache:"miss",fetched_at:fetchedAt,cache_expires_at:expiresAt};
 }
 
 function isEligibleOpenMatchdayFixture(f:any):boolean {
