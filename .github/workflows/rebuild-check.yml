@@ -1,0 +1,39 @@
+name: MONEYBALL Rebuild Checks
+
+on:
+  push:
+    branches:
+      - moneyball-rebuild
+  pull_request:
+    branches:
+      - moneyball-rebuild
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: moneyball-rebuild-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: TypeScript, tests and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated rebuild branch
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: TypeScript typecheck
+        run: npm run typecheck
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build
