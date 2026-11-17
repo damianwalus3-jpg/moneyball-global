@@ -78,6 +78,10 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("ENG", "ENG_6_national-league-north")).toBe(false);
     expect(isEuropeanTopTwoLeague("ENG", "ENG_7_northern-premier-league")).toBe(false);
     expect(isEuropeanTopTwoLeague("Greece", "Super League 2")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Hungary", "NB I")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Hungary", "NB II")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Hungary", "NB III - Northeast")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Hungary", "NB IV")).toBe(false);
     expect(isEuropeanTopTwoLeague("Denmark", "2nd Division - Group 2")).toBe(false);
     expect(isEuropeanTopTwoLeague("Russia", "Second League A - Division A Gold")).toBe(false);
     expect(isEuropeanTopTwoLeague("Russia", "Second League - Group 1")).toBe(false);
@@ -168,6 +172,11 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch(eligibleBase)).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya II" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya B" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Real Madrid Castilla" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Celta Fortuna" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Valencia Mestalla" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Betis Deportivo" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Sevilla Atletico" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: "women" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, competition: "Serie C" })).toBe(false);
     // OpenMatchday's source folder is authoritative tier metadata; display names
