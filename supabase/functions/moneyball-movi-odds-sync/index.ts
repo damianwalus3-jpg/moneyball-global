@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -63,7 +64,8 @@ Deno.serve(async(req)=>{
   const now=new Date(),day=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
   const owner=String(body.owner_id||"");
   const ownerFilter=owner?"&owner_id=eq."+encodeURIComponent(owner):"";
-  const matches=await db("matches?select=id,owner_id,user_id,home_team,away_team,competition,league,kickoff_at,kickoff_date,status&kickoff_date=eq."+encodeURIComponent(day)+"&order=kickoff_at.asc"+ownerFilter);
+  const rawMatches=await db("matches?select=id,owner_id,user_id,home_team,away_team,competition,league,country,kickoff_at,kickoff_date,status&kickoff_date=eq."+encodeURIComponent(day)+"&order=kickoff_at.asc"+ownerFilter);
+   const matches=(rawMatches||[]).filter((match:any)=>isGeographicEuropeCountry(match.country));
   const catalog=await movi("/catalog?sport=soccer");
   const fixtures=Array.isArray(catalog.fixtures)?catalog.fixtures:[];
   const pairs:any[]=[];
