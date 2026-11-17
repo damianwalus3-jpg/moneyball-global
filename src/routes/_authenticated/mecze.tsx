@@ -214,6 +214,7 @@ function Mecze() {
       scanRunId: match.scan_run_id,
       stake,
       targetLegs: 1,
+      recordStake: true,
     });
   }, { success: "Zapisano pojedynczy typ ze stałą stawką 4 €", onDone: () => setSingleBetPrediction(null) });
 
