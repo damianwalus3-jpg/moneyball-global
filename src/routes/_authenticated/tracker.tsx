@@ -13,7 +13,7 @@ import { formatJackpotSequence, makeTrackerCategoryKey } from "@/lib/tracker-dom
 import { insertRow } from "@/lib/db";
 import {
   couponFinanceQuery, dashboardSelectedPicksQuery, dashboardSummaryQuery, latestScanRunQuery,
-  trackerCategoriesQuery, jackpotEntriesQuery, tableQuery, useAction
+  trackerCategoriesQuery, jackpotEntriesQuery, trackerCategorySummaryQuery, tableQuery, useAction
 } from "@/lib/queries";
 
 export const Route = createFileRoute("/_authenticated/tracker")({
@@ -58,6 +58,7 @@ function TrackerPage() {
   const finance = useQuery(couponFinanceQuery());
   const scan = useQuery(latestScanRunQuery());
   const categories = useQuery(trackerCategoriesQuery());
+  const categorySummary = useQuery(trackerCategorySummaryQuery());
   const jackpot = useQuery(jackpotEntriesQuery());
   const coupons = useQuery(tableQuery("coupons"));
   const [jackpotCouponId, setJackpotCouponId] = useState("");
@@ -90,13 +91,13 @@ function TrackerPage() {
     },
   );
 
-  if (summary.isPending && picks.isPending && finance.isPending && scan.isPending && categories.isPending && jackpot.isPending && coupons.isPending) {
+  if (summary.isPending && picks.isPending && finance.isPending && scan.isPending && categories.isPending && categorySummary.isPending && jackpot.isPending && coupons.isPending) {
     return <><PageHeader eyebrow="CENTRUM KONTROLI" title="Tracker" /><PageLoader /></>;
   }
-  const firstError = summary.error ?? picks.error ?? finance.error ?? scan.error ?? categories.error ?? jackpot.error ?? coupons.error;
+  const firstError = summary.error ?? picks.error ?? finance.error ?? scan.error ?? categories.error ?? categorySummary.error ?? jackpot.error ?? coupons.error;
   if (firstError && !summary.data && !picks.data && !finance.data) {
     return <DataError error={firstError} reset={() => {
-      void Promise.all([summary.refetch(), picks.refetch(), finance.refetch(), scan.refetch(), categories.refetch(), jackpot.refetch(), coupons.refetch()]);
+      void Promise.all([summary.refetch(), picks.refetch(), finance.refetch(), scan.refetch(), categories.refetch(), categorySummary.refetch(), jackpot.refetch(), coupons.refetch()]);
     }} />;
   }
 
@@ -105,6 +106,7 @@ function TrackerPage() {
   const p = picks.data ?? [];
   const scanRow = scan.data;
   const categoryRows = categories.data ?? [];
+  const categoryCounts = new Map((categorySummary.data?.categories ?? []).map((category) => [category.category_key, category]));
   const newCategoryKey = (() => { try { return makeTrackerCategoryKey(newCategoryName); } catch { return ""; } })();
   const categoryKeyExists = categoryRows.some((category) => category.category_key === newCategoryKey);
   const jackpotRows = jackpot.data ?? [];
@@ -112,6 +114,13 @@ function TrackerPage() {
   const couponById = new Map(couponRows.map((coupon) => [coupon.id, coupon]));
   const financeTypes = f?.by_type ?? {};
   const financeRows = Object.entries(financeTypes).sort(([a], [b]) => a.localeCompare(b));
+  const intelligenceGroups = [
+    ["Decyzje", categorySummary.data?.decisions ?? []],
+    ["Źródła prognoz", categorySummary.data?.prediction_sources ?? []],
+    ["Źródła kuponów", categorySummary.data?.coupon_sources ?? []],
+    ["Rozliczenia prognoz", categorySummary.data?.prediction_settlements ?? []],
+    ["Statusy kuponów", categorySummary.data?.coupon_settlements ?? []],
+  ] as const;
 
   return (
     <div className="space-y-6">
@@ -187,6 +196,7 @@ function TrackerPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">{category.description ?? category.category_key}</p>
+                    <p className="mt-2 text-xs font-medium">{categoryCounts.get(category.category_key)?.prediction_count ?? 0} prognoz · {categoryCounts.get(category.category_key)?.coupon_count ?? 0} kuponów</p>
                   </div>
                 ))}
               </div>
@@ -213,6 +223,23 @@ function TrackerPage() {
                 </Button>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">Własne kategorie są prywatne dla konta i domyślnie wyłączone z oficjalnych finansów. Przypisywanie ich do historycznych rekordów pozostaje jawne — nie zmieniam starych etykiet automatycznie.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {intelligenceGroups.map(([groupTitle, rows]) => (
+                  <div key={groupTitle} className="rounded-lg border border-border bg-background/40 p-3">
+                    <h4 className="mb-2 text-xs font-semibold uppercase text-muted-foreground">{groupTitle}</h4>
+                    {rows.length ? (
+                      <div className="space-y-1">
+                        {rows.map((row) => (
+                          <div key={row.label} className="flex items-center justify-between gap-2 text-sm">
+                            <span>{row.label}</span>
+                            <span className="num font-semibold">{row.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <p className="text-xs text-muted-foreground">Brak danych</p>}
+                  </div>
+                ))}
+              </div>
             </>
           )}
         </div>
