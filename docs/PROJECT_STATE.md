@@ -1482,3 +1482,15 @@ No new provider was enabled, no API key was added, and no provider credits were 
 - Supabase cron job `moneyball-global-free-footynomad` is active on `1,16,31,46 * * * *`; the last ten recorded cron executions all show `succeeded`.
 - Detailed audit: `docs/FOOTBALLCHARTS_RATE_LIMIT_RECOVERY_AND_SOURCE_AUDIT_2026-11-17.md`.
 - Remaining acceptance: wait for the follow-up CI/deploy, deploy the verified MAIN `footynomad-sync` source to Supabase preserving `verify_jwt=true`, then authenticate with the user's existing MAIN session to prove cache write/hit and visually verify Matches/Predictions. Issue #77 stays OPEN. No matches, predictions, coupons, settlements, bankroll or historical data were changed.
+
+
+## FootballCharts recovery deployed and 17 Nov feed reconciled — 2026-11-17 19:05 Europe/Brussels
+
+- Follow-up commit `13e72a479299da3ce2324786912e556728514901` replaced out-of-scope Azerbaijan with Austria 2. Liga. Moneyball CI `44153149957` and Cloudflare MAIN deploy `44153150085` both SUCCESS.
+- Supabase Edge Function `footynomad-sync v105` deployed ACTIVE with `verify_jwt=true`; retrieved deployed source confirms concurrency 2, 12h partial-cache expiry, Austria 2. Liga and no Azerbaijan provider call.
+- Production feed table for Brussels date 2026-11-17: 31 eligible senior men's domestic fixtures, 4 countries, 9 leagues, all scheduled: England 21, France National 2 1, Northern Ireland Championship 2, Scotland Lowland League 7. Reserve-team Celtic II excluded. This agrees with independent FootyCheck public fixture page after applying MONEYBALL's exclusions.
+- Scheduled `moneyball-global-free-footynomad` cron remains active every 15 minutes; last 10 recorded cron executions succeeded.
+- Durable FootballCharts cache still has 0 rows, expected until a real authenticated owner POST scan after v105. The second-invocation cache-hit test is therefore still pending.
+- Browser profile inventory has no saved sign-in for the Cloudflare Worker domain. Signed-in Matches/Predictions click-through remains pending. Issue #77 stays OPEN.
+- Detailed evidence: `docs/FOOTBALLCHARTS_RATE_LIMIT_RECOVERY_AND_SOURCE_AUDIT_2026-11-17.md`.
+- No match, prediction, coupon, settlement, bankroll or historical data was changed during this audit.
