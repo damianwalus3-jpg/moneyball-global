@@ -43,25 +43,33 @@ function parseResults(csv: string): CsvRow[] {
     return Object.fromEntries(headers.map((header, i) => [header, cells[i] ?? ""]));
   });
 }
+const leagueRequests = new Map<string, Promise<{ rows: CsvRow[]; generatedAt: string }>>();
 async function loadLeagueResults(folder: string, beforeDate: string): Promise<{ rows: CsvRow[]; generatedAt: string }> {
   const season = seasonCode(beforeDate);
   const key = `${CACHE_PREFIX}${folder}:${season}`;
-  try {
-    const cached = localStorage.getItem(key);
-    if (cached) {
-      const parsed = JSON.parse(cached) as { rows: CsvRow[]; generatedAt: string; cachedAt: number };
-      if (Date.now() - parsed.cachedAt < CACHE_TTL) return parsed;
-    }
-  } catch { /* ignore malformed cache */ }
-  const indexResponse = await fetch(`${ROOT}/build_summary.json`);
-  if (!indexResponse.ok) throw new Error(`Indeks wyników niedostępny (HTTP ${indexResponse.status})`);
-  const index = await indexResponse.json() as { generated_utc: string };
-  const response = await fetch(`${ROOT}/data/${folder}/results_${season}.csv`);
-  if (!response.ok) throw new Error(`Brak pliku wyników dla ligi (HTTP ${response.status})`);
-  const rows = parseResults(await response.text());
-  const value = { rows, generatedAt: index.generated_utc, cachedAt: Date.now() };
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* cache is optional */ }
-  return value;
+  const existing = leagueRequests.get(key);
+  if (existing) return existing;
+  const request = (async () => {
+    try {
+      const cached = localStorage.getItem(key);
+      if (cached) {
+        const parsed = JSON.parse(cached) as { rows: CsvRow[]; generatedAt: string; cachedAt: number };
+        if (Date.now() - parsed.cachedAt < CACHE_TTL) return parsed;
+      }
+    } catch { /* ignore malformed cache */ }
+    const indexResponse = await fetch(`${ROOT}/build_summary.json`);
+    if (!indexResponse.ok) throw new Error(`Indeks wyników niedostępny (HTTP ${indexResponse.status})`);
+    const index = await indexResponse.json() as { generated_utc: string };
+    const response = await fetch(`${ROOT}/data/${folder}/results_${season}.csv`);
+    if (!response.ok) throw new Error(`Brak pliku wyników dla ligi (HTTP ${response.status})`);
+    const rows = parseResults(await response.text());
+    const value = { rows, generatedAt: index.generated_utc, cachedAt: Date.now() };
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* cache is optional */ }
+    return value;
+  })();
+  leagueRequests.set(key, request);
+  try { return await request; }
+  finally { leagueRequests.delete(key); }
 }
 function mapMatch(row: CsvRow, team: string): FormMatch | null {
   if (row.ft_home?.trim() === "" || row.ft_away?.trim() === "") return null;
