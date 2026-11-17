@@ -1345,3 +1345,16 @@ Final verification trigger: all-tier helper and database migration exclusions ha
 - Added end-to-end frontend eligibility regressions for National 2, Czech 3. liga, English National League North and Scottish Lowland League; retained explicit cup rejection. Updated the frontend eligibility comment to describe all senior tiers.
 - **Deployment blocker:** under the user's existing GitHub/Cloudflare-only restriction, do not directly deploy Supabase Edge Functions or apply the SQL migration. No Supabase deployment workflow exists in `.github/workflows`; current workflow only builds/deploys Cloudflare. Therefore this commit can validate/deploy Cloudflare, but cannot activate the backend changes. Do not report all-tier discovery as live until the authorized backend activation path is provided.
 - No historical matches, predictions, coupons, results or bankroll transactions were deleted or rewritten. Issue #77 remains open.
+
+
+### Final CI/Cloudflare verification for all-tier frontend commit (2026-11-17)
+
+- Commit `9181ba3c50f0f5d66f1a825bc6b35808c37cfffe` initially failed Deno type-check because the attempted cleanup removed more than the obsolete tier helper from `footynomad-sync`, including runtime declarations (`SUPABASE_URL`, `KEY`, `cors`, `runLimited`, `isEuropeanFixture`). CI blocked deployment as intended; this failed commit was never deployed.
+- Corrected by restoring the exact importer from parent MAIN `08fca6c9e4aa8d53c7bc4e2de05b158d3f6692f8` and making only the safe helper-name replacement. No importer configuration or runtime declarations were removed.
+- Corrective commit: `9eba11e7d325e392322b4c8b496b6c4e7cb473b6`.
+- GitHub CI run #44071134664: SUCCESS — Deno geographic scope tests, all-tier tests, bearer tests, Deno Edge Function type-check, application tests, TypeScript check and build all passed.
+- Cloudflare MAIN deploy run #44071134655: SUCCESS — Cloudflare build and Worker deployment passed.
+- MAIN now points to `9eba11e7d325e392322b4c8b496b6c4e7cb473b6`. The frontend and client eligibility are deployed. The production Supabase state is unchanged: `footynomad-sync v99`, `moneyball-free-feed v50`, `moneyball-predict v246`, `moneyball-public-sources v63`; SQL migration history still does not contain `20261117150000_expand_european_leagues_to_all_senior_tiers`.
+- Consequently, lower-tier eligibility remains false in the live database predicate until the backend migration and matching Edge Function versions are activated through an authorized backend deployment path. Do not repeat a manual scan yet and expect all tiers.
+- External fixture evidence: FootyNomad 17 Nov 2026 (`https://footynomad.com/fixtures/2026-11-17`, `https://footynomad.com/list?date=2026-11-17`), OpenMatchday league index (`https://github.com/oladeeayo/open-matchday/blob/master/LEAGUE_INDEX.md`), Non-League Ranking (`https://www.nonleagueranking.com/fixtures.php?Date=2026-11-17&game=all`). These sources support the lower-tier examples; they do not prove exhaustive Europe-wide daily coverage.
+- Issue #77 remains OPEN. No historical data, coupon, settlement or bankroll row was deleted or rewritten.
