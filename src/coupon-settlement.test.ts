@@ -27,6 +27,12 @@ describe("paper coupon settlement", () => {
     const malformed = { ...coupon, details: { legsJson: "[]" } };
     expect(evaluatePaperCoupon(malformed, results)).toBeNull();
   });
+  it("uses the newest valid result when a fixture has conflicting legacy rows", () => {
+    const newest = { ...results[0], id: "new", details: { fixtureId: "a", actual: "2" as const } };
+    const settled = evaluatePaperCoupon(coupon, [newest, ...results]);
+    expect(settled?.status).toBe("PAPER_MISS");
+    expect(settled?.legResults.find(row => row.fixtureId === "a")?.actual).toBe("2");
+  });
   it("marks three correct legs as paper hit", () => {
     const allCorrect = results.map((row, index) => index === 2 ? { ...row, details: { fixtureId: "c", actual: "2" } } : row);
     expect(evaluatePaperCoupon(coupon, allCorrect)?.status).toBe("PAPER_HIT");
