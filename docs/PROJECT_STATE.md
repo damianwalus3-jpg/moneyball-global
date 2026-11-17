@@ -1447,3 +1447,14 @@ No new provider was enabled, no API key was added, and no provider credits were 
 - Current Football Charts official docs confirm the keyless limit is 25 requests/day per IP and the provider updates once daily; free use requires personal/research use and attribution, with no raw-data redistribution. The existing hard owner gate remains; no key or paid plan was added. Source: https://www.football-charts.com/developers
 - Not yet proven: an authenticated owner POST scan after v102 deployment, persistence/readback of a real provider cache row, and signed-in visual click-through of Matches/Predictions. Available browser profiles have no recorded sign-in for the Worker domain. Do not claim those acceptance checks passed; keep issue #77 open until the user completes sign-in and the screens are verified.
 - No matches, predictions, coupons, settlement rows, or bankroll values were changed.
+
+
+## Predictor v250 post-deployment performance verification — 2026-11-17 17:39 Europe/Brussels
+
+- Read production Supabase unified logs for `moneyball-predict` function ID `bab9c85c-52da-48ad-9d8b-ae415e84e58a`, comparing v249 and v250 requests from 2026-11-17 13:45–16:39 UTC. The deployment boundary was 14:45 UTC; v250 traffic observed after deployment.
+- v249 baseline: 61 requests, 0 non-200 responses, average 3,282.9 ms, p50 1,741 ms, p95 20,296 ms, maximum 30,776 ms.
+- v250 after deployment: 113 requests, 0 non-200 responses, average 1,903.6 ms, p50 1,685 ms, p95 3,752 ms, maximum 6,649 ms.
+- Observed tail improvement: p95 reduced 81.5%; maximum reduced 78.4%; average reduced 42.0%; median reduced 3.2%. Sample sizes differ (61 vs 113) and this is an observational production comparison, not a controlled benchmark. The evidence strongly supports a reduced long-latency tail after parallel xG archive loading; do not claim every request became faster.
+- v250 function logs in the post-deployment window: 0 error-level rows; no logged `unavailable`/`failed` source messages found by the targeted search. Runtime boot/shutdown records include `EarlyDrop`; these are runtime lifecycle events and not treated as request failures. Function HTTP status remained 200 for all 113 observed requests.
+- Confirmed scheduled prediction invocations reached deployed version 250 in `eu-west-1` and returned HTTP 200 (e.g. 2026-11-17 16:38:01 UTC, execution_time_ms 1,845). No manual test scan was forced and no prediction, match, coupon, settlement or bankroll data was modified for this check.
+- Result: the v250 deployment is not only active but has post-deployment production traffic and a measurable reduction in slow-tail latency. Continue monitoring on subsequent scans; keep the comparison as observational because request mix and cache state are not controlled.
