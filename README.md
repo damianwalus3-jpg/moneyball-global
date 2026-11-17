@@ -44,3 +44,9 @@ Matches are normalized to Europe/Brussels date and deduplicated across feeds. Th
 ### Additional fixture source: OpenFootball
 
 The rebuild also reads public-domain Football.TXT feeds from OpenFootball for selected 2026/27 European competitions: France, Greece, Netherlands, Portugal, Scotland, Switzerland, Turkey, Czech Republic, Austria, England (top two tiers), Germany (top three tiers and DFB-Pokal), Spain, Italy and Belgium. Kickoff times are converted from the source league's IANA timezone to Europe/Brussels. These are additional feeds, not a complete European competition register; each repository has its own update cadence and missing files are reported.
+
+### Coverage audit (2026-11-17)
+
+The live open-matchday build summary listed 75 competitions, 65 of which were European folders accepted by the current country/UEFA allowlist. This included domestic cups, selected lower tiers and Belgian U21. It is a dated source snapshot, not a complete census of Europe. The app shows current provider counts and failures; it never claims that every European match is guaranteed to be present.
+
+Automated FotMob/Sofascore scraping is intentionally not used: their terms/official support material restrict programmatic reuse or do not offer public API access. The current source set stays within public open-matchday, OpenLigaDB and public-domain OpenFootball feeds.
