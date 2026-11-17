@@ -72,11 +72,11 @@ Official finance excludes WATCH, LEAN, CONDITIONAL, REJECTED, PASS and PAPER unl
 The intended configurable sections are:
 `TYP DNIA`, `MAIN A`, `MAIN B`, `EXTRA`, `MEGA`, `LOW LEAGUE`, `MULTI-SPORT`, `NHL/NBA`, `JACKPOT`.
 
-Today, the schema stores a legacy `group_name` on predictions and `coupon_type` on coupons. A future additive category registry should provide a stable category ID, display name, order, enabled flag, sport scope, official-finance flag, and display color. Existing group names and coupon types must be mapped without losing their original values.
+Today, the schema stores a legacy `group_name` on predictions and `coupon_type` on coupons. The additive registry is now implemented in `moneyball_tracker_categories`, with system categories, owner-scoped custom categories, and immutable legacy mappings in `moneyball_tracker_category_aliases`. Original group names and coupon types remain unchanged; missing or unknown values resolve to `UNCLASSIFIED`.
 
 ## Jackpot numbering
 
-Jackpot needs its own stable ID and a display sequence such as #001. Sequence values must be allocated once and never recalculated from current sort order or renumbered when a coupon is deleted/hidden. PASS and PAPER may display hypothetical AKO when every leg has a valid stored price, but must remain excluded from official finance.
+Jackpot now has its own stable ID and owner-scoped sequence such as #001 in `moneyball_jackpot_entries`. New sequence values are allocated once under a transaction lock and never recalculated from current sort order or renumbered when a coupon is hidden. The linked coupon is protected by an owner-scoped foreign key. PASS and PAPER may display hypothetical AKO when every leg has a valid stored price, but must remain excluded from official finance.
 
 ## Tracker screens
 
