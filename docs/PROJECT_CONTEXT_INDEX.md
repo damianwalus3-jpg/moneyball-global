@@ -108,15 +108,15 @@ OpenFootball's current 2026/27 mirror has limited league coverage and no 17 Nov 
 ## Results-sync v72 monitoring — 2026-11-17
 Fourth production sample: HTTP 200 in 3.249s, no errors, 7 coupon reconciliations with 0 failures. 3 alternate result observations persisted, no current due result settled. Continue 24h p50/p95 monitoring.
 
-## Bieżące priorytety — 2026-11-17 (aktualizacja 08:52 UTC)
-1. Zweryfikować skan zaplanowany na 15:00 Europe/Brussels: public_source_error, kwalifikowane mecze, prognozy, duplikaty i wyniki.
-2. Dokończyć issue #77: katalog lig FootyNomad kraj po kraju, source → DB → RPC → zalogowany MAIN UI. Nie zamykać bez dowodów.
-3. Rozwiązać brak świeżych kursów: TipsAudit jest tylko częściowym benchmarkiem fair 1X2, nie dostarcza odpowiednich belgijskich kursów; nie używać go do kuponów. Bez kluczy/płatnych źródeł MAIN/MEGA/EXTRA pozostają zablokowane.
-4. Wykonać zalogowane E2E w istniejącej sesji: skan → kupon 4 EUR → wynik → rozliczenie → saldo → statystyki.
-5. Monitorować nowe RPC finansowe po pierwszym rzeczywistym rozliczeniu; rollback-only testy potwierdziły idempotencję, zwrot i dokładne wypłaty.
-6. Pozostałe full-table reads ograniczyć do Bankroll i saveCouponBatch; nie zmieniać ich bez potrzeby, obecnie 9 transakcji i 9 kuponów.
-7. Zachować historyczny 5 EUR TEST kupon jako incomplete bez kursów; saldo 84.28 EUR. Nie wymyślać wypłaty.
-8. Projekt nie jest ukończony. Nie wdrażać Vercel ani TEST.
+## Bieżące priorytety — 2026-11-17 (aktualizacja 10:01 Europe/Brussels)
+1. Zweryfikować skan 15:00 Europe/Brussels na Edge Functions footynomad-sync v87, moneyball-free-feed v43 i moneyball-public-sources v63: źródła, eligible matches, predictions, duplikaty, wyniki i brak 5xx.
+2. Dokończyć issue #77: 25/55 federacji UEFA nie ma obecnie potwierdzonego źródła lig krajowych tier 1/2. Zbudować katalog per kraj i znaleźć wyłącznie legalne, aktualne, bezkluczowe feedy; nie dopisywać fikcyjnych aliasów.
+3. Zalogowane E2E w istniejącej sesji MAIN: scan → prediction → kupon 4 EUR → wynik → ledger → statystyki. Nie prosić o hasło ani nie symulować tożsamości.
+4. Brak świeżych kursów belgijskich pozostaje blokadą: MAIN/MEGA/EXTRA nie mogą korzystać ze starych/fair/syntetycznych cen.
+5. Monitorować nowe owner-scoped finance RPC po pierwszym rzeczywistym rozliczeniu. Rollback test 10:00 potwierdził stake 4 EUR, odds 3.72, payout 14.88, idempotencję, cancel refund 4 EUR i rollback bez rekordów testowych.
+6. Pozostałe full-table reads ograniczyć do Bankroll i saveCouponBatch; obecnie 9 transakcji, 9 kuponów, saldo 84.28 EUR. Nie zmieniać bez potrzeby.
+7. Zachować historyczny 5 EUR TEST kupon jako incomplete bez kursów; nie wymyślać wypłaty.
+8. Nie zamykać #77 i nie deklarować całego projektu jako ukończonego. Bez Vercel/TEST.
 ## Naprawy po audycie 08:15 — 2026-11-17
 Auth 401 źródeł publicznych naprawiony (moneyball-predict v245); ręczna paginacja po eligibility naprawiona (v246 + owner-scoped RPC); shared eligibility odrzuca nazwane hiszpańskie rezerwy i NB III+; finanse nie liczą kuponów ze stawką 0 jako niekompletnych. Szczegóły, migracje, commit SHAs, testy i metryki są w PROJECT_STATE oraz PROJECT_MEMORY_AND_REGRESSION_LOG. Najnowszy CI/deploy commit e82719ed — oba SUCCESS. Panel zalogowany nadal wymaga testu w sesji użytkownika.
 
@@ -125,3 +125,7 @@ Statystyki korzystają z jednego owner-scoped RPC moneyball_statistics_page_data
 
 ## Financial RPC and odds-source audit — 2026-11-17 08:52 UTC
 Settlement and cancellation now use owner-scoped atomic RPCs; rollback tests passed for pending→won, idempotent stake/return, cancellation refund and ledger rebuild. Exact 3-leg example 1.100×1.182×1.167 gives combined odds 1.517 and 4 EUR payout 6.07. Latest CI/deploy ee8e6eb1 success. Balance 84.28 EUR. TipsAudit public API was tested (HTTP 200) but provides only partial fair 1X2 references and no eligible domestic tier 1/2 fixtures today; not a usable Belgian bookmaker feed. No compliant no-key/free odds source found; keep real-money coupon categories blocked until fresh odds exist.
+
+
+## Source coverage and scope regression — 2026-11-17 10:01 UTC
+New audit: docs/EUROPEAN_LEAGUE_SOURCE_COVERAGE_2026-11-17.md. Current public catalogues provide at least one tier 1/2 source for 30/55 UEFA associations (28 tier 1, 19 tier 2, 17 both); 25 associations have no verified source. FootyNomad browse/day page is inconsistent. Production SQL accepted 3 false positives in 634 labels (Serie D Championship Round, Damallsvenskan, Premier League Summer Series); code + SQL filters fixed and 12/12 regression cases pass. Supabase Edge Functions v87/v43/v63 deployed; CI 44051320905 and Cloudflare 44051320954 SUCCESS. Next scheduled 15:00 scan and authenticated MAIN UI E2E remain pending. Project not complete.
