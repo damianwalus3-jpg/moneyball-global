@@ -31,3 +31,12 @@ See `docs/PRODUCT_SPEC.md`, `docs/DOMAIN_MODEL.md` and `docs/REBUILD_EXECUTION_L
 
 
 This project is designed to stay within free service quotas; no paid services are required or configured.
+
+## European fixture sources
+
+The daily scan combines two public, keyless feeds:
+
+- **open-matchday** — daily CSV dataset with 75 competitions in its current catalogue. It is non-commercial and its coverage varies by competition. The app scans all recognised European folders, including cups and youth categories, instead of filtering them out.
+- **OpenLigaDB** — public football API with a dynamic season catalogue. It is community-maintained, has no API key, and is used as a complementary source. Requests are throttled and successful responses are cached by the separate Cloudflare Worker for eight hours.
+
+Matches are normalized to Europe/Brussels date and deduplicated across feeds. The app reports provider errors and source counts. No single free feed proves complete coverage of every European senior, women's, youth, regional and amateur match; missing data is never invented. OpenLigaDB data is subject to its ODbL 1.0 and fair-use guidance; open-matchday's non-commercial terms must be respected.
