@@ -922,3 +922,10 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Migracja 20261117072931_enforce_unique_match_per_coupon_leg: match_id w coupon_legs NOT NULL, unique index coupon_legs_unique_coupon_match_idx(coupon_id,match_id). Przed migracją 0 null i 0 duplikatów; bez zmiany danych. Istniejący check leg_number1–3 + unique coupon/leg_number ogranicza maksymalnie do3.
 - Results-sync: commit 7f0cdffc2b7997da986229432ff341c4a712060c, wersja v72, równoległe niezależne odczyty. 3 próbki HTTP200: 5.268s (due lease), 3.887s i 4.379s (skip), 0 błędów. Discovery spadło z2.273s do0.113–0.134s; main load0.269–0.736s. v71 24h median4.594s/p95 8.76s/max13.55s. Próbka nadal mała, całkowitej latencji nie uznawać za rozwiązane.
 - Otwarte: zalogowany E2E UI singla/kuponu i bankroll; skan 15:00 ma potwierdzić v243→v62 bez401; kursy bukmacherskie, real xG i potwierdzone składy nadal ograniczone.
+
+
+## 17.11.2026 08:42 Brussels — final guard singla i automatyczny audyt
+- Dodano guard: target_legs=1 wyłącznie dla coupon_type MAIN. Commit 2044f44 miał błąd TypeScript TS2304 (zmienna couponType poza zakresem); CI wykryło go przed deployem. Poprawiono na options.couponType w commicie a5eb5dbfbd1f6b682aa198aeebb1b8ba10c12d2c.
+- Final checks a5eb5db: Deno Edge typecheck SUCCESS, 67/67 testów SUCCESS, TypeScript SUCCESS, build SUCCESS, deploy GitHub SUCCESS, Cloudflare Workers Build SUCCESS.
+- Smoke po deployu: root i /login działają; /panel bez sesji zwraca login_required. Potwierdza aktualny frontend shell i ochronę routingu, nie zalogowane E2E.
+- Zaktualizowano istniejący prompt automatyzacji 6afbeb034e4c81919dd6ad7d554497e0: osobne przepływy MAIN singiel 1 noga i AKO 3 różne mecze, recordStake=true, jedna stake/return, unique match guard oraz zakaz fałszywych agregatów SQL przez join fan-out. Harmonogram pozostaje codziennie 08:15 Europe/Brussels; następny run 18.11.

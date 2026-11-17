@@ -98,3 +98,8 @@ OpenFootball's current 2026/27 mirror has limited league coverage and no 17 Nov 
 - Rollback-only production SQL integration tests passed for single and 3-leg settlement, one stake/one return, and duplicate-match rejection. No test rows persisted.
 - Coupon ledger verified: 9 transactions, balance EUR 84.28, 0 balance_after mismatches. First inflated aggregate was a SQL join fan-out false positive, not duplicate data.
 - Full technical details and commits are in PROJECT_STATE and PROJECT_MEMORY_AND_REGRESSION_LOG.
+
+
+## Final single-pick guard and daily audit update — 2026-11-17
+- Final frontend guard requires target_legs=1 to use coupon_type MAIN. The first attempt's TypeScript scope error was caught by CI and fixed; final commit a5eb5db passed all checks and production smoke.
+- Daily 08:15 audit now explicitly verifies separate MAIN single (one leg, EUR 4, immediate stake transaction) and 3-leg AKO (three distinct matches, EUR 4), one stake/one return, unique match constraint and pre-aggregated ledger checks.

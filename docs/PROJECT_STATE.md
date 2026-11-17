@@ -934,3 +934,10 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Next scheduled scan at 15:00 Brussels must verify moneyball-predict v243 calls moneyball-public-sources v62 with no 401 and public_source_error=null.
 - Continue monitoring European domestic tier 1/2 feed coverage, fresh real bookmaker odds, true xG and confirmed lineups.
 - Security warnings remain: leaked-password protection disabled; pg_net extension in public. RLS service-only tables have no policies and no anon/authenticated SELECT; keep them private.
+
+
+## Final single-flow guard verification — 2026-11-17 08:42 Brussels
+- A follow-up frontend guard was added so target_legs=1 is accepted only when coupon_type=MAIN, matching the database trigger. Commit 2044f44 initially failed TypeScript because the guard referenced an out-of-scope couponType variable; CI correctly caught TS2304 before deployment. Fixed immediately to options.couponType in commit a5eb5dbfbd1f6b682aa198aeebb1b8ba10c12d2c.
+- Final checks for a5eb5db: Deno Edge type-check SUCCESS, 67/67 unit tests SUCCESS, TypeScript SUCCESS, build SUCCESS, GitHub Cloudflare deploy SUCCESS, Cloudflare Workers Build SUCCESS.
+- Post-deploy production smoke: root page and login page both load; /panel correctly requires login when unauthenticated. This confirms the latest deployed frontend shell and route guard. Authenticated workflow remains pending.
+- Existing daily audit automation 6afbeb034e4c81919dd6ad7d554497e0 was updated again at 08:41 Brussels: explicitly distinguishes MAIN single target_legs=1 from 3-leg AKO, verifies recordStake=true, one stake/one return, database unique match guard, and avoids SQL join fan-out by pre-aggregating legs and ledger separately. Schedule remains daily 08:15 Europe/Brussels; next run 18 Nov 2026.
