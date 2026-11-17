@@ -2,7 +2,7 @@ import { requireSupabase } from "./supabase";
 import { COLUMNS, OWNER_COLUMN } from "./schema";
 import type { TableName, TableRows } from "./types";
 import { brusselsDayKey, brusselsInputToISO } from "./time";
-import { isEuropeanTopTwoLeague } from "./domain";
+import { isEligibleEuropeanMatch } from "./domain";
 
 export interface DashboardMarketStats {
   won: number;
@@ -559,7 +559,7 @@ export async function fetchStatisticsPageData(): Promise<StatisticsPageData> {
   const uid = await currentUserId();
   const sb = requireSupabase();
   const eligibleMatchIds = matches
-    .filter((match) => isEuropeanTopTwoLeague(match.country, match.competition ?? match.league))
+    .filter((match) => isEligibleEuropeanMatch(match))
     .map((match) => match.id);
   const predictions = eligibleMatchIds.length === 0 ? [] : await fetchInChunks<TableRows["predictions"]>(
     eligibleMatchIds, 100, async (chunk) => {
