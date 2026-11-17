@@ -174,7 +174,22 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   // Source 2: OpenLigaDB's season catalogue and match feeds. Respect its 60 req/min fair-use limit.
   try {
     const year = Number(date.slice(0, 4));
-    const leagues = (await fetchJson<OpenLigaLeague[]>(`${OPENLIGA}/leagues/${year}`)).filter(isEuropeanOpenLiga);
+    const month = Number(date.slice(5, 7));
+    const seasonYears = month < 7 ? [year, year - 1] : [year];
+    const catalogues = await Promise.all(seasonYears.map(async seasonYear => {
+      try { return await fetchJson<OpenLigaLeague[]>(`${OPENLIGA}/leagues/${seasonYear}`); }
+      catch (error) {
+        errors.push(`OpenLigaDB · katalog ${seasonYear}: ${error instanceof Error ? error.message : "błąd źródła"}`);
+        return [];
+      }
+    }));
+    const leagueMap = new Map<string, OpenLigaLeague>();
+    for (const league of catalogues.flat().filter(isEuropeanOpenLiga)) {
+      const key = `${league.leagueShortcut ?? ""}|${league.leagueSeason ?? ""}`;
+      if (key !== "|") leagueMap.set(key, league);
+    }
+    const leagues = [...leagueMap.values()];
+    if (seasonYears.every((_, index) => catalogues[index].length === 0)) throw new Error("Brak dostępnego katalogu sezonów");
     let nextRequestAt = 0;
     const throttledMatches = await pooled(leagues, 4, async league => {
       const wait = Math.max(0, nextRequestAt - Date.now());
