@@ -41,7 +41,7 @@ self.addEventListener("fetch", event => {
 
   // Cache-first for same-origin build assets; Vite's hashed asset names make
   // old entries harmless until the next service-worker version activates.
-  event.respondWith(caches.match(request).then(async cached => {
+  event.respondWith(caches.match(request, { cacheName: CACHE_NAME }).then(async cached => {
     if (cached) return cached;
     const response = await fetch(request);
     if (response.ok && response.type === "basic") {
