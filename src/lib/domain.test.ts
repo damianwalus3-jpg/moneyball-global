@@ -185,6 +185,10 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Montenegro", competition: "Meridianbet 1. CFL" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "North Macedonia", competition: "Prva MFL" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bosnia and Herzegovina", competition: "WWIN Liga Bosne i Hercegovine" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Albania", competition: "Abissnet Superiore" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Luxembourg", competition: "BGL Ligue" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Malta", competition: "VBet Malta Premier League" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Kosovo", competition: "Albi Mall Superliga" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya II" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya B" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Real Madrid Castilla" })).toBe(false);
@@ -281,6 +285,11 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Montenegro", "Meridianbet 1. CFL")).toBe(true);
     expect(isEuropeanTopTwoLeague("North Macedonia", "Prva MFL")).toBe(true);
     expect(isEuropeanTopTwoLeague("Bosnia and Herzegovina", "WWIN Liga Bosne i Hercegovine")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Albania", "Abissnet Superiore")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Luxembourg", "BGL Ligue")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Luxembourg", "Promotion d'Honneur")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Malta", "VBet Malta Premier League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Kosovo", "Albi Mall Superliga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Liqa")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "Vysshaya Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "Pervaya Liga")).toBe(true);
