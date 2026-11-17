@@ -168,6 +168,43 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya B" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: "women" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, competition: "Serie C" })).toBe(false);
+    // OpenMatchday's source folder is authoritative tier metadata; display names
+    // are intentionally not required to match the app's legacy league alias list.
+    const openMatchdayBase = {
+      ...eligibleBase,
+      source: "OpenMatchday",
+      external_id: "om:BEL_1_pro-league:2026-11-17:club-a:club-b",
+      competition: "Belgian Pro League",
+      country: "Belgium",
+    };
+    expect(isEligibleEuropeanMatch(openMatchdayBase)).toBe(true);
+    expect(isEligibleEuropeanMatch({
+      ...openMatchdayBase,
+      external_id: "om:BEL_2_challenger-pro-league:2026-11-17:club-a:club-b",
+      competition: "Belgian Challenger Pro League",
+    })).toBe(true);
+    expect(isEligibleEuropeanMatch({
+      ...openMatchdayBase,
+      external_id: "om:ENG_3_league-one:2026-11-17:club-a:club-b",
+      competition: "League One",
+      country: "England",
+    })).toBe(false);
+    expect(isEligibleEuropeanMatch({
+      ...openMatchdayBase,
+      external_id: "om:UEFA_1_champions-league:2026-11-17:club-a:club-b",
+      competition: "UEFA Champions League",
+      country: "UEFA",
+    })).toBe(false);
+    expect(isEligibleEuropeanMatch({
+      ...openMatchdayBase,
+      external_id: "om:BEL_CUP_belgian-cup:2026-11-17:club-a:club-b",
+      competition: "Belgian Cup",
+    })).toBe(false);
+    expect(isEligibleEuropeanMatch({
+      ...openMatchdayBase,
+      external_id: "om:BEL_2_womens-super-league:2026-11-17:club-a:club-b",
+      competition: "Women's Super League",
+    })).toBe(false);
     expect(isEuropeanTopTwoLeague("Austria", "Austrian 2. Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Netherlands", "Eerste Divisie")).toBe(true);
     expect(isEuropeanTopTwoLeague("Turkey", "TFF First League")).toBe(true);
