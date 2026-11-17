@@ -4,6 +4,8 @@ export interface FreeFixture {
   competition: string;
   countryCode: string;
   leagueFolder: string;
+  leagueShortcut?: string;
+  leagueSeason?: string;
   date: string;
   time: string;
   home: string;
@@ -215,6 +217,8 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
             competition: match.leagueName || league.leagueName || shortcut,
             countryCode: "EU",
             leagueFolder: "",
+            leagueShortcut: shortcut,
+            leagueSeason: season,
             date: local.date,
             time: local.time,
             home,
