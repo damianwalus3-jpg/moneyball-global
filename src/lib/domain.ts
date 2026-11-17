@@ -229,11 +229,11 @@ function isOpenMatchdayTopTwoMatch(match: Pick<Match, "country" | "competition">
   if (String(match.source ?? "").toLowerCase() !== "openmatchday") return false;
   const folder = (String(match.external_id ?? "").match(/^om:([^:]+):/) || [])[1] || "";
   if (!/^[A-Z]{3}_[12]_[A-Za-z0-9-]+$/i.test(folder)) return false;
-  const normalize = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const country = normalize(String(match.country ?? ""));
   const competition = normalize(String(match.competition ?? ""));
   if (!EUROPEAN_COUNTRIES.has(country) || country === "europe" || country === "uefa") return false;
-  return !/\\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\\b/.test(folder + " " + competition);
+  return !/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\b/.test(folder + " " + competition);
 }
 
 /** True only for senior men's first/second-tier fixtures, excluding reserve/B teams. */
