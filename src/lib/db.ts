@@ -128,6 +128,36 @@ export async function fetchLatestScanRun(): Promise<TableRows["scan_runs"] | nul
   return (data ?? null) as TableRows["scan_runs"] | null;
 }
 
+/** Load the immutable system category registry together with this owner's custom categories. */
+export async function fetchTrackerCategories(): Promise<TableRows["moneyball_tracker_categories"][]> {
+  const uid = await currentUserId();
+  const { data, error } = await withRequestTimeout(
+    requireSupabase()
+      .from("moneyball_tracker_categories")
+      .select(READ_COLUMNS.moneyball_tracker_categories.join(","))
+      .or(`owner_id.is.null,owner_id.eq.${uid}`)
+      .order("sort_order", { ascending: true }),
+    "Pobieranie kategorii Trackera",
+  );
+  if (error) throw new Error(humanizeError(error, "moneyball_tracker_categories"));
+  return (data ?? []) as unknown as TableRows["moneyball_tracker_categories"][];
+}
+
+/** Jackpot entries are owner-scoped and ordered by their immutable sequence number. */
+export async function fetchJackpotEntries(): Promise<TableRows["moneyball_jackpot_entries"][]> {
+  const uid = await currentUserId();
+  const { data, error } = await withRequestTimeout(
+    requireSupabase()
+      .from("moneyball_jackpot_entries")
+      .select(READ_COLUMNS.moneyball_jackpot_entries.join(","))
+      .eq(OWNER_COLUMN, uid)
+      .order("sequence_no", { ascending: true }),
+    "Pobieranie rejestru Jackpot",
+  );
+  if (error) throw new Error(humanizeError(error, "moneyball_jackpot_entries"));
+  return (data ?? []) as unknown as TableRows["moneyball_jackpot_entries"][];
+}
+
 
 export interface CouponPageData {
   matches: TableRows["matches"][];
