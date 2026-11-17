@@ -328,3 +328,10 @@
 - Restricted static asset lookup to `CACHE_NAME` as well. This aligns asset reads with the existing activation cleanup policy and prevents another app's cache entry from being reused.
 - Commit: 01360c91430dcd0623c310d857c3d0d434d6580f.
 - Validation: source change committed; CI and production Worker deployment remain unverified for this commit.
+
+
+## 2026-11-17 — Stage 27: honest notification status in the UI
+- Replaced the inert notification bell with a working disclosure toggle.
+- The panel explicitly states that Web Push is not configured and that the app does not currently send background or cross-device alerts. This avoids implying a capability that has not been implemented.
+- Commit: e7d972d8df18e9c18bde476656af3755fb935050.
+- Validation: source committed; CI, browser interaction and deployment checks remain pending.
