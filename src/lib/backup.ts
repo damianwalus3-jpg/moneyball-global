@@ -48,10 +48,41 @@ export function stamp() {
   return new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
 }
 
+/** Validate the complete payload before the first database write. */
+export function validateBackup(data: unknown): { backup: Backup; counts: Partial<Record<TableName, number>> } {
+  if (!data || typeof data !== "object" || Array.isArray(data))
+    throw new Error("Nieprawidłowy format kopii zapasowej.");
+  const candidate = data as Partial<Backup>;
+  if (candidate.format !== BACKUP_FORMAT || candidate.version !== 1 || !candidate.tables ||
+      typeof candidate.tables !== "object" || Array.isArray(candidate.tables))
+    throw new Error("To nie jest obsługiwana kopia zapasowa MONEYBALL GLOBAL 2.0.");
+
+  const allowed = new Set<string>(TABLES_IN_ORDER);
+  const counts: Partial<Record<TableName, number>> = {};
+  for (const [tableName, rows] of Object.entries(candidate.tables)) {
+    if (!allowed.has(tableName))
+      throw new Error(`Kopia zawiera nieobsługiwaną tabelę: ${tableName}.`);
+    if (!Array.isArray(rows))
+      throw new Error(`Dane tabeli ${tableName} muszą być listą rekordów.`);
+    const ids = new Set<string>();
+    for (const [index, row] of rows.entries()) {
+      if (!row || typeof row !== "object" || Array.isArray(row) ||
+          typeof (row as Record<string, unknown>).id !== "string" ||
+          !(row as Record<string, unknown>).id || !(row as Record<string, unknown>).id?.toString().trim()) {
+        throw new Error(`Nieprawidłowy rekord ${index + 1} w tabeli ${tableName}: wymagane jest id.`);
+      }
+      const id = String((row as Record<string, unknown>).id);
+      if (ids.has(id)) throw new Error(`Powtórzone id ${id} w tabeli ${tableName}.`);
+      ids.add(id);
+    }
+    counts[tableName as TableName] = rows.length;
+  }
+  return { backup: candidate as Backup, counts };
+}
+
 /** Restores a backup in FK order. Existing rows (same id) are skipped, never overwritten. */
 export async function restoreBackup(data: unknown): Promise<Record<string, number>> {
-  const b = data as Backup;
-  if (!b || b.format !== BACKUP_FORMAT || !b.tables) throw new Error("To nie jest kopia zapasowa MONEYBALL GLOBAL 2.0.");
+  const { backup: b } = validateBackup(data);
   const counts: Record<string, number> = {};
   for (const t of TABLES_IN_ORDER) {
     const rows = b.tables[t];
