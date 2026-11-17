@@ -642,6 +642,8 @@ export default function App() {
               <div className="coupon-candidate-heading"><b>{candidates.length} kombinacji spełnia próg</b><small>Kolejność według iloczynu prawdopodobieństw modelu</small></div>
               {candidates.slice(0, 10).map((coupon, index) => {
                 const priced = selectedOddsBookmaker ? valueThreeLegCoupon(coupon, records, selectedOddsBookmaker) : null;
+                const couponKey = [coupon.date, ...coupon.legs.map(leg => `${leg.fixtureId}:${leg.selection}`), priced?.bookmaker ?? "NO_ODDS"].join("|");
+                const alreadySaved = records.some(row => row.kind === "coupon" && row.details.couponKey === couponKey);
                 return <article className="coupon-candidate" key={coupon.legs.map(leg => leg.fixtureId).join("|")}>
                   <div className="coupon-candidate-top"><b>Kupon testowy #{index + 1}</b><span>3/3 mecze</span></div>
                   {coupon.legs.map((leg, legIndex) => <div className="coupon-leg" key={leg.fixtureId}>
@@ -652,13 +654,14 @@ export default function App() {
                     {priced ? <span>AKO {priced.combinedOdds.toFixed(2)} · EV {(priced.expectedValue * 100).toFixed(1)}%</span> : <span>{selectedOddsBookmaker ? "Brak kompletnych/świeżych kursów dla wszystkich 3 meczów" : "Wybierz bukmachera — kursy niepotwierdzone"}</span>}
                   </div>
                   {priced && <p className="source-note">Stawka €{priced.stake.toFixed(2)} · możliwy zwrot €{priced.potentialReturn.toFixed(2)} · możliwy zysk €{priced.potentialProfit.toFixed(2)} · {priced.bookmaker}</p>}
-                  <button onClick={() => {
-                    addRecord({
+                  <button disabled={alreadySaved} onClick={() => {
+                    addRecordsIfMissing([{
                       kind: "coupon",
                       title: `Kupon ${fixtureScan!.date} #${index + 1}`,
                       status: priced ? "PAPER_WITH_ODDS" : "PAPER_NO_ODDS",
                       details: {
                         date: coupon.date,
+                        couponKey,
                         legsJson: JSON.stringify(coupon.legs.map((leg, legIndex) => ({
                           fixtureId: leg.fixtureId, selection: leg.selection, probability: leg.probability,
                           odds: priced?.legs[legIndex].decimalOdds ?? null,
@@ -671,9 +674,9 @@ export default function App() {
                         potentialReturn: priced?.potentialReturn ?? null,
                         potentialProfit: priced?.potentialProfit ?? null,
                       },
-                    });
+                    }], "couponKey");
                     setRecords(readRecords());
-                  }}>{priced ? "Zapisz wyceniony kupon €4" : "Zapisz kupon bez kursów"}</button>
+                  }}>{alreadySaved ? "Kupon już zapisany" : priced ? "Zapisz wyceniony kupon €4" : "Zapisz kupon bez kursów"}</button>
                 </article>;
               })}
             </div> : <div className="tracker-empty">Brak trzech różnych meczów z potwierdzoną prognozą ≥75% na dzień skanu. Wygeneruj prognozy w zakładce Mecze.</div>;
