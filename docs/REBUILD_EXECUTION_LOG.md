@@ -352,3 +352,10 @@
 - Source commit: `b7c85a529ab5e704c74117e2aff1eec3ebf5d0aa`.
 - Test commit: `f1f3e5311f316a2ffe72f9257a9cc7e4c936656d`.
 - Validation and Cloudflare deployment are triggered by the latest branch push; stage remains pending until those workflows complete successfully.
+
+## Stage 30 — idempotent pending-result selection
+- Added a dedicated, tested selector that chooses only the newest-first prediction for each unsettled fixture and ignores fixtures that already have a result.
+- Wired automatic/manual settlement to the selector, preventing duplicate provider requests and duplicate result records when older Tracker backups contain multiple predictions for one fixture.
+- Regression tests cover duplicate prediction rows, already-settled fixtures and malformed rows.
+- Commits: initial integration `06a0ff05952fc4e0c9b73055f0cac2257ec38526`; selector `ae8bd4e050ccf9c9e7cbeb1d27ec1484ac7126a6`; tests `945803fc9d97982c8c1a60ebaa6318e236339a41`; tested selector wiring `e483dc244a677b5753bce410c939c8c8ceb2e146`.
+- CI and Cloudflare deployment are pending on the latest branch state; do not mark this stage deployed until both succeed.
