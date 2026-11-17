@@ -31,3 +31,9 @@
 - Added settled-prediction evaluation metrics: multiclass Brier score, log loss and accuracy. Empty samples return no metric rather than a misleading zero.
 - Added unit tests for model directionality, probability normalization, input rejection and evaluation.
 - Status at commit time: implementation committed; CI and Cloudflare deployment must pass before this stage is marked deployed.
+
+### Stage 02 — passed and deployed
+- Commit: `f352cfa298f0ddbce9221018981637160e04e176`.
+- CI run `44106668871`: success; install, TypeScript typecheck, Vitest suite and production build all passed.
+- Cloudflare deploy run `44106669013`: success; same validation steps and static asset deployment passed.
+- Stage 02 is marked COMPLETE/DEPLOYED. The prediction engine is a tested calculation module, not yet fed by verified expected-goals data.
