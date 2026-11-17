@@ -4,6 +4,7 @@ import { addRecord, exportBackup, importBackup, readRecords, removeRecord, type 
 import { loadOpenLigaRecentTeamForm, loadRecentTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
 import { buildThreeLegCandidates } from "./coupon-engine";
+import { auditTrackerPredictions } from "./model-audit";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
@@ -132,6 +133,7 @@ export default function App() {
   };
   useEffect(() => { void runFixtureScan(); }, []);
   const fileRef = useRef<HTMLInputElement>(null);
+  const modelAudit = useMemo(() => auditTrackerPredictions(records), [records]);
   const visibleRecords = useMemo(() => records.filter(row => (active === "tracker" ? true : row.kind === (active === "matches" ? "match" : active === "coupons" ? "coupon" : active === "pick" ? "prediction" : "scan")) && (row.title.toLowerCase().includes(query.toLowerCase()) || row.status.toLowerCase().includes(query.toLowerCase()))), [records, active, query]);
   const refreshRecords = () => setRecords(readRecords());
   const saveRecord = () => { if (!newTitle.trim()) return; addRecord({ kind: newKind, title: newTitle.trim(), status: "draft", details: {} }); setNewTitle(""); refreshRecords(); setNotice("Zapisano lokalnie na tym urządzeniu."); };
@@ -199,12 +201,18 @@ export default function App() {
           })()}
           <p className="source-note">Nie wyliczamy kursów ani potencjalnej wygranej bez rzeczywistych notowań bukmacherskich. Iloczyn prawdopodobieństw to metryka modelu, nie kurs AKO i nie gwarancja trafienia.</p>
         </section>}
-        {active !== "dashboard" && active !== "tracker" && active !== "matches" && active !== "coupons" && <section className="module-panel">
-          <div className="module-icon">{active === "pick" ? <Sparkles/> : <BarChart3/>}</div>
-          <h2>{active === "pick" ? "Selekcja bez zgadywania" : "Pomiar jakości modelu"}</h2>
-          <p>{active === "pick" ? "Typ dnia zostanie opublikowany tylko wtedy, gdy dane i model uzasadnią wybór." : "Metryki będą liczone na rozliczonych prognozach. Nie pokażemy skuteczności bez próby."}</p>
-          <div className="module-status"><span className="status-dot"/> MODUŁ ZAPROJEKTOWANY · IMPLEMENTACJA W TOKU</div>
-          <div className="module-search"><Search size={17}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Wyszukaj (po podłączeniu darmowych źródeł)" disabled/><button disabled><Plus size={16}/> Dodaj</button></div>
+        {active === "intelligence" && <section className="module-panel audit-module">
+          <div className="module-icon"><BarChart3/></div>
+          <h2>Jakość modelu · wyniki rozliczone</h2>
+          <p>Metryki liczone wyłącznie z prognoz połączonych z rzeczywistym wynikiem przez identyfikator meczu.</p>
+          {modelAudit.metrics ? <><div className="audit-metrics"><article><small>Próba</small><b>{modelAudit.metrics.count}</b></article><article><small>Skuteczność 1X2</small><b>{(modelAudit.metrics.accuracy*100).toFixed(1)}%</b></article><article><small>Brier score</small><b>{modelAudit.metrics.brierScore.toFixed(4)}</b></article><article><small>Log loss</small><b>{modelAudit.metrics.logLoss.toFixed(4)}</b></article></div><h3>Kalibracja pewności</h3><div className="audit-buckets">{modelAudit.buckets.map(bucket => <div key={bucket.label}><b>{bucket.label}</b><span>Prognoza: {(bucket.averageConfidence*100).toFixed(1)}%</span><span>Trafienia: {(bucket.observedAccuracy*100).toFixed(1)}%</span><small>n={bucket.count}</small></div>)}</div></> : <div className="tracker-empty">Brak rozliczonych prognoz. Zapisz wynik z tym samym fixtureId co prognoza, aby uruchomić Brier score, log loss, skuteczność i kalibrację.</div>}
+          <div className="module-status"><span className="status-dot"/> Rozliczone: {modelAudit.settledPredictions} · oczekujące na wynik: {modelAudit.unmatchedPredictions}</div>
+          <p className="source-note">Nie pokazujemy skuteczności dla prognoz bez wyniku. Metryki nie są wyliczane z typów odrzuconych bez prawdopodobieństw.</p>
+        </section>}
+        {active === "pick" && <section className="module-panel">
+          <div className="module-icon"><Sparkles/></div><h2>Selekcja bez zgadywania</h2>
+          <p>Prognozy z całego skanu są dostępne po użyciu „Analizuj wszystkie” w zakładce Mecze. Kandydaci ≥75% trafiają do puli kuponów.</p>
+          <div className="module-status"><span className="status-dot"/> Zapisane prognozy: {records.filter(row => row.kind === "prediction").length} · kandydaci: {records.filter(row => row.kind === "prediction" && row.status === "KANDYDAT").length}</div>
         </section>}
 
         <footer className="footer"><span>MONEYBALL — TRUST THE PROCESS</span><span>FRESH BUILD · DATA TRANSPARENCY FIRST</span></footer>
