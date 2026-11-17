@@ -284,11 +284,15 @@ export function isCouponCandidate(prediction: Prediction, match: Match | undefin
 }
 
 
+export function isMissingOddsRejectionReason(reason: string | null | undefined): boolean {
+  return /Brak (?:aktualnego, )?potwierdzonego kursu/i.test(String(reason ?? ""));
+}
+
 /** A manual price may unlock a model pick only when the model already passed every non-odds gate. */
 export function canPromoteManualOdds(prediction: Prediction, match: Match | undefined, nowMs: number): boolean {
   const coverage = prediction.data_coverage;
   if (!coverage || prediction.verdict !== "ODRZUCONY") return false;
-  if (!String(prediction.rejection_reason ?? "").includes("Brak aktualnego, potwierdzonego kursu")) return false;
+  if (!isMissingOddsRejectionReason(prediction.rejection_reason)) return false;
   if (prediction.probability == null || !Number.isFinite(Number(prediction.probability)) || Number(prediction.probability) <= CANDIDATE_MIN_PROBABILITY) return false;
   const modelCoverage = Number(coverage["model_coverage"]);
   const homeMatches = Number(coverage["home_history_matches"]);
