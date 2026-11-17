@@ -37,7 +37,14 @@ describe("backup restore preflight", () => {
   it("validates audit trail rows and rejects duplicate audit IDs", () => {
     const result = validateBackup({
       ...backup({}),
-      tracker_source_audit: [{ id: "audit-1", entity_type: "prediction", new_source_class: "MODEL" }],
+      tracker_source_audit: [{
+        id: "123e4567-e89b-42d3-a456-426614174000",
+        entity_id: "123e4567-e89b-42d3-a456-426614174001",
+        changed_by: "123e4567-e89b-42d3-a456-426614174002",
+        entity_type: "prediction",
+        new_source_class: "MODEL",
+        changed_at: "2026-11-17T13:00:00Z",
+      }],
     });
     expect(result.backup.tracker_source_audit).toHaveLength(1);
     expect(() => validateBackup({
