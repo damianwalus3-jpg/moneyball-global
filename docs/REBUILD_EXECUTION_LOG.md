@@ -598,3 +598,25 @@
 - Code commits: Worker `e204fc4ead9b9a661802a9ffe672faee0a50121d`; tests `f9058ab38a2dcea1f8bd8902fef98e62073c8da3`.
 - Required before live provider pilot: set a strong random `ODDS_PILOT_TOKEN` secret on the separate `moneyball-global-rebuild` Worker. Until then the provider pilot is intentionally disabled, even though provider keys are configured.
 - CI and Cloudflare deployment must pass for the test commit before marking Stage 54 deployed. No provider credits were consumed and no Tracker, coupon, settlement or bankroll records were changed.
+
+
+## Stage 54 — odds pilot access hardening — 2026-11-17 (verified)
+- Audit found the public `/api/odds/pilot` endpoint could call configured credit-metered providers without owner authentication.
+- Added fail-closed `ODDS_PILOT_TOKEN` bearer authentication. If absent, pilot returns HTTP 503 without contacting providers; invalid token returns HTTP 401.
+- Restricted CORS grants to the exact production REBUILD origin. Arbitrary origins do not receive `Access-Control-Allow-Origin`; OPTIONS permits the Authorization header.
+- Added a 10-second timeout to upstream OddsPapi, StrikerAPI and OpenLigaDB requests.
+- `/api/odds/status` reports only configuration booleans, never secret values.
+- Added tests for disabled pilot, invalid token, arbitrary-origin CORS denial, authenticated provider calls and secret non-disclosure.
+- Worker commit `e204fc4ead9b9a661802a9ffe672faee0a50121d`; test correction commit `d50cae3e857fad0fa5f4d1913beb84e9a6132b74`.
+- CI `44190706973` (commit d50cae3) passed; Cloudflare deployment `44190707102` (commit d50cae3) passed. Public smoke test confirmed both provider secrets are configured and pilot remains disabled until the owner token is added.
+- No provider odds endpoint was called; no credits consumed and no Tracker/coupon/settlement/bankroll records changed.
+
+## Stage 55 — verified kickoff guard for pre-match predictions — 2026-11-17 (verified)
+- Audit found fixtures with missing kickoff time (`—`) were treated as future events by the prediction workflow and could enter the pre-match prediction path.
+- Added strict date/time validation through `hasKnownKickoff`; invalid dates and unknown times are now rejected before form retrieval or prediction.
+- The safest-pick selector also excludes any prediction without a valid, known kickoff time, including legacy Tracker rows.
+- Added tests for unknown kickoff, malformed calendar dates and normal future kickoff values.
+- Final implementation is on `moneyball-rebuild`; latest validation run `44191051496` passed typecheck, all Vitest tests and production build. Cloudflare deployment `44191051439` passed all validation steps and deployed successfully.
+- Production smoke test after deployment confirmed the app shell responds, `/api/odds/status` returns both provider keys configured and `pilotEnabled:false`, and unauthenticated `/api/odds/pilot` returns HTTP 503 without contacting providers.
+- Intermediate commits had failed/cancelled workflow runs while test fixtures and the kickoff helper regex were corrected. Only the final successful run/deployment above is the accepted release evidence.
+- No existing Tracker, prediction, coupon, settlement, bankroll or historical record was changed.
