@@ -100,7 +100,7 @@ const AuthenticatedStatystykiRoute = AuthenticatedStatystykiRouteImport.update({
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedTrackerRoute = AuthenticatedTrackerRouteImport.update({
-  id: '/_authenticated/tracker',
+  id: '/tracker',
   path: '/tracker',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
