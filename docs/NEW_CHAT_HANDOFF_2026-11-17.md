@@ -63,3 +63,16 @@ Szczegóły, linki i architektura w `docs/ODDS_PROVIDER_RESEARCH_2026-11-17.md`.
 
 ## Zasada uczciwości
 Nie deklaruj, że wszystkie mecze Europy mają kursy. Nie przedstawiaj opóźnionych kursów jako live. Nie podstawiaj kursów z podobnego meczu. Nie nazywaj papierowego P/L rzeczywistym wynikiem finansowym. Nie usuwaj historii użytkownika.
+
+## Uzupełnienie badań kursów po rozszerzonym przeszukaniu internetu
+Nowe najlepsze opcje do testu:
+- **OddsPapi Free**: 250 requests/month, pre-game REST, history, szeroka lista bookmakerów wg dostawcy; klucz wymagany, nie ma darmowego WebSocket, dostawca nie gwarantuje kursu dla każdego meczu. Dane o 300+ books są deklaracją vendora; testować rzeczywiste ligi i fixture.
+- **StrikerAPI Free**: 500 credits/month; get_odds: 5 credits per match lub 10 credits per day; odświeżenie co godzinę dla nadchodzących 4 dni, brak live; wybrane europejskie ligi, nie pełna Europa.
+- **Polymarket Gamma API**: keyless public API, ale prediction-market prices, nie kursy bookmakerów; używać wyłącznie osobno jako benchmark tam, gdzie istnieje płynny rynek.
+- **FootballAPIs.com**: katalog 17 providerów i MCP discovery, nie feed odds.
+- **OddsHarvester**: open-source scraper OddsPortal, ale OddsPortal ToS zakazuje automatycznych żądań/scrapingu/agregacji bez zgody; nie wdrażać bez pisemnej zgody.
+- **BetExplorer**: ToS także zakazuje scraping/automatycznych żądań bez zgody.
+- **football-data.co.uk**: ma historyczne i sezonowe CSV z kursami, ale zastrzega prywatny użytek, nie komercyjne produkty, boty/scraping/AI training; nie wdrażać bez zgody.
+Fora Reddit r/algobetting zgłaszają blokady Cloudflare, zmiany HTML/XHR, regionalne różnice kursów i bookmakerów oraz utrzymaniowy koszt scraperów. Nie obchodzić blokad przez rotację proxy/VPN.
+Szczegóły, linki i tabela są w `docs/ODDS_PROVIDER_RESEARCH_2026-11-17.md`.
+**Kolejny krok:** test pilotażowy OddsPapi i StrikerAPI, ale tylko po zgodzie użytkownika na darmowy klucz API. Bez klucza nie ma obecnie potwierdzonego legalnego, stabilnego feedu sportsbook odds o szerokim europejskim pokryciu.
