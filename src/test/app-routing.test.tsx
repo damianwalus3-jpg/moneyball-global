@@ -14,4 +14,12 @@ describe("App routing", () => {
 
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
   });
+
+  it("registers the authenticated Tracker route", () => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+
+    const matches = router.matchRoutes("/tracker");
+
+    expect(matches.at(-1)?.routeId).toBe("/_authenticated/tracker");
+  });
 });
