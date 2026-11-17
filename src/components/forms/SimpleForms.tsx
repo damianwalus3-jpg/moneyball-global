@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/app/ui-bits";
 import { insertRow, updateRow, fetchAll } from "@/lib/db";
-import { canPromoteManualOdds, signedAmount, TX_LABELS } from "@/lib/domain";
+import { canPromoteManualOdds, isCouponCandidate, signedAmount, TX_LABELS } from "@/lib/domain";
 import { matchLabel, parseDecimal } from "@/lib/format";
 import { useAction } from "@/lib/queries";
 import { brusselsInputToISO, isoToBrusselsInput, nowBrusselsInput } from "@/lib/time";
@@ -156,9 +156,12 @@ export function OddsForm({
     } catch {
       sourceUrlValid = false;
     }
-    const canPromote = canPromoteManualOdds(prediction, matchById.get(prediction.match_id), nowMs)
+    const match = matchById.get(prediction.match_id);
+    const canPromote = canPromoteManualOdds(prediction, match, nowMs)
       && quoteFresh
       && sourceUrlValid;
+    const canUsePrice = quoteFresh && sourceUrlValid
+      && (canPromote || isCouponCandidate(prediction, match, nowMs));
     await updateRow("predictions", prediction.id, {
       odds: row.odds,
       data_source: row.bookmaker,
@@ -173,6 +176,7 @@ export function OddsForm({
         odds_source_url: row.source_url,
       },
       ...(canPromote ? { verdict: "WYBRANY", selection_status: "WYBRANY", rejection_reason: null } : {}),
+      ...(canUsePrice ? { stake: 4, potential_return: Math.round(4 * Number(row.odds) * 100) / 100 } : {}),
     });
   }, { success: "Zapisano kurs i przypisano go do wybranego typu", onDone: () => onOpenChange(false) });
   function submit() {
