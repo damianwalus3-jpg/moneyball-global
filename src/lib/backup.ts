@@ -102,6 +102,8 @@ export function validateBackup(data: unknown): { backup: Backup; counts: BackupP
       const changedBy = auditRow["changed_by"];
       const entityType = auditRow["entity_type"];
       const sourceClass = auditRow["new_source_class"];
+      const previousClass = auditRow["previous_source_class"];
+      const note = auditRow["note"];
       const changedAt = auditRow["changed_at"];
       const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       if (typeof id !== "string" || !uuidPattern.test(id) ||
@@ -109,6 +111,8 @@ export function validateBackup(data: unknown): { backup: Backup; counts: BackupP
           typeof changedBy !== "string" || !uuidPattern.test(changedBy) ||
           (entityType !== "prediction" && entityType !== "coupon") ||
           (sourceClass !== "USER" && sourceClass !== "MODEL" && sourceClass !== "PAPER") ||
+          (previousClass !== undefined && previousClass !== null && previousClass !== "USER" && previousClass !== "MODEL" && previousClass !== "PAPER") ||
+          (note !== undefined && note !== null && (typeof note !== "string" || note.length > 500)) ||
           typeof changedAt !== "string" || Number.isNaN(Date.parse(changedAt))) {
         throw new Error(`Nieprawidłowe pola wpisu audytu nr ${index + 1}.`);
       }
