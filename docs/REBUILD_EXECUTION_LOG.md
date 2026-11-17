@@ -189,3 +189,14 @@
 - CI run `44114289890`: SUCCESS — TypeScript, all tests and production build passed.
 - Cloudflare deploy run `44114289877`: SUCCESS — separate rebuild Worker deployment passed.
 - Stage 12 is COMPLETE/DEPLOYED. This makes provider coverage and feed failures visible; it does not prove the public providers contain every European competition.
+
+## 2026-11-17 — Stage 13: 15-minute fixture refresh
+- The app now performs a fixture scan on entry and refreshes every 15 minutes while the app remains open.
+- Browser fixture cache and OpenFootball cache were reduced to 15 minutes; the manual scan action bypasses browser cache.
+- Cloudflare Worker cache TTL is now 15 minutes for OpenLigaDB match feeds, while league catalogues and team-history feeds remain cached for 8 hours to reduce provider load.
+- The service worker remains network-first for same-origin GET requests and uses cached shell/API responses only when offline.
+- This is foreground refresh only; a static PWA does not execute a background scan when fully closed.
+- Final code commit: `dd63ec8f667581bf0e62e86931d437703b10a5d7` (`perf(rebuild): align OpenFootball cache with 15-minute fixture refresh`).
+- CI run `44114595319`: SUCCESS — TypeScript, all tests and production build passed.
+- Cloudflare deploy run `44114595317`: SUCCESS — separate rebuild Worker deployment passed.
+- Stage 13 is COMPLETE/DEPLOYED.
