@@ -833,3 +833,12 @@
 - Deployment queue safeguard: the prior REBUILD deploy workflow run 44199523416 remained stuck `in_progress` with no job steps and held the old concurrency group. Bumped the isolated REBUILD deploy concurrency group from v2 to v3 so the verified current build can deploy without touching MAIN.
 
 - Post-deploy smoke test: the new ESPN proxy route was reachable but the upstream returned HTTP 403 to the initial Worker-specific automation User-Agent. Updated the upstream request to use ordinary ESPN website browser headers (User-Agent, Referer, Origin, Accept-Language) and will re-test the live route before considering Stage 67 complete.
+
+
+## Stage 67 — live validation and separate Worker deployment
+- Final code revision 6ce822efae3b4700b17d6dd95a6dc0c134f32cc8 passed MONEYBALL rebuild CI run 44200136994 (typecheck, unit tests, production build), Rebuild Checks run 44200137044, and separate Cloudflare REBUILD deployment run 44200136932.
+- Live smoke test of https://moneyball-global-rebuild.damianwalus3.workers.dev/ succeeded. The new proxy endpoints `/api/espn/scoreboard/20261117` and `/api/espn/scoreboard/20261118` both returned HTTP-success JSON (65 and 28 raw events respectively).
+- Combined those live scoreboards and filtered by Europe/Brussels local date plus European venue country: 19 unique European fixtures for 2026-11-18 (Spain 10, England 7, Sweden 1, Italy 1). The six Copa del Rey fixtures also occur in open-matchday and are deduplicated by normalized date/home/away keys; the additional European women's competitions were absent from the previous source-only set.
+- The app now has four independent public fixture sources and explicitly reports source fixture counts/errors in the Matches tab. ESPN is supplementary, not a guarantee of complete all-European lower-tier coverage; source coverage must remain visible and no missing fixtures are fabricated.
+- ESPN's initial Worker request was blocked with HTTP 403 when using the custom MONEYBALL User-Agent. Switching to ordinary browser User-Agent, Referer, Origin and Accept-Language headers fixed the live Worker request. The previous stale deployment concurrency lock was bypassed by moving the isolated REBUILD deploy group to v3; MAIN remains untouched.
+- Existing Tracker records, coupon history, settlement history and bankroll were not modified.
