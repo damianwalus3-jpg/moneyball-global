@@ -33,7 +33,7 @@ self.addEventListener("fetch", event => {
 
   if (request.mode === "navigate") {
     event.respondWith(fetch(request).catch(async () => {
-      const cached = await caches.match("/");
+      const cached = await caches.match("/", { cacheName: CACHE_NAME });
       return cached || Response.error();
     }));
     return;
