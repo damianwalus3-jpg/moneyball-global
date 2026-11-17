@@ -179,3 +179,13 @@
 - CI run `44114031886`: SUCCESS — TypeScript, all tests and production build passed.
 - Cloudflare deployment run `44114031588`: deploy step SUCCESS — separate rebuild Worker deployment passed.
 - Stage 11 is COMPLETE/DEPLOYED. Real-time completeness audit across every federation and every amateur/youth/women's division remains impossible with public feeds alone; provider gaps are reported in the UI.
+
+## 2026-11-17 — Stage 12: provider coverage diagnostics
+- Fixture scan now returns separate provider coverage summaries: catalogues/competitions/feeds checked, raw fixtures found and source errors for open-matchday, OpenLigaDB and OpenFootball.
+- The Mecze screen displays these provider-level counts; duplicate matches may appear in more than one provider count but are merged into one fixture row.
+- Empty scan results are explicitly described as no matches found in downloaded feeds, not as proof that Europe has no fixtures.
+- Bumped the local fixture cache key to v5 so older cached payloads without the coverage object cannot break the new UI.
+- Final code commit: `465c096f1bb0ca796d44ddb11f30126243bceb05` (`ui(rebuild): show per-provider catalog, fixture and error counts`).
+- CI run `44114289890`: SUCCESS — TypeScript, all tests and production build passed.
+- Cloudflare deploy run `44114289877`: SUCCESS — separate rebuild Worker deployment passed.
+- Stage 12 is COMPLETE/DEPLOYED. This makes provider coverage and feed failures visible; it does not prove the public providers contain every European competition.
