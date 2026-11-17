@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const S="https://gzgeklcukrclgwbsmbsp.supabase.co",K=Deno.env.get("SUPABASE_ANON_KEY")||"",SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"",V="MONEYBALL GLOBAL 3.8";
-let CRON_FALLBACK_TOKEN="",CRON_JWT_TOKEN="";
+let CRON_FALLBACK_TOKEN="";
 const C={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-requested-with, prefer, cache-control, pragma","Access-Control-Allow-Methods":"POST, GET, OPTIONS","Access-Control-Max-Age":"86400","Vary":"Origin"};
 const out=(x:any,n=200)=>new Response(JSON.stringify(x),{status:n,headers:{...C,"Content-Type":"application/json"}});
 
@@ -264,11 +264,11 @@ function formFromPublic(f:any){
  return {w,d,l,matches:games.length,goals_for:gf,goals_against:ga,source,last10:games,avg_shots_for:f?.avg_shots_for==null?null:Number(f.avg_shots_for),avg_shots_on_target_for:f?.avg_shots_on_target_for==null?null:Number(f.avg_shots_on_target_for),avg_corners_for:f?.avg_corners_for==null?null:Number(f.avg_corners_for),avg_possession_pct:f?.avg_possession_pct==null?null:Number(f.avg_possession_pct),avg_yellow_cards:f?.avg_yellow_cards==null?null:Number(f.avg_yellow_cards),avg_red_cards:f?.avg_red_cards==null?null:Number(f.avg_red_cards),avg_fouls:f?.avg_fouls==null?null:Number(f.avg_fouls),home_matches:f?.home_matches==null?null:Number(f.home_matches),away_matches:f?.away_matches==null?null:Number(f.away_matches),neutral_matches:f?.neutral_matches==null?null:Number(f.neutral_matches),xg_last10:Array.isArray(f?.xg_last10)?f.xg_last10:[],elo:f?.elo==null?null:Number(f.elo),rd:f?.rd==null?null:Number(f.rd),hfa:f?.hfa==null?null:Number(f.hfa),elo_as_of:f?.elo_as_of||null};
 }
 let publicSourceFormsCache:{date:string,at:number,value:any}|null=null;
-async function readPublicSourceForms(date:string,token:string){
+async function readPublicSourceForms(date:string){
  if(publicSourceFormsCache&&publicSourceFormsCache.date===date&&Date.now()-publicSourceFormsCache.at<10*60*1000)return publicSourceFormsCache.value;
  const byPair=new Map<string,any>(),byTeam=new Map<string,any[]>(),eloByTeam=new Map<string,any>();
  try{
-  const r=await fetch(S+"/functions/v1/moneyball-public-sources?date="+encodeURIComponent(date),{headers:{apikey:K,Authorization:"Bearer "+token,Accept:"application/json"},signal:AbortSignal.timeout(25000)});
+  const r=await fetch(S+"/functions/v1/moneyball-public-sources?date="+encodeURIComponent(date),{headers:{apikey:K,Accept:"application/json"},signal:AbortSignal.timeout(25000)});
   if(!r.ok)throw new Error("Public sources HTTP "+r.status);
   const j=await r.json();
    const eloMeta={as_of:j?.elo_ratings?.as_of||null,ratings_count:Number(j?.elo_ratings?.ratings_count||0)};
@@ -551,11 +551,9 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  if(req.method!=="POST")return out({error:"POST required"},405);
  const body=await req.json().catch(()=>({}));
  let token=req.headers.get("Authorization")?.replace("Bearer ","")||"";
- const requestToken=token;
  let ownerId="";
  const cronToken=req.headers.get("x-cron-token")||"";
  CRON_FALLBACK_TOKEN=cronToken;
- CRON_JWT_TOKEN=requestToken;
  if(cronToken){
   if(!SERVICE_KEY)throw Error("Brak konfiguracji bezpiecznego klucza serwisowego.");
   const check=await fetch(S+"/rest/v1/rpc/moneyball_cron_token_valid",{method:"POST",headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+SERVICE_KEY,"Content-Type":"application/json"},body:JSON.stringify({p_token:cronToken})});
@@ -610,7 +608,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    try{
     feedRows=await db("moneyball_global_fixture_feed?select=scan_date,external_id,source,competition,country,gender,home_team,away_team,kickoff_at,status&scan_date=eq."+encodeURIComponent(date)+"&order=kickoff_at.asc",token);
    }catch(e){feedError=String(e);}
-   const publicForImport=await readPublicSourceForms(date,token);
+   const publicForImport=await readPublicSourceForms(date);
    const publicRows=Array.isArray(publicForImport.fixtureRows)?publicForImport.fixtureRows:[];
    const candidates=[...feedRows,...publicRows];
    const fixtureDay=(f:any)=>brusselsFixtureDay(f.kickoff_at)||String(f.scan_date||f.date||f.kickoff_date||"").slice(0,10);
@@ -673,7 +671,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FootyNomad"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FotbalInfo"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.XGoalsPro"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
-  readPublicSourceForms(date,token),
+  readPublicSourceForms(date),
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI"+pageMatchFilter,token):Promise.resolve([]),
   providerOddsQuery,
   readTipsAuditFairMarket(date,matches),
