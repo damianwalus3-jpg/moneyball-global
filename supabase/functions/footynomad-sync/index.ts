@@ -6,6 +6,8 @@ function isExcludedSeniorTeam(value: unknown): boolean {
 function isTopTwoTierLeague(competition: unknown, country?: unknown): boolean {
   const scopeCountry = String(country ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
   const scopeLabel = String(competition ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  // OpenMatchday competition slugs encode English tiers as ENG_1..ENG_n; only ENG_1 and ENG_2 are in scope.
+  if ((["england", "eng"].includes(scopeCountry) && /^eng (?:[3-9]|[1-9][0-9]+)\b/.test(scopeLabel))) return false;
   if ((["croatia", "cro"].includes(scopeCountry) && scopeLabel === "hnl") || (["san marino", "smr"].includes(scopeCountry) && scopeLabel === "campionato")) return true;
   if ((["scotland", "sco"].includes(scopeCountry) && /\b(lowland league|highland league)\b/.test(scopeLabel))
     || (["turkey", "turkiye", "tur"].includes(scopeCountry) && /\b2 lig\b/.test(scopeLabel))
