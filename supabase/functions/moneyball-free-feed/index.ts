@@ -237,12 +237,12 @@ Deno.serve(async (request) => {
         fixtures_count: result.fixtures.length,
         duplicates_removed: 0,
         fetched_at: new Date().toISOString(),
-        notes: "Pobrano " + result.fixtures.length + " meczów europejskich lig krajowych I/II; nowe: " + inserted + "; aktualizacje: " + updated + "; usunięto stare/niepasujące rekordy cache: " + staleRows.length + ".",
+        notes: "Pobrano " + result.fixtures.length + " meczów ze wszystkich szczebli europejskich lig krajowych seniorów; nowe: " + inserted + "; aktualizacje: " + updated + "; usunięto stare/niepasujące rekordy cache: " + staleRows.length + ".",
       });
       return json({
         ok: true, date, source: "FootyNomad", reported_total: result.reportedTotal,
         fixtures_count: result.fixtures.length, inserted, updated, scan_run_id: runId,
-        schedule: "08:00 i 15:00 Europe/Brussels",
+        schedule: "odświeżanie co 15 minut; skan predykcji co minutę",
       });
     } catch (error) {
       await db("moneyball_global_scan_runs?id=eq." + runId, "PATCH", {
