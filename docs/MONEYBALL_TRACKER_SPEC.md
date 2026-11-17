@@ -165,7 +165,7 @@ All seven are additive. They do not rewrite historical matches, predictions, cou
 ### Remaining work
 
 - Validate the rendered page and create the first real Jackpot entry through an authenticated user session.
-- Add category edit/archive controls and explicit legacy source classification.
+- Add category rename/description controls and explicit legacy source classification.
 - Add separate PAPER reporting and verify finance/settlement behavior with controlled non-production fixtures; do not fabricate production rows.
 - Continue full authenticated UI, backup/restore and settlement regression testing before declaring the whole Tracker complete.
 
