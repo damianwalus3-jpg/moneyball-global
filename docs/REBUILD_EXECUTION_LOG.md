@@ -200,3 +200,15 @@
 - CI run `44114595319`: SUCCESS — TypeScript, all tests and production build passed.
 - Cloudflare deploy run `44114595317`: SUCCESS — separate rebuild Worker deployment passed.
 - Stage 13 is COMPLETE/DEPLOYED.
+
+## 2026-11-17 — Stage 14: OpenFootball form and result support
+- OpenFootball fixtures now retain feed identity and final scores parsed from both Football.TXT match layouts.
+- OpenFootball-only fixtures now expose “Forma 5 + typ”; the form adapter uses finished current-season matches, filters by Brussels date and calculates home/away results and points.
+- Form retrieval falls back across open-matchday, OpenLigaDB and OpenFootball sources when an earlier provider does not have usable history.
+- Result settlement also falls back to OpenFootball and records only matches with a published final score; unscored fixtures remain pending.
+- Added tests for both source score formats, recent form, result settlement and yearless historical date headings.
+- Fixed a missing App import found by CI before release; latest CI passed.
+- Final code commit: `18abdf52087d729882424c67267080f80d96f172` (`test(rebuild): cover historical season inference for OpenFootball form`).
+- CI run `44115497308`: SUCCESS — TypeScript, all tests and production build passed.
+- Cloudflare deployment run `44115497817`: SUCCESS — separate rebuild Worker deployment passed.
+- Stage 14 is COMPLETE/DEPLOYED. Predictions can now use the third source where no matching open-matchday/OpenLigaDB history exists.
