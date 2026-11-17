@@ -891,3 +891,13 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Ponowne advisors po migracji: Health bez lints; security warnings bez zmian; 24 unused indexes INFO. Nie dodano publicznych RLS policies i nie usuwano indeksów.
 - Zaktualizowano prompt codziennego audytu `6afbeb034e4c81919dd6ad7d554497e0`: przed pracą ma czytać PROJECT_CONTEXT_INDEX, PROJECT_STATE, PROJECT_MEMORY_AND_REGRESSION_LOG i README, odzyskiwać poprzednie decyzje projektu, sprawdzać latest main/deploy i nie powtarzać potwierdzonych napraw. Harmonogram bez zmian: codziennie 08:15 Europe/Brussels, następny run 18.11.
 - Projekt nadal IN PROGRESS. Brak zalogowanego E2E, nie tworzono fikcyjnych produkcyjnych meczów, typów ani kuponów.
+
+
+## 17.11.2026 08:20 Brussels — weryfikacja dodatkowych darmowych źródeł terminarza
+- Sprawdzono dodatkowe źródła zanim uznano 2 mecze FootyNomad za błąd importu:
+  - OpenFootball football.json 2026/27 ma tylko 8 plików ligowych: Anglia poziom 1 i 2, Niemcy poziom 1, Hiszpania poziom 1, Francja poziom 1, Włochy poziom 1, Holandia poziom 1, Portugalia poziom 1. Nie daje szerokiego pokrycia europejskich poziomów 2. Sprawdzone pliki nie zawierały spotkań 17.11. README projektu ostrzega, że upstream Football.TXT nie jest automatycznie aktualizowany codziennie; codzienny refresh mirror nie gwarantuje świeżości upstream. Nadaje się tylko jako niskopriorytetowy fallback terminarza z kontrolą świeżości, nie live/status/xG/odds.
+  - Oficjalna dokumentacja TheSportsDB: darmowy klucz 123, 30 req/min i limit 3 zdarzeń dla eventsday. Test 17.11 zwrócił dokładnie 3 mecze UEFA Nations League (Walia–Portugalia, Dania–Norwegia, Ukraina–Gruzja), bez krajowych lig. Nie nadaje się jako pełne źródło fixture przy darmowych limitach; może pozostać źródłem uzupełniającym wyniki.
+  - OpenMatchday ma 75 folderów i codzienne CSV, ale parser sprawdził 38 kwalifikujących się folderów EU tier1/2 i nie znalazł meczu 17.11.
+  - FootyNomad ma 2 kwalifikujące się mecze krajowe. Data wypada w oknie reprezentacyjnym; niezależne źródła również nie pokazują meczów głównych lig w tym dniu. Dwa mecze mogą być realnie rzadkim dniem, nie dowodem błędu importu. Nie dopisywać UEFA/reprezentacji/pucharów/out-of-scope dla sztucznego zwiększenia liczby.
+- Źródła: openfootball/europe, openfootball/football.json, oladeeayo/open-matchday, oficjalne TheSportsDB API docs. Linki zapisane w PROJECT_STATE.
+- Nie dodano nowego adaptera: obecne dowody nie uzasadniają niezweryfikowanego feedu.

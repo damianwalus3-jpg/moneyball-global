@@ -86,3 +86,7 @@ Użytkownik wielokrotnie i jednoznacznie wymagał, aby MONEYBALL GLOBAL:
 
 ## Continuity automation — 2026-11-17
 The existing daily 08:15 Brussels audit automation (`6afbeb034e4c81919dd6ad7d554497e0`) now explicitly reads this index, PROJECT_STATE, PROJECT_MEMORY_AND_REGRESSION_LOG and README before work, checks prior project conversations when available, and avoids repeating verified work. Keep its schedule unchanged.
+
+
+## Free fixture-source research — 2026-11-17
+OpenFootball's current 2026/27 mirror has limited league coverage and no 17 Nov fixtures in the checked files; TheSportsDB free day endpoint caps at 3 and returned only UEFA Nations League; OpenMatchday checked eligible folders returned no domestic fixture for that date. FootyNomad's two domestic fixtures may therefore be a genuinely sparse international-window day, not a proven import failure. Do not force extra out-of-scope matches into the app. Full source notes and URLs are in PROJECT_STATE.

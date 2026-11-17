@@ -879,3 +879,18 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Supabase advisors were rerun after the migration. Health: no lints. Security warnings unchanged (five service-only RLS tables with no policies, pg_net in public, leaked-password protection disabled). Performance: 24 unused-index INFO findings. No unsafe policy or index changes were made.
 - Continuity: existing daily audit automation `6afbeb034e4c81919dd6ad7d554497e0` was updated to read `PROJECT_CONTEXT_INDEX.md`, `PROJECT_STATE.md`, `PROJECT_MEMORY_AND_REGRESSION_LOG.md`, README and recent MAIN state before every run, recover prior project decisions when available, and avoid repeating completed work. It remains daily 08:15 Europe/Brussels, next run 18 Nov 2026.
 - Project remains IN PROGRESS until the authenticated user workflows and next scheduled import are verified. No production fixture/pick/coupon was fabricated to test finance.
+
+
+## Free-source coverage verification — 2026-11-17 08:20 Brussels
+
+- Cross-checked the low 17 Nov domestic fixture count against additional public sources before treating it as an import defect:
+  - OpenFootball football.json current 2026/27 directory exposes only eight league files: England tiers 1 and 2, Germany tier 1, Spain tier 1, France tier 1, Italy tier 1, Netherlands tier 1, Portugal tier 1. It does not provide broad Europe-wide second-tier coverage. The checked 2026/27 files had no fixtures dated 2026-11-17. The project FAQ explicitly warns upstream Football.TXT is not automatically updated daily; football.json refreshes its mirror daily but cannot guarantee fresh upstream content. Use only as a low-priority schedule fallback with source freshness metadata, never as a live status/odds/xG source.
+  - TheSportsDB free v1 documentation states shared public key 123, 30 requests/minute and endpoint-specific caps; `eventsday` has a free limit of 3. A direct 2026-11-17 soccer day request returned exactly 3 UEFA Nations League events (Wales–Portugal, Denmark–Norway, Ukraine–Georgia), not domestic league fixtures. It is unsuitable as a full global fixture source under free limits. It remains useful for selected result enrichment only.
+  - OpenMatchday's 75 competitions / daily CSV data is free for non-commercial use; current project parser checked 38 eligible EU tier-1/2 folders and returned no fixture for 17 Nov.
+  - FootyNomad returned two eligible domestic fixtures for 17 Nov. Because this date is within a national-team window and independent sources checked also show no major top-tier fixtures, the two domestic matches may be a legitimate sparse day. Do not inflate counts with UEFA/national-team/cup/out-of-scope fixtures. Keep a coverage warning and continue scheduled audits for missed domestic leagues.
+- Source references:
+  - OpenFootball Europe datasets: https://github.com/openfootball/europe
+  - OpenFootball football.json and update caveat: https://github.com/openfootball/football.json
+  - OpenMatchday coverage and license: https://github.com/oladeeayo/open-matchday
+  - TheSportsDB official free API limits and schedule docs: https://www.thesportsdb.com/API.php and https://www.thesportsdb.com/docs/api
+- No new fixture adapter was added: current source checks do not justify an unverified feed integration.
