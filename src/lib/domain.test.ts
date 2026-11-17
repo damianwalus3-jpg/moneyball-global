@@ -5,6 +5,8 @@ import {
   buildSingleCouponBatch,
   couponPayout,
   couponStatus,
+  effectiveOdds,
+  totalOdds,
   hitRate,
   isValidPick,
   groupHitRates,
@@ -581,6 +583,16 @@ describe("settlement", () => {
       { odds: 3, status: "void" },
       { odds: 1.5, status: "won" },
     ])).toBe(30);
+  });
+  it("calculates payout from exact leg odds and rounds only the cash return", () => {
+    const legs = [
+      { odds: 1.1, status: "won" as const },
+      { odds: 1.182, status: "won" as const },
+      { odds: 1.167, status: "won" as const },
+    ];
+    expect(totalOdds(legs.map((leg) => leg.odds))).toBe(1.517);
+    expect(effectiveOdds(legs)).toBe(1.517);
+    expect(couponPayout(4, legs)).toBe(6.07);
   });
 });
 

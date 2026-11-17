@@ -123,7 +123,7 @@ export function totalOdds(odds: (number | null | undefined)[]): number | null {
   if ((odds.length !== 1 && odds.length !== COUPON_SIZE) || odds.some((odd) => odd == null || !Number.isFinite(Number(odd)) || Number(odd) <= 1))
     return null;
   const total = odds.reduce<number>((acc, odd) => acc * Number(odd), 1);
-  return Math.round(total * 100) / 100;
+  return Math.round(total * 1000) / 1000;
 }
 
 /** Void legs are treated as 1.00 when calculating the final coupon price. */
@@ -132,7 +132,7 @@ export function effectiveOdds(legs: Pick<CouponLeg, "odds" | "status">[]): numbe
   const activeOdds = legs.filter((leg) => leg.status !== "void").map((leg) => leg.odds);
   if (activeOdds.length === 0) return 1;
   if (activeOdds.some((odd) => odd == null || Number(odd) <= 1)) return null;
-  return Math.round(activeOdds.reduce<number>((acc, odd) => acc * Number(odd), 1) * 100) / 100;
+  return Math.round(activeOdds.reduce<number>((acc, odd) => acc * Number(odd), 1) * 1000) / 1000;
 }
 
 export function combinedProbability(probabilities: (number | null | undefined)[]): number | null {
@@ -617,6 +617,9 @@ export function couponPayout(
   if (status === "lost") return 0;
   if (status === "void") return Number(stake);
   if (status !== "won") return null;
-  const odds = effectiveOdds(legs);
-  return odds == null ? null : Math.round(Number(stake) * odds * 100) / 100;
+  const activeOdds = legs.filter((leg) => leg.status !== "void").map((leg) => leg.odds);
+  if (activeOdds.length === 0) return Number(stake);
+  if (activeOdds.some((odd) => odd == null || !Number.isFinite(Number(odd)) || Number(odd) <= 1)) return null;
+  const exactCombinedOdds = activeOdds.reduce<number>((acc, odd) => acc * Number(odd), 1);
+  return Math.round(Number(stake) * exactCombinedOdds * 100) / 100;
 }
