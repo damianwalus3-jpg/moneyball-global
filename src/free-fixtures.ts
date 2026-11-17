@@ -1,3 +1,4 @@
+import { seasonCode } from "./season";
 export interface FreeFixture {
   id: string;
   competition: string;
@@ -34,7 +35,7 @@ const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const OPENLIGA = "/api/openligadb";
 const SOURCE = "open-matchday + OpenLigaDB (darmowe źródła publiczne)";
 const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","ISR","KOS","UEFA"]);
-const CACHE_KEY = "moneyball.free-fixtures.v3";
+const CACHE_KEY = "moneyball.free-fixtures.v4";
 const CACHE_MS = 30 * 60 * 1000;
 const COUNTRY_NAMES = [
   "england","scotland","wales","northern ireland","ireland","france","germany","italy","spain","portugal","netherlands","belgium","austria","switzerland","turkey","greece","denmark","sweden","norway","romania","poland","croatia","czech","ukraine","cyprus","slovakia","slovenia","finland","kazakhstan","albania","serbia","bosnia","bulgaria","hungary","iceland","luxembourg","malta","estonia","latvia","lithuania","moldova","georgia","armenia","azerbaijan","macedonia","montenegro","andorra","faroe","gibraltar","israel","kosovo","uefa"
@@ -144,7 +145,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     const responses = await pooled(leagues, 8, async league => {
       const folder = league.folder.replace(/^data\//, "");
       try {
-        const csv = await fetchText(`${ROOT}/${league.folder}/fixtures_2627.csv`);
+        const csv = await fetchText(`${ROOT}/${league.folder}/fixtures_${seasonCode(date)}.csv`);
         const fixtures = parseCsv(csv).filter(row => row.date === date && row.home && row.away).map(row => ({
           id: `open-matchday|${folder}|${row.gw}|${row.date}|${row.time}|${row.home}|${row.away}`,
           competition: league.league,
