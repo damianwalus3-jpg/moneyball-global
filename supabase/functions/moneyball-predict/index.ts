@@ -641,6 +641,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    scheduledImport={ok:!feedError||!publicForImport.error,attempted:true,feed_rows:feedRows.length,public_rows:publicRows.length,eligible_rows:eligible.length,inserted:Array.isArray(saved)?saved.length:0,skipped_existing:skippedExisting,deduplicated_candidates:deduplicatedCandidates,source_counts:sourceCounts,feed_error:feedError,public_source_error:publicForImport.error||null};
   }catch(e){scheduledImport={ok:false,attempted:true,error:String(e)};}
  }
+ if(scheduledImport.attempted)console.log("scheduled_import",JSON.stringify(scheduledImport));
  let scheduledPage:any=null;
  const all=scheduledMode
   ?(scheduledPage=await db("rpc/moneyball_prediction_scan_page",token,"POST",{p_owner_id:ownerId,p_date:date,p_cursor_kickoff_at:scanCursorKickoff,p_cursor_match_id:scanCursorId,p_limit:batchSize,p_token:cronToken})).rows||[]
