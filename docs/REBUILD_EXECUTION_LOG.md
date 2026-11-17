@@ -755,3 +755,5 @@
 - Commits: coupon fixture 0900bb1984419db202b9c3b15196b27f610f0a39d; Worker auth fixtures 09f03e3bc7d7816c41d078bf72ac17c013f49ec5.
 - Earlier CI run reported 109 passing / 3 failing tests (112 total); these were test-data issues, not reasons to weaken the fail-closed security or prediction validation.
 - New CI and Cloudflare deployment checks on the latest branch HEAD are pending. No external odds API was called and no Tracker or bankroll data was modified.
+
+- Follow-up CI exposed one remaining regression-test ordering mistake: the simulated newer rejected prediction had the same createdAt as the existing KANDYDAT row, so stable sorting correctly retained the original first row. Updated the test to use a strictly later timestamp in commit b38fd98821ead5bd276bf9b37836ad6f62fe4553. The production newest-prediction ordering was not weakened.
