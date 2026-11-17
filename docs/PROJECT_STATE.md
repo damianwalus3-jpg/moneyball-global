@@ -1351,3 +1351,13 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - Preserve all prediction/coupon/history/settlement/bankroll records. This change only narrows reads and invalidates cached references.
 
 - Dodatkowa osłona UX w commicie `bfaf7750e90abec465e774fe26f5a7332ff63267`: gdy pobranie powiązań kuponowych zakończy się błędem, ekran Prognozy pokazuje wyraźny komunikat i przycisk ponowienia; edycja/usuwanie nadal pozostają zablokowane do czasu potwierdzenia braku/presencji powiązania. To zapobiega cichej blokadzie i nie osłabia ochrony historii.
+
+
+## Deployment ledger — 2026-11-17 14:15 UTC
+- Production source: `main` HEAD `7a461971b32d5fe2623707904f39c9455031352b` — `fix: update production league scope fingerprint`.
+- GitHub Actions Moneyball CI run `44100626166`: SUCCESS.
+- Cloudflare Workers production deployment run `44100625996`: SUCCESS.
+- Live public Worker smoke check: HTTP page content fetched successfully; title `MONEYBALL GLOBAL 2.0`; meta `league-scope-version=europe-all-senior-domestic-tiers-2026-11-17`; measured fetch latency about 388 ms.
+- This confirms the frontend fingerprint is live on the production Worker. It does NOT independently prove that an authenticated scan has ingested all eligible fixtures or that the user-authenticated Tracker UI/backup round-trip has passed.
+- Previous docs-only commit `c3922e0a9000a513d590ec6f3e984e93c0c6825f`: CI run `44098323507` SUCCESS; Cloudflare run `44098323620` SUCCESS.
+- Continue from this exact HEAD and these verified results. Do not rerun completed deployment checks unless a new commit, regression, or production discrepancy requires it.
