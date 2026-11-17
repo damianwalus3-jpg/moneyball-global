@@ -17,7 +17,7 @@ export interface SaveBatchOptions {
 export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatchOptions) {
   if (!coupons.length) throw new Error("Brak kuponów do zapisania.");
   const targetLegs = options.targetLegs ?? 3;
-  if (targetLegs !== 3) throw new Error("MONEYBALL zapisuje wyłącznie kupony 3-zdarzeniowe.");
+  if (targetLegs !== 1 && targetLegs !== 3) throw new Error("MONEYBALL zapisuje wyłącznie single albo kupony 3-zdarzeniowe.");
   const requireOdds = options.couponType != null && options.couponType !== "TEST";
   // Enforce selection rules again at the persistence boundary. UI filtering is not a data-integrity boundary.
   if (coupons.some((coupon) => coupon.some((prediction) => !isEligibleCouponPrediction(prediction)))) {
