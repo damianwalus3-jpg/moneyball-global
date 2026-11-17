@@ -56,3 +56,28 @@ The initial audit incorrectly left Belarus as the remaining country without a ve
 The same live GET for 2026-11-21 returned 301 fixtures across 43 countries; SQL validation found 301 eligible and 0 rejected. This confirms the parser and canonical scope for that dated source response, but does not prove authenticated insertion into the owner's `matches` table.
 
 Updated source discovery evidence: 54/55 UEFA associations. Liechtenstein is the sole association without a domestic national league; its clubs compete in Switzerland and its national cup is excluded. There is no remaining UEFA domestic-league association without at least one verified source in this audit. Automated import coverage remains narrower than source-discovery coverage.
+
+
+## Additional tracker evaluation — 2026-11-17 17:10 Europe/Brussels
+
+The following candidates were checked against the existing no-API-key / no-paid-provider project constraint:
+
+| Candidate | Current public facts | Decision for MAIN |
+|---|---|---|
+| PitchAPI | Official site states 77 leagues, free/no paid tier and unlimited requests, but every call requires an API key. | Best future candidate for xG, shots, lineups and stats if the user explicitly permits a free API key. Not enabled under the current no-key constraint. |
+| StrikerAPI | Official docs state 500 free credits/month, every request requires an API key; paid tiers start at $19/month. | Not suitable for full Europe-wide polling; keep disabled and do not consume credits. |
+| API-Football | Official coverage lists 1,251 competitions, but the free plan is limited to 100 requests/day and requires an API key. | Catalogue is broad, quota is too small for a frequent all-Europe scan; do not enable under current no-key constraint. |
+| Football Charts | No-key tier is limited to 25 requests/day and private/personal use; 8 allowlisted competitions are currently integrated. The 17 Nov scan returned 429 for 4 of 8 leagues. | Keep optional and owner-only only after durable caching and controlled request cadence; never let it block FootyNomad. |
+| Flashscore third-party scraper | An unofficial scraper claims broad Flashscore competition coverage and no account/API key. | Do not add as a production dependency until the scraper's terms, source access, uptime, rate limits and redistribution rights are independently cleared. Use Flashscore as a manual verification source only. |
+| FotMob / SofaScore | Existing project checks found unstable/restricted automated access; current research does not justify bypassing their controls. | Do not scrape or bypass blocks. |
+| Fotbalinfo + Jina Reader | Current test function fetches one hard-coded Slovenian 2. SNL match page through a text proxy. | A one-match parser experiment, not a general European fixture tracker; do not enable for production ingestion. |
+| OpenMatchday | Free/no-key daily CSV source with a fixed published competition index; useful for results/history and some fixtures, but not every European league. | Keep as an independent supplemental feed, with date, status and eligibility reconciliation. |
+
+Official provider references checked:
+- PitchAPI: https://pitchapi.dev/
+- StrikerAPI docs/pricing: https://strikerapi.com/docs and https://strikerapi.com/
+- API-Football coverage/pricing: https://www.api-football.com/coverage and https://www.api-football.com/pricing
+- Flashscore scraper candidate: https://github.com/clearfetch/flashscore-football-scraper
+- OpenMatchday: https://github.com/oladeeayo/open-matchday
+
+No new provider was enabled, no API key was added, and no provider credits were consumed. The current best no-key primary fixture source remains FootyNomad, with OpenMatchday and carefully limited Football Charts as supplemental sources. The 54/55 official source-discovery audit remains distinct from automated importer coverage.
