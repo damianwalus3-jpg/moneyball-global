@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ConfirmDelete, EmptyState, PageHeader, SelectionBadge, SettlementBadge, StatCard } from "@/components/app/ui-bits";
 import { PredictionForm } from "@/components/forms/PredictionForm";
 import { deleteRow, fetchPredictionsPage, updateRow, type PredictionPageCursor } from "@/lib/db";
-import { impliedProbability, MARKET_LABELS, PICK_LABELS } from "@/lib/domain";
+import { impliedProbability, isEligibleEuropeanMatch, MARKET_LABELS, PICK_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { predictionMatchesQuery, tableQuery, useAction } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
@@ -91,15 +91,24 @@ export function PredictionsView({ market }: { market: Market }) {
     gcTime: 600_000,
     refetchOnWindowFocus: true,
   });
-  const list = useMemo(
+  const rawList = useMemo(
     () => pageQuery.data?.pages.flatMap((page) => page.rows) ?? [],
     [pageQuery.data],
   );
-  const visibleMatchIds = useMemo(() => [...new Set(list.map((prediction) => prediction.match_id))], [list]);
+  const visibleMatchIds = useMemo(() => [...new Set(rawList.map((prediction) => prediction.match_id))], [rawList]);
   const pageMatchesQuery = useQuery(predictionMatchesQuery(visibleMatchIds));
   const byId = useMemo(() => new Map((pageMatchesQuery.data ?? []).map((match) => [match.id, match])), [pageMatchesQuery.data]);
+  const list = useMemo(
+    () => rawList.filter((prediction) => {
+      const match = byId.get(prediction.match_id);
+      return !!match && isEligibleEuropeanMatch(match);
+    }),
+    [rawList, byId],
+  );
   const formMatchesQuery = useQuery({ ...tableQuery("matches"), enabled: open });
-  const formMatches = formMatchesQuery.data ?? [];
+  const formMatches = (formMatchesQuery.data ?? []).filter(isEligibleEuropeanMatch);
+  const matchRowsPending = visibleMatchIds.length > 0 && pageMatchesQuery.isPending;
+  const matchRowsError = visibleMatchIds.length > 0 && pageMatchesQuery.isError;
   const stats = pageQuery.data?.pages[0];
   const rate = stats && stats.settled > 0
     ? { rate: (stats.won / stats.settled) * 100, won: stats.won, settled: stats.settled }
@@ -150,12 +159,17 @@ export function PredictionsView({ market }: { market: Market }) {
         ))}
         <Input placeholder="Szukaj…" value={query} onChange={(event) => setQuery(event.target.value)} className="h-8 max-w-xs" />
       </div>
-      {pageQuery.isPending ? (
+      {pageQuery.isPending || matchRowsPending ? (
         <div className="surface-card p-6 text-center text-sm text-muted-foreground">Ładowanie prognoz…</div>
       ) : pageQuery.isError ? (
         <div className="surface-card flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
           <span className="text-destructive">Nie udało się pobrać prognoz: {pageQuery.error.message}</span>
           <Button size="sm" variant="outline" onClick={() => pageQuery.refetch()}>Spróbuj ponownie</Button>
+        </div>
+      ) : matchRowsError ? (
+        <div className="surface-card flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+          <span className="text-destructive">Nie udało się sprawdzić krajów meczów. Odśwież stronę.</span>
+          <Button size="sm" variant="outline" onClick={() => pageMatchesQuery.refetch()}>Spróbuj ponownie</Button>
         </div>
       ) : list.length === 0 ? (
         <EmptyState icon={Target} title="Brak prognoz" description="Dodaj prognozę lub zmień filtry." />

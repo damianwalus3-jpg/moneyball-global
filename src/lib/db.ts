@@ -159,7 +159,8 @@ export async function fetchCouponPageData(): Promise<CouponPageData> {
   for (const [result, table] of [[todayTimed,"matches"],[todayUndated,"matches"],[couponsResult,"coupons"],[legsResult,"coupon_legs"]] as const) {
     if (result.error) throw new Error(humanizeError(result.error, table));
   }
-  const todayMatches = [...(todayTimed.data ?? []), ...(todayUndated.data ?? [])] as unknown as TableRows["matches"][];
+  const todayMatches = ([...(todayTimed.data ?? []), ...(todayUndated.data ?? [])] as unknown as TableRows["matches"][])
+    .filter(isEligibleEuropeanMatch);
   const coupons = (couponsResult.data ?? []) as unknown as TableRows["coupons"][];
   const legs = (legsResult.data ?? []) as unknown as TableRows["coupon_legs"][];
   const predictions = await fetchPredictionsByIds([
@@ -197,12 +198,28 @@ export async function fetchCouponPageData(): Promise<CouponPageData> {
     if (error) throw new Error(humanizeError(error, "match_results"));
     return (data ?? []) as unknown as TableRows["match_results"][];
   });
+  const eligibleMatches = historicalMatches.filter(isEligibleEuropeanMatch);
+  const eligibleMatchIds = new Set(eligibleMatches.map((match) => match.id));
+  const eligiblePredictions = allPredictions.filter((prediction) => eligibleMatchIds.has(prediction.match_id));
+  const eligiblePredictionIds = new Set(eligiblePredictions.map((prediction) => prediction.id));
+  const couponLegsByCoupon = new Map<string, TableRows["coupon_legs"][]>();
+  for (const leg of legs) {
+    const current = couponLegsByCoupon.get(leg.coupon_id) ?? [];
+    current.push(leg);
+    couponLegsByCoupon.set(leg.coupon_id, current);
+  }
+  const eligibleCouponIds = new Set(coupons
+    .filter((coupon) => {
+      const couponLegs = couponLegsByCoupon.get(coupon.id) ?? [];
+      return couponLegs.length > 0 && couponLegs.every((leg) => eligiblePredictionIds.has(leg.prediction_id));
+    })
+    .map((coupon) => coupon.id));
   return {
-    matches: historicalMatches,
-    predictions: allPredictions,
-    coupons,
-    legs,
-    results,
+    matches: eligibleMatches,
+    predictions: eligiblePredictions,
+    coupons: coupons.filter((coupon) => eligibleCouponIds.has(coupon.id)),
+    legs: legs.filter((leg) => eligibleCouponIds.has(leg.coupon_id)),
+    results: results.filter((result) => eligibleMatchIds.has(result.match_id)),
   };
 }
 
@@ -236,7 +253,8 @@ export async function fetchMatchPageData(): Promise<MatchPageData> {
   if (timed.error) throw new Error(humanizeError(timed.error, "matches"));
   if (undated.error) throw new Error(humanizeError(undated.error, "matches"));
   if (scansResult.error) throw new Error(humanizeError(scansResult.error, "scan_runs"));
-  const matches = [...(timed.data ?? []), ...(undated.data ?? [])] as unknown as TableRows["matches"][];
+  const matches = ([...(timed.data ?? []), ...(undated.data ?? [])] as unknown as TableRows["matches"][])
+    .filter(isEligibleEuropeanMatch);
   const matchIds = matches.map((match) => match.id);
   const predictions = await fetchInChunks<TableRows["predictions"]>(matchIds, 100, async (chunk) => {
     const { data, error } = await withRequestTimeout(sb.from("predictions").select(READ_COLUMNS.predictions.join(",")).eq(OWNER_COLUMN, uid).in("match_id", chunk), "Pobieranie prognoz dzisiejszych meczów");
@@ -409,7 +427,8 @@ export async function fetchResultsPage(args: {
     "Pobieranie strony wyników",
   );
   if (error) throw new Error(humanizeError(error));
-  return data as ResultsPageResult;
+  const page = data as ResultsPageResult;
+  return { ...page, rows: page.rows.filter((row) => isEligibleEuropeanMatch(row.match)) };
 }
 
 export interface HistoryPageCursor {
@@ -450,7 +469,8 @@ export async function fetchHistoryPage(args: {
     "Pobieranie historii i kolejki rozliczeń",
   );
   if (error) throw new Error(humanizeError(error));
-  return data as HistoryPageResult;
+  const page = data as HistoryPageResult;
+  return { ...page, rows: page.rows.filter((row) => isEligibleEuropeanMatch(row.match)) };
 }
 
 /** Only predictions belonging to the match currently being settled. */
