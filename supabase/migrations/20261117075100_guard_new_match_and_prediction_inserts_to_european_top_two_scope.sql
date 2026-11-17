@@ -52,7 +52,7 @@ begin
     return null;
   end if;
 
-  if v_competition || ' ' || v_teams ~* '(women|womens|woman|frauen|femenina|femenino|feminin|female|ladies|girls|academy|youth|juniors?|u[[:space:]]*[0-9]{2}|under[[:space:]-]*[0-9]{2}|reserves?|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico)' then
+  if (v_competition || ' ' || v_teams) ~* '(women|womens|woman|frauen|femenina|femenino|feminin|female|ladies|girls|academy|youth|juniors?|u[[:space:]]*[0-9]{2}|under[[:space:]-]*[0-9]{2}|reserves?|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico)' then
     return null;
   end if;
 
