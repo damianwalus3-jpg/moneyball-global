@@ -169,6 +169,13 @@ export function mapOpenLigaTeamForm(matches: OpenLigaHistoryMatch[], team: strin
     sourceUpdatedAt: updated,
   };
 }
+export function cacheOpenLigaTeamForms(matches: OpenLigaHistoryMatch[], teams: string[], shortcut: string, season: string, beforeDate: string): void {
+  for (const team of new Set(teams.map(value => value.trim()).filter(Boolean))) {
+    const key = `moneyball.openliga-form.v1:${shortcut}:${season}:${normalizeTeam(team)}:${beforeDate}`;
+    const form = mapOpenLigaTeamForm(matches, team, beforeDate);
+    try { localStorage.setItem(key, JSON.stringify({ ...form, cachedAt: Date.now() })); } catch { /* cache is optional */ }
+  }
+}
 export async function loadOpenLigaRecentTeamForm(shortcut: string, season: string, team: string, beforeDate: string): Promise<TeamForm> {
   if (!/^[a-z0-9._-]+$/i.test(shortcut) || !/^\d{4}$/.test(season) || !team.trim()) throw new Error("Nieprawidłowe parametry historii OpenLigaDB");
   const key = `moneyball.openliga-form.v1:${shortcut}:${season}:${normalizeTeam(team)}:${beforeDate}`;
