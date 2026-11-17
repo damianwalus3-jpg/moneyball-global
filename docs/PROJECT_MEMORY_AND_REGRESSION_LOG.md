@@ -1477,3 +1477,18 @@ Official provider references checked:
 - OpenMatchday: https://github.com/oladeeayo/open-matchday
 
 No new provider was enabled, no API key was added, and no provider credits were consumed. The current best no-key primary fixture source remains FootyNomad, with OpenMatchday and carefully limited Football Charts as supplemental sources. The 54/55 official source-discovery audit remains distinct from automated importer coverage.
+
+
+## FootballCharts durable cache deployment — 2026-11-17 17:45 Europe/Brussels
+
+- Fixed the repeated cold-isolate fetch risk. Removed the isolate-local in-memory Map cache and added persistent owner-scoped cache storage in `public.moneyball_provider_cache`.
+- Cache key is stable per owner/provider, stores the upcoming fixture set across dates, and filters the requested Europe/Brussels date on read. A successful or partial response is retained for 24 hours. An atomic insert / conditional expired-row update with a five-minute refresh lease prevents concurrent manual scans from issuing duplicate provider batches. Concurrent scans use the cached response (or a pending/stale response) rather than calling FootballCharts again.
+- One refresh makes at most eight requests (one per allowlisted league), not eight requests per scan. Provider failure is cached for 24 hours to avoid repeated 429 retries; the primary FootyNomad scan remains independent and catches any optional cache/provider failure.
+- The cache table is private per owner: RLS enabled; three owner-only select/insert/update policies; authenticated grants only; no anon/public access and no delete permission. The migration has been applied as Supabase version `20261117163632`.
+- GitHub MAIN migration file commit: `60732b238f58edcc61c5c5e57666713b646182c9`. Function source commits: `b257abb189298943ca864e6da664f45e63739179` (durable cache) and `f308c90cd41fd33ad730b7250ac92a46b1027cf7` (date-regex correction).
+- Deployed the exact current MAIN `footynomad-sync` source as Supabase Edge Function v102; deployment returned ACTIVE with `verify_jwt=true` preserved. Shared imports were bundled from MAIN. The deployment bundle compiled successfully.
+- Database verification: cache table exists, RLS is enabled, three owner policies are present, and no cache rows were created by the deployment itself. This is expected until the next authenticated owner scan. The owner-scoped policy was also checked against a different simulated JWT subject; the other user sees zero rows.
+- Production Cloudflare Worker root smoke fetch succeeded: title `MONEYBALL GLOBAL 2.0`, expected Polish landing copy, no fetch errors. No frontend/Worker code changed, so no Cloudflare redeployment was required.
+- Current Football Charts official docs confirm the keyless limit is 25 requests/day per IP and the provider updates once daily; free use requires personal/research use and attribution, with no raw-data redistribution. The existing hard owner gate remains; no key or paid plan was added. Source: https://www.football-charts.com/developers
+- Not yet proven: an authenticated owner POST scan after v102 deployment, persistence/readback of a real provider cache row, and signed-in visual click-through of Matches/Predictions. Available browser profiles have no recorded sign-in for the Worker domain. Do not claim those acceptance checks passed; keep issue #77 open until the user completes sign-in and the screens are verified.
+- No matches, predictions, coupons, settlement rows, or bankroll values were changed.
