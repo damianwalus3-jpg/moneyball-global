@@ -1,3 +1,4 @@
+import { footyNomadSectionAt } from "../../supabase/functions/_shared/footynomad-section.ts";
 import { describe, expect, it } from "vitest";
 import {
   bankrollBalance,
@@ -896,5 +897,34 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
     for (const [country, competition] of rejected) {
       expect(isEuropeanTopTwoLeague(country, competition), `${country}: ${competition}`).toBe(false);
     }
+  });
+});
+
+
+describe("FootyNomad country/competition section parser", () => {
+  it("does not inherit the previous country's competition when the current country has no league group", () => {
+    const html = [
+      '<h2 class="section-title">Country A 2</h2>',
+      '<details class="league-group"><summary><a href="/league/old">Old League</a></summary></details>',
+      '<h2 class="section-title">Country B 1</h2>',
+      '<a href="/fixture/123">Fixture</a>',
+    ].join("");
+    const section = footyNomadSectionAt(html, html.indexOf("/fixture/123"));
+    expect(section.countryHtml).toContain("Country B");
+    expect(section.summaryHtml).toBe("");
+  });
+
+  it("uses a league group only when it follows the current country heading", () => {
+    const html = [
+      '<h2 class="section-title">Country A 1</h2>',
+      '<details class="league-group"><summary><a href="/league/a">League A</a></summary></details>',
+      '<h2 class="section-title">Country B 1</h2>',
+      '<details class="league-group"><summary><a href="/league/b">League B</a></summary></details>',
+      '<a href="/fixture/456">Fixture</a>',
+    ].join("");
+    const section = footyNomadSectionAt(html, html.indexOf("/fixture/456"));
+    expect(section.countryHtml).toContain("Country B");
+    expect(section.summaryHtml).toContain("League B");
+    expect(section.summaryHtml).not.toContain("League A");
   });
 });

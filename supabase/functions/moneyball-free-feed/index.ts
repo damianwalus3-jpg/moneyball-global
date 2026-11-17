@@ -1,3 +1,4 @@
+import { footyNomadSectionAt } from "../_shared/footynomad-section.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const PROJECT_URL = Deno.env.get("SUPABASE_URL") || "https://gzgeklcukrclgwbsmbsp.supabase.co";
@@ -108,14 +109,10 @@ async function readFixtures(date: string) {
     if (kickoffBrusselsDate !== date) continue;
     seen.add(externalId);
 
-    const groupStart = html.lastIndexOf('<details class="league-group', match.index);
-    const summaryEnd = groupStart >= 0 ? html.indexOf("</summary>", groupStart) : -1;
-    const summary = groupStart >= 0 && summaryEnd > groupStart ? html.slice(groupStart, summaryEnd) : "";
-    const competition = textOf((summary.match(/href=["']\/league\/[^"']+["'][^>]*>([\s\S]*?)<\/a>/i) || [])[1] || "") || null;
-    const sectionStart = html.lastIndexOf('<h2 class="section-title', match.index);
-    const sectionEnd = sectionStart >= 0 ? html.indexOf("</h2>", sectionStart) : -1;
-    const country = sectionStart >= 0 && sectionEnd > sectionStart
-      ? textOf(html.slice(sectionStart, sectionEnd)).replace(/\s+\d+$/, "").trim() || null
+    const { countryHtml, summaryHtml } = footyNomadSectionAt(html, match.index);
+    const competition = textOf((summaryHtml.match(/href=["']\/league\/[^"']+["'][^>]*>([\s\S]*?)<\/a>/i) || [])[1] || "") || null;
+    const country = countryHtml
+      ? textOf(countryHtml).replace(/\s+\d+$/, "").trim() || null
       : null;
     if (!isEuropeanFixture(country,competition,home,away) || !isTopTwoTierLeague(competition,country)) continue;
     if (isExcludedSeniorTeam(home) || isExcludedSeniorTeam(away)) continue;
