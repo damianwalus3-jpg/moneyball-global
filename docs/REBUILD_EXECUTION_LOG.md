@@ -579,3 +579,10 @@
 - Oficjalna dokumentacja OddsPapi potwierdza parametr `apiKey` w query string: https://oddspapi.io/en/docs oraz https://oddspapi.io/us/docs/errors. Źródła: dokumentacja producenta.
 - Commity: Worker `ee80716922515e680acd701c11b63948e82a971f`; testy `ff3252aeed5c72bf127396aace5c360ff78c8d3a`.
 - Wymagane po commitach: potwierdzić CI i deployment dla najnowszego HEAD. Nie wykonywać jeszcze billable zapytań OddsPapi. Live endpoint status nadal nieosiągalny w narzędziach; obecność sekretów i rzeczywiste działanie providerów pozostają niepotwierdzone.
+
+### Stage 53 — wynik końcowy walidacji po poprawce
+- Pierwsza iteracja testów ujawniła, że zmiana autoryzacji nie została zastosowana do rzeczywistego fragmentu kodu (test oczekiwał parametru apiKey, Worker nadal wysyłał x-api-key). Błąd wykryto w CI i poprawiono przed uznaniem etapu za zakończony.
+- Finalny commit kodu: `728650d7492eecaee11ad46f327f23b287263ff5`.
+- Finalne workflow dla tego samego HEAD: MONEYBALL rebuild CI `44189226174` SUCCESS; MONEYBALL Rebuild Checks `44189226170` SUCCESS; Cloudflare deployment `44189226159` SUCCESS.
+- Zmiany OPTIONS i OddsPapi query authentication są więc w finalnym wdrożeniu REBUILD. Poprzednie runy dla commitów pośrednich zakończone failure/cancelled nie są aktualnym stanem; finalny HEAD ma komplet SUCCESS.
+- Nadal niepotwierdzone: publiczny smoke test `/api/odds/status`, obecność obu sekretów, live odpowiedź OddsPapi/StrikerAPI oraz coverage i fixture matching. Nie wykonywano billable zapytań do OddsPapi.
