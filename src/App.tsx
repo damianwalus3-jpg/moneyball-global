@@ -3,6 +3,7 @@ import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from ".
 import { addRecord, exportBackup, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { loadOpenLigaRecentTeamForm, loadRecentTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
+import { buildThreeLegCandidates, type ThreeLegCandidate } from "./coupon-engine";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
@@ -45,6 +46,7 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
     status: prediction?.strongCandidate ? "KANDYDAT" : "ODRZUCONY",
     details: {
       fixtureId: match.id,
+      fixtureDate: match.date,
       competition: match.competition,
       model,
       market: "1X2",
@@ -156,10 +158,32 @@ export default function App() {
 
         {active === "tracker" && <section className="tracker-panel"><div className="tracker-toolbar"><div><h2>Twój lokalny rejestr</h2><p>Dane są zapisywane w pamięci tej przeglądarki. Eksportuj kopię, aby ich nie utracić.</p></div><div className="backup-actions"><button onClick={downloadBackup}>Eksport JSON</button><button onClick={() => fileRef.current?.click()}>Import JSON</button><input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={e => void loadBackup(e.target.files?.[0])}/></div></div><div className="tracker-form"><select value={newKind} onChange={e => setNewKind(e.target.value as TrackerKind)}><option value="match">Mecz</option><option value="prediction">Prognoza</option><option value="coupon">Kupon</option><option value="scan">Skan</option><option value="result">Wynik</option><option value="odds">Kurs</option><option value="ledger">Bankroll</option><option value="category">Kategoria</option><option value="jackpot">Jackpot</option></select><input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Dodaj wpis do Trackera…"/><button onClick={saveRecord} disabled={!newTitle.trim()}><Plus size={16}/> Zapisz</button></div>{notice && <div className="tracker-notice">{notice}</div>}<div className="tracker-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Szukaj wpisów…"/><span>{visibleRecords.length} wpisów</span></div><div className="tracker-table"><div className="tracker-head"><span>TYP</span><span>NAZWA</span><span>STATUS</span><span>DATA</span><span/></div>{visibleRecords.map(row => <div className="tracker-row" key={row.id}><span>{row.kind}</span><b>{row.title}</b><span>{row.status}</span><time>{new Date(row.createdAt).toLocaleString("pl-BE")}</time><button aria-label="Usuń wpis" onClick={() => { removeRecord(row.id); refreshRecords(); }}>×</button></div>)}{visibleRecords.length === 0 && <div className="tracker-empty">Brak wpisów. Dodaj pierwszy rekord lub zaimportuj kopię zapasową.</div>}</div></section>}
 
-        {active !== "dashboard" && active !== "tracker" && active !== "matches" && <section className="module-panel">
-          <div className="module-icon">{active === "pick" ? <Sparkles/> : active === "coupons" ? <Ticket/> : <BarChart3/>}</div>
-          <h2>{active === "pick" ? "Selekcja bez zgadywania" : active === "coupons" ? "Kupony analityczne" : "Pomiar jakości modelu"}</h2>
-          <p>{active === "pick" ? "Typ dnia zostanie opublikowany tylko wtedy, gdy dane i model uzasadnią wybór." : active === "coupons" ? "Generator będzie pilnował reguł kuponu, kursów, stawek analitycznych i rozliczeń." : "Metryki będą liczone na rozliczonych prognozach. Nie pokażemy skuteczności bez próby."}</p>
+        {active === "coupons" && <section className="module-panel coupon-module">
+          <div className="module-icon"><Ticket/></div>
+          <h2>Kupony testowe · dokładnie 3 mecze</h2>
+          <p>Do puli trafiają wyłącznie typy z najwyższym prawdopodobieństwem co najmniej 75%. Każdy kupon ma trzy różne mecze, bez powtórek.</p>
+          <div className="module-status"><span className="status-dot"/> {fixtureScan ? `DATA SKANU: ${fixtureScan.date}` : "NAJPIERW WYKONAJ SKAN MECZÓW"}</div>
+          {(() => {
+            const candidates = buildThreeLegCandidates(records, fixtureScan?.date ?? "");
+            return candidates.length ? <div className="coupon-candidates">
+              <div className="coupon-candidate-heading"><b>{candidates.length} kombinacji spełnia próg</b><small>Kolejność według iloczynu prawdopodobieństw modelu</small></div>
+              {candidates.slice(0, 10).map((coupon, index) => <article className="coupon-candidate" key={coupon.legs.map(leg => leg.fixtureId).join("|")}>
+                <div className="coupon-candidate-top"><b>Kupon testowy #{index + 1}</b><span>3/3 mecze</span></div>
+                {coupon.legs.map(leg => <div className="coupon-leg" key={leg.fixtureId}><b>{leg.title}</b><span>{leg.selection} · {Math.round(leg.probability * 100)}%</span><small>{leg.competition}</small></div>)}
+                <div className="coupon-candidate-bottom"><span>Iloczyn prawdopodobieństw: {(coupon.combinedProbability * 100).toFixed(1)}%</span><span>Kursy: brak potwierdzonych danych</span></div>
+                <button onClick={() => {
+                  addRecord({ kind: "coupon", title: `Kupon ${fixtureScan!.date} #${index + 1}`, status: "PAPER_NO_ODDS", details: { date: coupon.date, legs: coupon.legs.map(leg => ({ fixtureId: leg.fixtureId, selection: leg.selection, probability: leg.probability })), combinedProbability: coupon.combinedProbability, odds: null, stake: null } });
+                  setRecords(readRecords());
+                }}>Zapisz kupon testowy</button>
+              </article>)}
+            </div> : <div className="tracker-empty">Brak trzech różnych meczów z potwierdzoną prognozą ≥75% na dzień skanu. Wygeneruj prognozy w zakładce Mecze.</div>;
+          })()}
+          <p className="source-note">Nie wyliczamy kursów ani potencjalnej wygranej bez rzeczywistych notowań bukmacherskich. Iloczyn prawdopodobieństw to metryka modelu, nie kurs AKO i nie gwarancja trafienia.</p>
+        </section>}
+        {active !== "dashboard" && active !== "tracker" && active !== "matches" && active !== "coupons" && <section className="module-panel">
+          <div className="module-icon">{active === "pick" ? <Sparkles/> : <BarChart3/>}</div>
+          <h2>{active === "pick" ? "Selekcja bez zgadywania" : "Pomiar jakości modelu"}</h2>
+          <p>{active === "pick" ? "Typ dnia zostanie opublikowany tylko wtedy, gdy dane i model uzasadnią wybór." : "Metryki będą liczone na rozliczonych prognozach. Nie pokażemy skuteczności bez próby."}</p>
           <div className="module-status"><span className="status-dot"/> MODUŁ ZAPROJEKTOWANY · IMPLEMENTACJA W TOKU</div>
           <div className="module-search"><Search size={17}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Wyszukaj (po podłączeniu darmowych źródeł)" disabled/><button disabled><Plus size={16}/> Dodaj</button></div>
         </section>}
