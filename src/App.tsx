@@ -170,12 +170,12 @@ export default function App() {
             if (!result && typeof d.openFootballFeedId === "string") {
               try { result = await findOpenFootballFixtureResult(d.openFootballFeedId, d.home, d.away, d.fixtureDate); } catch { /* provider may not have published a score */ }
             }
-            if (result) addRecord({
+            if (result) addRecordsIfMissing([{
               kind: "result",
               title: `${prediction.title} · ${result.homeGoals}:${result.awayGoals}`,
               status: "SETTLED",
               details: { fixtureId: d.fixtureId as string, actual: result.actual, homeGoals: result.homeGoals, awayGoals: result.awayGoals, date: result.date, source: result.source },
-            });
+            }], "fixtureId");
           } catch { /* provider failures remain pending and are retried on next run */ }
         }));
         processed = Math.min(index + batch.length, pending.length);
@@ -185,10 +185,10 @@ export default function App() {
       const latest = readRecords();
       const coupons = latest.filter(row => row.kind === "coupon" && row.status === "PAPER_NO_ODDS"
         && !latest.some(item => item.kind === "coupon" && item.details.parentCouponId === row.id));
-      for (const coupon of coupons) {
+      const settlementRows = coupons.flatMap(coupon => {
         const settlement = evaluatePaperCoupon(coupon, latest);
-        if (settlement) addRecord({
-          kind: "coupon",
+        return settlement ? [{
+          kind: "coupon" as const,
           title: `${coupon.title} · ${settlement.correctLegs}/3`,
           status: settlement.status,
           details: {
@@ -199,8 +199,9 @@ export default function App() {
             odds: null,
             stake: null,
           },
-        });
-      }
+        }] : [];
+      });
+      addRecordsIfMissing(settlementRows, "parentCouponId");
       setSettling(false);
       settlementLock.current = false;
       setRecords(readRecords());
