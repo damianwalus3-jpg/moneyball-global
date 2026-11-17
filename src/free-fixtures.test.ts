@@ -15,6 +15,8 @@ describe("European fixture source classification", () => {
     expect(isEuropeanOpenLiga({ leagueId: 13, leagueName: "1. Frauen Fußballbundesliga", leagueShortcut: "ffb1" })).toBe(true);
     expect(isEuropeanOpenLiga({ leagueId: 14, leagueName: "Eredivisie", leagueShortcut: "ERE" })).toBe(true);
     expect(isEuropeanOpenLiga({ leagueId: 15, leagueName: "Admiral Bundesliga Österreich", leagueShortcut: "öbl" })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 16, leagueName: "Premier League 2026/2027", leagueShortcut: "pl" })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 17, leagueName: "DFB Frauen Supercup", leagueShortcut: "wsc" })).toBe(true);
   });
 
   it("rejects a non-football sport even when the league name looks European", () => {
