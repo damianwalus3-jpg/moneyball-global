@@ -695,3 +695,15 @@
 - Files added: `src/coupon-value.ts` commit `99e386923f10b79450700ee37bd4355a24d6e33a`; `src/coupon-value.test.ts` commit `33eacdbeed43423bd79b41fb0d20c124cd5d6fc3`.
 - Coupon valuation is a calculation module only. UI selection, persistence of bookmaker/odds/stake into coupon records, and settlement of priced paper coupons remain outstanding.
 - No real provider calls or credits consumed. CI and Cloudflare deployment validation remain pending.
+
+
+## 2026-11-17 — Stage 22: coupon UI and paper settlement integration
+- Integrated bookmaker selection into the Coupons module; the list is derived only from fresh, complete, valid 1X2 snapshots for fixtures in the current candidate pool.
+- Coupon cards now show per-leg verified decimal prices and EV, plus combined AKO odds, combined EV, and €4 paper stake / potential gross return / net profit when all three prices exist from the same bookmaker.
+- If any leg lacks a complete fresh quote, the UI explicitly says so and only offers saving a no-odds paper coupon. It never estimates missing prices.
+- Priced coupons are stored as `PAPER_WITH_ODDS`, preserving bookmaker, captured prices, combined odds, model probability, EV, €4 stake, potential return/profit and per-leg prices in Tracker history.
+- Paper settlement now accepts priced and unpriced coupons. For priced coupons, the settlement record retains bookmaker, AKO odds, stake, gross return on a hit and net profit/loss; an all-leg miss records the full stake as loss. Unpriced historical coupons continue to settle without invented financial values.
+- Added regression test that priced coupons settle using the same fixture result logic.
+- Code commits: coupon settlement support `61733339efde2b4d0c8f4fd349a577e18aefa93c`; UI integration `88310ec99573371a405773383a53bb2f083f1460`; settlement regression test `2bcc5a594d283f20140bc3e1069658d065e189a4`.
+- No existing Tracker records were rewritten; the new status applies only to coupons saved after this deployment.
+- CI and Cloudflare deployment validation remain pending. Do not claim this workflow is live until those checks pass.
