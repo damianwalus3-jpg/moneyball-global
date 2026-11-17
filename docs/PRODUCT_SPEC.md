@@ -37,6 +37,7 @@ MONEYBALL — Trust the Process is a mobile-first installable PWA for football m
 - Separate paper/analytical stakes from real bookmaker activity. Defaults must be configurable and clearly labelled.
 - Every balance change is a ledger transaction; do not directly overwrite a calculated balance.
 - Coupon settlement is idempotent and auditable. Store odds per leg and coupon-level total odds/potential return.
+- Web Push is opt-in, permission-gated and limited to user-selected events; no notifications before explicit browser permission.
 - Backups are versioned, validated, and restore only by explicit user action; never silently overwrite existing rows.
 
 ## UX and security
