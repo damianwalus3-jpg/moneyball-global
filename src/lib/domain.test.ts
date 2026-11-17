@@ -70,6 +70,11 @@ const match = (id: string, kickoff_at = "2026-11-11T20:00:00.000Z") =>
 describe("European domestic league scope", () => {
   it("keeps first and second tiers while excluding cups, youth and lower divisions", () => {
     expect(isEuropeanTopTwoLeague("England", "Premier League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("ENG", "ENG_1_premier-league")).toBe(true);
+    expect(isEuropeanTopTwoLeague("ENG", "ENG_2_championship")).toBe(true);
+    expect(isEuropeanTopTwoLeague("ENG", "ENG_3_league-one")).toBe(false);
+    expect(isEuropeanTopTwoLeague("ENG", "ENG_6_national-league-north")).toBe(false);
+    expect(isEuropeanTopTwoLeague("ENG", "ENG_7_northern-premier-league")).toBe(false);
     expect(isEuropeanTopTwoLeague("Greece", "Super League 2")).toBe(true);
     expect(isEuropeanTopTwoLeague("Denmark", "2nd Division - Group 2")).toBe(false);
     expect(isEuropeanTopTwoLeague("Russia", "Second League A - Division A Gold")).toBe(false);
