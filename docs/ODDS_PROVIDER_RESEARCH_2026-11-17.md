@@ -55,3 +55,45 @@ Nie wdrożono jeszcze pobierania kursów ani nie dodano żadnego sekretu/klucza.
 - Betfair developer costs: https://support.developer.betfair.com/hc/en-us/articles/115003864531-Are-there-any-costs-associated-with-API-access
 - Betfair licence requirements: https://support.developer.betfair.com/hc/en-us/articles/360002464152-Which-API-Licence-Do-I-Require
 - OddsPortal scraper (historical): https://github.com/Bedbin17/oddsportal_scraper
+
+## 2026-11-17 — szerokie rozszerzenie badań: fora, GitHub, agregatory i API keyless
+
+### Nowe, istotne odkrycia
+1. **OddsPapi — nowy mocny kandydat do pilotażu.** Oficjalna strona pokazuje Free: 250 requestów/miesiąc, pre-game REST, wszystkie sporty/bukmacherzy i historię; WebSocket jest w ofercie B2B/płatnej. API wymaga darmowego klucza. Dostawca sam zastrzega, że nie gwarantuje kursów dla każdego meczu/bukmachera. Jego blog podaje 300+ bookmakerów i jeden request na pełny board meczu. Są to twierdzenia dostawcy, nie niezależny test pokrycia europejskich lig. Źródła: https://oddspapi.io/en ; https://oddspapi.io/blog/free-sports-data-api/ ; https://oddspapi.io/blog/historical-odds-api/ ; https://oddspapi.io/blog/odds-api-pricing-2026-comparison/
+2. **StrikerAPI — drugi kandydat do pilotażu.** Oficjalna dokumentacja: 500 kredytów/miesiąc, endpoint get_odds kosztuje 5 kredytów dla meczu lub 10 dla dnia; kursy odświeżane co godzinę dla meczów w najbliższych 4 dniach, bez feedu live. Zakres obejmuje określone ligi (m.in. EPL, La Liga, Serie A, Bundesliga, Ligue 1, Championship, Eredivisie, Primeira, UCL/UEL/UECL, Scotland i wybrane poza Europą). Daily feed może mieć tylko 1–2 bukmacherów na mecz; głębsze archiwum obejmuje 16 rozgrywek, nie całą Europę. Klucz wymagany. Źródła: https://strikerapi.com/ ; https://strikerapi.com/docs/get-odds ; https://strikerapi.com/docs/atlas
+3. **FootballAPIs.com** to katalog/porównywarka 17 providerów i publiczny MCP do wyszukiwania dostawców, nie samodzielny kursowy feed. Może służyć do dalszego odkrywania źródeł i monitorowania zmian. https://footballapis.com/ ; https://footballapis.com/compare/ ; https://footballapis.com/api/
+4. **Polymarket Gamma API** jest publiczne, bez klucza, i daje eventy/rynki/ceny dla części meczów piłkarskich. To rynek predykcyjny/exchange, nie bukmacherski kurs 1X2; dostępność i płynność są ograniczone, a bid/ask/spread ma znaczenie. Może być osobnym benchmarkiem tylko tam, gdzie istnieje właściwy event i wystarczająca płynność. https://docs.polymarket.com/developers/gamma-markets-api/overview ; https://institute.polymarket.com/data
+5. **football-data.co.uk** — bieżąca strona pokazuje pliki sezonowe i kursy opening/closing, ale zastrzega użycie dla prywatnych osób, nie dla komercyjnych produktów, automatycznych botów/scraperów/AI training. Nie wdrażać bez zgody/licencji. Strona ostrzega też o nieaktualnych kursach Pinnacle po 23.07.2025. https://www.football-data.co.uk/data.php ; https://www.football-data.co.uk/downloadm.php
+6. **OddsHarvester** — dojrzały projekt open source (MIT, ok. 273 stars / 58 forks w wynikach badania), Playwright, upcoming/historic/live, ponad 100 lig, 11 sportów, JSON/CSV/S3. Jednak źródłem jest OddsPortal. Regulamin OddsPortal wprost zakazuje automatycznych żądań, scrapingu/agregacji i udostępniania istotnej części bazy bez zgody. MIT dotyczy kodu scraper'a, nie praw do danych OddsPortal. Nie używać w produkcji bez pisemnej zgody. Repo: https://github.com/jordantete/OddsHarvester ; ToS: https://www.oddsportal.com/terms/
+7. **BetExplorer** — regulamin również zakazuje automatycznych żądań oraz scrapingu/agregowania treści bez wyraźnej zgody. Odrzucić jako nieautoryzowany feed. https://www.betexplorer.com/terms-of-service.php
+8. **Społecznościowe tropy Reddit/r/algobetting**: użytkownicy wskazują, że ukryte XHR/JSON endpointy bywają łatwiejsze niż HTML, ale zmieniają się, wymagają czasem weryfikacji i grożą blokadami; relacje wskazują regionalizację bookmakerów i znikające kursy (np. Bwin/Unibet zależnie od kraju/IP). To obserwacje użytkowników, nie potwierdzone API ani zgoda na użycie. Źródła: https://www.reddit.com/r/algobetting/comments/1bky53f/ ; https://www.reddit.com/r/algobetting/comments/1mfijyi/ ; https://www.reddit.com/r/algobetting/comments/1mub2r6/ ; https://www.reddit.com/r/algobetting/comments/1sz5ycy/
+9. **Problemy OddsPortal**: szyfrowane payloady, wydłużony czas pobrania 6–10 sekund na stronę, regionalne przekierowania i blokady. Reddit: https://www.reddit.com/r/algobetting/comments/1h55lna/ ; https://www.reddit.com/r/algobetting/comments/1jufa65/
+
+### Porównanie nowych opcji
+| Źródło | Bez klucza? | Darmowy limit | Zakres | Aktualność | Ocena |
+|---|---|---:|---|---|---|
+| OddsPapi | Nie | 250 requestów/miesiąc | 300+ bookmakerów deklarowane; realne ligi/mecze do testu | pre-game REST; WebSocket płatny | Najlepszy kandydat na pierwszy test coverage |
+| StrikerAPI | Nie | 500 credits/miesiąc; get_odds 10 credits/dzień | wybrane ligi europejskie | co godzinę, next 4 days; brak live | Uzupełnienie/benchmark, nie pełna Europa |
+| Polymarket Gamma | Tak | publiczny endpoint | tylko wydarzenia z aktywnymi rynkami | ceny rynku aktualne, bid/ask i płynność | Alternatywny benchmark, nie bookmaker |
+| football-data.co.uk | Tak | darmowe pliki | ~22 dywizje / 11 krajów w bieżącym pliku; historycznie więcej | okresowe pliki; nie live | Bez zgody nie do produkcji |
+| OddsHarvester/OddsPortal | Nie wymaga API key | kod open source, koszt utrzymania | 100+ lig wg README | scraping stron | Bez zgody OddsPortal nie do produkcji |
+| BetExplorer scraping | — | — | wiele lig | niestabilne | Odrzucić — ToS zabrania |
+| FootballAPIs.com | Katalog bez klucza | publiczny katalog/MCP | 17 providerów porównanych | aktualizacje katalogu | Discovery, nie kursy |
+
+### Co wynika z forów — rzeczywisty problem
+- Samo znalezienie endpointu JSON nie rozwiązuje prawa do danych, regionalnego widoku, blokad Cloudflare, limitów ani ciągłego utrzymania parsera.
+- Scraping każdego bukmachera jest kosztowny w utrzymaniu; użytkownicy zgłaszają zmiany HTML, endpointów i blokady IP.
+- OddsPortal pokazuje różne listy bookmakerów w zależności od regionu/IP; dla Belgii może to oznaczać, że źródło nie prezentuje tego samego co lokalny Bwin/Unibet.
+- Nie wolno rotować proxy/VPN w celu obchodzenia zabezpieczeń. Wybieramy oficjalne API, licencjonowany feed albo źródło z jasną zgodą.
+
+### Nowy wniosek i rekomendowana kolejność testów
+A. Najpierw **OddsPapi Free** — sprawdzić darmowe konto i testowo pobrać 5–10 europejskich fixture'ów z różnych krajów, sprawdzić bookmaker list, 1X2, hasOdds, timestamp, freshness, API limits i realną dostępność. Uwaga: 250 requestów/miesiąc nie wystarczy na codzienne pobieranie kursów dla setek meczów.
+B. Równolegle **StrikerAPI Free** — użyć get_odds(date) dla jednego dnia (10 credits), zmierzyć, czy wynik obejmuje wszystkie wspierane mecze danego dnia, i porównać wspólne fixture'y z OddsPapi. 500 credits/miesiąc to ok. 50 zapytań dziennych po 10 credits.
+C. **Polymarket** tylko jako osobny typ rynku i osobna kolumna, nigdy nie mieszać z kursami bukmacherów.
+D. Nie podłączać OddsPortal/BetExplorer/football-data.co.uk do produkcji bez zgody na automatyczne pobieranie i dalsze użycie danych.
+E. Nie dodawać żadnego klucza do GitHub ani frontendowego kodu. Klucz (jeśli użytkownik wyrazi zgodę) tylko jako Cloudflare Worker Secret.
+
+### Ograniczenia wiarygodności badania
+- Nie istnieje możliwość dosłownego przeszukania całego Internetu ani wszystkich prywatnych forów. Przeszukano publicznie indeksowane źródła, dokumentacje dostawców, GitHub, publiczne wątki Reddit/r/algobetting i porównywarki.
+- Dane o limitach i coverage OddsPapi są częściowo deklaracjami dostawcy; należy potwierdzić przez live test konta i sprawdzenie odpowiedzi API.
+- Nie wykonano jeszcze zapytań z kontem/kluczem użytkownika; nie pobrano realnego kursu do produkcji.
