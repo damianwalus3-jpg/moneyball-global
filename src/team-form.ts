@@ -100,3 +100,89 @@ export async function loadRecentTeamForm(folder: string, team: string, beforeDat
     sourceUpdatedAt: generatedAt,
   };
 }
+
+interface OpenLigaResultRow {
+  resultTypeID?: number;
+  resultName?: string | null;
+  resultOrderID?: number;
+  pointsTeam1?: number;
+  pointsTeam2?: number;
+}
+interface OpenLigaHistoryMatch {
+  matchDateTime?: string | null;
+  matchDateTimeUTC?: string | null;
+  matchIsFinished?: boolean;
+  lastUpdateDateTime?: string | null;
+  team1?: { teamName?: string | null };
+  team2?: { teamName?: string | null };
+  matchResults?: OpenLigaResultRow[] | null;
+}
+function brusselsDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const get = (key: string) => parts.find(part => part.type === key)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+function normalizeTeam(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+export function mapOpenLigaTeamForm(matches: OpenLigaHistoryMatch[], team: string, beforeDate: string, sourceUpdatedAt = new Date().toISOString()): TeamForm {
+  const target = normalizeTeam(team);
+  const mapped = matches.flatMap(match => {
+    if (match.matchIsFinished !== true) return [];
+    const kickoff = match.matchDateTimeUTC || match.matchDateTime;
+    const date = kickoff ? brusselsDate(kickoff) : "";
+    const home = match.team1?.teamName?.trim() ?? "";
+    const away = match.team2?.teamName?.trim() ?? "";
+    if (!date || date >= beforeDate || !home || !away) return [];
+    const isHome = normalizeTeam(home) === target;
+    const isAway = normalizeTeam(away) === target;
+    if (!isHome && !isAway) return [];
+    const results = match.matchResults ?? [];
+    const finalResult = results.find(row => row.resultTypeID === 2 || /endresult|endergebnis|final/i.test(row.resultName ?? ""))
+      ?? [...results].sort((a, b) => (b.resultOrderID ?? 0) - (a.resultOrderID ?? 0))[0];
+    if (!finalResult || !Number.isInteger(finalResult.pointsTeam1) || !Number.isInteger(finalResult.pointsTeam2)) return [];
+    const homeScore = finalResult.pointsTeam1 as number;
+    const awayScore = finalResult.pointsTeam2 as number;
+    if (homeScore < 0 || awayScore < 0) return [];
+    const goalsFor = isHome ? homeScore : awayScore;
+    const goalsAgainst = isHome ? awayScore : homeScore;
+    const result = goalsFor > goalsAgainst ? "W" : goalsFor === goalsAgainst ? "D" : "L";
+    return [{
+      date,
+      opponent: isHome ? away : home,
+      venue: isHome ? "H" as const : "A" as const,
+      goalsFor,
+      goalsAgainst,
+      result,
+      points: result === "W" ? 3 : result === "D" ? 1 : 0,
+    }];
+  }).sort((a, b) => b.date.localeCompare(a.date));
+  const updated = matches.map(match => match.lastUpdateDateTime).filter((value): value is string => Boolean(value)).sort().at(-1) ?? sourceUpdatedAt;
+  return {
+    team,
+    matches: mapped.slice(0, 5),
+    home: mapped.filter(match => match.venue === "H").slice(0, 5),
+    away: mapped.filter(match => match.venue === "A").slice(0, 5),
+    source: "OpenLigaDB",
+    sourceUpdatedAt: updated,
+  };
+}
+export async function loadOpenLigaRecentTeamForm(shortcut: string, season: string, team: string, beforeDate: string): Promise<TeamForm> {
+  if (!/^[a-z0-9._-]+$/i.test(shortcut) || !/^\d{4}$/.test(season) || !team.trim()) throw new Error("Nieprawidłowe parametry historii OpenLigaDB");
+  const key = `moneyball.openliga-form.v1:${shortcut}:${season}:${normalizeTeam(team)}`;
+  try {
+    const cached = localStorage.getItem(key);
+    if (cached) {
+      const parsed = JSON.parse(cached) as TeamForm & { cachedAt: number };
+      if (Date.now() - parsed.cachedAt < CACHE_TTL) return parsed;
+    }
+  } catch { /* ignore malformed cache */ }
+  const response = await fetch(`/api/openligadb/team-matches/${encodeURIComponent(shortcut)}/${encodeURIComponent(season)}/${encodeURIComponent(team)}`, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(`OpenLigaDB historia niedostępna (HTTP ${response.status})`);
+  const matches = await response.json() as OpenLigaHistoryMatch[];
+  const form = mapOpenLigaTeamForm(matches, team, beforeDate);
+  try { localStorage.setItem(key, JSON.stringify({ ...form, cachedAt: Date.now() })); } catch { /* cache is optional */ }
+  return form;
+}
