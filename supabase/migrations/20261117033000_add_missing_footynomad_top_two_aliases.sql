@@ -27,15 +27,15 @@ BEGIN
   END IF;
   definition := replace(definition, old_aliases, new_aliases);
 
-  IF position($q$AND (n.comp ~* $q$ IN definition) = 0 THEN
+  IF position('n.comp ~*' IN definition) = 0 THEN
     RAISE EXCEPTION 'Allowlist expression insertion point missing';
   END IF;
   definition := replace(
     definition,
-    $q$AND (n.comp ~* $q$,
-    $q$AND ((lower(coalesce(p_country,'')) = ANY (ARRAY['croatia','cro']) AND n.comp = 'hnl')
+    'n.comp ~*',
+    $q$(lower(coalesce(p_country,'')) = ANY (ARRAY['croatia','cro']) AND n.comp = 'hnl')
   OR (lower(coalesce(p_country,'')) = ANY (ARRAY['san marino','smr']) AND n.comp = 'campionato')
-  OR n.comp ~* $q$
+  OR n.comp ~*$q$
   );
 
   EXECUTE definition;
