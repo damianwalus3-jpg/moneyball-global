@@ -894,3 +894,43 @@ No new odds provider was activated in this audit; no key was supplied and no rea
   - OpenMatchday coverage and license: https://github.com/oladeeayo/open-matchday
   - TheSportsDB official free API limits and schedule docs: https://www.thesportsdb.com/API.php and https://www.thesportsdb.com/docs/api
 - No new fixture adapter was added: current source checks do not justify an unverified feed integration.
+
+
+## 2026-11-17 08:33 Brussels — single pick, coupon integrity, ledger and runtime performance
+
+### Single-pick save flow restored
+- Found a genuine dead-end: Mecze.tsx exposed saveSingleBet and passed targetLegs:1, but saveCouponBatch rejected every target except 3; the database trigger also unconditionally forced 3 legs. The UI also omitted recordStake:true, so pending single stakes would not immediately appear in the bankroll.
+- Fixed src/lib/coupons.ts to accept only 1 or 3 legs (the existing validateBatch validates exact size, >75% probability, unique matches, and fresh confirmed odds for MAIN/MEGA/EXTRA).
+- Fixed src/routes/_authenticated/mecze.tsx to save single picks as MAIN with exactly 1 leg, EUR 4 stake, fresh odds, and recordStake:true.
+- Added a unit test for one-leg validation and mandatory real odds.
+- Applied migration 20261117073215_allow_four_euro_main_single_pick_coupons: database trigger now permits target_legs=1 only for coupon_type MAIN; all coupon types may use 3 legs; every new coupon remains fixed at EUR 4. The existing moneyball_reconcile_coupon_finance and moneyball_coupon_finance_summary already correctly support both 1- and 3-leg coupons.
+- Verified with production rollback-only SQL integration tests:
+  - MAIN single: inserted one leg, forced stake EUR 4 even when test supplied EUR 5, settled won, wrote exactly one stake EUR 4 and one return EUR 7.20 at odds 1.80; all test writes rolled back.
+  - Three-leg MAIN: three distinct matches, odds 1.10 × 1.20 × 1.30, settled won, wrote exactly one stake EUR 4 and one return EUR 6.86; all test writes rolled back.
+  - Duplicate-match insertion into the same coupon was rejected by the database unique index; test writes rolled back.
+  - Verified zero test coupon, leg or ledger rows remained after both tests.
+- Production code commit 16348bb506953e70891d57901372023f8034e5d4: Moneyball validate SUCCESS (Deno Edge checks, tests, TS, build), GitHub Cloudflare deploy SUCCESS, Cloudflare Workers Build SUCCESS.
+- Post-deploy Worker smoke: root 200 and title MONEYBALL GLOBAL 2.0, /login renders login form, /panel returns login_required unauthenticated. Root 98ms, login 75ms in this smoke. Authenticated UI click-through still not tested.
+
+### Coupon and bankroll audit — corrected SQL fan-out false alarm
+- Initial aggregate joined coupon_legs and bankroll_transactions directly (two one-to-many tables), inflating counts. This was a query fan-out error, not duplicate production data. No data was modified.
+- Re-ran with separate pre-aggregated CTEs. Current 3-leg MAIN coupons each have exactly 3 legs, 3 distinct matches/predictions, one stake transaction and one return transaction. The single-pick historical MAIN coupon has exactly 1 leg, one stake and one return. No duplicate coupon-match groups and no null match IDs before the new constraint.
+- Current EUR 4 three-leg coupons: #1 stake 4 / return 4.36; #2 stake 4 / return 6.07. Historical EUR 5 records and zero-stake TEST records remain unchanged.
+- Bankroll: 9 transactions; initial deposit EUR 91.60, total stakes EUR 23.00, total returns EUR 15.68; balance EUR 84.28. Window-function audit found 0 balance_after mismatches. No duplicate stake/return transaction per coupon; existing unique indexes remain in place.
+- One old test coupon MONEYBALL AUTO TEST 2026-11-12 is marked won but has no odds/potential return; finance summary correctly treats its payout as incomplete. It is a historical TEST record, not a real bet. Preserve it and do not invent a payout.
+
+### Coupon leg database integrity
+- Existing code-level validateCoupon already rejected duplicate matches, but database lacked a matching invariant.
+- Applied migration 20261117072931_enforce_unique_match_per_coupon_leg: coupon_legs.match_id is now NOT NULL and unique index coupon_legs_unique_coupon_match_idx(coupon_id,match_id) prevents the same match appearing twice in one coupon. Existing data had 0 null match IDs and 0 duplicate coupon/match groups. No rows changed.
+- The table already restricts leg_number to 1–3 and unique (coupon_id,leg_number), so at most 3 legs can exist; finance RPC leaves incomplete coupons pending when actual leg count differs from target.
+
+### Results-sync performance optimization (v72)
+- Commit 7f0cdffc2b7997da986229432ff341c4a712060c parallelized independent timed-match and date-only PostgREST reads in both the discovery and alternate-results paths.
+- Deployed moneyball-results-sync v72. Three observed HTTP 200 runtime samples: 5.268s (reschedule lease due), 3.887s and 4.379s (reschedule skipped). No errors; alternate feed matched 3 observations and financial reconciliation checked 7 coupons with 0 failures.
+- Before fix v71 (24h): median 4.594s, p95 8.76s, max 13.55s. Internal discovery improved from 2.273s sequential to 0.113–0.134s parallel; main match load observed 0.269–0.736s. Overall sample is still small; continue monitoring, do not claim total latency solved.
+
+### Remaining
+- Authenticated production UI E2E is still outstanding: save single → verify pending bankroll stake → settle → verify return/profit and statistics; save 3-leg MAIN → verify settlement. Database rollback-only tests prove SQL triggers/RPC, not browser interaction.
+- Next scheduled scan at 15:00 Brussels must verify moneyball-predict v243 calls moneyball-public-sources v62 with no 401 and public_source_error=null.
+- Continue monitoring European domestic tier 1/2 feed coverage, fresh real bookmaker odds, true xG and confirmed lineups.
+- Security warnings remain: leaked-password protection disabled; pg_net extension in public. RLS service-only tables have no policies and no anon/authenticated SELECT; keep them private.

@@ -901,3 +901,24 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
   - FootyNomad ma 2 kwalifikujące się mecze krajowe. Data wypada w oknie reprezentacyjnym; niezależne źródła również nie pokazują meczów głównych lig w tym dniu. Dwa mecze mogą być realnie rzadkim dniem, nie dowodem błędu importu. Nie dopisywać UEFA/reprezentacji/pucharów/out-of-scope dla sztucznego zwiększenia liczby.
 - Źródła: openfootball/europe, openfootball/football.json, oladeeayo/open-matchday, oficjalne TheSportsDB API docs. Linki zapisane w PROJECT_STATE.
 - Nie dodano nowego adaptera: obecne dowody nie uzasadniają niezweryfikowanego feedu.
+
+
+## 17.11.2026 08:33 Brussels — naprawa singla, integralność kuponów i bankroll
+- Naprawiono martwą ścieżkę singla: UI przekazywał targetLegs:1, ale saveCouponBatch odrzucał wszystkie kupony poza 3; trigger SQL też zawsze wymuszał 3. UI nie przekazywał recordStake:true.
+- src/lib/coupons.ts akceptuje teraz 1 lub 3 zdarzenia, waliduje dokładny rozmiar, >75%, różne mecze i świeże potwierdzone kursy dla MAIN/MEGA/EXTRA. Mecze zapisuje singiel jako MAIN, 1 noga, stawka 4 EUR i recordStake:true.
+- Dodano test walidacji singla i wymogu rzeczywistego kursu.
+- Migracja 20261117073215_allow_four_euro_main_single_pick_coupons: trigger pozwala na target_legs=1 wyłącznie dla MAIN, wszystkie typy mogą mieć 3 nogi, stawka zawsze 4 EUR. RPC rozliczeń i podsumowania finansowego już obsługiwały 1 i 3.
+- Produkcyjne testy SQL tylko w transakcji rollback:
+  - Singiel MAIN: jedna noga, trigger wymusił 4 EUR mimo wejściowych 5 EUR, wynik won, dokładnie jedna transakcja stake 4 EUR i return 7.20 EUR przy kursie1.80; wszystko wycofane.
+  - Kupon 3-leg MAIN: 3 różne mecze, kursy 1.10×1.20×1.30, wynik won, jedna stawka4 EUR i zwrot6.86 EUR; wszystko wycofane.
+  - Próba duplikatu tego samego meczu w kuponie odrzucona przez indeks unique; wszystko wycofane.
+  - Po testach 0 rekordów testowych w coupons/coupon_legs/ledger.
+- Commit 16348bb506953e70891d57901372023f8034e5d4: CI validate SUCCESS (Deno, testy, TS, build), deploy GitHub SUCCESS, Cloudflare Workers Build SUCCESS.
+- Smoke produkcji po deployu: root 200/MONEYBALL GLOBAL 2.0, /login formularz logowania, /panel login_required bez sesji. Root 98ms, login75ms. Zalogowany E2E w przeglądarce nadal niepotwierdzony.
+- Audyt kuponów: pierwszy agregat SQL zawyżył liczbę nóg i transakcji przez join dwóch relacji 1-do-wielu. To błąd zapytania, nie danych. Poprawiono analizę przez pre-aggregated CTE; nie zmieniono danych.
+- Dwa aktualne 3-leg MAIN: po 3 nogi/3 różne mecze, jedna stake i jedna return na kupon; singiel historyczny: 1 noga, jedna stake i jedna return. Brak duplikatów match per coupon.
+- Bankroll: 9 transakcji, depozyt91.60 EUR, stawki23 EUR, zwroty15.68 EUR, saldo84.28 EUR. Window-function audit: 0 rozbieżności balance_after. Historyczne 5 EUR i zero-stake TEST zachowane.
+- Stary kupon testowy MONEYBALL AUTO TEST 2026-11-12 ma status won bez kursu i payout; podsumowanie finansowe prawidłowo oznacza payout jako incomplete. To rekord TEST, nie dopisywać fikcyjnej wygranej.
+- Migracja 20261117072931_enforce_unique_match_per_coupon_leg: match_id w coupon_legs NOT NULL, unique index coupon_legs_unique_coupon_match_idx(coupon_id,match_id). Przed migracją 0 null i 0 duplikatów; bez zmiany danych. Istniejący check leg_number1–3 + unique coupon/leg_number ogranicza maksymalnie do3.
+- Results-sync: commit 7f0cdffc2b7997da986229432ff341c4a712060c, wersja v72, równoległe niezależne odczyty. 3 próbki HTTP200: 5.268s (due lease), 3.887s i 4.379s (skip), 0 błędów. Discovery spadło z2.273s do0.113–0.134s; main load0.269–0.736s. v71 24h median4.594s/p95 8.76s/max13.55s. Próbka nadal mała, całkowitej latencji nie uznawać za rozwiązane.
+- Otwarte: zalogowany E2E UI singla/kuponu i bankroll; skan 15:00 ma potwierdzić v243→v62 bez401; kursy bukmacherskie, real xG i potwierdzone składy nadal ograniczone.

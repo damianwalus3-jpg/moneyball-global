@@ -90,3 +90,11 @@ The existing daily 08:15 Brussels audit automation (`6afbeb034e4c81919dd6ad7d554
 
 ## Free fixture-source research — 2026-11-17
 OpenFootball's current 2026/27 mirror has limited league coverage and no 17 Nov fixtures in the checked files; TheSportsDB free day endpoint caps at 3 and returned only UEFA Nations League; OpenMatchday checked eligible folders returned no domestic fixture for that date. FootyNomad's two domestic fixtures may therefore be a genuinely sparse international-window day, not a proven import failure. Do not force extra out-of-scope matches into the app. Full source notes and URLs are in PROJECT_STATE.
+
+
+## Coupon finance and single-pick repair — 2026-11-17
+- Fixed the single-pick path end-to-end: saveCouponBatch accepts exactly 1 or 3 legs; MAIN single saves stake EUR 4 and records the bankroll stake immediately; database trigger allows target_legs=1 only for MAIN.
+- Added coupon_legs.match_id NOT NULL and unique (coupon_id, match_id) index to enforce one match per coupon.
+- Rollback-only production SQL integration tests passed for single and 3-leg settlement, one stake/one return, and duplicate-match rejection. No test rows persisted.
+- Coupon ledger verified: 9 transactions, balance EUR 84.28, 0 balance_after mismatches. First inflated aggregate was a SQL join fan-out false positive, not duplicate data.
+- Full technical details and commits are in PROJECT_STATE and PROJECT_MEMORY_AND_REGRESSION_LOG.
