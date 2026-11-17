@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/app/ui-bits";
 import { insertRow, updateRow, fetchAll } from "@/lib/db";
-import { signedAmount, TX_LABELS } from "@/lib/domain";
+import { canPromoteManualOdds, signedAmount, TX_LABELS } from "@/lib/domain";
 import { matchLabel, parseDecimal } from "@/lib/format";
 import { useAction } from "@/lib/queries";
 import { brusselsInputToISO, isoToBrusselsInput, nowBrusselsInput } from "@/lib/time";
@@ -145,10 +145,20 @@ export function OddsForm({
     else await insertRow("odds_snapshots", row);
     const prediction = predictions.find((item) => item.id === row.prediction_id);
     if (!prediction) throw new Error("Nie znaleziono prognozy, do której zapisujesz kurs.");
-    const canPromote = prediction.verdict === "ODRZUCONY"
-      && (prediction.rejection_reason ?? "").includes("Brak potwierdzonego kursu")
-      && Number(prediction.probability) > 75
-      && Number(prediction.confidence) >= 55;
+    const nowMs = Date.now();
+    const capturedMs = Date.parse(row.captured_at);
+    const quoteAgeMs = nowMs - capturedMs;
+    const quoteFresh = Number.isFinite(capturedMs) && quoteAgeMs >= 0 && quoteAgeMs <= 6 * 60 * 60 * 1000;
+    let sourceUrlValid = false;
+    try {
+      const sourceUrl = new URL(row.source_url ?? "");
+      sourceUrlValid = (sourceUrl.protocol === "https:" || sourceUrl.protocol === "http:") && !!sourceUrl.hostname;
+    } catch {
+      sourceUrlValid = false;
+    }
+    const canPromote = canPromoteManualOdds(prediction, matchById.get(prediction.match_id), nowMs)
+      && quoteFresh
+      && sourceUrlValid;
     await updateRow("predictions", prediction.id, {
       odds: row.odds,
       data_source: row.bookmaker,
@@ -158,6 +168,9 @@ export function OddsForm({
         odds_bookmaker: row.bookmaker,
         odds_captured_at: row.captured_at,
         odds_suspended: false,
+        odds_phase: "prematch",
+        odds_status: quoteFresh && sourceUrlValid ? "CONFIRMED" : "MISSING",
+        odds_source_url: row.source_url,
       },
       ...(canPromote ? { verdict: "WYBRANY", selection_status: "WYBRANY", rejection_reason: null } : {}),
     });
@@ -189,7 +202,7 @@ export function OddsForm({
         <Field label="Bukmacher" error={errors["bookmaker"]}><Input value={form.bookmaker} onChange={(event) => setForm({ ...form, bookmaker: event.target.value })} /></Field>
         <Field label="Kurs" error={errors["odds"]}><Input inputMode="decimal" className="num" value={form.odds} onChange={(event) => setForm({ ...form, odds: event.target.value })} /></Field>
         <Field label="Czas (Bruksela)" error={errors["captured"]}><Input type="datetime-local" value={form.captured} onChange={(event) => setForm({ ...form, captured: event.target.value })} /></Field>
-        <Field label="URL źródła"><Input value={form.source_url} onChange={(event) => setForm({ ...form, source_url: event.target.value })} placeholder="https://…" /></Field>
+        <Field label="URL źródła (wymagany do zatwierdzenia)"><Input value={form.source_url} onChange={(event) => setForm({ ...form, source_url: event.target.value })} placeholder="https://…" /></Field>
       </div>
     </FormDialog>
   );
