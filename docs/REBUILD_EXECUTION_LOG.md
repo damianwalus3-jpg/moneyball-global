@@ -831,3 +831,5 @@
 - Hardened ESPN day boundaries: a Brussels-local calendar day is assembled from both the preceding UTC date and the same UTC date, then filtered by actual Europe/Brussels kickoff date. One scoreboard may fail without discarding the successful day's results; the scan reports partial source errors.
 
 - Deployment queue safeguard: the prior REBUILD deploy workflow run 44199523416 remained stuck `in_progress` with no job steps and held the old concurrency group. Bumped the isolated REBUILD deploy concurrency group from v2 to v3 so the verified current build can deploy without touching MAIN.
+
+- Post-deploy smoke test: the new ESPN proxy route was reachable but the upstream returned HTTP 403 to the initial Worker-specific automation User-Agent. Updated the upstream request to use ordinary ESPN website browser headers (User-Agent, Referer, Origin, Accept-Language) and will re-test the live route before considering Stage 67 complete.
