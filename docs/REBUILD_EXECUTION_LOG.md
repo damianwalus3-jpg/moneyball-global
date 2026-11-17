@@ -165,3 +165,17 @@
 - CI run `44113308266`: SUCCESS — TypeScript, all tests and production build passed.
 - Cloudflare deploy run `44113307906`: SUCCESS — separate rebuild Worker deployment passed.
 - Stage 10 is COMPLETE/DEPLOYED. Automatic paper result tracking is now connected end-to-end for saved coupons; real bookmaker odds and any real-money accounting remain out of scope.
+
+## 2026-11-17 — Stage 11: third European fixture source (OpenFootball)
+- Added an OpenFootball Football.TXT adapter for 18 current-season European feeds: Czech Republic, France, Greece, Netherlands, Portugal, Scotland, Switzerland, Turkey, Austria, England (Premier League and Championship), Germany (Bundesliga, 2. Bundesliga, 3. Liga and DFB-Pokal), Spain, Italy and Belgium.
+- Feed paths are derived from the current European season (two-digit end year, e.g. `2026-27`); missing feed files are reported rather than silently ignored.
+- Parser supports both `home v away` and score-between-teams formats, with and without a kickoff time. It handles date headers with or without explicit year.
+- Kickoff times are converted from each feed's local IANA timezone to Europe/Brussels using DST-aware Intl time-zone offsets.
+- Fixtures are deduplicated against open-matchday and OpenLigaDB by normalized date and home/away team names; source provenance is merged.
+- Added tests for both Football.TXT match formats, date rollover, season path format and UK summer-time conversion to Brussels time.
+- Source review: OpenFootball Europe repository describes its datasets as public-domain; coverage is still selected leagues rather than all European tiers. The repository updates at differing cadences; Belgium's source file may lag official fixture revisions. No 100% coverage claim is made.
+- Current feeds are cached locally for six hours. Manual refresh bypasses the browser cache and re-reads the raw repositories.
+- Final code commit: `2d5626a88047b0f51bdd0f3a35cdc24dee1f4566` (`fix(rebuild): update both season assertions to source filename format`).
+- CI run `44114031886`: SUCCESS — TypeScript, all tests and production build passed.
+- Cloudflare deployment run `44114031588`: deploy step SUCCESS — separate rebuild Worker deployment passed.
+- Stage 11 is COMPLETE/DEPLOYED. Real-time completeness audit across every federation and every amateur/youth/women's division remains impossible with public feeds alone; provider gaps are reported in the UI.
