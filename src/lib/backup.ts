@@ -18,7 +18,7 @@ export async function buildBackup(): Promise<Backup> {
   const audit: Record<string, unknown>[] = [];
   for (let offset = 0; ; offset += 500) {
     const page = await fetchTrackerSourceAuditPage(offset, 500);
-    audit.push(...page);
+    audit.push(...(page as unknown as Record<string, unknown>[]));
     if (page.length < 500) break;
   }
   return { format: BACKUP_FORMAT, version: 1, exported_at: new Date().toISOString(), tables, tracker_source_audit: audit };
