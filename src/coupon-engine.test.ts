@@ -37,7 +37,7 @@ describe("three-leg coupon candidates", () => {
     expect(candidates).toHaveLength(0);
   });
   it("uses the newest eligible prediction per fixture even when Tracker rows are out of order", () => {
-    const older = { ...prediction("a-old", 0.92), createdAt: "2026-11-17T08:00:00Z" };
+    const older = { ...prediction("a-old", 0.92), createdAt: "2026-11-17T08:00:00Z", details: { ...prediction("a-old", 0.92).details, fixtureId: "a" } };
     const newer = {
       ...prediction("a-new", 0.78),
       createdAt: "2026-11-17T12:00:00Z",

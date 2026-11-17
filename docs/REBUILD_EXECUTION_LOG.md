@@ -424,3 +424,5 @@
 - Added regression coverage with an older high-probability prediction appearing before a newer lower-probability prediction for the same fixture; the newer prediction must be selected.
 - Preserves the existing rules: same selected date, exactly three distinct fixtures, each selected outcome probability at least 75%, and no bookmaker odds claim.
 - CI and Cloudflare deployment are required before this stage is marked complete/deployed.
+
+- First Stage 38 CI run caught an error in the new regression fixture: the intended older prediction was accidentally assigned its own fixture ID rather than sharing the newer prediction's fixture ID. Corrected the test data to model two predictions for the same match; the production selector logic is unchanged. Re-run CI/deploy required.
