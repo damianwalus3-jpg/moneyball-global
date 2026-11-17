@@ -30,6 +30,7 @@ export const TRACKER_CATEGORIES: readonly TrackerCategoryDefinition[] = [
   { key: "LEGACY_TEST", label: "TEST · legacy", description: "Historyczne wpisy testowe", group: "LEGACY", persisted: true },
   { key: "LEGACY_BASELINE", label: "BASELINE / NISKA WIARYGODNOŚĆ", description: "Historyczna grupa zachowana bez zmiany", group: "LEGACY", persisted: true },
   { key: "LEGACY_MARKET_DATA_TEST", label: "MARKET DATA / TEST", description: "Historyczna grupa techniczna zachowana bez zmiany", group: "LEGACY", persisted: true },
+  { key: "UNCLASSIFIED", label: "UNCLASSIFIED", description: "Historyczne wpisy bez rozpoznanej etykiety", group: "LEGACY", persisted: true },
 ] as const;
 
 const CATEGORY_BY_LEGACY_VALUE: Record<string, string> = {
@@ -47,6 +48,7 @@ const CATEGORY_BY_LEGACY_VALUE: Record<string, string> = {
   "TEST": "LEGACY_TEST",
   "BASELINE / NISKA WIARYGODNOŚĆ": "LEGACY_BASELINE",
   "MARKET DATA / TEST": "LEGACY_MARKET_DATA_TEST",
+  "__NULL__": "UNCLASSIFIED",
 };
 
 /** Exact legacy labels are preserved; unknown values remain visible as unknown. */
