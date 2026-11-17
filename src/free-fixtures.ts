@@ -8,6 +8,7 @@ export interface FreeFixture {
   leagueFolder: string;
   leagueShortcut?: string;
   leagueSeason?: string;
+  openFootballFeedId?: string;
   date: string;
   time: string;
   home: string;
@@ -275,11 +276,10 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     for (const fixture of openFootball.fixtures) {
       const key = fixtureKey(fixture.date, fixture.home, fixture.away);
       const existing = byKey.get(key);
-      if (existing) existing.source = `${existing.source} + openfootball`;
-      else byKey.set(key, {
-        ...fixture,
-        leagueFolder: "",
-      });
+      if (existing) {
+        existing.source = `${existing.source} + openfootball`;
+        existing.openFootballFeedId = fixture.feedId;
+      } else byKey.set(key, { ...fixture, leagueFolder: "", openFootballFeedId: fixture.feedId });
     }
   } catch (error) {
     errors.push(`openfootball · ${error instanceof Error ? error.message : "katalog niedostępny"}`);
