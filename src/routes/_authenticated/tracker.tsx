@@ -1,14 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   Activity, Archive, BarChart3, CalendarDays, CircleDollarSign, ClipboardList,
   History, Layers3, ShieldCheck, Ticket, Trophy
 } from "lucide-react";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { fmtMoney, fmtPct } from "@/lib/format";
-import { TRACKER_CATEGORIES } from "@/lib/tracker-domain";
+import { formatJackpotSequence } from "@/lib/tracker-domain";
+import { insertRow } from "@/lib/db";
 import {
-  couponFinanceQuery, dashboardSelectedPicksQuery, dashboardSummaryQuery, latestScanRunQuery
+  couponFinanceQuery, dashboardSelectedPicksQuery, dashboardSummaryQuery, latestScanRunQuery,
+  trackerCategoriesQuery, jackpotEntriesQuery, tableQuery, useAction
 } from "@/lib/queries";
 
 export const Route = createFileRoute("/_authenticated/tracker")({
@@ -52,14 +57,29 @@ function TrackerPage() {
   const picks = useQuery(dashboardSelectedPicksQuery());
   const finance = useQuery(couponFinanceQuery());
   const scan = useQuery(latestScanRunQuery());
+  const categories = useQuery(trackerCategoriesQuery());
+  const jackpot = useQuery(jackpotEntriesQuery());
+  const coupons = useQuery(tableQuery("coupons"));
+  const [jackpotCouponId, setJackpotCouponId] = useState("");
+  const [jackpotTitle, setJackpotTitle] = useState("");
+  const addJackpot = useAction(
+    async (args: { couponId: string; title: string }) => insertRow("moneyball_jackpot_entries", {
+      coupon_id: args.couponId,
+      title: args.title.trim(),
+    }),
+    {
+      success: "Dodano kupon do rejestru JACKPOT",
+      onDone: () => { setJackpotCouponId(""); setJackpotTitle(""); },
+    },
+  );
 
-  if (summary.isPending && picks.isPending && finance.isPending && scan.isPending) {
+  if (summary.isPending && picks.isPending && finance.isPending && scan.isPending && categories.isPending && jackpot.isPending && coupons.isPending) {
     return <><PageHeader eyebrow="CENTRUM KONTROLI" title="Tracker" /><PageLoader /></>;
   }
-  const firstError = summary.error ?? picks.error ?? finance.error ?? scan.error;
+  const firstError = summary.error ?? picks.error ?? finance.error ?? scan.error ?? categories.error ?? jackpot.error ?? coupons.error;
   if (firstError && !summary.data && !picks.data && !finance.data) {
     return <DataError error={firstError} reset={() => {
-      void Promise.all([summary.refetch(), picks.refetch(), finance.refetch(), scan.refetch()]);
+      void Promise.all([summary.refetch(), picks.refetch(), finance.refetch(), scan.refetch(), categories.refetch(), jackpot.refetch(), coupons.refetch()]);
     }} />;
   }
 
@@ -67,6 +87,10 @@ function TrackerPage() {
   const f = finance.data;
   const p = picks.data ?? [];
   const scanRow = scan.data;
+  const categoryRows = categories.data ?? [];
+  const jackpotRows = jackpot.data ?? [];
+  const couponRows = coupons.data ?? [];
+  const couponById = new Map(couponRows.map((coupon) => [coupon.id, coupon]));
   const financeTypes = f?.by_type ?? {};
   const financeRows = Object.entries(financeTypes).sort(([a], [b]) => a.localeCompare(b));
 
@@ -129,25 +153,78 @@ function TrackerPage() {
           <p className="text-sm text-muted-foreground">Brak rozliczonych kategorii kuponów w podsumowaniu.</p>
         )}
         <div className="mt-4">
-          <h3 className="mb-2 text-sm font-semibold uppercase">Kategorie docelowe Trackera</h3>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-            {TRACKER_CATEGORIES.filter((category) => category.group !== "LEGACY").map((category) => (
-              <div key={category.key} className="rounded-lg border border-border bg-background/40 p-3">
-                <div className="flex flex-wrap items-center justify-between gap-1">
-                  <span className="text-sm font-semibold">{category.label}</span>
-                  <span className={category.persisted ? "text-[10px] font-semibold text-success" : "text-[10px] font-semibold text-muted-foreground"}>
-                    {category.persisted ? "DANE HISTORYCZNE" : "DO REJESTRACJI"}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">{category.description}</p>
+          <h3 className="mb-2 text-sm font-semibold uppercase">Kategorie z bazy Trackera</h3>
+          {categories.error ? (
+            <p className="text-sm text-destructive">{categories.error.message}</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                {categoryRows.map((category) => (
+                  <div key={category.id} className="rounded-lg border border-border bg-background/40 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-1">
+                      <span className="text-sm font-semibold">{category.display_name}</span>
+                      <span className={category.is_system ? "text-[10px] font-semibold text-muted-foreground" : "text-[10px] font-semibold text-success"}>
+                        {category.is_system ? "SYSTEM" : "WŁASNA"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{category.description ?? category.category_key}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <p className="mt-2 text-xs text-muted-foreground">Historyczne etykiety pozostają oddzielone od nowych kategorii: {TRACKER_CATEGORIES.filter((category) => category.group === "LEGACY").map((category) => category.label).join(" · ")}. Nie przypisuję automatycznie starego MAIN do MAIN A ani MAIN B.</p>
+              <p className="mt-2 text-xs text-muted-foreground">Systemowe kategorie i mapowania historycznych etykiet są tylko do odczytu. Stare MAIN pozostaje oddzielone od MAIN A i MAIN B.</p>
+            </>
+          )}
         </div>
-        <div className="mt-3 rounded-lg border border-dashed border-border p-3">
-          <div className="flex items-center gap-2 font-semibold"><Trophy className="size-4 text-primary" /> JACKPOT</div>
-          <p className="mt-1 text-sm text-muted-foreground">Dedykowany rejestr z niezmienną numeracją #001, #002… wymaga jeszcze bezpiecznej, dodatkowej tabeli. Nie udaję, że jest już aktywny — najpierw sprawdzę zależności i przygotuję migrację bez naruszania starych kuponów.</p>
+        <div className="mt-3 rounded-lg border border-border p-3">
+          <div className="flex items-center gap-2 font-semibold"><Trophy className="size-4 text-primary" /> JACKPOT · numeracja stała</div>
+          {jackpot.error ? (
+            <p className="mt-2 text-sm text-destructive">{jackpot.error.message}</p>
+          ) : jackpotRows.length ? (
+            <div className="mt-3 space-y-2">
+              {jackpotRows.map((entry) => {
+                const coupon = couponById.get(entry.coupon_id);
+                return (
+                  <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-background/40 p-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold">{formatJackpotSequence(entry.sequence_no)} · {entry.title}</p>
+                      <p className="text-xs text-muted-foreground">{coupon?.name ?? "Kupon"}{coupon ? ` · ${coupon.coupon_type} · ${coupon.status.toUpperCase()}` : ""}</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{dateLabel(entry.created_at)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">Rejestr jest gotowy, ale nie ma jeszcze wpisów. Nie utworzyłem żadnych fikcyjnych kuponów.</p>
+          )}
+          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+            <select
+              className="h-10 min-w-0 rounded-md border border-input bg-background px-3 text-sm"
+              value={jackpotCouponId}
+              onChange={(event) => {
+                const id = event.target.value;
+                setJackpotCouponId(id);
+                const coupon = couponRows.find((row) => row.id === id);
+                if (coupon && !jackpotTitle) setJackpotTitle(coupon.name);
+              }}
+            >
+              <option value="">Wybierz istniejący kupon…</option>
+              {couponRows.map((coupon) => (
+                <option key={coupon.id} value={coupon.id} disabled={jackpotRows.some((entry) => entry.coupon_id === coupon.id)}>
+                  {coupon.name} · {coupon.coupon_type} · {coupon.status}
+                </option>
+              ))}
+            </select>
+            <Input value={jackpotTitle} onChange={(event) => setJackpotTitle(event.target.value)} placeholder="Nazwa wpisu Jackpot" maxLength={120} />
+            <Button
+              variant="outline"
+              disabled={!jackpotCouponId || !jackpotTitle.trim() || addJackpot.isPending}
+              onClick={() => addJackpot.mutate({ couponId: jackpotCouponId, title: jackpotTitle.trim() })}
+            >
+              {addJackpot.isPending ? "Zapisywanie…" : "Dodaj do Jackpot"}
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">Numer #001, #002… nadaje baza. Numeru, właściciela ani powiązanego kuponu nie można zmienić; wpisów nie można usuwać przez aplikację.</p>
         </div>
       </section>
 
