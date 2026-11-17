@@ -803,3 +803,9 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Wdrożenia: Cloudflare Worker deploy #680 SUCCESS; CI #1094 SUCCESS (Deno type-check Edge Functions, TypeScript, build, 61/61 testów). Supabase Edge Functions ACTIVE: `moneyball-public-sources v61`, `footynomad-sync v86`, `moneyball-predict v240`; ustawienia `verify_jwt` zachowano.
 - Audyt po skanie o 08:15 (Europe/Brussels) rozszerzono o kontrolę `scheduled_import`, liczby feed/public/eligible/inserted, deduplikacji i porównanie do powyższego baseline. Wynik runtime po skanie pozostaje do potwierdzenia; samo wdrożenie nie oznacza zaliczenia testu.
 - Główne commity naprawy: `007b73978ab2` (import przed automatycznym skanem) oraz `84751ff55c92` (testy regresyjne); pełna seria zmian znajduje się w historii branch `main`.
+
+
+### Telemetria importu przed skanem — 2026-11-17 06:06 UTC
+- Dodatkowo `moneyball-predict v241` zapisuje w logach JSON `scheduled_import` z polami `ok`, `feed_rows`, `public_rows`, `eligible_rows`, `inserted`, `skipped_existing`, `deduplicated_candidates`, `source_counts`, `feed_error` i `public_source_error`. Wymagany jest jawny `source`, `external_id`, liga i nazwy obu drużyn; importer nie podstawia domyślnego źródła.
+- CI #1099 SUCCESS, 61/61 testów, Deno type-check, TypeScript i build SUCCESS. Cloudflare Worker deploy #685 SUCCESS. Supabase: `moneyball-predict v241 ACTIVE`, `moneyball-public-sources v61 ACTIVE`, `footynomad-sync v86 ACTIVE`.
+- Produkcyjny `moneyball_prediction_scan_state` dla 17.11 ma `next_scan_at=2026-11-17 07:00 UTC` (08:00 Europe/Brussels). Poprzedni skan jest completed; claim nowego skanu resetuje kursor, więc importer uruchomi się na pierwszej stronie nowej partii. Nie wymuszano skanu i nie obchodzono cooldownu.
