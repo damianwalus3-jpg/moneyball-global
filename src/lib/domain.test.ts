@@ -182,6 +182,9 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Israel", competition: "Ligat Winner" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Faroe Islands", competition: "Meistaradeildin menn" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Iceland", competition: "Lengjudeild karla" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Montenegro", competition: "Meridianbet 1. CFL" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "North Macedonia", competition: "Prva MFL" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bosnia and Herzegovina", competition: "WWIN Liga Bosne i Hercegovine" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya II" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya B" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Real Madrid Castilla" })).toBe(false);
@@ -275,6 +278,9 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Faroe Islands", "Meistaradeildin menn")).toBe(true);
     expect(isEuropeanTopTwoLeague("Faroe Islands", "1. deild menn")).toBe(true);
     expect(isEuropeanTopTwoLeague("Iceland", "Lengjudeild karla")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Montenegro", "Meridianbet 1. CFL")).toBe(true);
+    expect(isEuropeanTopTwoLeague("North Macedonia", "Prva MFL")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Bosnia and Herzegovina", "WWIN Liga Bosne i Hercegovine")).toBe(true);
     expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Liqa")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "Vysshaya Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "Pervaya Liga")).toBe(true);
