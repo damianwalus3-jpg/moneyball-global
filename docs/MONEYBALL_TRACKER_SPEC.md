@@ -154,14 +154,15 @@ The first production Tracker release is implemented on the existing MAIN applica
 - `20261117131016_tracker_unclassified_queue_type_filter`
 - `20261117131322_tracker_source_audit_backup_restore`
 - `20261117131434_fix_tracker_source_audit_restore_count`
-- `20261117143000_harden_tracker_source_classification_rpc`
-- `20261117144500_guard_legacy_paper_classification_and_audit_restore`
+- `20261117134243_harden_tracker_source_classification_rpc`
+- `20261117134553_guard_legacy_paper_classification_and_audit_restore`
+- `20261117134915_harden_tracker_invoker_rpc_search_path`
 
-All 14 Tracker migrations are additive. They do not rewrite historical matches, predictions, coupons, coupon legs, results or bankroll transactions.
+All 15 Tracker migrations are additive. They do not rewrite historical matches, predictions, coupons, coupon legs, results or bankroll transactions.
 
 ### Verification snapshot
 
-- 15 system categories; 14 legacy aliases; 8 additive Tracker migrations.
+- 15 system categories; 14 legacy aliases; 15 additive Tracker migrations.
 - 0 Jackpot entries at deployment time — no synthetic entries were created.
 - 19,201 predictions; 9 coupons; 9 bankroll transactions remained unchanged by the migrations.
 - New tables have RLS enabled with owner/system-specific policies. Tracker-specific RLS initialization-plan warnings and the category-alias foreign-key index warning were remediated. Remaining advisor findings concern pre-existing unrelated objects; the new alias index is naturally reported unused until alias joins exercise it.
@@ -181,7 +182,7 @@ All 14 Tracker migrations are additive. They do not rewrite historical matches, 
 - The PAPER classification guard was based on a read-only audit of all 9 legacy coupons: 6 have existing bankroll transactions and must retain USER/MODEL classification unless the user explicitly chooses a different financial-history policy. The UI explains this restriction.
 - Ran rollback-only production SQL regression checks using existing owner records as temporary fixtures: PAPER settlement and cancellation did not write bankroll transactions or issue refunds; explicit prediction/coupon classification wrote audit entries; PAPER classification was allowed for a coupon with no ledger rows and blocked for a coupon with existing ledger rows; audit restore inserted once and then returned zero on repeat; source-class mismatches and invalid null entity types were rejected. All fixture mutations were rolled back. Production counts remained unchanged.
 - Production read-only snapshot: 15 system categories, 14 aliases, 19,201 predictions, 9 coupons, 9 bankroll transactions, 0 Jackpot entries, 0 audit entries, 18,724 unclassified predictions and 9 unclassified coupons. No historical source values were changed by this delivery.
-- CI passed: 92 tests across 9 test files, Supabase Edge Function type-check, application TypeScript check and production build. The release commit `06f7c23` passed CI and Cloudflare deployment: 92 tests across 9 files, Supabase Edge Function type-check, application TypeScript check, Cloudflare build and deploy all succeeded.
+- CI passed: 92 tests across 9 test files, Supabase Edge Function type-check, application TypeScript check and production build. The Tracker code release `06f7c23` passed CI and Cloudflare deployment: 92 tests across 9 files, Supabase Edge Function type-check, application TypeScript check, Cloudflare build and deploy all succeeded. The subsequent documentation/migration-alignment HEAD `f056bda` also passed the latest CI run `44096609053` and Cloudflare deployment run `44096606593`.
 
 ### Remaining verification
 
@@ -189,4 +190,4 @@ All 14 Tracker migrations are additive. They do not rewrite historical matches, 
 - Run the full JSON backup download/import round-trip in the signed-in UI. SQL restore RPC idempotency and audit ownership checks have passed rollback-only database tests; the browser workflow remains unverified.
 - Existing Supabase advisor findings outside the Tracker remain: internal tables without authenticated policies, `pg_net` in the public schema, leaked-password protection disabled, and pre-existing SECURITY DEFINER RPC warnings. The new owner-scoped classification and audit restore RPCs are also SECURITY DEFINER by design; their grants are restricted to authenticated users and their bodies enforce the caller's own user ID. These findings are documented, not silently represented as resolved.
 
-The Tracker release with audited legacy classification and audit-aware JSON backup is deployed to Cloudflare MAIN. The `06f7c23` release passed all 92 tests and the Cloudflare deployment workflow. Rollback-only SQL tests for PAPER settlement/cancellation, classification and idempotent audit restore passed without changing production data. The only remaining verification requiring a signed-in browser is the complete Tracker UI and JSON backup download/import round-trip; the full project is not marked complete until that browser workflow is verified.
+The Tracker release with audited legacy classification and audit-aware JSON backup is deployed to Cloudflare MAIN. The code release `06f7c23` passed all 92 tests and the Cloudflare deployment workflow; the latest repository HEAD `f056bda` also passed CI and Cloudflare deployment. Rollback-only SQL tests for PAPER settlement/cancellation, classification and idempotent audit restore passed without changing production data. The only remaining verification requiring a signed-in browser is the complete Tracker UI and JSON backup download/import round-trip; the full project is not marked complete until that browser workflow is verified.
