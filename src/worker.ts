@@ -13,7 +13,7 @@ export default {
       const upstreamPath = leagues
         ? `/getavailableleagues/${leagues[1]}`
          : teamMatches
-          ? `/getmatchdata/${teamMatches[1]}/${teamMatches[2]}/${encodeURIComponent(decodeURIComponent(teamMatches[3]))}`
+          ? `/getmatchdata/${encodeURIComponent(decodeURIComponent(teamMatches[1]))}/${teamMatches[2]}/${encodeURIComponent(decodeURIComponent(teamMatches[3]))}`
           : `/getmatchdata/${encodeURIComponent(decodeURIComponent(matches![1]))}/${matches![2]}`;
       const cacheKey = new Request(url.toString(), { method: "GET" });
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
