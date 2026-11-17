@@ -466,3 +466,10 @@
 - Added a regression test proving the DC sample and scores are calculated separately; added a dedicated UI section with explicit three-markets-per-fixture sample labeling.
 - DC probabilities remain derived from the current 1X2 model; this audit does not claim an independently trained DC model.
 - CI and Cloudflare deployment required before marking deployed.
+
+
+## Stage 44 — Cloudflare Worker integration regression tests
+- Added isolated tests for the production Worker OpenLigaDB proxy: fixture endpoint mapping, safe encoding of team names, source/CORS/cache headers, successful-response caching, no caching of failed upstream responses, and pass-through to static assets.
+- These tests exercise the Worker handler contract in CI without requiring paid services or live API credentials.
+- This is automated integration coverage, not a substitute for visual testing on a physical Android device.
+- CI and Cloudflare deployment required before marking deployed.
