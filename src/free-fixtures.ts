@@ -122,7 +122,9 @@ export function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
   if (league.sport?.sportName && !league.sport.sportName.toLowerCase().includes("football") && !league.sport.sportName.toLowerCase().includes("fußball") && !league.sport.sportName.toLowerCase().includes("fussball")) return false;
   if (COUNTRY_NAMES.some(country => name.includes(country))) return true;
   const countryCodeFeed = [...EUROPEAN_COUNTRY_SHORTCUTS].some(code => new RegExp("^" + code + "(?:[0-9]|[-_])").test(shortcut));
-  return countryCodeFeed || EUROPEAN_SHORTCUT_PREFIXES.some(prefix => shortcut === prefix || shortcut.startsWith(prefix));
+  const startsWithCountryCode = [...EUROPEAN_COUNTRY_SHORTCUTS].some(code => shortcut.startsWith(code));
+  if (startsWithCountryCode) return countryCodeFeed;
+  return EUROPEAN_SHORTCUT_PREFIXES.some(prefix => shortcut === prefix || shortcut.startsWith(prefix));
 }
 export function fixtureKey(date: string, home: string, away: string): string {
   const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
