@@ -259,3 +259,14 @@
 - Cloudflare deployment run 44119268133: SUCCESS — separate rebuild Worker deployment passed.
 - Public Worker smoke check confirmed the updated dashboard copy, progress labels and source links. The text fetch does not execute the client-side React app or prove fixture data loading; visual/mobile E2E and live browser scan validation remain outstanding.
 - Stage 18 is COMPLETE/DEPLOYED.
+
+## 2026-11-17 — Stage 19: repair Cloudflare API routing and encoded OpenLigaDB paths
+- Live endpoint verification found a production-path bug: requests under /api/openligadb/* were receiving the SPA index.html instead of JSON. The Worker handler existed, but Cloudflare Static Assets used asset-first routing with single-page-app fallback, so the API paths never reached the handler.
+- Configured assets.run_worker_first for /api/* so the Worker now handles API requests before the SPA fallback. This is the documented Cloudflare routing mechanism for SPA + API Workers.
+- Expanded the Worker route matcher to accept percent-encoded UTF-8 competition shortcuts and safely decode/re-encode them before forwarding to OpenLigaDB. Applied the same encoding treatment to team-history shortcut and team-name segments.
+- CI run 44120043921: SUCCESS — TypeScript, all tests and production build passed.
+- Cloudflare deploy run 44120043971: SUCCESS — separate rebuild Worker deployment passed.
+- Live Worker smoke tests now return JSON, not HTML: league catalogue 88 entries; Premier League feed 380 matches; UEFA Women's Champions League feed 54 matches; UEFA WCL team-history route for FC Bayern München Frauen returned 6 matches. Encoded ÖBL/Thüringen shortcuts also returned valid JSON arrays (currently zero rows from those specific feeds, not an HTML fallback).
+- This fixes a real integration blocker: OpenLigaDB catalogues, match feeds and team-history requests can now reach the upstream API through the Worker. Zero-row league feeds remain provider-data gaps and are not treated as errors.
+- Final config commit: 6e4d0df0b7bf5211cf63ae5cb9d1fc5cc2105bd7 (fix(rebuild): route API requests through Worker before SPA assets).
+- Stage 19 is COMPLETE/DEPLOYED.
