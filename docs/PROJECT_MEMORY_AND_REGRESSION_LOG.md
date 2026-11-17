@@ -1248,3 +1248,8 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - CI #1222 / Cloudflare #808 exposed additional legacy positive assertions in a later test block, beyond the 110-row provider catalogue: Turkey TFF First League, Israel Liga Leumit/Winner League/Ligat Winner, Georgia Erovnuli Liga 2, Azerbaijan Birinci Liqa, Kazakhstan First Division and Cyprus Second Division were all still marked true.
 - Corrected every stale positive assertion in that block to false. Earlier run failures were therefore a broad mismatch between old UEFA-based fixtures and the new geographic contract; they were not repeated production code defects. The canonical helper remains unchanged. No test has been skipped or disabled.
 - CI #1222 failed only at the tests stage; Cloudflare did not deploy. This follow-up requires a fresh full CI + Cloudflare deployment.
+
+
+## 17.11.2026 — exhaustive stale-country assertion sweep
+- A final source-wide scan of `src/lib/domain.test.ts` found one duplicate Israel `Liga Leumit` positive assertion remained because an earlier replacement changed only the first duplicate occurrence. Replaced all remaining positive assertions for Asia-classified countries/codes (Armenia, Azerbaijan, Cyprus, Georgia, Israel, Kazakhstan, Turkey/Türkiye and ISO-3 variants) with negative expectations. Albania is deliberately untouched and remains positive.
+- This is the final cleanup of duplicated UEFA-era test examples. The next CI run must prove zero stale positives remain; do not deploy before full success.

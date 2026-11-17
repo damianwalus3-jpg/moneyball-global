@@ -311,7 +311,7 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Liqa")).toBe(false);
     expect(isEuropeanTopTwoLeague("Belarus", "Vysshaya Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "Pervaya Liga")).toBe(true);
-    expect(isEuropeanTopTwoLeague("Israel", "Liga Leumit")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Israel", "Liga Leumit")).toBe(false);
     expect(isEuropeanTopTwoLeague("Kazakhstan", "First Division")).toBe(false);
     expect(isEuropeanTopTwoLeague("Bosnia and Herzegovina", "Prva Liga Republike Srpske")).toBe(true);
     expect(isEuropeanTopTwoLeague("Bulgaria", "Second Professional Football League")).toBe(true);
