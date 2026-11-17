@@ -830,3 +830,41 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Moved the memoized match index and safe empty-data defaults above all early returns. This preserves stable hook order while keeping the existing loading/error UI and statistics calculations.
 - Commit: `e5fe44f5f61072c59603168694b12bfaaa3dc922`.
 - Source was fetched back from GitHub and the hook now executes unconditionally before loading/error branches. Existing Vercel status reports a build-rate-limit failure; it does not confirm or refute the Cloudflare Worker deployment. No CI SUCCESS or Cloudflare deployment for this commit is confirmed yet.
+
+
+## 2026-11-17 08:12–08:18 Brussels — independence, stake consistency and backend audit
+
+### Independent application architecture — confirmed
+- User reiterated that the application must be a separate, self-operating product. The requirement means: its own frontend/codebase/release URL on the existing Cloudflare Worker; no Lovable/no-code builder, no Vercel, no TEST deployment, no second app or second database, and no need to visit Supabase UI for ordinary use.
+- The app's own backend remains the existing Supabase project `gzgeklcukrclgwbsmbsp` for Auth and Postgres. This is a standalone web product backed by its own Cloudflare Worker + existing Supabase project, not an offline/no-backend application.
+- Added `docs/PROJECT_CONTEXT_INDEX.md` as a short durable index of relevant project conversation history, constraints, chronology and open work. Continue to read it together with this file and `PROJECT_MEMORY_AND_REGRESSION_LOG.md` before any new session/task. Do not claim access to every raw chat transcript; the index and project ledgers preserve the relevant decisions and verified work.
+- README updated to make this independent architecture explicit.
+
+### MoviOdds no-key guard
+- `supabase/functions/moneyball-movi-odds-sync/index.ts` commit `08592e9dbd6c69e1c436d09773fed0b46eb2209b`: after validating the private cron token, if `MOVIODDS_API_KEY` is absent, return HTTP 200 with `ok:true, skipped:true` and an explicit reason, without calling MoviOdds or writing/deleting any odds.
+- GitHub checks for that commit: Moneyball validate SUCCESS, GitHub deploy SUCCESS, Cloudflare Worker build SUCCESS. Supabase Edge Function is ACTIVE v7, `verify_jwt=false`.
+- Live GET health returned `key_configured:false`, which confirms the no-key environment. The POST skip branch is deployed but was not directly exercised because the private cron token is not exposed to this audit. No fake odds were inserted.
+- Previous MoviOdds 500s were from v5 on 16 Nov; v6 GET health returned 200. v7 now avoids the unnecessary provider request when no key exists.
+
+### Fixed €4 stake — database and UI mismatch repaired
+- Live schema audit found `public.predictions.stake` defaulted to `5.00`, even though the current product rule is €4 for newly selected singles and new coupons. The earlier 5 EUR migration had never been aligned with the newer 4 EUR application logic.
+- Applied Supabase migration `20261117071516_align_moneyball_pick_stake_defaults_to_four_eur`: changed only the default to 4.00, aligned `moneyball_coupon_default_stake()` fallback to 4.00 and updated column comments. Verified live `information_schema.columns.column_default = 4.00`. No existing rows were updated.
+- Added the exact migration file to the repo: `supabase/migrations/20261117071516_align_moneyball_pick_stake_defaults_to_four_eur.sql`.
+- UI commit `2999e5efe8093dd82130464da3ae4ee542326f57`: manual promotion from ODRZUCONY to WYBRANY sets stake 4 and recalculates potential gross return from the stored odds.
+- UI commit `26c790e0205a5dcde7e24064811b27cecf05c585`: manual creation sets stake 4; changing an old rejected pick to selected sets 4; editing an already selected historical pick preserves its existing stake. Potential return is recalculated only for a selected pick with odds >1.
+- The newer combined branch commit `d521581b374fe77ba504a424bece485c768ad32d` includes these changes and the migration. Its CI validation completed SUCCESS (tests, Deno checks, TS, build); its Cloudflare deploy was still in progress at 08:17 Brussels. The subsequent context-index commit `26978d1b20de475269b3fe98864ba155f0e8e341` triggers a fresh production workflow; recheck the exact latest commit before claiming deployment.
+- Live audit found 18,935 prediction rows. The 13 selected rows with stake 0 are old 16 Nov UEFA Nations League test picks (outside current domestic-league scope), with stored profit/loss 0; 17 selected rows with stake 5 are historical picks created 13–16 Nov. Coupons include old 5 EUR history and current 4 EUR records. Do not backfill/rewrite any of these historical records. The UI now sets 4 EUR for new promotions.
+- Do not report E2E stake workflow complete until a newly created/promoted 4 EUR pick is tested through odds → settlement → stats and a new coupon is checked through ledger. Do not create fake production bets or fixtures for this test.
+
+### Supabase security / performance advisor audit
+- Project status ACTIVE_HEALTHY; health advisor returned no lints.
+- Security advisor: five tables have RLS enabled and zero policies: `match_result_sources`, `moneyball_password_recovery`, `moneyball_prediction_scan_state`, `moneyball_reschedule_sync_state`, `project_work_log`. Live privilege check confirms anon/authenticated have no SELECT and service_role does. This is intentional service-only isolation, not a missing public policy; do not add permissive policies.
+- Remaining security warnings: leaked-password protection is disabled; `pg_net` extension is in `public`. These require careful project-level/configuration work; no unsafe changes made.
+- Performance advisor reports 24 unused indexes. Do not drop them based on one snapshot: many are newly added for query paths, and deleting them without representative production load/EXPLAIN evidence can reintroduce timeouts. Health advisor has no issues.
+- Keep security/performance warnings in the open-work register and re-audit after stable workload.
+
+### External technical references checked
+- Supabase Authorization headers: https://supabase.com/docs/guides/functions/auth-headers
+- Supabase Securing Edge Functions: https://supabase.com/docs/guides/functions/auth
+- Supabase database indexes: https://supabase.com/docs/guides/database/postgres/indexes
+- Cloudflare Workers deployment: https://developers.cloudflare.com/workers/wrangler/commands/workers/

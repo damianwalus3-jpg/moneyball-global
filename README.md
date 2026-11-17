@@ -1,5 +1,9 @@
 # MONEYBALL GLOBAL 2.0
 
+## Independent application
+
+MONEYBALL GLOBAL is its own standalone web application, not a Lovable project or a Vercel deployment. Its production frontend runs on the existing Cloudflare Worker. The existing Supabase project is the app's backend for authentication and data; users interact through the app's single URL and do not need to open Supabase for normal use. Keep the existing repository, Worker and database. Do not create a second app/database or introduce paid APIs/provider keys without explicit approval.
+
 Polish-language football data and prediction tracking application. The existing Supabase project remains the source of truth for authentication and data; the application frontend is hosted on the existing Cloudflare Worker.
 
 ## Stack
