@@ -132,7 +132,7 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Greece", "Football League")).toBe(false);
     expect(isEuropeanTopTwoLeague("SCO", "Football League - Lowland League")).toBe(false);
     expect(isEuropeanTopTwoLeague("Türkiye", "2. Lig")).toBe(false);
-    expect(isEuropeanTopTwoLeague("Türkiye", "1. Lig")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Türkiye", "1. Lig")).toBe(false);
     expect(isEuropeanTopTwoLeague("Bosnia", "Premijer Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Bosnia", "1st League - FBiH")).toBe(true);
     expect(isEuropeanTopTwoLeague("Bosnia", "1st League - RS")).toBe(true);
@@ -775,12 +775,8 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
   ["Albania", "1st Division"],
   ["Andorra", "1a Divisió"],
   ["Andorra", "2a Divisió"],
-  ["Armenia", "Premier League"],
-  ["Armenia", "First League"],
   ["Austria", "Bundesliga"],
   ["Austria", "2. Liga"],
-  ["Azerbaijan", "Premyer Liqa"],
-  ["Azerbaijan", "Birinci Dasta"],
   ["Belarus", "Premier League"],
   ["Belarus", "1. Division"],
   ["Belgium", "Jupiler Pro League"],
@@ -792,8 +788,6 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
   ["Bulgaria", "Second League"],
   ["Croatia", "HNL"],
   ["Croatia", "First NL"],
-  ["Cyprus", "1. Division"],
-  ["Cyprus", "2. Division"],
   ["Czech Republic", "Czech Liga"],
   ["Czech Republic", "FNL"],
   ["Denmark", "Superliga"],
@@ -808,8 +802,6 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
   ["Finland", "Ykkösliiga"],
   ["France", "Ligue 1"],
   ["France", "Ligue 2"],
-  ["Georgia", "Erovnuli Liga"],
-  ["Georgia", "Erovnuli Liga 2"],
   ["Germany", "Bundesliga"],
   ["Germany", "2. Bundesliga"],
   ["Gibraltar", "Premier Division"],
@@ -821,12 +813,8 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
   ["Iceland", "1. Deild"],
   ["Ireland", "Premier Division"],
   ["Ireland", "First Division"],
-  ["Israel", "Ligat Ha'Al"],
-  ["Israel", "Liga Leumit"],
   ["Italy", "Serie A"],
   ["Italy", "Serie B"],
-  ["Kazakhstan", "Premier League"],
-  ["Kazakhstan", "1. Division"],
   ["Kosovo", "Superliga"],
   ["Kosovo", "Liga e Parë"],
   ["Latvia", "Virsliga"],
@@ -871,15 +859,10 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
   ["Sweden", "Superettan"],
   ["Switzerland", "Super League"],
   ["Switzerland", "Challenge League"],
-  ["Turkey", "Süper Lig"],
-  ["Turkey", "1. Lig"],
   ["Ukraine", "Premier League"],
   ["Ukraine", "Persha Liga"],
   ["Wales", "Premier League"],
   ["Wales", "FAW Championship"],
-  ["ISR", "Ligat Ha'Al"],
-  ["ISR", "Liga Leumit"],
-  ["Georgia", "E Rovnuli Liga"],
   ["Bosnia", "Prva Liga Republike Srpske"]
   ];
   const rejected: Array<[string, string]> = [
@@ -928,7 +911,7 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
   ["England", "Premier League 2 Division One"]
   ];
 
-  it("accepts all 110 exact provider labels from UEFA domestic senior men's tiers 1 and 2", () => {
+  it("accepts only provider labels from geographic Europe (UN M49), senior men's tiers 1 and 2", () => {
     for (const [country, competition] of accepted) {
       expect(isEuropeanTopTwoLeague(country, competition), `${country}: ${competition}`).toBe(true);
     }
