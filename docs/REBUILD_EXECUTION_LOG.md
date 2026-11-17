@@ -608,7 +608,7 @@
 - `/api/odds/status` reports only configuration booleans, never secret values.
 - Added tests for disabled pilot, invalid token, arbitrary-origin CORS denial, authenticated provider calls and secret non-disclosure.
 - Worker commit `e204fc4ead9b9a661802a9ffe672faee0a50121d`; test correction commit `d50cae3e857fad0fa5f4d1913beb84e9a6132b74`.
-- CI `44190706973` (commit d50cae3) passed; Cloudflare deployment `44190707102` (commit d50cae3) passed. Public smoke test confirmed both provider secrets are configured and pilot remains disabled until the owner token is added.
+- CI `44190808454` (commit d50cae3) passed; Cloudflare deployment `44190808432` (commit d50cae3) passed. Public smoke test confirmed both provider secrets are configured and pilot remains disabled until the owner token is added.
 - No provider odds endpoint was called; no credits consumed and no Tracker/coupon/settlement/bankroll records changed.
 
 ## Stage 55 — verified kickoff guard for pre-match predictions — 2026-11-17 (verified)
