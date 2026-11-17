@@ -3,7 +3,7 @@ interface Env { ASSETS: { fetch(request: Request): Promise<Response> } }
 const OPENLIGA_API = "https://api.openligadb.de";
 
 export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<Response> {
     const url = new URL(request.url);
     const leagues = url.pathname.match(/^\/api\/openligadb\/leagues\/(\d{4})$/);
     const matches = url.pathname.match(/^\/api\/openligadb\/matches\/([a-z0-9._-]+)\/(\d{4})$/i);
@@ -13,7 +13,7 @@ export default {
         ? `/getavailableleagues/${leagues[1]}`
         : `/getmatchdata/${matches![1]}/${matches![2]}`;
       const cacheKey = new Request(url.toString(), { method: "GET" });
-      const cache = caches.default;
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
       const cached = await cache.match(cacheKey);
       if (cached) return cached;
 
