@@ -1468,3 +1468,17 @@ No new provider was enabled, no API key was added, and no provider credits were 
 - Rechecked the production function registry: v103 ACTIVE. Rechecked cache table: RLS enabled, three owner-only policies, no production cache rows yet (expected until authenticated owner scan).
 - The earlier v102 deployment is superseded; v103 is the current target for the first authenticated scan.
 - Still pending: owner-authenticated POST scan and real cache write/read proof, then authenticated UI click-through. No user match, prediction, coupon, settlement or bankroll data changed.
+
+
+## FootballCharts rate-limit recovery and source coverage audit — 2026-11-17 19:00 Europe/Brussels
+
+- Reviewed live Supabase scan history: the 17 Nov 13:42 UTC owner scan had FootballCharts HTTP 429 for Hungary, Latvia, Lithuania and Serbia while all eight allowlisted requests were launched concurrently. The durable cache table still had zero rows because no authenticated owner scan had been performed after the v104 deployment; this is not evidence of a failed insert.
+- Updated MAIN `footynomad-sync`: FootballCharts requests now run with concurrency 2. A complete cache snapshot remains valid 24 hours; partial/error snapshots are marked `partial` and expire after 12 hours, so they are served as stale data and can be retried after expiry rather than being frozen for 24 hours.
+- Provider catalogue research: FootballCharts exposes 98 leagues in 44 countries, but its no-key quota is 25 requests/day/IP and its free key/app terms do not justify expanding to all 98 calls. The existing eight-competition list remains an optional sample only, not full European coverage. The out-of-scope Azerbaijan entry was replaced with Austria 2. Liga.
+- FootyCheck public index claims 149 countries and 776 leagues in a rolling 7-day index. No stable public API or clear automated-ingestion permission was verified; discovery/reconciliation candidate only, not enabled for production scraping.
+- OpenMatchday public repository documents 75 competitions with daily CSV refresh; useful supplemental source, but the provider explicitly documents uneven fixture/stat coverage. Not full Europe by itself.
+- Moneyball CI run `44152983223` for commit `471e755f0f110664558839417736ee8b3cda155b`: SUCCESS. Cloudflare MAIN deploy run `44152983292`: SUCCESS.
+- Follow-up commit `13e72a479299da3ce2324786912e556728514901` replaces Azerbaijan with Austria 2. Liga; CI/deploy are pending at this note.
+- Supabase cron job `moneyball-global-free-footynomad` is active on `1,16,31,46 * * * *`; the last ten recorded cron executions all show `succeeded`.
+- Detailed audit: `docs/FOOTBALLCHARTS_RATE_LIMIT_RECOVERY_AND_SOURCE_AUDIT_2026-11-17.md`.
+- Remaining acceptance: wait for the follow-up CI/deploy, deploy the verified MAIN `footynomad-sync` source to Supabase preserving `verify_jwt=true`, then authenticate with the user's existing MAIN session to prove cache write/hit and visually verify Matches/Predictions. Issue #77 stays OPEN. No matches, predictions, coupons, settlements, bankroll or historical data were changed.
