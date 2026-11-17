@@ -83,7 +83,7 @@ function Ustawienia() {
 
       <section className="surface-card grid gap-3 p-4">
         <h2 className="text-xl font-semibold uppercase">Diagnostyka schematu</h2>
-        <p className="text-sm text-muted-foreground">Tylko odczyt: sprawdza 8 tabel, kanoniczne kolumny, liczbę Twoich rekordów i dostęp anonimowy. Nie generuje SQL i niczego nie zmienia w bazie.</p>
+        <p className="text-sm text-muted-foreground">Tylko odczyt: sprawdza 10 tabel, kanoniczne kolumny, liczbę Twoich rekordów i dostęp anonimowy. Nie generuje SQL i niczego nie zmienia w bazie.</p>
         <Button className="w-fit" onClick={check} disabled={checking}><Database /> {checking ? "Sprawdzanie…" : "Sprawdź tabele"}</Button>
         {report && (
           <div className="grid gap-1 text-sm">
