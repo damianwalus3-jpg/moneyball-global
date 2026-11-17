@@ -411,6 +411,8 @@ describe("manual odds promotion", () => {
     expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_coverage: 45 } }, match("m1"), now)).toBe(false);
     expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_source_type: "BASELINE_ONLY" } }, match("m1"), now)).toBe(false);
     expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, home_history_matches: 2 } }, match("m1"), now)).toBe(false);
+    expect(canPromoteManualOdds({ ...eligible, data_coverage: { model_coverage: 60, model_source_type: "PARTIAL_VERIFIED_HISTORY" } }, match("m1"), now)).toBe(false);
+    expect(canPromoteManualOdds({ ...eligible, data_coverage: { model_coverage: 75, model_source_type: "TIPSAUDIT_FAIR_MARKET", market_odds: true } }, match("m1"), now)).toBe(true);
     expect(canPromoteManualOdds({ ...eligible, rejection_reason: "Prawdopodobieństwo poniżej progu." }, match("m1"), now)).toBe(false);
   });
 
