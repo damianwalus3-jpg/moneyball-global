@@ -49,6 +49,13 @@ describe("Cloudflare OpenLigaDB proxy", () => {
 });
 
 describe("odds provider pilot proxy", () => {
+  it("answers preflight with an empty 204 response", async () => {
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot", { method: "OPTIONS" }), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(204);
+    expect(await response.text()).toBe("");
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://moneyball.example");
+  });
+
   it("reports only whether secrets are configured and never exposes their values", async () => {
     const secret = "do-not-return-this";
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/status"), {
@@ -75,7 +82,8 @@ describe("odds provider pilot proxy", () => {
     }, { waitUntil: vi.fn() });
     const body = await response.text();
     expect(fetchMock.mock.calls[0][0].toString()).toContain("/v4/odds?fixtureId=fixture-123");
-    expect(fetchMock.mock.calls[0][1].headers["x-api-key"]).toBe("private-key-value");
+    expect(new URL(fetchMock.mock.calls[0][0].toString()).searchParams.get("apiKey")).toBe("private-key-value");
+    expect(fetchMock.mock.calls[0][1].headers["x-api-key"]).toBeUndefined();
     expect(body).toContain('"status":"ok"');
     expect(body).not.toContain("private-key-value");
   });
