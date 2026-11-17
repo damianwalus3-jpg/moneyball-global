@@ -23,6 +23,7 @@ import { Route as AuthenticatedPanelRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedPrognozy1x2RouteImport } from './routes/_authenticated/prognozy-1x2'
 import { Route as AuthenticatedPrognozyGoleRouteImport } from './routes/_authenticated/prognozy-gole'
 import { Route as AuthenticatedStatystykiRouteImport } from './routes/_authenticated/statystyki'
+import { Route as AuthenticatedTrackerRouteImport } from './routes/_authenticated/tracker'
 import { Route as AuthenticatedUstawieniaRouteImport } from './routes/_authenticated/ustawienia'
 import { Route as AuthenticatedWynikiRouteImport } from './routes/_authenticated/wyniki'
 
@@ -98,6 +99,11 @@ const AuthenticatedStatystykiRoute = AuthenticatedStatystykiRouteImport.update({
   path: '/statystyki',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTrackerRoute = AuthenticatedTrackerRouteImport.update({
+  id: '/_authenticated/tracker',
+  path: '/tracker',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedUstawieniaRoute = AuthenticatedUstawieniaRouteImport.update({
   id: '/ustawienia',
   path: '/ustawienia',
@@ -123,6 +129,8 @@ export interface FileRoutesByFullPath {
   '/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
   '/prognozy-gole': typeof AuthenticatedPrognozyGoleRoute
   '/statystyki': typeof AuthenticatedStatystykiRoute
+  '/tracker': typeof AuthenticatedTrackerRoute
+  '/tracker': typeof AuthenticatedTrackerRoute
   '/ustawienia': typeof AuthenticatedUstawieniaRoute
   '/wyniki': typeof AuthenticatedWynikiRoute
 }
@@ -178,6 +186,7 @@ export interface FileRouteTypes {
     | '/prognozy-1x2'
     | '/prognozy-gole'
     | '/statystyki'
+    | '/tracker'
     | '/ustawienia'
     | '/wyniki'
   fileRoutesByTo: FileRoutesByTo
@@ -213,6 +222,7 @@ export interface FileRouteTypes {
     | '/_authenticated/prognozy-1x2'
     | '/_authenticated/prognozy-gole'
     | '/_authenticated/statystyki'
+    | '/_authenticated/tracker'
     | '/_authenticated/ustawienia'
     | '/_authenticated/wyniki'
   fileRoutesById: FileRoutesById
@@ -325,6 +335,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedStatystykiRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/tracker': {
+      id: '/_authenticated/tracker'
+      path: '/tracker'
+      fullPath: '/tracker'
+      preLoaderRoute: typeof AuthenticatedTrackerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/ustawienia': {
       id: '/_authenticated/ustawienia'
       path: '/ustawienia'
@@ -352,6 +369,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPrognozy1x2Route: typeof AuthenticatedPrognozy1x2Route
   AuthenticatedPrognozyGoleRoute: typeof AuthenticatedPrognozyGoleRoute
   AuthenticatedStatystykiRoute: typeof AuthenticatedStatystykiRoute
+  AuthenticatedTrackerRoute: typeof AuthenticatedTrackerRoute
   AuthenticatedUstawieniaRoute: typeof AuthenticatedUstawieniaRoute
   AuthenticatedWynikiRoute: typeof AuthenticatedWynikiRoute
 }
@@ -366,6 +384,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPrognozy1x2Route: AuthenticatedPrognozy1x2Route,
   AuthenticatedPrognozyGoleRoute: AuthenticatedPrognozyGoleRoute,
   AuthenticatedStatystykiRoute: AuthenticatedStatystykiRoute,
+  AuthenticatedTrackerRoute: AuthenticatedTrackerRoute,
   AuthenticatedUstawieniaRoute: AuthenticatedUstawieniaRoute,
   AuthenticatedWynikiRoute: AuthenticatedWynikiRoute,
 }
