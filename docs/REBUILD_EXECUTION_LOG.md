@@ -426,3 +426,11 @@
 - CI and Cloudflare deployment are required before this stage is marked complete/deployed.
 
 - First Stage 38 CI run caught an error in the new regression fixture: the intended older prediction was accidentally assigned its own fixture ID rather than sharing the newer prediction's fixture ID. Corrected the test data to model two predictions for the same match; the production selector logic is unchanged. Re-run CI/deploy required.
+
+
+## Stage 39 — retryable prediction enrichment
+- Found a refresh-path bug in `savePredictionRecord`: once a fixture/model had any prediction row, later scans could never save a successful form-based prediction if the first attempt had been a placeholder with missing probabilities.
+- Added a small policy helper: first attempt is retained; repeated failed attempts do not flood Tracker; a later successful probability set can supersede an earlier invalid/empty row; once a valid prediction exists, it remains the canonical saved prediction for that fixture/model.
+- Added regression tests for first attempt, duplicate failure suppression, recovery after source data becomes available, valid-record protection, and fixture isolation.
+- Existing history is append-only; no rows are deleted or overwritten. Intelligence already selects the newest prediction per fixture.
+- CI and Cloudflare deployment required before marking complete.

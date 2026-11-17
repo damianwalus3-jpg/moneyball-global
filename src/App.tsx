@@ -8,6 +8,7 @@ import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from ".
 import { evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
+import { shouldAppendPrediction } from "./prediction-record";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
@@ -40,9 +41,10 @@ function Metric({ label, value, note, icon: Icon }: { label: string; value: stri
 
 function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, reason?: string): TrackerRecord[] {
   const model = "recent-form-goals-poisson-v1";
-  const existing = readRecords().some(row => row.kind === "prediction" && row.details.fixtureId === match.id && row.details.model === model);
-  if (existing) return readRecords();
   const probabilities = prediction?.prediction.probabilities;
+  const hasProbabilities = !!probabilities;
+  const currentRecords = readRecords();
+  if (!shouldAppendPrediction(currentRecords, match.id, model, hasProbabilities)) return currentRecords;
   const dc = prediction?.prediction.doubleChance;
   addRecord({
     kind: "prediction",
