@@ -17,8 +17,8 @@ describe("Tracker legacy normalization", () => {
   it("normalizes known category labels and preserves unknown labels as unknown", () => {
     expect(resolveTrackerCategory("  market data / test ")).toBe("LEGACY_MARKET_DATA_TEST");
     expect(resolveTrackerCategory("MEGA")).toBe("MEGA");
-    expect(resolveTrackerCategory("some new label")).toBe("UNKNOWN");
-    expect(resolveTrackerCategory(null)).toBe("UNKNOWN");
+    expect(resolveTrackerCategory("some new label")).toBe("UNCLASSIFIED");
+    expect(resolveTrackerCategory(null)).toBe("UNCLASSIFIED");
   });
 
   it("maps only explicit legacy decision states", () => {
