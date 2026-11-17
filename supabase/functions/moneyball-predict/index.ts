@@ -268,7 +268,7 @@ async function readPublicSourceForms(date:string){
  if(publicSourceFormsCache&&publicSourceFormsCache.date===date&&Date.now()-publicSourceFormsCache.at<10*60*1000)return publicSourceFormsCache.value;
  const byPair=new Map<string,any>(),byTeam=new Map<string,any[]>(),eloByTeam=new Map<string,any>();
  try{
-  const r=await fetch(S+"/functions/v1/moneyball-public-sources?date="+encodeURIComponent(date),{headers:{apikey:K,Accept:"application/json"},signal:AbortSignal.timeout(25000)});
+  const r=await fetch(S+"/functions/v1/moneyball-public-sources?date="+encodeURIComponent(date),{headers:{apikey:SERVICE_KEY||K,Accept:"application/json"},signal:AbortSignal.timeout(25000)});
   if(!r.ok)throw new Error("Public sources HTTP "+r.status);
   const j=await r.json();
    const eloMeta={as_of:j?.elo_ratings?.as_of||null,ratings_count:Number(j?.elo_ratings?.ratings_count||0)};
