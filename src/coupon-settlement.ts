@@ -8,7 +8,7 @@ export interface PaperCouponSettlement {
   legResults: Array<{ fixtureId: string; selection: "1" | "X" | "2"; actual: "1" | "X" | "2"; correct: boolean }>;
 }
 export function evaluatePaperCoupon(coupon: TrackerRecord, records: TrackerRecord[]): PaperCouponSettlement | null {
-  if (coupon.kind !== "coupon" || coupon.status !== "PAPER_NO_ODDS" || typeof coupon.details.legsJson !== "string") return null;
+  if (coupon.kind !== "coupon" || !["PAPER_NO_ODDS", "PAPER_WITH_ODDS"].includes(coupon.status) || typeof coupon.details.legsJson !== "string") return null;
   let legs: Array<{ fixtureId: string; selection: "1" | "X" | "2" }>;
   try {
     const parsed: unknown = JSON.parse(coupon.details.legsJson);
