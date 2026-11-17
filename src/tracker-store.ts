@@ -53,6 +53,9 @@ export function addRecord(input: NewTrackerRecord): TrackerRecord {
 export function addRecordsIfMissing(inputs: NewTrackerRecord[], uniqueDetailField: string): number {
   const existing = readRecords();
   const keys = new Set(existing.flatMap(row => {
+    // A malformed legacy result must not block insertion of a later verified score.
+    if (row.kind === "result" && uniqueDetailField === "fixtureId"
+      && !["1", "X", "2"].includes(String(row.details.actual))) return [];
     const value = row.details[uniqueDetailField];
     return typeof value === "string" ? [`${row.kind}|${value}`] : [];
   }));
