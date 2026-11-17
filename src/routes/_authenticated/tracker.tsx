@@ -104,7 +104,7 @@ function TrackerPage() {
           <StatCard label="Wynik miesiąca" value={f?.month.net == null ? "—" : fmtMoney(f.month.net)} hint={f ? `${f.month.count} rozliczonych kuponów` : "brak danych"} />
           <StatCard label="Wynik łącznie" value={f?.all.net == null ? "—" : fmtMoney(f.all.net)} hint={f ? `${f.all.count} rozliczonych kuponów` : "brak danych"} />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">To zestawienie dotyczy istniejących rozliczeń kuponów. Nie dodaje stawek typów pojedynczych drugi raz do bankrolla.</p>
+        <p className="mt-2 text-xs text-muted-foreground">To zestawienie dotyczy istniejących rozliczeń kuponów. Nie dodaje stawek typów pojedynczych drugi raz do bankrolla. Starsze rekordy nie mają jeszcze pełnej klasyfikacji USER / MODEL / PAPER — nie przypisuję jej automatycznie, także na podstawie samej etykiety TEST.</p>
       </section>
 
       <section className="surface-card p-4">
