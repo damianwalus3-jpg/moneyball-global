@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixtureKey, isEuropeanOpenLiga, openLigaSeasonYears } from "./free-fixtures";
+import { fixtureKey, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaSeasonYears } from "./free-fixtures";
 
 describe("European fixture source classification", () => {
   it("accepts known European country names and competition prefixes", () => {
@@ -31,5 +31,17 @@ describe("OpenLigaDB season discovery", () => {
   });
   it("checks the current season from July onward", () => {
     expect(openLigaSeasonYears("2026-11-17")).toEqual([2026]);
+  });
+});
+
+describe("European competition folders", () => {
+  it("includes cup, youth and smaller-country folders without category exclusions", () => {
+    expect(isEuropeanCompetitionFolder("data/ENG_CUP_FA")).toBe(true);
+    expect(isEuropeanCompetitionFolder("data/UEFA_U21_qualifiers")).toBe(true);
+    expect(isEuropeanCompetitionFolder("data/SMR_1_campionato")).toBe(true);
+    expect(isEuropeanCompetitionFolder("data/LIE_1_league")).toBe(true);
+  });
+  it("rejects non-European country folders", () => {
+    expect(isEuropeanCompetitionFolder("data/BRA_1_serie-a")).toBe(false);
   });
 });
