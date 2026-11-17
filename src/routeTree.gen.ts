@@ -130,7 +130,6 @@ export interface FileRoutesByFullPath {
   '/prognozy-gole': typeof AuthenticatedPrognozyGoleRoute
   '/statystyki': typeof AuthenticatedStatystykiRoute
   '/tracker': typeof AuthenticatedTrackerRoute
-  '/tracker': typeof AuthenticatedTrackerRoute
   '/ustawienia': typeof AuthenticatedUstawieniaRoute
   '/wyniki': typeof AuthenticatedWynikiRoute
 }
@@ -148,6 +147,7 @@ export interface FileRoutesByTo {
   '/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
   '/prognozy-gole': typeof AuthenticatedPrognozyGoleRoute
   '/statystyki': typeof AuthenticatedStatystykiRoute
+  '/tracker': typeof AuthenticatedTrackerRoute
   '/ustawienia': typeof AuthenticatedUstawieniaRoute
   '/wyniki': typeof AuthenticatedWynikiRoute
 }
@@ -167,6 +167,7 @@ export interface FileRoutesById {
   '/_authenticated/prognozy-1x2': typeof AuthenticatedPrognozy1x2Route
   '/_authenticated/prognozy-gole': typeof AuthenticatedPrognozyGoleRoute
   '/_authenticated/statystyki': typeof AuthenticatedStatystykiRoute
+  '/_authenticated/tracker': typeof AuthenticatedTrackerRoute
   '/_authenticated/ustawienia': typeof AuthenticatedUstawieniaRoute
   '/_authenticated/wyniki': typeof AuthenticatedWynikiRoute
 }
@@ -204,6 +205,7 @@ export interface FileRouteTypes {
     | '/prognozy-1x2'
     | '/prognozy-gole'
     | '/statystyki'
+    | '/tracker'
     | '/ustawienia'
     | '/wyniki'
   id:
