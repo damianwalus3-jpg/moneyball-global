@@ -414,7 +414,7 @@ function TrackerPage() {
               </div>
             </div>
             <div className="mt-2 max-h-[420px] overflow-auto rounded-lg border border-border">
-              {(legacyRows.data ?? []).map((row) => (
+              {(legacyRows.data ?? []).slice(0, 50).map((row) => (
                 <label key={row.entity_id} className="flex cursor-pointer items-start gap-3 border-b border-border p-3 last:border-b-0 hover:bg-secondary/30">
                   <input
                     type="checkbox"
@@ -429,7 +429,7 @@ function TrackerPage() {
                   <span className="text-[10px] font-semibold text-warning">NIEPRZYPISANE</span>
                 </label>
               ))}
-              {!(legacyRows.data ?? []).length && <p className="p-4 text-sm text-muted-foreground">Na tej stronie nie ma więcej nieprzypisanych rekordów tego rodzaju.</p>}
+              {!(legacyRows.data ?? []).slice(0, 50).length && <p className="p-4 text-sm text-muted-foreground">Na tej stronie nie ma więcej nieprzypisanych rekordów tego rodzaju.</p>}
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-muted-foreground">Maksymalnie 100 rekordów w jednej operacji. Przypisanie jest trwałe i odnotowane w audycie.</p>
