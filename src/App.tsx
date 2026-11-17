@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
-import { addRecord, exportBackup, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
+import { addRecord, addRecordsIfMissing, exportBackup, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadOpenLigaRecentTeamForm, loadRecentTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
 import { buildThreeLegCandidates } from "./coupon-engine";
@@ -207,6 +207,12 @@ export default function App() {
     try {
       const scan = await scanTodayEuropeanFixtures(force);
       setFixtureScan(scan);
+      addRecordsIfMissing(scan.fixtures.map(match => ({
+        kind: "match" as const,
+        title: `${match.home} vs ${match.away}`,
+        status: "SCHEDULED",
+        details: { fixtureId: match.id, date: match.date, time: match.time, competition: match.competition, source: match.source, sourceUpdatedAt: match.sourceUpdatedAt ?? null },
+      })), "fixtureId");
       addRecord({ kind: "scan", title: `Skan europejski ${scan.date}`, status: scan.leaguesFailed.length ? "WITH_WARNINGS" : "OK", details: { fixtures: scan.fixtures.length, catalogueEntries: scan.leaguesChecked, errors: scan.leaguesFailed.length, source: scan.source } });
       setRecords(readRecords());
     } catch (error) { setScanError(error instanceof Error ? error.message : "Nie udało się pobrać terminarza."); }
