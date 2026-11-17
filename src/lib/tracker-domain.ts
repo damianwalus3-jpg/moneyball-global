@@ -89,3 +89,16 @@ export function formatJackpotSequence(sequence: number): string {
   if (!Number.isSafeInteger(sequence) || sequence < 1) throw new Error("Numer Jackpot musi być dodatnią liczbą całkowitą.");
   return "#" + String(sequence).padStart(3, "0");
 }
+
+/** Build a collision-resistant, owner-local key for a custom category. */
+export function makeTrackerCategoryKey(label: string): string {
+  const slug = label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 48);
+  if (!slug) throw new Error("Nazwa kategorii musi zawierać litery lub cyfry.");
+  return `CUSTOM_${slug}`;
+}
