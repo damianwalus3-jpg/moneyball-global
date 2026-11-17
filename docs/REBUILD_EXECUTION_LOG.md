@@ -366,3 +366,10 @@
 - Added a regression test for the CSV header, text fields and fixture identifiers.
 - Commits: implementation `a1bdda97535a5354c72c72098b76a9d90b3ca35f`; test `82225fe3b2af70f876220ebaaa08806acb5b8c6e`; UI `975b36eb779e0a68479a82705568f95e6f17780b`.
 - CI and Cloudflare deployment are pending; this stage is not complete until both pass.
+
+## Stage 32 — coupon settlement result precedence
+- Fixed coupon settlement to retain the newest valid result for each fixture, matching Tracker's newest-first ordering and the prediction audit's behavior.
+- This prevents older conflicting/legacy result rows from silently changing a coupon's hit/miss status.
+- Added a regression test with conflicting result rows and an explicit correct-leg count assertion.
+- Commits: implementation `ee2ae8d8db177cc06408a3c7180f3b6acae37a0d`; test updates `3834bdc39e1348d87aed93cc78e36feb22f9a6e9`, `09066643243f1b542da74c7b987b899fe2891c5e`, `8f9a1476fd86da75f918dee1a2380704a1d574a3`.
+- CI and Cloudflare deployment pending on the latest branch push.
