@@ -24,7 +24,13 @@ export function auditTrackerPredictions(records: TrackerRecord[]): ModelAudit {
     const actual = record.details.actual;
     if (actual === "1" || actual === "X" || actual === "2") results.set(record.details.fixtureId, actual);
   }
-  const predictions = records.filter(record => record.kind === "prediction" && typeof record.details.fixtureId === "string");
+  const predictionByFixture = new Map<string, TrackerRecord>();
+  for (const record of records) {
+    if (record.kind !== "prediction" || typeof record.details.fixtureId !== "string" || predictionByFixture.has(record.details.fixtureId)) continue;
+    // Tracker is newest-first: one canonical prediction per fixture prevents duplicate rows from overweighting metrics.
+    predictionByFixture.set(record.details.fixtureId, record);
+  }
+  const predictions = [...predictionByFixture.values()];
   const settled = predictions.flatMap(record => {
     const d = record.details;
     const actual = results.get(d.fixtureId as string);
