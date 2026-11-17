@@ -157,7 +157,7 @@ export default {
       }, 200, origin);
     }
 
-    const espnScoreboard = url.pathname.match(/^\\/api\\/espn\\/scoreboard\\/(\\d{8})$/);
+    const espnScoreboard = url.pathname.match(/^\/api\/espn\/scoreboard\/(\d{8})$/);
     if (espnScoreboard) {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
       const date = espnScoreboard[1];
