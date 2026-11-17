@@ -149,7 +149,7 @@ async function readFootballChartsFixtures(date:string,ownerId:string,token:strin
    const payload=await response.json(),matches=Array.isArray(payload?.matches)?payload.matches:[];
    const fixtures=matches.flatMap((match:any)=>{
     const matchDate=String(match?.match_date||""),time=String(match?.time||"");
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(matchDate)||!/^([01]\\d|2[0-3]):[0-5]\\d$/.test(time))return [];
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(matchDate)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return [];
     const parsed=new Date(matchDate+"T"+time+":00Z");
     if(!Number.isFinite(parsed.getTime()))return [];
     const localDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(parsed);
