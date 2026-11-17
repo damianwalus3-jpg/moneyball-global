@@ -91,7 +91,7 @@ export function importBackup(value: unknown): number {
     ids.add(row.id);
     return true;
   });
-  if (missing.length) writeRecords([...missing, ...existing]);
+  if (missing.length) writeRecords([...missing, ...existing].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)));
   return missing.length;
 }
 
