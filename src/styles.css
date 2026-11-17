@@ -44,3 +44,17 @@
 .safest-pick-card p, .dashboard-safest-pick p { margin: 6px 0 10px; }
 .safest-pick-card small, .dashboard-safest-pick small { display: block; line-height: 1.5; opacity: .82; }
 .fixture-row .scan-error { grid-column: 1 / -1; margin: 6px 0; }
+
+/* Stage 48 — selected/rejected odds and stake ledger */
+.bet-metrics { margin: 18px 0 26px; }
+.bet-entry-list { display:grid; gap:12px; margin-top:14px; }
+.bet-entry { border:1px solid var(--line); background:var(--panel2); border-radius:12px; padding:14px; display:grid; gap:12px; }
+.bet-entry > div:first-child { display:grid; gap:5px; }
+.bet-entry small { color:var(--muted); line-height:1.45; }
+.bet-entry-controls { display:grid; grid-template-columns:1fr 1fr 1fr auto auto; gap:8px; }
+.bet-entry-controls input,.bet-entry-controls select { min-width:0; width:100%; background:#0b1322; color:var(--text); border:1px solid var(--line); border-radius:8px; padding:9px; }
+.bet-entry-controls button { border:1px solid var(--line); background:#17243a; color:var(--text); border-radius:8px; padding:9px 12px; }
+.bet-entry-controls button:disabled { opacity:.45; cursor:not-allowed; }
+.bet-row { grid-template-columns: .8fr 2fr .6fr .8fr 1.2fr; }
+.profit-positive { color:var(--mint); } .profit-negative { color:#ff8585; }
+@media(max-width:700px){.bet-entry-controls{grid-template-columns:1fr 1fr}.bet-entry-controls button{min-height:42px}.bet-row{grid-template-columns:1fr;gap:5px}}
