@@ -55,6 +55,18 @@ function isOpenMatchdayTopTwoMatch(m:any):boolean {
  if(/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\b/i.test(folder+" "+competition))return false;
  return true;
 }
+function isEligibleScheduledFixture(f:any):boolean {
+ const competition=String(f?.competition||f?.league||"");
+ const country=String(f?.country||"");
+ const home=f?.home_team||f?.home,away=f?.away_team||f?.away;
+ return isEuropeanFixture(country,competition,home,away)
+  && (isOpenMatchdayTopTwoMatch(f)||isTopTwoTierLeague(competition,country))
+  && fixtureGender(f)==="men";
+}
+function brusselsFixtureDay(value:any):string {
+ const stamp=Date.parse(String(value||""));
+ return Number.isFinite(stamp)?new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(stamp)):"";
+}
 async function db(p:string,t:string,m="GET",b?:any,prefer="return=representation"){const isService=t===SERVICE_KEY;const r=await fetch(S+"/rest/v1/"+p,{method:m,headers:{apikey:isService?SERVICE_KEY:K,Authorization:"Bearer "+(isService?SERVICE_KEY:t),...(isService?{"x-cron-token":CRON_FALLBACK_TOKEN}:{}),"Content-Type":"application/json",Prefer:prefer},body:b===undefined?undefined:JSON.stringify(b)});const s=await r.text();let j:any;try{j=s?JSON.parse(s):null}catch{j=s}if(!r.ok)throw Error(j?.message||j?.details||"DB HTTP "+r.status);return j;}
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
 function normTeam(v:any){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\b(fc|cf|sc|ac|afc|club)\b/g," ").replace(/\b(wfc|women|w)\b/g," women ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");}
@@ -271,10 +283,10 @@ async function readPublicSourceForms(date:string,token:string){
     // Preserve one-sided form when the opponent has no tracked league results.
     for(const [team,form] of [[f.home_team,h],[f.away_team,a]] as any[]){if(!form)continue;const key=normTeam(team),arr=byTeam.get(key)||[];arr.push({form,country:String(f.country||"").toLowerCase(),competition:String(f.competition||"").toLowerCase(),gender:genderKey});byTeam.set(key,arr);}
    }
-  const result={byPair,byTeam,eloByTeam,eloMeta,fixtures:Number(j?.european_fixtures||0),error:null};
+  const result={byPair,byTeam,eloByTeam,eloMeta,fixtures:Number(j?.european_fixtures||0),fixtureRows:Array.isArray(j?.fixtures)?j.fixtures:[],error:null};
   publicSourceFormsCache={date,at:Date.now(),value:result};
   return result;
- }catch(e){console.error("OpenMatchday supplemental form unavailable:",String(e));return {byPair,byTeam,eloByTeam,eloMeta:null,fixtures:0,error:String(e)};}
+ }catch(e){console.error("OpenMatchday supplemental form unavailable:",String(e));return {byPair,byTeam,eloByTeam,eloMeta:null,fixtures:0,fixtureRows:[],error:String(e)};}
 }
 let tipsAuditPayloadCache:any=null;let tipsAuditPayloadCacheAt=0;
 async function readTipsAuditFairMarket(date:string,matches:any[]){
