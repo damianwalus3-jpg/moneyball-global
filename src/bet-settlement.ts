@@ -10,7 +10,8 @@ export function selectionWon(selection: string, actual: string): boolean {
 
 export function buildBetSettlementRows(records: TrackerRecord[]): Array<Omit<TrackerRecord, "id" | "createdAt">> {
   const results = new Map<string, string>();
-  for (const row of records) {
+  const newestFirst = [...records].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  for (const row of newestFirst) {
     if (row.kind === "result" && typeof row.details.fixtureId === "string"
       && ["1", "X", "2"].includes(String(row.details.actual)) && !results.has(row.details.fixtureId)) {
       results.set(row.details.fixtureId, String(row.details.actual));
@@ -21,14 +22,16 @@ export function buildBetSettlementRows(records: TrackerRecord[]): Array<Omit<Tra
     .map(row => String(row.details.parentBetId)));
   return records.flatMap(row => {
     if (row.kind !== "bet" || typeof row.details.fixtureId !== "string"
-      || typeof row.details.decision !== "string" || existingSettlements.has(row.id)) return [];
+      || !["SELECTED", "REJECTED"].includes(String(row.details.decision)) || existingSettlements.has(row.id)) return [];
     const actual = results.get(row.details.fixtureId);
     if (!actual) return [];
     const selection = String(row.details.selection ?? row.details.market ?? "");
+    if (!["1", "X", "2", "1X", "X2", "12"].includes(selection)) return [];
     const won = selectionWon(selection, actual);
     const selected = row.details.decision === "SELECTED";
     const stake = Number(row.details.stake);
     const odds = Number(row.details.odds);
+    if (!Number.isFinite(odds) || odds <= 1 || (selected && (!Number.isFinite(stake) || stake <= 0))) return [];
     const profitLoss = selected ? (won ? stake * (odds - 1) : -stake) : 0;
     return [{
       kind: "bet" as const,
