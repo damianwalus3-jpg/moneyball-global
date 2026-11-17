@@ -4,6 +4,7 @@ import { addRecord, exportBackup, importBackup, readRecords, removeRecord, type 
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadOpenLigaRecentTeamForm, loadRecentTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
 import { buildThreeLegCandidates } from "./coupon-engine";
+import { evaluatePaperCoupon } from "./coupon-settlement";
 import { auditTrackerPredictions } from "./model-audit";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
@@ -160,6 +161,25 @@ export default function App() {
         setSettleProgress(processed);
       }
     } finally {
+      const latest = readRecords();
+      const coupons = latest.filter(row => row.kind === "coupon" && row.status === "PAPER_NO_ODDS"
+        && !latest.some(item => item.kind === "coupon" && item.details.parentCouponId === row.id));
+      for (const coupon of coupons) {
+        const settlement = evaluatePaperCoupon(coupon, latest);
+        if (settlement) addRecord({
+          kind: "coupon",
+          title: `${coupon.title} · ${settlement.correctLegs}/3`,
+          status: settlement.status,
+          details: {
+            parentCouponId: coupon.id,
+            correctLegs: settlement.correctLegs,
+            totalLegs: settlement.totalLegs,
+            legResultsJson: JSON.stringify(settlement.legResults),
+            odds: null,
+            stake: null,
+          },
+        });
+      }
       setSettling(false);
       setRecords(readRecords());
     }
