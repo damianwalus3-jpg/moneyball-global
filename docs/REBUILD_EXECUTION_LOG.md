@@ -805,3 +805,13 @@
 - Implemented dynamic discovery from the single recursive OpenFootball Europe Git tree endpoint, selecting only current-season/calendar-year files for known European country directories; retains existing standalone country feeds; records catalogue failures in source errors; registers discovered feed IDs so team-form and result adapters can resolve them after scan. Bumped both fixture-cache versions so an old 15-minute cached scan cannot hide newly discovered feeds; dynamic feed registry is initialized before any cached scan is returned.
 - Expanded OpenLigaDB country shortcut classification using strict country-code-plus-digit/separator matching for ISO-2 and ISO-3 codes; ambiguous shortcuts beginning with a country code are rejected unless they match the code pattern, while verified named feeds such as NOFV and Regionalliga remain included. Added regression tests for the missing country prefixes. Added dynamic OpenFootball discovery tests to exclude stale seasons, RSSSF history files and non-European folders.
 - No paid provider requests, credits, Tracker records, coupon history or bankroll values were touched. Stage validation and separate Cloudflare REBUILD deployment are pending CI.
+
+
+## Stage 66 — validation and deployment confirmation
+- CI run 44197660638 succeeded: typecheck, unit tests and production build.
+- Rebuild checks run 44197660818 succeeded.
+- Separate Cloudflare REBUILD deployment run 44197660690 succeeded.
+- Live Worker https://moneyball-global-rebuild.damianwalus3.workers.dev/ returned the expected Polish MONEYBALL application shell. No MAIN Worker or main branch was changed.
+- Source audit: open-matchday advertised 62 European competition folders and its index timestamp was 2026-11-17T07:19:26Z. The current OpenFootball Europe tree exposed eight 2026/27 or 2026 calendar-year files on the audit date. These public catalogues are finite and do not establish complete coverage of every European division.
+- UI audit confirmed there is no 10-match cap in the scan or full Mecze list. The Dashboard intentionally previews up to six fixtures; the full Mecze tab renders every fixture returned by the scan. The observed count of 10 is therefore not caused by a scan `.slice(0,10)` limit. The exact ten browser rows were not available for row-by-row reconciliation.
+- Current state: dynamic feed discovery, stricter European OpenLigaDB shortcut recognition, and stale-cache invalidation are deployed. Do not describe the scan as exhaustive. Next stage: qualify additional genuinely free, no-key European fixture sources and integrate only providers with verified coverage and usage terms.
