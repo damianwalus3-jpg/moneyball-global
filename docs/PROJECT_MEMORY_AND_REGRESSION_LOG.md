@@ -1295,3 +1295,13 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 
 
 **Final source/Cloudflare validation:** Deno scope tests, Edge Function type-check, application tests, TypeScript and build passed in CI #1231 and #1232. Cloudflare deploy #818 SUCCESS for `effa5063e006a40f30da26f3981987e9153865c5`. The odds-sync function now also rejects matches outside the shared geographic country gate. Supabase functions and SQL migration remain source-only and are not live.
+
+
+## Manual fixture search HTTP 400 root-cause — 2026-11-17
+
+- User screenshot showed Supabase Edge Function non-2xx during the manual match search.
+- Read-only production logs confirmed `POST /functions/v1/footynomad-sync` returned HTTP 400 twice at 2026-11-17 10:31:33Z and 10:31:37Z (Belgium 11:31). The adjacent `moneyball-public-sources` call returned HTTP 200. Results-sync logs independently reported 173 FootyNomad fixtures for 2026-11-17. Thus the public fixture sources were reachable; the failure occurred in the authenticated import path.
+- Production function version 97 and the main-branch source contained `req.headers.get("Authorization")?.replace(/^Bearer\\\\s+/i, "")` (two literal backslashes in the regex). It does not strip the normal `Bearer ` prefix. The function then forwards `Authorization: Bearer ` plus that unstripped value to PostgREST. This explains a downstream authorization failure surfaced as HTTP 400 by the function's outer catch. The exact DB error body is not retained in the function logs, so treat this as the strongly evidenced root cause, not a claim that the downstream 401 body was directly captured.
+- Fixed source by adding shared `extractBearerToken` helper and tests (standard, case-insensitive, raw token, missing header), and wired tests into CI. Updated the match-screen error handler to read the Edge Function response body and show HTTP status plus the actual error, rather than the generic SDK non-2xx message.
+- Commit: `5ff5fc72050dc3265d5203c6226d86061ffa960a`. CI #1233 and Cloudflare deploy #819 were running when this note was prepared.
+- **Production activation remains pending:** the failing request is handled by Supabase Edge Function `footynomad-sync` (project `gzgeklcukrclgwbsmbsp`, active version 97). A Cloudflare Worker deploy cannot replace this function. Under the project's established Cloudflare/GitHub-only deployment constraint, do not deploy directly to Supabase. The source fix must be activated through the authorized Supabase deployment path before a live retry can confirm recovery.
