@@ -5,6 +5,8 @@ export type SelectionGoals = "BTTS_YES" | "BTTS_NO" | "OVER_1.5" | "UNDER_1.5" |
 export type Selection = Selection1X2 | SelectionDC | SelectionGoals;
 export type Outcome = Selection1X2;
 export type Verdict = "WYBRANY" | "ODRZUCONY";
+export type DecisionStatus = "FINAL" | "WATCH" | "LEAN" | "CONDITIONAL" | "REJECTED" | "PASS" | "PAPER";
+export type SourceClass = "USER" | "MODEL" | "PAPER";
 export type Settlement = "pending" | "won" | "lost" | "void";
 export type CouponStatus = Settlement | "cancelled";
 export type MatchStatus = "scheduled" | "live" | "finished" | "postponed" | "cancelled" | "unknown";
@@ -80,6 +82,8 @@ export interface Prediction {
   notes?: string | null;
   data_source?: string | null;
   data_coverage?: Record<string, unknown> | null;
+  decision_status?: DecisionStatus | null;
+  source_class?: SourceClass | null;
 }
 
 export interface Coupon {
@@ -98,6 +102,7 @@ export interface Coupon {
   notes: string | null;
   total_odds?: number | null;
   combined_probability?: number | null;
+  source_class?: SourceClass | null;
 }
 
 export interface CouponLeg {
@@ -159,6 +164,29 @@ export interface BankrollTransaction {
   type?: TxType;
 }
 
+export interface TrackerCategory {
+  id: string;
+  owner_id: string | null;
+  category_key: string;
+  display_name: string;
+  description: string | null;
+  category_group: "CORE" | "SPORT" | "LEGACY";
+  sort_order: number;
+  is_system: boolean;
+  include_in_official_finance: boolean;
+  created_at: string;
+}
+
+export interface JackpotEntry {
+  id: string;
+  owner_id: string;
+  sequence_no: number;
+  coupon_id: string;
+  title: string;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface TableRows {
   scan_runs: ScanRun;
   matches: Match;
@@ -168,6 +196,8 @@ export interface TableRows {
   match_results: MatchResult;
   odds_snapshots: OddsSnapshot;
   bankroll_transactions: BankrollTransaction;
+  moneyball_tracker_categories: TrackerCategory;
+  moneyball_jackpot_entries: JackpotEntry;
 }
 export type TableName = keyof TableRows;
 
@@ -181,6 +211,8 @@ export const TABLES_IN_ORDER: TableName[] = [
   "coupons",
   "coupon_legs",
   "bankroll_transactions",
+  "moneyball_tracker_categories",
+  "moneyball_jackpot_entries",
 ];
 
 export const TABLE_LABELS: Record<TableName, string> = {
@@ -192,4 +224,6 @@ export const TABLE_LABELS: Record<TableName, string> = {
   match_results: "Wyniki meczów",
   odds_snapshots: "Kursy",
   bankroll_transactions: "Transakcje bankrolla",
+  moneyball_tracker_categories: "Kategorie Trackera",
+  moneyball_jackpot_entries: "Rejestr Jackpot",
 };
