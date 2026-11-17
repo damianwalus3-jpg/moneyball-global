@@ -19,6 +19,9 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
   const targetLegs = options.targetLegs ?? 3;
   if (targetLegs !== 1 && targetLegs !== 3) throw new Error("MONEYBALL zapisuje wyłącznie single albo kupony 3-zdarzeniowe.");
   if (targetLegs === 1 && options.couponType !== "MAIN") throw new Error("Pojedynczy typ musi być zapisany jako kupon MAIN.");
+  const couponType = options.couponType ?? "TEST";
+  const sourceClass = couponType === "TEST" ? "PAPER" : "MODEL";
+  const recordStake = options.recordStake === true && sourceClass !== "PAPER";
   const requireOdds = options.couponType != null && options.couponType !== "TEST";
   // Enforce selection rules again at the persistence boundary. UI filtering is not a data-integrity boundary.
   if (coupons.some((coupon) => coupon.some((prediction) => !isEligibleCouponPrediction(prediction)))) {
@@ -35,7 +38,7 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
   const createdLegs: string[] = [];
   const createdTransactions: string[] = [];
   try {
-    const balances = options.recordStake
+    const balances = recordStake
       ? stakeBalances(await fetchAll("bankroll_transactions"), stake, coupons.length)
       : [];
     for (const [index, predictions] of coupons.entries()) {
@@ -47,8 +50,8 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
       const coupon = await insertRow("coupons", {
         scan_run_id: options.scanRunId ?? null,
         name: `${options.namePrefix} #${index + 1}`.trim(),
-        coupon_type: options.couponType ?? "TEST",
-        source_class: options.couponType === "TEST" ? "PAPER" : "MODEL",
+        coupon_type: couponType,
+        source_class: sourceClass,
         status: "pending",
         target_legs: targetLegs,
         combined_odds: odds,
@@ -71,7 +74,7 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
       createdLegs.push(...legs.map((leg) => leg.id));
       if (legs.length !== predictions.length)
         throw new Error("Kupon " + coupon.name + ": zapisano " + legs.length + " z " + predictions.length + " zdarzeń.");
-      if (options.recordStake) {
+      if (recordStake) {
         const transaction = await insertRow("bankroll_transactions", {
           transaction_type: "stake",
           amount: stake,
