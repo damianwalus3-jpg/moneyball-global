@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { addRecord, exportBackup, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
@@ -33,6 +34,16 @@ export default function App() {
   const [active, setActive] = useState<Tab>("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [records, setRecords] = useState<TrackerRecord[]>(() => readRecords());
+  const [newTitle, setNewTitle] = useState("");
+  const [newKind, setNewKind] = useState<TrackerKind>("match");
+  const [notice, setNotice] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const visibleRecords = useMemo(() => records.filter(row => (active === "tracker" ? true : row.kind === (active === "matches" ? "match" : active === "coupons" ? "coupon" : active === "pick" ? "prediction" : "scan")) && (row.title.toLowerCase().includes(query.toLowerCase()) || row.status.toLowerCase().includes(query.toLowerCase()))), [records, active, query]);
+  const refreshRecords = () => setRecords(readRecords());
+  const saveRecord = () => { if (!newTitle.trim()) return; addRecord({ kind: newKind, title: newTitle.trim(), status: "draft", details: {} }); setNewTitle(""); refreshRecords(); setNotice("Zapisano lokalnie na tym urządzeniu."); };
+  const downloadBackup = () => { const blob = new Blob([JSON.stringify(exportBackup(), null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "moneyball-backup.json"; a.click(); URL.revokeObjectURL(url); };
+  const loadBackup = async (file?: File) => { if (!file) return; try { const imported = importBackup(JSON.parse(await file.text())); refreshRecords(); setNotice(`Zaimportowano ${imported} nowych rekordów. Istniejące dane zachowano.`); } catch (error) { setNotice(error instanceof Error ? error.message : "Błąd importu kopii."); } if (fileRef.current) fileRef.current.value = ""; };
   const current = descriptions[active];
 
   const changeTab = (tab: Tab) => { setActive(tab); setMobileOpen(false); };
@@ -68,12 +79,14 @@ export default function App() {
           <section className="lower-grid"><article className="panel"><div className="panel-heading"><div><h3>Ostatnia aktywność</h3><p>Zdarzenia w nowym systemie</p></div><Activity size={18}/></div><div className="empty-state"><div className="empty-icon"><Activity size={21}/></div><b>To początek historii</b><span>Po uruchomieniu źródeł pojawią się tu skany, prognozy i rozliczenia.</span></div></article><article className="panel"><div className="panel-heading"><div><h3>Etapy uruchomienia</h3><p>Postęp budowy platformy</p></div><Trophy size={18}/></div><div className="check-list"><div className="check-row done"><span>01</span><div><b>Nowy fundament aplikacji</b><small>Utworzono czystą gałąź i strukturę PWA</small></div><i>DONE</i></div><div className="check-row"><span>02</span><div><b>Model danych i Tracker</b><small>Projekt schematu i walidacji</small></div><i>NEXT</i></div><div className="check-row"><span>03</span><div><b>Źródła i silnik prognoz</b><small>Integracje i testy modeli</small></div><i>WAIT</i></div><div className="check-row"><span>04</span><div><b>Bezpieczeństwo i publikacja</b><small>Testy końcowe i wdrożenie</small></div><i>WAIT</i></div></div></article></section>
         </>}
 
-        {active !== "dashboard" && <section className="module-panel">
+        {active === "tracker" && <section className="tracker-panel"><div className="tracker-toolbar"><div><h2>Twój lokalny rejestr</h2><p>Dane są zapisywane w pamięci tej przeglądarki. Eksportuj kopię, aby ich nie utracić.</p></div><div className="backup-actions"><button onClick={downloadBackup}>Eksport JSON</button><button onClick={() => fileRef.current?.click()}>Import JSON</button><input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={e => void loadBackup(e.target.files?.[0])}/></div></div><div className="tracker-form"><select value={newKind} onChange={e => setNewKind(e.target.value as TrackerKind)}><option value="match">Mecz</option><option value="prediction">Prognoza</option><option value="coupon">Kupon</option><option value="scan">Skan</option><option value="result">Wynik</option><option value="odds">Kurs</option><option value="ledger">Bankroll</option><option value="category">Kategoria</option><option value="jackpot">Jackpot</option></select><input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Dodaj wpis do Trackera…"/><button onClick={saveRecord} disabled={!newTitle.trim()}><Plus size={16}/> Zapisz</button></div>{notice && <div className="tracker-notice">{notice}</div>}<div className="tracker-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Szukaj wpisów…"/><span>{visibleRecords.length} wpisów</span></div><div className="tracker-table"><div className="tracker-head"><span>TYP</span><span>NAZWA</span><span>STATUS</span><span>DATA</span><span/></div>{visibleRecords.map(row => <div className="tracker-row" key={row.id}><span>{row.kind}</span><b>{row.title}</b><span>{row.status}</span><time>{new Date(row.createdAt).toLocaleString("pl-BE")}</time><button aria-label="Usuń wpis" onClick={() => { removeRecord(row.id); refreshRecords(); }}>×</button></div>)}{visibleRecords.length === 0 && <div className="tracker-empty">Brak wpisów. Dodaj pierwszy rekord lub zaimportuj kopię zapasową.</div>}</div></section>}
+
+        {active !== "dashboard" && active !== "tracker" && <section className="module-panel">
           <div className="module-icon">{active === "matches" ? <CalendarDays/> : active === "pick" ? <Sparkles/> : active === "coupons" ? <Ticket/> : active === "intelligence" ? <BarChart3/> : <ClipboardList/>}</div>
           <h2>{active === "matches" ? "Centrum meczów" : active === "pick" ? "Selekcja bez zgadywania" : active === "coupons" ? "Kupony analityczne" : active === "intelligence" ? "Pomiar jakości modelu" : "Centralny rejestr danych"}</h2>
           <p>{active === "matches" ? "Terminarz i dane meczowe pojawią się po podłączeniu zweryfikowanych źródeł." : active === "pick" ? "Typ dnia zostanie opublikowany tylko wtedy, gdy dane i model uzasadnią wybór." : active === "coupons" ? "Generator będzie pilnował reguł kuponu, kursów, stawek analitycznych i rozliczeń." : active === "intelligence" ? "Metryki będą liczone na rozliczonych prognozach. Nie pokażemy skuteczności bez próby." : "Tracker stanie się natywnym źródłem prawdy — bez Google Sheets."}</p>
           <div className="module-status"><span className="status-dot"/> MODUŁ ZAPROJEKTOWANY · IMPLEMENTACJA W TOKU</div>
-          <div className="module-search"><Search size={17}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder={active === "tracker" ? "Szukaj w rejestrze (po uruchomieniu danych)" : "Wyszukaj (po podłączeniu źródeł)"} disabled/><button disabled><Plus size={16}/> Dodaj</button></div>
+          <div className="module-search"><Search size={17}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Wyszukaj (po podłączeniu darmowych źródeł)" disabled/><button disabled><Plus size={16}/> Dodaj</button></div>
         </section>}
 
         <footer className="footer"><span>MONEYBALL — TRUST THE PROCESS</span><span>FRESH BUILD · DATA TRANSPARENCY FIRST</span></footer>
