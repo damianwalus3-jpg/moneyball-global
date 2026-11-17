@@ -127,6 +127,7 @@ The first production Tracker release is implemented on the existing MAIN applica
 
 - Authenticated route `/tracker` is registered in TanStack Router and exposed in desktop/mobile navigation.
 - Overview reads the existing dashboard summary, selected picks, coupon finance summary and latest scan. It does not download the full predictions history.
+- Server-side RPC `moneyball_tracker_category_summary` returns category, decision, source and settlement aggregates only; it maps legacy and missing labels without downloading the full prediction history.
 - Category registry is persisted in `moneyball_tracker_categories`: 15 global read-only system categories (including `UNCLASSIFIED`) plus owner-scoped custom-category support.
 - Legacy category mapping is persisted in `moneyball_tracker_category_aliases` (14 aliases, including missing `group_name` values). Historical `MAIN` remains a separate legacy category and is never silently rewritten as `MAIN A` or `MAIN B`.
 - Jackpot register is persisted in `moneyball_jackpot_entries`, linked to an existing coupon with an owner-scoped foreign key. Sequence numbers are owner-scoped, allocated under a transaction advisory lock, immutable after insert and not deletable through the authenticated API.
@@ -142,8 +143,10 @@ The first production Tracker release is implemented on the existing MAIN applica
 - `20261117121443_moneyball_tracker_registry_and_jackpot`
 - `20261117121659_preserve_jackpot_sequence_on_restore`
 - `20261117121922_exclude_paper_coupons_from_official_finance`
+- `20261117122156_add_unclassified_tracker_category`
+- `20261117122648_moneyball_tracker_category_summary`
 
-All three are additive. They do not rewrite historical matches, predictions, coupons, coupon legs, results or bankroll transactions.
+All five are additive. They do not rewrite historical matches, predictions, coupons, coupon legs, results or bankroll transactions.
 
 ### Verification snapshot
 
@@ -151,7 +154,8 @@ All three are additive. They do not rewrite historical matches, predictions, cou
 - 0 Jackpot entries at deployment time — no synthetic entries were created.
 - 19,201 predictions; 9 coupons; 9 bankroll transactions remained unchanged by the migrations.
 - New tables have RLS enabled with owner/system-specific policies. No new Supabase health lints or security-advisor findings were introduced by the Tracker tables.
-- CI passed: 83 tests, Supabase Edge Function type-check, application type-check and production build.
+- The aggregate RPC was checked against the authenticated owner scope and its totals matched the 19,201 prediction and 9 coupon records.
+- CI passed: 86 tests, Supabase Edge Function type-check, application type-check and production build.
 - Cloudflare MAIN deployment workflow completed successfully for the current Tracker release.
 - The `/tracker` route remains behind the existing authentication guard; unauthenticated route fetches return `login_required`.
 
