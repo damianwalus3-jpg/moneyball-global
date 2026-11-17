@@ -212,3 +212,12 @@
 - CI run `44115497308`: SUCCESS — TypeScript, all tests and production build passed.
 - Cloudflare deployment run `44115497817`: SUCCESS — separate rebuild Worker deployment passed.
 - Stage 14 is COMPLETE/DEPLOYED. Predictions can now use the third source where no matching open-matchday/OpenLigaDB history exists.
+
+## 2026-11-17 — Stage 15: current source coverage audit and policy
+- Queried the live open-matchday `build_summary.json` generated at `2026-11-17T07:19:26Z`: 75 competitions were listed, of which 65 were European folders accepted by the app's country/UEFA allowlist. The current list includes domestic cups, multiple English tiers (including National League North/South and Northern Premier League), Scottish lower divisions, Welsh divisions, Belgian U21, German 2./3. tiers, Spanish Segunda, Italian Serie B, French Ligue 2 and Dutch Eerste Divisie.
+- This is a dated provider snapshot, not a guarantee that all European competitions or all matches are present. Some folders may have missing or partial fixture spines; per-provider errors and counts are now exposed in the app.
+- Reviewed further free sources: OpenFootball public-domain datasets add selected current-season European competitions; football-data.org free tier is limited; zerozero's free plan is limited to 250 calls/month and two club teams, not a Europe-wide feed.
+- Rejected automated FotMob and Sofascore scraping as an implementation path: FotMob explicitly requested removal of automated access in a 2026 scraper issue; Sofascore terms restrict scraping/aggregation and its FAQ says it does not provide public API endpoints. No unauthorized scraping was added.
+- Current source set remains open-matchday + OpenLigaDB + OpenFootball. All sources are free/public and no API keys or subscriptions were added.
+- Final code HEAD before this documentation update: `7e2548a47c07190ad1b0a366681710985ae9c659`.
+- 100% Europe coverage remains unprovable and unavailable from the current legal/free sources; the app must continue reporting source coverage honestly.
