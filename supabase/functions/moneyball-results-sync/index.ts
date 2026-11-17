@@ -67,8 +67,10 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
  const out:ScoreFeed[]=[];
  const matchFields="select=id,external_id,home_team,away_team,owner_id,country,league,gender,kickoff_at,kickoff_date,status";
  const discoveryStarted=Date.now();
- const timedMatches=await db("matches?"+matchFields+"&kickoff_at=gte."+encodeURIComponent(startDate+"T00:00:00Z")+"&kickoff_at=lt."+encodeURIComponent(endDate+"T23:59:59Z")).catch(()=>[]);
- const dateOnlyMatches=await db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=gte."+encodeURIComponent(startDate)+"&kickoff_date=lte."+encodeURIComponent(endDate)).catch(()=>[]);
+ const [timedMatches,dateOnlyMatches]=await Promise.all([
+  db("matches?"+matchFields+"&kickoff_at=gte."+encodeURIComponent(startDate+"T00:00:00Z")+"&kickoff_at=lt."+encodeURIComponent(endDate+"T23:59:59Z")).catch(()=>[]),
+  db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=gte."+encodeURIComponent(startDate)+"&kickoff_date=lte."+encodeURIComponent(endDate)).catch(()=>[]),
+ ]);
  console.log("[moneyball-results-sync] discovery",JSON.stringify({timedMatches:timedMatches.length,dateOnlyMatches:dateOnlyMatches.length,durationMs:Date.now()-discoveryStarted}));
  const unresolved=[...(timedMatches||[]),...(dateOnlyMatches||[])],todayKey=day(new Date());
  const due=unresolved.filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team)&&((m.kickoff_at&&new Date(m.kickoff_at).getTime()<Date.now())||(!m.kickoff_at&&m.kickoff_date&&String(m.kickoff_date)<=todayKey))&& !["finished","postponed","cancelled"].includes(String(m.status||"").toLowerCase()));
@@ -403,8 +405,10 @@ Deno.serve(async(req:Request)=>{
      const matchFields="select=id,external_id,source,home_team,away_team,country,league,gender,kickoff_at,kickoff_date,status,owner_id";
      const ownerFilter=ownerId?"&owner_id=eq."+encodeURIComponent(ownerId):"";
      const matchLoadStarted=Date.now();
-     const rawMatches=await db("matches?"+matchFields+"&kickoff_at=gte."+encodeURIComponent(start.toISOString())+"&kickoff_at=lt."+encodeURIComponent(end.toISOString())+ownerFilter);
-     const rawDateOnly=await db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=eq."+encodeURIComponent(date)+ownerFilter);
+     const [rawMatches,rawDateOnly]=await Promise.all([
+      db("matches?"+matchFields+"&kickoff_at=gte."+encodeURIComponent(start.toISOString())+"&kickoff_at=lt."+encodeURIComponent(end.toISOString())+ownerFilter),
+      db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=eq."+encodeURIComponent(date)+ownerFilter),
+     ]);
      const matches=[...(rawMatches||[]).filter((m:any)=>m.kickoff_at&&day(new Date(m.kickoff_at))===date),...(rawDateOnly||[]).filter((m:any)=>String(m.kickoff_date||"").slice(0,10)===date)].filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team));
     const existingResults:any[]=[];
     // Bound every IN query to avoid PostgREST gateway URL limits on large match days.
