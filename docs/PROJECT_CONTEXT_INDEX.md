@@ -132,3 +132,14 @@ New audit: docs/EUROPEAN_LEAGUE_SOURCE_COVERAGE_2026-11-17.md. Current public ca
 
 ## Football Charts fallback and remaining source gap — 2026-11-17 10:20 UTC
 New provider audit in docs/EUROPEAN_LEAGUE_SOURCE_COVERAGE_2026-11-17.md and docs/FOOTBALL_CHARTS_SOURCE_EVALUATION_2026-11-17.md. Football Charts: 98 leagues / 44 countries, 31 UEFA associations; adds seven countries to previous 30/55 coverage, now at least 37/55; 18 associations remain uncovered. Implemented owner-only no-key eight-league fixture fallback in authenticated footynomad-sync; UTC to Europe/Brussels date filter, attribution, provider model discarded; owner UUID gate for personal-use terms. SQL aliases for efbet League and TOPLYGA; 15/15 SQL tests. CI 44053372684 and Cloudflare MAIN deploy 44053372690 SUCCESS; Supabase footynomad-sync v88. Authenticated import still needs verification at 15:00. FotMob/SofaScore rejected due automated extraction restrictions; TheSportsDB adds no coverage; OpenFootball old files are historical only.
+
+
+## FootyNomad day-page vs DB reconciliation — 2026-11-17 10:24 Europe/Brussels
+
+- Full FootyNomad page for 17 Nov reports 173 matches across 20 countries: https://footynomad.com/fixtures/2026-11-17
+- Owner DB contains 99 FootyNomad rows for the Brussels-local day. Grouped DB counts: 41 European domestic-category rows, 57 UEFA/World competition rows (senior Nations League and U17/U19/U21/U20 competitions), plus one Ukraine Persha Liga row involving Polissya II.
+- The page's European domestic categories are exactly France National 2 (1), Czech 3. liga (1), England domestic lower tiers/cups (28), Northern Ireland Championship (2), Portugal U23 (1), Scotland Lowland League (8) = 41; all 41 are present in the DB. No European domestic day-page fixture omission was found in this comparison.
+- Exactly 2/41 European domestic rows qualify: Northern Ireland Championship matches Rathfriland–Moyola Park and Warrenpoint–Glenavon. The remaining 39 are correctly out of scope: France National 2 (tier 4), Czech 3. liga (tier 3), England EFL Trophy/cups and National League North/South + Non-League Premier (lower tiers), Portugal Liga Revelação U23, Scotland Lowland League (below tier 2).
+- Ukraine Persha Liga is not a reserve-tier alias issue: one side is Polissya II, so the B-team exclusion correctly rejects it.
+- The 173 page total is global, not Europe-only: it includes AFC U17, AFCON qualifiers, friendlies and non-European domestic fixtures. Do not compare 173 directly with the 99 Europe-filtered stored rows or treat the difference as an importer failure.
+- This reconciliation confirms the day-specific European filter and importer coverage for the visible European domestic categories. It does not prove every country has a source on every date; the separate 18-country source gap remains.
