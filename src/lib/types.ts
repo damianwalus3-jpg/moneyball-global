@@ -173,6 +173,7 @@ export interface TrackerCategory {
   category_group: "CORE" | "SPORT" | "LEGACY";
   sort_order: number;
   is_system: boolean;
+  is_active: boolean;
   include_in_official_finance: boolean;
   created_at: string;
 }
@@ -196,6 +197,7 @@ export interface TrackerCategoryCount {
   category_key: string;
   display_name: string;
   category_group: "CORE" | "SPORT" | "LEGACY";
+  is_active: boolean;
   prediction_count: number;
   coupon_count: number;
 }
