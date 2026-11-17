@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
 import { addRecord, exportBackup, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
-import { loadOpenLigaRecentTeamForm, loadRecentTeamForm, type TeamForm } from "./team-form";
+import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadOpenLigaRecentTeamForm, loadRecentTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
 import { buildThreeLegCandidates } from "./coupon-engine";
 import { auditTrackerPredictions } from "./model-audit";
@@ -48,6 +48,11 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
     details: {
       fixtureId: match.id,
       fixtureDate: match.date,
+      home: match.home,
+      away: match.away,
+      leagueFolder: match.leagueFolder,
+      leagueShortcut: match.leagueShortcut,
+      leagueSeason: match.leagueSeason,
       competition: match.competition,
       model,
       market: "1X2",
@@ -81,6 +86,8 @@ export default function App() {
   const [scanLoading, setScanLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
+  const [settling, setSettling] = useState(false);
+  const [settleProgress, setSettleProgress] = useState(0);
   const [scanError, setScanError] = useState("");
   const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
   const loadFixtureForms = async (match: NonNullable<typeof fixtureScan>["fixtures"][number]) => {
@@ -118,6 +125,42 @@ export default function App() {
       }
     } finally {
       setBulkLoading(false);
+      setRecords(readRecords());
+    }
+  };
+  const settlePendingResults = async () => {
+    if (settling) return;
+    const all = readRecords();
+    const settledIds = new Set(all.filter(row => row.kind === "result" && typeof row.details.fixtureId === "string").map(row => row.details.fixtureId as string));
+    const pending = all.filter(row => row.kind === "prediction" && typeof row.details.fixtureId === "string" && !settledIds.has(row.details.fixtureId));
+    setSettling(true);
+    setSettleProgress(0);
+    let processed = 0;
+    try {
+      for (let index = 0; index < pending.length; index += 4) {
+        const batch = pending.slice(index, index + 4);
+        await Promise.all(batch.map(async prediction => {
+          const d = prediction.details;
+          if (typeof d.fixtureDate !== "string" || typeof d.home !== "string" || typeof d.away !== "string") return;
+          try {
+            const result = typeof d.leagueFolder === "string" && d.leagueFolder
+              ? await findOpenMatchdayResult(d.leagueFolder, d.home, d.away, d.fixtureDate)
+              : typeof d.leagueShortcut === "string" && typeof d.leagueSeason === "string"
+                ? await findOpenLigaFixtureResult(d.leagueShortcut, d.leagueSeason, d.home, d.away, d.fixtureDate)
+                : null;
+            if (result) addRecord({
+              kind: "result",
+              title: `${prediction.title} · ${result.homeGoals}:${result.awayGoals}`,
+              status: "SETTLED",
+              details: { fixtureId: d.fixtureId as string, actual: result.actual, homeGoals: result.homeGoals, awayGoals: result.awayGoals, date: result.date, source: result.source },
+            });
+          } catch { /* provider failures remain pending and are retried on next run */ }
+        }));
+        processed = Math.min(index + batch.length, pending.length);
+        setSettleProgress(processed);
+      }
+    } finally {
+      setSettling(false);
       setRecords(readRecords());
     }
   };
@@ -203,10 +246,10 @@ export default function App() {
         </section>}
         {active === "intelligence" && <section className="module-panel audit-module">
           <div className="module-icon"><BarChart3/></div>
-          <h2>Jakość modelu · wyniki rozliczone</h2>
+          <h2>Jakość modelu · wyniki rozliczone</h2><button className="settle-button" onClick={() => void settlePendingResults()} disabled={settling}>{settling ? `Sprawdzanie ${settleProgress}…` : "Pobierz wyniki i rozlicz"}</button>
           <p>Metryki liczone wyłącznie z prognoz połączonych z rzeczywistym wynikiem przez identyfikator meczu.</p>
           {modelAudit.metrics ? <><div className="audit-metrics"><article><small>Próba</small><b>{modelAudit.metrics.count}</b></article><article><small>Skuteczność 1X2</small><b>{(modelAudit.metrics.accuracy*100).toFixed(1)}%</b></article><article><small>Brier score</small><b>{modelAudit.metrics.brierScore.toFixed(4)}</b></article><article><small>Log loss</small><b>{modelAudit.metrics.logLoss.toFixed(4)}</b></article></div><h3>Kalibracja pewności</h3><div className="audit-buckets">{modelAudit.buckets.map(bucket => <div key={bucket.label}><b>{bucket.label}</b><span>Prognoza: {(bucket.averageConfidence*100).toFixed(1)}%</span><span>Trafienia: {(bucket.observedAccuracy*100).toFixed(1)}%</span><small>n={bucket.count}</small></div>)}</div></> : <div className="tracker-empty">Brak rozliczonych prognoz. Zapisz wynik z tym samym fixtureId co prognoza, aby uruchomić Brier score, log loss, skuteczność i kalibrację.</div>}
-          <div className="module-status"><span className="status-dot"/> Rozliczone: {modelAudit.settledPredictions} · oczekujące na wynik: {modelAudit.unmatchedPredictions}</div>
+          <div className="module-status"><span className="status-dot"/> Rozliczone: {modelAudit.settledPredictions} · oczekujące na wynik: {modelAudit.unmatchedPredictions} · nierozliczone w kolejce: {settling ? settleProgress : "—"}</div>
           <p className="source-note">Nie pokazujemy skuteczności dla prognoz bez wyniku. Metryki nie są wyliczane z typów odrzuconych bez prawdopodobieństw.</p>
         </section>}
         {active === "pick" && <section className="module-panel">
