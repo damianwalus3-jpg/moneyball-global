@@ -321,3 +321,10 @@
 - Kept Node 22 and the explicit install, typecheck, Vitest and production build steps. This is a bootstrap fix only; it does not establish that CI is green.
 - Commit: 78f5aa67e933415d550ae75994a03a15beaefc13.
 - Validation: awaiting the GitHub Actions run for this push; no claim of a successful pipeline or new Cloudflare deployment is made.
+
+
+## 2026-11-17 — Stage 26: isolate static asset cache lookups
+- Audited the service worker's fetch handler after Stage 23. Navigation fallback already queried only the active MONEYBALL cache, but static asset lookup still used global `caches.match(request)`, which can search unrelated caches on the same origin.
+- Restricted static asset lookup to `CACHE_NAME` as well. This aligns asset reads with the existing activation cleanup policy and prevents another app's cache entry from being reused.
+- Commit: 01360c91430dcd0623c310d857c3d0d434d6580f.
+- Validation: source change committed; CI and production Worker deployment remain unverified for this commit.
