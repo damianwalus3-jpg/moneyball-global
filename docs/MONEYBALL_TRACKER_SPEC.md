@@ -150,8 +150,13 @@ The first production Tracker release is implemented on the existing MAIN applica
 - `20261117123139_add_tracker_category_archiving`
 - `20261117123206_tracker_category_summary_archive_state`
 - `20261117125207_moneyball_tracker_rls_and_fk_index_hardening`
+- `20261117130907_moneyball_tracker_source_classification_audit`
+- `20261117131016_tracker_unclassified_queue_type_filter`
+- `20261117131322_tracker_source_audit_backup_restore`
+- `20261117131434_fix_tracker_source_audit_restore_count`
+- `20261117143000_harden_tracker_source_classification_rpc`
 
-All seven are additive. They do not rewrite historical matches, predictions, coupons, coupon legs, results or bankroll transactions.
+All 13 Tracker migrations are additive. They do not rewrite historical matches, predictions, coupons, coupon legs, results or bankroll transactions.
 
 ### Verification snapshot
 
@@ -171,15 +176,15 @@ All seven are additive. They do not rewrite historical matches, predictions, cou
 - Added the append-only table `moneyball_tracker_source_audit` with RLS and owner-only read access. The Tracker shows the latest 25 audit events with entity type, prior/new class, note and timestamp. No legacy records were classified automatically.
 - JSON backups now export the full source-classification audit history, validate audit UUIDs, entity types, source classes and timestamps before any restore writes, preview audit row counts, and restore audit rows idempotently in bounded batches. Existing rows remain skipped, never overwritten.
 - Pagination is reset to the first page after a classification operation to avoid skipping rows as the unclassified queue shrinks.
-- Added four additive migrations for the audit table/RPC, type-filtered queue, audit backup/restore and accurate idempotent restore counts. Tracker-specific migration count is now 12.
+- Added five additive migrations for the audit table/RPC, type-filtered queue, audit backup/restore, accurate idempotent restore counts and SECURITY DEFINER hardening. Tracker-specific migration count is now 13.
+- Ran rollback-only production SQL regression checks using existing owner records as temporary fixtures: PAPER settlement and cancellation did not write bankroll transactions or issue refunds; explicit prediction/coupon classification wrote the audit entries; audit restore inserted once and then returned zero on repeat; invalid null entity types were rejected. All fixture mutations were rolled back. Production counts remained unchanged.
 - Production read-only snapshot: 15 system categories, 14 aliases, 19,201 predictions, 9 coupons, 9 bankroll transactions, 0 Jackpot entries, 0 audit entries, 18,724 unclassified predictions and 9 unclassified coupons. No historical source values were changed by this delivery.
 - CI passed: 92 tests across 9 test files, Supabase Edge Function type-check, application TypeScript check and production build. The final docs commit `09b88f4` was verified through the Cloudflare deployment workflow: all 92 tests, Edge Function type-check, application type-check and Cloudflare build passed, and deployment succeeded.
 
 ### Remaining verification
 
-- Confirm the re-run Cloudflare deployment for the latest CI-passing commit before calling this release fully deployed.
-- Verify the rendered Tracker page and perform an authenticated classification/backup round-trip through a real signed-in user session. Unauthenticated production requests correctly return `login_required`; no credentials are requested or stored in chat.
-- Verify PAPER settlement behavior with controlled non-production fixtures. Production rows are not fabricated or mutated for testing.
+- Verify the rendered Tracker page and perform a complete authenticated UI classification/backup round-trip through a real signed-in user session. Unauthenticated production requests correctly return `login_required`; no credentials are requested or stored in chat.
+- Run the full JSON backup download/import round-trip in the signed-in UI. SQL restore RPC idempotency and audit ownership checks have passed rollback-only database tests; the browser workflow remains unverified.
 - Existing Supabase advisor findings outside the Tracker remain: internal tables without authenticated policies, `pg_net` in the public schema, leaked-password protection disabled, and pre-existing SECURITY DEFINER RPC warnings. The new owner-scoped classification and audit restore RPCs are also SECURITY DEFINER by design; their grants are restricted to authenticated users and their bodies enforce the caller's own user ID. These findings are documented, not silently represented as resolved.
 
-The Tracker release with audited legacy classification and audit-aware JSON backup is deployed to Cloudflare MAIN. Latest commit `09b88f4` passed the deployment workflow (92 tests across 9 test files, Supabase Edge Function type-check, application type-check and production build) and was deployed successfully to Cloudflare MAIN. Authenticated user-session checks and controlled settlement/restore regression checks remain the final verification items; the full project is not marked complete until those are verified.
+The Tracker release with audited legacy classification and audit-aware JSON backup is deployed to Cloudflare MAIN. Latest code commit `facdb5e` contains the SECURITY DEFINER hardening and was followed by a documentation/test-validation commit; the latest MAIN deployment must be verified from the current workflow runs before final completion. Authenticated user-session checks and controlled settlement/restore regression checks remain the final verification items; the full project is not marked complete until those are verified.
