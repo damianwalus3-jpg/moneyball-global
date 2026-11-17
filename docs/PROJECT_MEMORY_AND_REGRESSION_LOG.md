@@ -839,3 +839,18 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Publiczny TipsAudit feed sprawdzony: 292 globalne mecze, w tym stare fair snapshots i bieżące mecze międzynarodowe. Fair odds to prawdopodobieństwa rynkowe bez marży, nie kurs wypłaty bukmachera. Atrybucja jest wymagana; PredictionsView pokazuje widoczny link TipsAudit i zastrzeżenie, że fair odds nie są ofertą bukmachera. Nie używać fair odds do kuponów.
 - Bwin/Kambi Edge Functions są ACTIVE, ale ich kod celowo zwraca 404; nie są działającymi feedami. MoviOdds aktywne, ale bez MOVIODDS_API_KEY. Nie scrapować bukmacherów i nie wpisywać fikcyjnych kursów. Obecny fallback: ręczny kurs z URL.
 - Projekt pozostaje w toku; następny warunek to udany zaplanowany skan oraz testy E2E po zalogowaniu.
+
+
+## Audyt produkcji i poprawka zakresu statystyk — 17.11.2026 08:00–08:05 Brussels
+- Skan dzienny zakończył się: 1 batch, 2 mecze, status completed, brak last_error; kolejny batch zaplanowany na 15:00 Brussels.
+- Baza miała 98 meczów z datą 17.11, ale tylko 2 spełniły SQL-owy filtr lig europejskich poziomu 1/2 i płci męskiej: Warrenpoint Town–Glenavon FC oraz Rathfriland–Moyola Park. Pozostałe 96 rekordów to mecze spoza zakresu, zachowane w bazie.
+- Dwa kwalifikujące się spotkania mają predykcje w trzech rynkach, ale wszystkie typy są ODRZUCONY: część przez próg >75%, część przez brak aktualnego potwierdzonego kursu. Nie wymuszać kuponów.
+- Kursy: 219 022 historycznych rekordów, 0 świeżych niesuspendowanych ofert w ostatnich 6 h. xG: brak rzeczywistych obserwacji xG dla tych meczów; dane XGoalsPro to ostatnie wyniki i gole. Brak potwierdzonych składów/kontuzji.
+- W logach z ostatnich 24 h: moneyball-predict 957 requestów, 8 HTTP 5xx, średnia 2.1 s, p95 4.6 s, max 30.5 s; moneyball-results-sync 287 requestów, 0 5xx, średnia 7.5 s, p95 13.5 s, max 26.8 s; moneyball-free-feed 98 requestów, 0 5xx; moneyball-movi-odds-sync 14 requestów, 3 HTTP 5xx. Priorytet audytu: błędy predykcji i MoviOdds oraz opóźnienia synchronizacji wyników.
+- Znaleziono błąd zakresu statystyk: warstwa DB i UI statystyk używały wyłącznie filtra ligi, pomijając jawne `gender` i drużyny rezerwowe. Obie warstwy przełączono na kanoniczne `isEligibleEuropeanMatch(match)`:
+  - commit `8f7f83074aca56be7ecf031aa5ba1109d3280d2a` — filtrowanie w zapytaniu statystyk;
+  - commit `6a408f8a7fe9b3352744de4e1ac58023fdd784c9` — identyczny filtr w UI.
+  - Istniejący test domenowy potwierdza odrzucenie `gender=women`; poprawka usuwa rozjazd między statystykami a ekranem Mecze.
+- CI/produkcja: status Vercel nie jest dowodem deployu Cloudflare. Dla tych dwóch commitów nie ma jeszcze potwierdzonego CI SUCCESS ani Cloudflare deploy SUCCESS. Nie oznaczać poprawki jako wdrożonej.
+- `MONEYBALL GLOBAL 3.8` to wersja modelu predykcji, a Supabase Edge Function `v242` to numer wdrożenia funkcji — różne numeracje.
+- Projekt nadal w toku. Nie zmieniać zakresu lig ani reguł kuponów; nie usuwać historii; nie tworzyć kuponów bez aktualnego kursu.
