@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scanTodayEuropeanFixtures, type FixtureScan } from "./free-fixtures";
-import { addRecord, exportBackup, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";\nimport { loadRecentTeamForm, type TeamForm } from "./team-form";
+import { addRecord, exportBackup, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
+import { loadRecentTeamForm, type TeamForm } from "./team-form";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
@@ -41,7 +42,17 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [fixtureScan, setFixtureScan] = useState<FixtureScan | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
-  const [scanError, setScanError] = useState("");\n  const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; loading: boolean; error?: string }>>({});\n  const loadFixtureForms = async (match: NonNullable<typeof fixtureScan>["fixtures"][number]) => {\n    setTeamForms(current => ({ ...current, [match.id]: { ...current[match.id], loading: true, error: undefined } }));\n    try {\n      const [home, away] = await Promise.all([loadRecentTeamForm(match.leagueFolder, match.home, match.date), loadRecentTeamForm(match.leagueFolder, match.away, match.date)]);\n      setTeamForms(current => ({ ...current, [match.id]: { home, away, loading: false } }));\n    } catch (error) {\n      setTeamForms(current => ({ ...current, [match.id]: { loading: false, error: error instanceof Error ? error.message : "Nie udało się pobrać formy." } }));\n    }\n  };
+  const [scanError, setScanError] = useState("");
+  const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; loading: boolean; error?: string }>>({});
+  const loadFixtureForms = async (match: NonNullable<typeof fixtureScan>["fixtures"][number]) => {
+    setTeamForms(current => ({ ...current, [match.id]: { ...current[match.id], loading: true, error: undefined } }));
+    try {
+      const [home, away] = await Promise.all([loadRecentTeamForm(match.leagueFolder, match.home, match.date), loadRecentTeamForm(match.leagueFolder, match.away, match.date)]);
+      setTeamForms(current => ({ ...current, [match.id]: { home, away, loading: false } }));
+    } catch (error) {
+      setTeamForms(current => ({ ...current, [match.id]: { loading: false, error: error instanceof Error ? error.message : "Nie udało się pobrać formy." } }));
+    }
+  };
   const runFixtureScan = async (force = false) => { setScanLoading(true); setScanError(""); try { setFixtureScan(await scanTodayEuropeanFixtures(force)); } catch (error) { setScanError(error instanceof Error ? error.message : "Nie udało się pobrać terminarza."); } finally { setScanLoading(false); } };
   useEffect(() => { void runFixtureScan(); }, []);
   const fileRef = useRef<HTMLInputElement>(null);
