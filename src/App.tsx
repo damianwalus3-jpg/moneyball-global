@@ -91,6 +91,7 @@ export default function App() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState(0);
   const [settling, setSettling] = useState(false);
+  const settlementLock = useRef(false);
   const [settleProgress, setSettleProgress] = useState(0);
   const [scanError, setScanError] = useState("");
   const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
@@ -144,7 +145,8 @@ export default function App() {
     }
   };
   const settlePendingResults = async () => {
-    if (settling) return;
+    if (settlementLock.current) return;
+    settlementLock.current = true;
     const all = readRecords();
     const settledIds = new Set(all.filter(row => row.kind === "result" && typeof row.details.fixtureId === "string").map(row => row.details.fixtureId as string));
     const pending = all.filter(row => row.kind === "prediction" && typeof row.details.fixtureId === "string" && !settledIds.has(row.details.fixtureId));
@@ -200,6 +202,7 @@ export default function App() {
         });
       }
       setSettling(false);
+      settlementLock.current = false;
       setRecords(readRecords());
     }
   };
@@ -221,7 +224,11 @@ export default function App() {
   };
   useEffect(() => {
     void runFixtureScan();
-    const refreshId = window.setInterval(() => void runFixtureScan(true), 15 * 60 * 1000);
+    void settlePendingResults();
+    const refreshId = window.setInterval(() => {
+      void runFixtureScan(true);
+      void settlePendingResults();
+    }, 15 * 60 * 1000);
     return () => window.clearInterval(refreshId);
   }, []);
   useEffect(() => {
