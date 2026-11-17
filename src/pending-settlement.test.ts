@@ -6,5 +6,6 @@ const result = (fixtureId: string): TrackerRecord => ({ id: "r-" + fixtureId, ki
 describe("pending result settlement selection", () => {
   it("selects only one newest-first prediction for each unsettled fixture", () => { expect(uniquePendingPredictions([prediction("new", "f1"), prediction("old", "f1"), prediction("other", "f2")]).map(row => row.id)).toEqual(["new", "other"]); });
   it("skips fixtures that already have a result", () => { expect(uniquePendingPredictions([prediction("p1", "f1"), result("f1")])).toEqual([]); });
+  it("retries a fixture when its newest result row has an invalid outcome", () => { const invalid: TrackerRecord = { id: "bad-result", kind: "result", title: "invalid", status: "SETTLED", createdAt: "2026-11-17T20:00:00Z", details: { fixtureId: "f1", actual: "?" } }; expect(uniquePendingPredictions([invalid, prediction("p1", "f1")]).map(row => row.id)).toEqual(["p1"]); });
   it("ignores malformed rows without a fixture id", () => { const malformed = { ...prediction("bad", "f1"), details: {} }; expect(uniquePendingPredictions([malformed, prediction("good", "f2")]).map(row => row.id)).toEqual(["good"]); });
 });
