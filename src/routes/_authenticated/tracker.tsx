@@ -65,6 +65,9 @@ function TrackerPage() {
   const [jackpotTitle, setJackpotTitle] = useState("");
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newCategoryGroup, setNewCategoryGroup] = useState<"CORE" | "SPORT">("CORE");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [editingCategoryDescription, setEditingCategoryDescription] = useState("");
   const addJackpot = useAction(
     async (args: { couponId: string; title: string }) => insertRow("moneyball_jackpot_entries", {
       coupon_id: args.couponId,
@@ -93,6 +96,16 @@ function TrackerPage() {
   const toggleCategory = useAction(
     async (args: { id: string; is_active: boolean }) => updateRow("moneyball_tracker_categories", args.id, { is_active: args.is_active }),
     { success: "Zmieniono status kategorii Trackera" },
+  );
+  const updateCategory = useAction(
+    async (args: { id: string; name: string; description: string }) => updateRow("moneyball_tracker_categories", args.id, {
+      display_name: args.name.trim(),
+      description: args.description.trim() || null,
+    }),
+    {
+      success: "Zapisano nazwę i opis kategorii",
+      onDone: () => { setEditingCategoryId(null); setEditingCategoryName(""); setEditingCategoryDescription(""); },
+    },
   );
 
   if (summary.isPending && picks.isPending && finance.isPending && scan.isPending && categories.isPending && categorySummary.isPending && jackpot.isPending && coupons.isPending) {
@@ -200,18 +213,44 @@ function TrackerPage() {
                           {category.is_system ? "SYSTEM" : category.is_active ? "WŁASNA" : "ARCHIWALNA"}
                         </span>
                         {!category.is_system && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={toggleCategory.isPending}
-                            onClick={() => toggleCategory.mutate({ id: category.id, is_active: !category.is_active })}
-                          >
-                            {category.is_active ? "Archiwizuj" : "Przywróć"}
-                          </Button>
+                          <>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingCategoryId(editingCategoryId === category.id ? null : category.id);
+                                setEditingCategoryName(category.display_name);
+                                setEditingCategoryDescription(category.description ?? "");
+                              }}
+                            >
+                              {editingCategoryId === category.id ? "Zamknij" : "Edytuj"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={toggleCategory.isPending}
+                              onClick={() => toggleCategory.mutate({ id: category.id, is_active: !category.is_active })}
+                            >
+                              {category.is_active ? "Archiwizuj" : "Przywróć"}
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">{category.description ?? category.category_key}</p>
+                    {editingCategoryId === category.id && !category.is_system && (
+                      <div className="mt-3 grid gap-2">
+                        <Input value={editingCategoryName} onChange={(event) => setEditingCategoryName(event.target.value)} placeholder="Nazwa kategorii" maxLength={80} />
+                        <Input value={editingCategoryDescription} onChange={(event) => setEditingCategoryDescription(event.target.value)} placeholder="Opis kategorii (opcjonalnie)" maxLength={240} />
+                        <Button
+                          size="sm"
+                          disabled={!editingCategoryName.trim() || updateCategory.isPending}
+                          onClick={() => updateCategory.mutate({ id: category.id, name: editingCategoryName, description: editingCategoryDescription })}
+                        >
+                          {updateCategory.isPending ? "Zapisywanie…" : "Zapisz zmiany"}
+                        </Button>
+                      </div>
+                    )}
                     <p className="mt-2 text-xs font-medium">{categoryCounts.get(category.category_key)?.prediction_count ?? 0} prognoz · {categoryCounts.get(category.category_key)?.coupon_count ?? 0} kuponów</p>
                   </div>
                 ))}
