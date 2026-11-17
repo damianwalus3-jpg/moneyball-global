@@ -823,3 +823,10 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Verification: public endpoint GET for 2026-11-17 returned HTTP success and JSON `ok=true`, `api_key_required=false`, `source_count=4`, `raw_fixtures=11`, `european_fixtures=8`. OpenMatchday checked 38 eligible league folders but returned 0 fixtures for that date; all 8 returned European rows had form, but 0 had Elo, true xG, lineups, injuries, or bookmaker odds. The aggregator is operational, but its coverage is not sufficient to claim full European domestic tier-1/2 coverage.
 - The next scheduled batch at 15:00 Brussels must confirm that v243 calls v62 without 401 and logs `public_source_error=null`. Do not manually bypass cooldown or claim the new call path E2E-tested before that scheduled run.
 - Historical 500s from Nov 16 came from old Edge versions 217/218 and included invalid cron token and permission denied for `moneyball_cron_owner_id`. They are not evidence of a current v243 failure; continue monitoring current versions separately.
+
+## Statistics screen React hook-order hardening — 2026-11-17
+
+- Static component review found `Statystyki` returned early for pending/error states before calling `useMemo` later in the function. This could change hook count between the initial loading render and the loaded render.
+- Moved the memoized match index and safe empty-data defaults above all early returns. This preserves stable hook order while keeping the existing loading/error UI and statistics calculations.
+- Commit: `e5fe44f5f61072c59603168694b12bfaaa3dc922`.
+- Source was fetched back from GitHub and the hook now executes unconditionally before loading/error branches. Existing Vercel status reports a build-rate-limit failure; it does not confirm or refute the Cloudflare Worker deployment. No CI SUCCESS or Cloudflare deployment for this commit is confirmed yet.
