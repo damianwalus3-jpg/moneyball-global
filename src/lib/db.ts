@@ -545,7 +545,7 @@ export type StatisticsMatch = Pick<
 
 export type StatisticsPrediction = Pick<
   TableRows["predictions"],
-  "id" | "match_id" | "model_version" | "market" | "selection" | "probability" | "verdict" |
+  "id" | "match_id" | "model_version" | "market" | "selection" | "probability" | "verdict" | "rationale" |
   "odds" | "settlement_status" | "verified" | "stake" | "potential_return" | "profit_loss"
 >;
 
