@@ -94,3 +94,12 @@ export function importBackup(value: unknown): number {
   if (missing.length) writeRecords([...missing, ...existing]);
   return missing.length;
 }
+
+export function exportCsv(records: TrackerRecord[] = readRecords()): string {
+  const headers = ["id", "createdAt", "kind", "title", "status", "details"];
+  const cell = (value: unknown) => {
+    const text = typeof value === "string" ? value : JSON.stringify(value ?? "");
+    return `"${text.replace(/"/g, '""')}"`;
+  };
+  return [headers.map(cell).join(","), ...records.map(row => [row.id, row.createdAt, row.kind, row.title, row.status, JSON.stringify(row.details)].map(cell).join(","))].join("\r\n");
+}
