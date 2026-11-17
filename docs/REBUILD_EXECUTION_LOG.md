@@ -757,3 +757,22 @@
 - New CI and Cloudflare deployment checks on the latest branch HEAD are pending. No external odds API was called and no Tracker or bankroll data was modified.
 
 - Follow-up CI exposed one remaining regression-test ordering mistake: the simulated newer rejected prediction had the same createdAt as the existing KANDYDAT row, so stable sorting correctly retained the original first row. Updated the test to use a strictly later timestamp in commit b38fd98821ead5bd276bf9b37836ad6f62fe4553. The production newest-prediction ordering was not weakened.
+
+
+## Stage 62 — CI repair verified and deployed (2026-11-18)
+- After correcting the fixtures, GitHub Actions passed on branch moneyball-rebuild at commit c03eecce7a6a65738c20d60e32627ea7eca78959:
+  - MONEYBALL rebuild CI: success (run 44195657321)
+  - MONEYBALL Rebuild Checks: success (run 44195657257)
+  - Cloudflare Free Worker deployment: success (run 44195657199)
+- Verified the live REBUILD Worker URL returned the MONEYBALL application shell with the expected title, Polish UI, and current navigation/dashboard content. No production MAIN resources were touched.
+- The test suite completed successfully after fixing the coupon test's timestamp ordering; the successful CI run includes typecheck, tests and build.
+- Stage 60/61 changes are therefore validated and deployed to the separate REBUILD Worker.
+
+## Stage 63 — explicit paper coupon settlement accounting (2026-11-18)
+- Moved paper coupon settlement financial arithmetic from inline UI code into the tested pure helper buildPaperCouponSettlementRecord.
+- For a priced PAPER_WITH_ODDS coupon with valid decimal AKO odds and positive stake: win records gross return = stake × odds and net profit = stake × (odds − 1); loss records gross return 0 and net loss = −stake.
+- Legacy PAPER_NO_ODDS coupons, and malformed price/stake values, retain null odds/stake/P&L/return rather than inventing a financial result. Existing Tracker history remains append-only.
+- App now uses the shared helper when adding the settlement child record; duplicate protection remains keyed by parentCouponId.
+- Added tests for priced win, priced loss, unpriced legacy coupon and invalid price/stake.
+- Commits: helper 931c1f4ffde9a1e47007a75e67f27ad13889b9f7; App integration dae0748baee6d5ef1685aefd6796809cece2f9ea; tests d6acb2964858fe6380a3bf7db42cbf2462ff7bf6.
+- Validation and deployment for Stage 63 are pending the latest CI and Cloudflare workflow results.
