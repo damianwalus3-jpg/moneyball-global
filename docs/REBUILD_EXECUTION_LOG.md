@@ -278,3 +278,12 @@
 - Verified that the repaired Worker proxy serves the 88-entry catalogue and real league JSON, and that the UEFA Women's Champions League team-history endpoint returns six matches for FC Bayern München Frauen.
 - No source rows or probabilities were fabricated. A provider's empty response is not evidence that no match exists in all European football.
 - Stage 20 is COMPLETE as a source audit; no new code deployment was required beyond Stage 19.
+
+
+## 2026-11-17 — Stage 21: idempotent fixture history in Tracker
+- Connected every successful daily fixture scan to the local Tracker's match registry.
+- Each discovered fixture is recorded with its provider fixture ID, Brussels date/time, competition, source and source-update timestamp when supplied.
+- Repeated scans are idempotent: existing match rows with the same fixture ID are preserved and not overwritten; new fixtures are appended in one storage write.
+- Hardened backup record validation to reject array-shaped details objects while retaining the existing merge-only import rule.
+- Added regression tests for repeated scans, preservation of existing match rows and malformed details payloads.
+- Validation/deployment status: pending GitHub Actions CI and separate rebuild Worker deployment after this commit.
