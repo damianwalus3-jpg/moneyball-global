@@ -60,7 +60,8 @@ export default {
             apiUrl.searchParams.set("fixtureId", fixtureId);
             apiUrl.searchParams.set("language", "en");
             apiUrl.searchParams.set("verbosity", "3");
-            const response = await fetch(apiUrl, { headers: { Accept: "application/json", "x-api-key": env.ODDSPAPI_API_KEY } });
+            apiUrl.searchParams.set("apiKey", env.ODDSPAPI_API_KEY);
+            const response = await fetch(apiUrl, { headers: { Accept: "application/json" } });
             const payload = await readJson(response);
             results.oddspapi = { status: "ok", capturedAt: new Date().toISOString(), data: payload };
           } catch (error) {
