@@ -90,10 +90,25 @@ export function validateBackup(data: unknown): { backup: Backup; counts: Partial
     if (!Array.isArray(candidate.tracker_source_audit)) throw new Error("Rejestr audytu w kopii musi być listą.");
     const auditIds = new Set<string>();
     for (const [index, row] of candidate.tracker_source_audit.entries()) {
-      if (!row || typeof row !== "object" || Array.isArray(row) || typeof (row as Record<string, unknown>)["id"] !== "string") {
+      if (!row || typeof row !== "object" || Array.isArray(row)) {
         throw new Error(`Nieprawidłowy wpis audytu nr ${index + 1}.`);
       }
-      const id = String((row as Record<string, unknown>)["id"]);
+      const auditRow = row as Record<string, unknown>;
+      const id = auditRow["id"];
+      const entityId = auditRow["entity_id"];
+      const changedBy = auditRow["changed_by"];
+      const entityType = auditRow["entity_type"];
+      const sourceClass = auditRow["new_source_class"];
+      const changedAt = auditRow["changed_at"];
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (typeof id !== "string" || !uuidPattern.test(id) ||
+          typeof entityId !== "string" || !uuidPattern.test(entityId) ||
+          typeof changedBy !== "string" || !uuidPattern.test(changedBy) ||
+          (entityType !== "prediction" && entityType !== "coupon") ||
+          (sourceClass !== "USER" && sourceClass !== "MODEL" && sourceClass !== "PAPER") ||
+          typeof changedAt !== "string" || Number.isNaN(Date.parse(changedAt))) {
+        throw new Error(`Nieprawidłowe pola wpisu audytu nr ${index + 1}.`);
+      }
       if (auditIds.has(id)) throw new Error(`Powtórzony identyfikator wpisu audytu: ${id}.`);
       auditIds.add(id);
     }
