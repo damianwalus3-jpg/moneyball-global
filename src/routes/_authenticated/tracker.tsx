@@ -130,6 +130,8 @@ function TrackerPage() {
   const couponRows = coupons.data ?? [];
   const couponById = new Map(couponRows.map((coupon) => [coupon.id, coupon]));
   const financeTypes = f?.by_type ?? {};
+  const paperPredictionCount = categorySummary.data?.prediction_sources.find((row) => row.label === "PAPER")?.count ?? 0;
+  const paperCouponCount = categorySummary.data?.coupon_sources.find((row) => row.label === "PAPER")?.count ?? 0;
   const financeRows = Object.entries(financeTypes).sort(([a], [b]) => a.localeCompare(b));
   const intelligenceGroups = [
     ["Decyzje", categorySummary.data?.decisions ?? []],
@@ -174,6 +176,10 @@ function TrackerPage() {
           <StatCard label="Wynik łącznie" value={f?.all.net == null ? "—" : fmtMoney(f.all.net)} hint={f ? `${f.all.count} rozliczonych kuponów` : "brak danych"} />
         </div>
         <p className="mt-2 text-xs text-muted-foreground">To zestawienie dotyczy istniejących rozliczeń kuponów. Nie dodaje stawek typów pojedynczych drugi raz do bankrolla. Starsze rekordy nie mają jeszcze pełnej klasyfikacji USER / MODEL / PAPER — nie przypisuję jej automatycznie, także na podstawie samej etykiety TEST.</p>
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <StatCard label="Typy PAPER" value={paperPredictionCount} hint="oddzielone od oficjalnych typów" />
+          <StatCard label="Kupony PAPER" value={paperCouponCount} hint="poza oficjalnym bankroll i ROI" />
+        </div>
       </section>
 
       <section className="surface-card p-4">
