@@ -152,7 +152,7 @@ export default {
       return json({
         mode: "provider-pilot",
         results,
-        warning: "Provider IDs must be matched to the same fixture independently. This endpoint does not write odds to Tracker or P/L.",
+        warning: "StrikerAPI date lookups use UTC; convert startsAt to Europe/Brussels before matching. Provider IDs must be matched independently. This endpoint does not write odds to Tracker or P/L.",
       }, 200, origin);
     }
 
