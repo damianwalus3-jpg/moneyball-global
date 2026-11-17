@@ -14,6 +14,8 @@ declare
   v_new_class text;
   v_changed_by uuid;
   v_changed_at timestamptz;
+  v_rows integer := 0;
+  v_total integer := 0;
 begin
   if v_owner is null then raise exception 'Authentication required'; end if;
   if p_rows is null or jsonb_typeof(p_rows) <> 'array' or jsonb_array_length(p_rows) > 500 then
@@ -39,11 +41,10 @@ begin
       v_new_class, nullif(v_row->>'note', ''), v_owner, v_changed_at
     )
     on conflict (id) do nothing;
+    get diagnostics v_rows = row_count;
+    v_total := v_total + v_rows;
   end loop;
-  return (select count(*)::integer from public.moneyball_tracker_source_audit
-    where owner_id = v_owner and id in (
-      select (value->>'id')::uuid from jsonb_array_elements(p_rows)
-    ));
+  return v_total;
 end;
 $$;
 revoke all on function public.moneyball_tracker_restore_source_audit(jsonb) from public, anon;
