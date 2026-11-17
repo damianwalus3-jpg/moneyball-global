@@ -164,6 +164,9 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Greece", "Super League 2")).toBe(true);
     expect(isEuropeanTopTwoLeague("Ukraine", "Druha Liga")).toBe(false);
     expect(isEuropeanTopTwoLeague("Italy", "Serie C - Girone B")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Italy", "Serie D - Championship Round")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Sweden", "Damallsvenskan")).toBe(false);
+    expect(isEuropeanTopTwoLeague("England", "Premier League - Summer Series")).toBe(false);
     expect(isEuropeanTopTwoLeague("England", "Premier League Cup")).toBe(false);
     expect(isEuropeanTopTwoLeague("Germany", "Frauen Bundesliga")).toBe(false);
     expect(isEuropeanTopTwoLeague("Italy", "Serie A Femminile")).toBe(false);
@@ -181,6 +184,9 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Sevilla Atletico" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: "women" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, competition: "Serie C" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie D - Championship Round" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Sweden", competition: "Damallsvenskan", gender: null })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "Premier League - Summer Series" })).toBe(false);
     // OpenMatchday's source folder is authoritative tier metadata; display names
     // are intentionally not required to match the app's legacy league alias list.
     const openMatchdayBase = {
@@ -191,6 +197,12 @@ describe("European domestic league scope", () => {
       country: "Belgium",
     };
     expect(isEligibleEuropeanMatch(openMatchdayBase)).toBe(true);
+    expect(isEligibleEuropeanMatch({
+      ...openMatchdayBase,
+      country: "Sweden",
+      competition: "Damallsvenskan",
+      external_id: "om:SWE_1_damallsvenskan:2026-11-17:club-a:club-b",
+    })).toBe(false);
     // ISO-3 country codes must be treated consistently with the backend source filters.
     expect(isEligibleEuropeanMatch({
       ...openMatchdayBase,

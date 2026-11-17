@@ -179,7 +179,7 @@ async function openMatchday(date: string) {
     const country = m[3].trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const league = m[2].trim();
     return !!tier && EUROPE_COUNTRIES.has(country) && !["europe", "uefa"].includes(country)
-      && !/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\b/i.test(folder + " " + league);
+      && !/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series|cup|copa|trophy|youth|academy|reserves?)\b/i.test(folder + " " + league);
   });
   const folders = eligibleIndexRows.map(m => m[1]);
   const unique = [...new Set(folders)];
@@ -202,7 +202,7 @@ async function openMatchday(date: string) {
       source_tier: tier,
       competition: leagueName,
       country: countryName,
-      gender: /women|womens|female|frauen|femenin|femenina|damallsvenskan|wsl/i.test(folder + " " + leagueName) ? "women" : "men",
+      gender: /women|womens|female|frauen|femenin|femenina|damallsvenskan|wsl|liga f/i.test(folder + " " + leagueName) ? "women" : "men",
       home_team: norm(r[ix("home")]),
       away_team: norm(r[ix("away")]),
       // CSV kickoff is venue-local. Convert using the competition's IANA timezone;
