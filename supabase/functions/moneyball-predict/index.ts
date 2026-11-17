@@ -643,11 +643,11 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   }catch(e){scheduledImport={ok:false,attempted:true,error:String(e)};}
  }
  if(scheduledImport.attempted)console.log("scheduled_import",JSON.stringify(scheduledImport));
- let scheduledPage:any=null;
+ let scheduledPage:any=null,manualPage:any=null;
  const all=scheduledMode
   ?(scheduledPage=await db("rpc/moneyball_prediction_scan_page",token,"POST",{p_owner_id:ownerId,p_date:date,p_cursor_kickoff_at:scanCursorKickoff,p_cursor_match_id:scanCursorId,p_limit:batchSize,p_token:cronToken})).rows||[]
-  :await db("matches?select=id,owner_id,scan_run_id,external_id,source,competition,league,country,gender,home_team,away_team,kickoff_at,kickoff_date,status&owner_id=eq."+encodeURIComponent(ownerId)+"&or=(and(kickoff_at.gte."+encodeURIComponent(fromUtc)+",kickoff_at.lt."+encodeURIComponent(toUtc)+"),and(kickoff_at.is.null,kickoff_date.eq."+date+"))&order=kickoff_at.asc,id.asc&limit="+batchSize+"&offset="+analysisOffset,token);
- const moreAvailable=scheduledMode?!!scheduledPage?.has_more:all.length===batchSize;
+  :(manualPage=await db("rpc/moneyball_manual_prediction_scan_page",token,"POST",{p_date:date,p_offset:analysisOffset,p_limit:batchSize})).rows||[];
+ const moreAvailable=scheduledMode?!!scheduledPage?.has_more:!!manualPage?.has_more;
  const lastRawMatch=all.length?all[all.length-1]:null;
  const finishScheduledScan=async(processed:number)=>{
   if(!scheduledMode||!scanLeaseToken)return null;
