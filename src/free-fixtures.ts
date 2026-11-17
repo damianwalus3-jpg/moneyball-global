@@ -1,3 +1,4 @@
+import { scanOpenFootball } from "./openfootball";
 import { cacheOpenLigaTeamForms } from "./team-form";
 import { seasonCode } from "./season";
 export interface FreeFixture {
@@ -39,7 +40,7 @@ interface OpenLigaMatch {
 }
 const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const OPENLIGA = "/api/openligadb";
-const SOURCE = "open-matchday + OpenLigaDB (darmowe źródła publiczne)";
+const SOURCE = "open-matchday + OpenLigaDB + openfootball (darmowe źródła publiczne)";
 const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","ISR","KOS","BLR","LIE","SMR","MCO","VAT","UEFA"]);
 const CACHE_KEY = "moneyball.free-fixtures.v4";
 const CACHE_MS = 30 * 60 * 1000;
@@ -148,6 +149,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   let generatedAt = new Date().toISOString();
   let openMatchdayChecked = 0;
   let openLigaChecked = 0;
+  let openFootballChecked = 0;
 
   // Source 1: every European folder in open-matchday, including cups and youth competitions.
   try {
@@ -254,12 +256,30 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     errors.push(`OpenLigaDB · ${error instanceof Error ? error.message : "katalog niedostępny"}`);
   }
 
+  // Source 3: OpenFootball public-domain current-season datasets across additional European countries.
+  try {
+    const openFootball = await scanOpenFootball(date, force);
+    openFootballChecked = openFootball.checked;
+    errors.push(...openFootball.failed.map(error => `openfootball · ${error}`));
+    for (const fixture of openFootball.fixtures) {
+      const key = fixtureKey(fixture.date, fixture.home, fixture.away);
+      const existing = byKey.get(key);
+      if (existing) existing.source = `${existing.source} + openfootball`;
+      else byKey.set(key, {
+        ...fixture,
+        leagueFolder: "",
+      });
+    }
+  } catch (error) {
+    errors.push(`openfootball · ${error instanceof Error ? error.message : "katalog niedostępny"}`);
+  }
+
   const fixtures = [...byKey.values()].sort((a,b) => a.time.localeCompare(b.time) || a.competition.localeCompare(b.competition));
   const result: FixtureScan = {
     date,
     generatedAt,
     fixtures,
-    leaguesChecked: openMatchdayChecked + openLigaChecked,
+    leaguesChecked: openMatchdayChecked + openLigaChecked + openFootballChecked,
     leaguesFailed: errors,
     source: SOURCE,
     cache: false,
