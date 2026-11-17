@@ -9,7 +9,7 @@ import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fmtMoney, fmtPct } from "@/lib/format";
-import { formatJackpotSequence } from "@/lib/tracker-domain";
+import { formatJackpotSequence, makeTrackerCategoryKey } from "@/lib/tracker-domain";
 import { insertRow } from "@/lib/db";
 import {
   couponFinanceQuery, dashboardSelectedPicksQuery, dashboardSummaryQuery, latestScanRunQuery,
@@ -62,6 +62,8 @@ function TrackerPage() {
   const coupons = useQuery(tableQuery("coupons"));
   const [jackpotCouponId, setJackpotCouponId] = useState("");
   const [jackpotTitle, setJackpotTitle] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryGroup, setNewCategoryGroup] = useState<"CORE" | "SPORT">("CORE");
   const addJackpot = useAction(
     async (args: { couponId: string; title: string }) => insertRow("moneyball_jackpot_entries", {
       coupon_id: args.couponId,
@@ -70,6 +72,21 @@ function TrackerPage() {
     {
       success: "Dodano kupon do rejestru JACKPOT",
       onDone: () => { setJackpotCouponId(""); setJackpotTitle(""); },
+    },
+  );
+  const addCategory = useAction(
+    async (args: { name: string; key: string; group: "CORE" | "SPORT"; sortOrder: number }) => insertRow("moneyball_tracker_categories", {
+      category_key: args.key,
+      display_name: args.name,
+      description: null,
+      category_group: args.group,
+      sort_order: args.sortOrder,
+      is_system: false,
+      include_in_official_finance: false,
+    }),
+    {
+      success: "Dodano własną kategorię Trackera",
+      onDone: () => setNewCategoryName(""),
     },
   );
 
@@ -172,6 +189,34 @@ function TrackerPage() {
                 ))}
               </div>
               <p className="mt-2 text-xs text-muted-foreground">Systemowe kategorie i mapowania historycznych etykiet są tylko do odczytu. Stare MAIN pozostaje oddzielone od MAIN A i MAIN B.</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_140px_auto]">
+                <Input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} placeholder="Nazwa własnej kategorii" maxLength={80} />
+                <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={newCategoryGroup} onChange={(event) => setNewCategoryGroup(event.target.value as "CORE" | "SPORT")}>
+                  <option value="CORE">CORE</option>
+                  <option value="SPORT">SPORT</option>
+                </select>
+                <Button
+                  variant="outline"
+                  disabled={!newCategoryName.trim() || addCategory.isPending}
+                  onClick={() => {
+                    try {
+                      const key = makeTrackerCategoryKey(newCategoryName);
+                      if (categoryRows.some((category) => category.category_key === key)) return;
+                      addCategory.mutate({
+                        name: newCategoryName.trim(),
+                        key,
+                        group: newCategoryGroup,
+                        sortOrder: Math.max(0, ...categoryRows.map((category) => category.sort_order)) + 10,
+                      });
+                    } catch {
+                      return;
+                    }
+                  }}
+                >
+                  {addCategory.isPending ? "Zapisywanie…" : "Dodaj kategorię"}
+                </Button>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">Własne kategorie są prywatne dla konta i domyślnie wyłączone z oficjalnych finansów. Przypisywanie ich do historycznych rekordów pozostaje jawne — nie zmieniam starych etykiet automatycznie.</p>
             </>
           )}
         </div>
