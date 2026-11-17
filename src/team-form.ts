@@ -17,7 +17,7 @@ export interface TeamForm {
 }
 type CsvRow = Record<string, string>;
 const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
-const CACHE_PREFIX = "moneyball.team-results.v1:";
+const CACHE_PREFIX = "moneyball.team-results.v2:";
 const CACHE_TTL = 6 * 60 * 60 * 1000;
 
 function parseLine(line: string): string[] {
@@ -62,6 +62,7 @@ async function loadLeagueResults(folder: string): Promise<{ rows: CsvRow[]; gene
   return value;
 }
 function mapMatch(row: CsvRow, team: string): FormMatch | null {
+  if (row.ft_home?.trim() === "" || row.ft_away?.trim() === "") return null;
   const homeScore = Number(row.ft_home), awayScore = Number(row.ft_away);
   if (!row.date || !Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) return null;
   const isHome = row.home.toLocaleLowerCase() === team.toLocaleLowerCase();
