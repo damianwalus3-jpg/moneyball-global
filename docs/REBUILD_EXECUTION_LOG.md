@@ -287,3 +287,11 @@
 - Hardened backup record validation to reject array-shaped details objects while retaining the existing merge-only import rule.
 - Added regression tests for repeated scans, preservation of existing match rows and malformed details payloads.
 - Validation/deployment status: pending GitHub Actions CI and separate rebuild Worker deployment after this commit.
+
+
+## 2026-11-17 — Stage 22: Tracker integrity and multi-tab consistency
+- Hardened backup validation: record IDs must be non-empty, timestamps parseable, and details values must remain flat JSON primitives. Nested objects/arrays are rejected rather than silently accepted into the typed Tracker schema.
+- Backup import now deduplicates repeated IDs inside the same backup file as well as against existing local records. Existing records always win; imports only add missing IDs.
+- Tracker writes emit a same-tab update event. The React app listens for same-tab updates and browser storage events, keeping open tabs/windows in sync without a server or overwriting existing records.
+- Added regression tests for nested malformed details and duplicate IDs within one backup.
+- Validation/deployment status: pending automated CI and separate rebuild Worker deployment. Cross-device sync remains a separate backend requirement; this stage only synchronizes tabs on the same browser origin.
