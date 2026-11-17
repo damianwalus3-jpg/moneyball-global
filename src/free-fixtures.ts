@@ -131,6 +131,11 @@ export interface FixtureScan {
   leaguesFailed: string[];
   source: string;
   cache: boolean;
+  coverage: {
+    openMatchday: { cataloguesChecked: number; fixtures: number; errors: number };
+    openLigaDB: { competitionsChecked: number; fixtures: number; errors: number };
+    openFootball: { feedsChecked: number; fixtures: number; errors: number };
+  };
 }
 export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureScan> {
   const date = brusselsDate();
@@ -150,6 +155,9 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   let openMatchdayChecked = 0;
   let openLigaChecked = 0;
   let openFootballChecked = 0;
+  let openMatchdayFixturesFound = 0;
+  let openLigaFixturesFound = 0;
+  let openFootballFixturesFound = 0;
 
   // Source 1: every European folder in open-matchday, including cups and youth competitions.
   try {
@@ -182,6 +190,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     });
     for (const response of responses) {
       if (response.error) errors.push(response.error);
+      openMatchdayFixturesFound += response.fixtures.length;
       for (const fixture of response.fixtures) byKey.set(fixtureKey(fixture.date, fixture.home, fixture.away), fixture);
     }
   } catch (error) {
@@ -245,6 +254,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     openLigaChecked = leagues.length;
     for (const response of throttledMatches) {
       if (response.error) errors.push(response.error);
+      openLigaFixturesFound += response.fixtures.length;
       for (const fixture of response.fixtures) {
         const key = fixtureKey(fixture.date, fixture.home, fixture.away);
         const existing = byKey.get(key);
@@ -260,6 +270,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   try {
     const openFootball = await scanOpenFootball(date, force);
     openFootballChecked = openFootball.checked;
+    openFootballFixturesFound = openFootball.fixtures.length;
     errors.push(...openFootball.failed.map(error => `openfootball · ${error}`));
     for (const fixture of openFootball.fixtures) {
       const key = fixtureKey(fixture.date, fixture.home, fixture.away);
@@ -283,6 +294,11 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     leaguesFailed: errors,
     source: SOURCE,
     cache: false,
+    coverage: {
+      openMatchday: { cataloguesChecked: openMatchdayChecked, fixtures: openMatchdayFixturesFound, errors: errors.filter(error => error.startsWith("open-matchday ·")).length },
+      openLigaDB: { competitionsChecked: openLigaChecked, fixtures: openLigaFixturesFound, errors: errors.filter(error => error.startsWith("OpenLigaDB ·")).length },
+      openFootball: { feedsChecked: openFootballChecked, fixtures: openFootballFixturesFound, errors: errors.filter(error => error.startsWith("openfootball ·")).length },
+    },
   };
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ...result, cachedAt: Date.now() })); } catch { /* storage may be full */ }
   return result;
