@@ -598,6 +598,46 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  };
  const fromUtc=brusselsMidnightUtc(date);
  const toUtc=brusselsMidnightUtc(nextDate);
+ let scheduledImport:any={ok:true,attempted:false,feed_rows:0,public_rows:0,eligible_rows:0,inserted:0};
+ // The minute cron previously predicted only rows already present in matches.
+ // Import the refreshed global FootyNomad feed and public European fixtures on
+ // the first page of each scheduled scan, before the scan cursor is read.
+ if(scheduledMode&&!scanCursorKickoff&&!scanCursorId){
+  scheduledImport={ok:true,attempted:true,feed_rows:0,public_rows:0,eligible_rows:0,inserted:0};
+  try{
+   let feedRows:any[]=[];
+   let feedError:string|null=null;
+   try{
+    feedRows=await db("moneyball_global_fixture_feed?select=scan_date,external_id,source,competition,country,gender,home_team,away_team,kickoff_at,status&scan_date=eq."+encodeURIComponent(date)+"&order=kickoff_at.asc",token);
+   }catch(e){feedError=String(e);}
+   const publicForImport=await readPublicSourceForms(date,token);
+   const publicRows=Array.isArray(publicForImport.fixtureRows)?publicForImport.fixtureRows:[];
+   const candidates=[...feedRows,...publicRows];
+   const fixtureDay=(f:any)=>brusselsFixtureDay(f.kickoff_at)||String(f.scan_date||f.date||f.kickoff_date||"").slice(0,10);
+   const eligible=candidates.filter((f:any)=>fixtureDay(f)===date&&isEligibleScheduledFixture(f)&&String(f.external_id||"")&&String(f.home_team||f.home||"")&&String(f.away_team||f.away||""));
+   const existingRows=await db("matches?select=source,external_id,country,competition,league,gender,home_team,away_team,kickoff_at,kickoff_date&owner_id=eq."+encodeURIComponent(ownerId)+"&or=(and(kickoff_at.gte."+encodeURIComponent(fromUtc)+",kickoff_at.lt."+encodeURIComponent(toUtc)+"),kickoff_date.eq."+date+")",token);
+   const identity=(f:any)=>normTeam(f.home_team||f.home)+"|"+normTeam(f.away_team||f.away)+"|"+fixtureDay(f);
+   const existingKeys=new Set((existingRows||[]).filter((f:any)=>isEligibleScheduledFixture(f)).map(identity));
+   const sourceRank=(f:any)=>String(f.source||"").toLowerCase()==="footynomad"?0:String(f.source||"").toLowerCase()==="openmatchday"?1:2;
+   const selected=new Map<string,any>();
+   for(const f of eligible){
+    const key=identity(f);if(existingKeys.has(key))continue;
+    const previous=selected.get(key);
+    if(!previous||sourceRank(f)<sourceRank(previous))selected.set(key,f);
+   }
+   const rows=[...selected.values()].map((f:any)=>({
+    owner_id:ownerId,scan_run_id:null,external_id:String(f.external_id),source:String(f.source||"OpenMatchday"),
+    competition:f.competition||f.league||null,league:f.league||f.competition||null,country:f.country||null,
+    gender:"men",home_team:String(f.home_team||f.home),away_team:String(f.away_team||f.away),
+    kickoff_at:f.kickoff_at||null,kickoff_date:date,status:String(f.status||"scheduled").toLowerCase()
+   }));
+   let saved:any[]=[];
+   if(rows.length)saved=await db("matches?on_conflict=owner_id,source,external_id",token,"POST",rows,"resolution=ignore-duplicates,return=representation");
+   const sourceCounts:Record<string,number>={};
+   for(const f of eligible){const key=String(f.source||"unknown");sourceCounts[key]=(sourceCounts[key]||0)+1;}
+   scheduledImport={ok:true,attempted:true,feed_rows:feedRows.length,public_rows:publicRows.length,eligible_rows:eligible.length,inserted:Array.isArray(saved)?saved.length:0,source_counts:sourceCounts,feed_error:feedError,public_source_error:publicForImport.error||null};
+  }catch(e){scheduledImport={ok:false,attempted:true,error:String(e)};}
+ }
  let scheduledPage:any=null;
  const all=scheduledMode
   ?(scheduledPage=await db("rpc/moneyball_prediction_scan_page",token,"POST",{p_owner_id:ownerId,p_date:date,p_cursor_kickoff_at:scanCursorKickoff,p_cursor_match_id:scanCursorId,p_limit:batchSize,p_token:cronToken})).rows||[]
@@ -629,7 +669,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FootyNomad"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FotbalInfo"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.XGoalsPro"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
-  readPublicSourceForms(date,requestToken),
+  readPublicSourceForms(date,token),
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI"+pageMatchFilter,token):Promise.resolve([]),
   providerOddsQuery,
   readTipsAuditFairMarket(date,matches),
@@ -660,7 +700,7 @@ const history=historyTimed||[];
  }
  const americanToDecimal=(value:any)=>{const n=Number(value);if(!Number.isFinite(n)||n===0)return null;return +(n>0?1+n/100:1+100/Math.abs(n)).toFixed(3);};
 
- if(!matches.length){const scanState=await finishScheduledScan(all.length);return out({ok:true,date,total:0,matches:0,offset:analysisOffset,batch_size:batchSize,has_more:moreAvailable,predictions:0,created:0,updated:0,preserved:0,covered:0,missing:0,selected:0,scheduled:scheduledMode,scan_state:scanState,message:moreAvailable?"Brak kwalifikujących się meczów w tej partii; skan przechodzi dalej.":"Brak kolejnych kwalifikujących się meczów."});}
+ if(!matches.length){const scanState=await finishScheduledScan(all.length);return out({ok:true,date,total:0,matches:0,offset:analysisOffset,batch_size:batchSize,has_more:moreAvailable,predictions:0,created:0,updated:0,preserved:0,covered:0,missing:0,selected:0,scheduled:scheduledMode,scheduled_import:scheduledImport,scan_state:scanState,message:moreAvailable?"Brak kwalifikujących się meczów w tej partii; skan przechodzi dalej.":"Brak kolejnych kwalifikujących się meczów."});}
  // Add a no-key public score-history fallback for teams missing recent verified results.
  const xgoalsTeamForms=new Map<string,any>(),xgoalsCandidates=new Map<string,{team:string,country:string,kickoff:string}>();
  for(const m of matches){
@@ -910,5 +950,5 @@ const history=historyTimed||[];
  }
  const couponCreated=false,couponLegs=0;
  const scanState=await finishScheduledScan(matches.length);
- return out({ok:true,date,model:V,provider:"Verified database history + cached FootyNomad/FotbalInfo + compact OpenMatchday public sources + fresh market probabilities",tipsaudit:{ok:tipsAudit.ok,matched:tipsAudit.matched,generated_at:tipsAudit.generated_at,error:tipsAudit.error||null},matches:matches.length,offset:scheduledMode?null:analysisOffset,batch_size:batchSize,has_more:moreAvailable,scheduled:scheduledMode,scan_state:scanState,fixtures_before_deduplication:rawDateMatches.length,duplicates_removed:duplicatesRemoved,predictions:rows.length,created,updated,preserved,covered,missing,footy_form_candidates:footyForms.size,fotbal_form_candidates:fotbalCandidates.length,footy_form_matches:footyForms.size,openmatchday_fixtures:publicForms.fixtures,openmatchday_error:publicForms.error||null,github_public_teams:Object.keys(githubPublic.teams||{}).length,github_public_competitions:githubPublic.coverage?.competitions_with_results||0,github_openfootball_matches:githubPublic.coverage?.openfootball_league_matches_read||0,github_openfootball_files:githubPublic.coverage?.openfootball_league_files_loaded||0,github_public_generated_at:githubPublic.generated_at||null,github_public_error:githubPublic.error||null,github_form_matches:new Set(rows.filter((x:any)=>String(x.note).includes("KEYLESS_GITHUB_LAST10_FORM")).map((x:any)=>x.match_id)).size,selected:rows.filter(x=>x.verdict==="WYBRANY").length,couponCreated,couponLegs,limitations:["W trakcie skanowania używane są zweryfikowana historia bazy, zapisane cache FootyNomad/FotbalInfo i kompaktowe źródła OpenMatchday. Duże archiwa historyczne CSV/JSON nie są parsowane ponownie w każdej partii, aby uniknąć limitu CPU Edge Function.","Nie wszystkie ligi mają świeże xG, potwierdzone składy i kontuzje. Brakujące dane pozostają jawnie oznaczone; model bazowy jest ODRZUCONY i nie trafia do kuponów. Kursy rynkowe są używane wyłącznie, gdy zapis ma maksymalnie 48 godzin.","Dane publiczne odświeżane przez GitHub Actions zgodnie z harmonogramem poszczególnych źródeł.","Kupony tworzy użytkownik przyciskiem generatora; skan nie zapisuje automatycznie kuponów."]});
+ return out({ok:true,date,model:V,provider:"Verified database history + cached FootyNomad/FotbalInfo + compact OpenMatchday public sources + fresh market probabilities",tipsaudit:{ok:tipsAudit.ok,matched:tipsAudit.matched,generated_at:tipsAudit.generated_at,error:tipsAudit.error||null},matches:matches.length,offset:scheduledMode?null:analysisOffset,batch_size:batchSize,has_more:moreAvailable,scheduled:scheduledMode,scheduled_import:scheduledImport,scan_state:scanState,fixtures_before_deduplication:rawDateMatches.length,duplicates_removed:duplicatesRemoved,predictions:rows.length,created,updated,preserved,covered,missing,footy_form_candidates:footyForms.size,fotbal_form_candidates:fotbalCandidates.length,footy_form_matches:footyForms.size,openmatchday_fixtures:publicForms.fixtures,openmatchday_error:publicForms.error||null,github_public_teams:Object.keys(githubPublic.teams||{}).length,github_public_competitions:githubPublic.coverage?.competitions_with_results||0,github_openfootball_matches:githubPublic.coverage?.openfootball_league_matches_read||0,github_openfootball_files:githubPublic.coverage?.openfootball_league_files_loaded||0,github_public_generated_at:githubPublic.generated_at||null,github_public_error:githubPublic.error||null,github_form_matches:new Set(rows.filter((x:any)=>String(x.note).includes("KEYLESS_GITHUB_LAST10_FORM")).map((x:any)=>x.match_id)).size,selected:rows.filter(x=>x.verdict==="WYBRANY").length,couponCreated,couponLegs,limitations:["W trakcie skanowania używane są zweryfikowana historia bazy, zapisane cache FootyNomad/FotbalInfo i kompaktowe źródła OpenMatchday. Duże archiwa historyczne CSV/JSON nie są parsowane ponownie w każdej partii, aby uniknąć limitu CPU Edge Function.","Nie wszystkie ligi mają świeże xG, potwierdzone składy i kontuzje. Brakujące dane pozostają jawnie oznaczone; model bazowy jest ODRZUCONY i nie trafia do kuponów. Kursy rynkowe są używane wyłącznie, gdy zapis ma maksymalnie 48 godzin.","Dane publiczne odświeżane przez GitHub Actions zgodnie z harmonogramem poszczególnych źródeł.","Kupony tworzy użytkownik przyciskiem generatora; skan nie zapisuje automatycznie kuponów."]});
 }catch(e){console.error("moneyball-predict failed:",String(e),e instanceof Error?e.stack:"");return out({ok:false,error:String(e)},500)}});
