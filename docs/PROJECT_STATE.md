@@ -1372,3 +1372,12 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - Double Chance has 93 probability-bearing rows across 31 matches, all currently rejected; Goals has 256 probability-bearing rows across 32 matches, currently rejected under the >75% candidate threshold. Do not misrepresent these as strong picks or create coupons from them.
 - This is a successful scope-ingestion/recording check, not proof that every European country has a source on every date. Continue coverage-gap checks and inspect the authenticated UI/scan run metrics separately.
 - No production data was modified during this audit.
+
+
+## Runtime health snapshot — 2026-11-17 14:25 UTC
+- Current production Supabase Edge Function versions confirmed ACTIVE: `footynomad-sync v101`, `moneyball-free-feed v53`, `moneyball-predict v249`, `moneyball-results-sync v72`.
+- Last-24h function edge logs for these exact current versions: FootyNomad 4/4 HTTP 200 (avg 3.745 s, max 7.221 s); free feed 11/11 HTTP 200 (avg 2.201 s, max 2.955 s); predictor 130/130 HTTP 200 (avg 2.740 s, max 30.776 s); results sync 87/87 HTTP 200 (avg 5.088 s, max 8.427 s).
+- Historical errors in the same 24-hour log window belong to older deployed versions (predictor v217/v218 and FootyNomad v97); no HTTP errors were observed for the currently active versions in this grouped check. Older FootyNomad v97 also returned HTTP 400 and is not the active version.
+- The predictor v249 max latency of 30.776 s is a performance watch item despite all requests returning HTTP 200; inspect long-running batches before changing concurrency or schedules.
+- A previous 1X2 forecast record was superseded and retained with NULL probability; it is historical and must not be counted as the current model output.
+- Production data was only read. No migrations, data writes, cron changes, or Edge Function redeploys were made in this runtime audit.
