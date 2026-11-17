@@ -241,7 +241,7 @@ Deno.serve(async(req)=>{
   let footballChartsStatus:any={ok:false,skipped:"personal-use-only"};
   if(footballChartsOwner){
    try{
-    const footballCharts=await readFootballChartsFixtures(date);
+    const footballCharts=await readFootballChartsFixtures(date,ownerId,token);
     const eligible=footballCharts.fixtures.filter(isEligiblePublicFixture);
     publicFixtures.push(...eligible);
     footballChartsStatus={ok:footballCharts.ok,requests:footballCharts.requests,leagues_checked:footballCharts.leagues_checked,fixtures_count:footballCharts.fixtures_count,eligible_for_date:eligible.length,errors:footballCharts.errors,league_status:footballCharts.league_status,cache:footballCharts.cache,attribution:footballCharts.attribution,model_predictions_imported:false,stats_imported:false,odds_available:false};
