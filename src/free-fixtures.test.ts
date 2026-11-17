@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixtureKey, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaSeasonYears, parseEspnEuropeanFixtures } from "./free-fixtures";
+import { fixtureKey, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaSeasonYears, parseEspnEuropeanFixtures, espnScoreboardDatesForBrusselsDay } from "./free-fixtures";
 
 describe("European fixture source classification", () => {
   it("accepts known European country names and competition prefixes", () => {
@@ -116,5 +116,12 @@ describe("ESPN European daily fixture fallback", () => {
 
   it("rejects malformed scoreboard payloads instead of reporting an empty successful scan", () => {
     expect(() => parseEspnEuropeanFixtures({ events: null }, "2026-11-18")).toThrow("nieprawidłowa odpowiedź");
+  });
+});
+
+
+describe("ESPN Brussels-day source window", () => {
+  it("checks the prior UTC day as well as the current day to catch after-midnight Brussels kickoffs", () => {
+    expect(espnScoreboardDatesForBrusselsDay("2026-11-18")).toEqual(["20261117", "20261118"]);
   });
 });
