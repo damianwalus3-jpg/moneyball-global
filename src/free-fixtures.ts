@@ -1,7 +1,7 @@
 export interface FreeFixture {
   id: string;
   competition: string;
-  countryCode: string;
+  countryCode: string;\n  leagueFolder: string;
   date: string;
   time: string;
   home: string;
@@ -94,7 +94,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       const fixtures = parseCsv(csv).filter(row => row.date === date).map(row => ({
         id: `${folder}|${row.gw}|${row.date}|${row.time}|${row.home}|${row.away}`,
         competition: league.league,
-        countryCode: folder.split("_")[0],
+        countryCode: folder.split("_")[0],\n        leagueFolder: folder,
         date: row.date,
         time: row.time,
         home: row.home,
