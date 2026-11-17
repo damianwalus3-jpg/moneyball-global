@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { mapOpenLigaTeamForm } from "./team-form";
+import { findOpenLigaFixtureResult, mapOpenLigaTeamForm } from "./team-form";
+import { vi } from "vitest";
 
 const match = (date: string, home: string, away: string, homeGoals: number, awayGoals: number) => ({
   matchDateTimeUTC: `${date}T18:00:00Z`,
@@ -33,5 +34,30 @@ describe("OpenLigaDB team form", () => {
       matchIsFinished: false,
     }], "Club A", "2026-08-20");
     expect(form.matches).toHaveLength(0);
+  });
+});
+
+describe("OpenLigaDB result settlement", () => {
+  it("returns a result only for a finished matching fixture", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{
+        matchDateTimeUTC: "2026-11-17T18:00:00Z",
+        matchIsFinished: true,
+        team1: { teamName: "Club A" },
+        team2: { teamName: "Club B" },
+        matchResults: [{ resultTypeID: 2, resultName: "Endergebnis", resultOrderID: 2, pointsTeam1: 2, pointsTeam2: 1 }],
+      }],
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const result = await findOpenLigaFixtureResult("bl1", "2026", "Club A", "Club B", "2026-11-17");
+      expect(result?.actual).toBe("1");
+      expect(result?.homeGoals).toBe(2);
+      expect(result?.awayGoals).toBe(1);
+      expect(result?.source).toBe("OpenLigaDB");
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
