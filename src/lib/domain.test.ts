@@ -180,6 +180,8 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Lithuania", competition: "TOPLYGA" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Moldova", competition: "Liga 7777" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Israel", competition: "Ligat Winner" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Faroe Islands", competition: "Meistaradeildin menn" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Iceland", competition: "Lengjudeild karla" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya II" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya B" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Real Madrid Castilla" })).toBe(false);
@@ -270,6 +272,9 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Portugal", "Liga Portugal 2")).toBe(true);
     expect(isEuropeanTopTwoLeague("Israel", "Liga Leumit")).toBe(true);
     expect(isEuropeanTopTwoLeague("Israel", "Winner League")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Faroe Islands", "Meistaradeildin menn")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Faroe Islands", "1. deild menn")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Iceland", "Lengjudeild karla")).toBe(true);
     expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Liqa")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "Vysshaya Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "Pervaya Liga")).toBe(true);
