@@ -25,7 +25,7 @@ function prediction(overrides: Partial<TrackerRecord["details"]> = {}, status = 
 describe("safest daily pick", () => {
   it("chooses only one highest qualifying Double Chance candidate", () => {
     const result = getSafestPick([
-      prediction({ fixtureId: "fixture-1", dc1x: 0.86, dc12: 0.91 }),
+      prediction({ fixtureId: "fixture-1", dc1x: 0.86, dc12: 0.85 }),
       prediction({ fixtureId: "fixture-2", dc1x: 0.88, dcx2: 0.89, dc12: 0.84 }),
     ]);
     expect(result?.fixtureId).toBe("fixture-2");
