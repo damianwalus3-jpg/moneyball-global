@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, PageHeader } from "@/components/app/ui-bits";
-import { buildBackup, downloadFile, importTableCsv, restoreBackup, stamp, toCsv } from "@/lib/backup";
+import { buildBackup, downloadFile, importTableCsv, restoreBackup, stamp, toCsv, validateBackup } from "@/lib/backup";
 import { maskKey, readConfig, readPrefs, savePrefs } from "@/lib/config";
 import { fetchAll } from "@/lib/db";
 import { canInstall, isStandalone, promptInstall, subscribeInstall } from "@/lib/install";
@@ -58,6 +58,22 @@ function Ustawienia() {
   const restore = useAction(async (file: File) => restoreBackup(JSON.parse(await file.text())), {
     success: (c) => `Przywrócono (pominięto istniejące): ${Object.entries(c).map(([k, v]) => `${k} ${v}`).join(", ") || "0"}`,
   });
+  async function handleRestoreFile(file: File) {
+    try {
+      const parsed: unknown = JSON.parse(await file.text());
+      const preview = validateBackup(parsed);
+      const entries = Object.entries(preview.counts).filter(([, count]) => (count ?? 0) > 0);
+      const total = entries.reduce((sum, [, count]) => sum + (count ?? 0), 0);
+      const summary = entries.map(([table, count]) => `${TABLE_LABELS[table as TableName]}: ${count}`).join("\\n");
+      const confirmed = window.confirm(
+        `Kopia zawiera ${total} rekordów w ${entries.length} tabelach.\\n\\n${summary}\\n\\nPrzywracanie dopisze tylko rekordy o nieistniejących identyfikatorach. Istniejące rekordy nie zostaną nadpisane. Kontynuować?`,
+      );
+      if (confirmed) restore.mutate(file);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Nie udało się sprawdzić kopii zapasowej.");
+    }
+  }
+
   const importCsv = useAction(async (file: File) => importTableCsv(csvTable, await file.text()), {
     success: (n) => `Zaimportowano ${n} wierszy do ${TABLE_LABELS[csvTable]}`,
   });
@@ -110,7 +126,7 @@ function Ustawienia() {
           <Button onClick={async () => { try { downloadFile(`moneyball-backup-${stamp()}.json`, JSON.stringify(await buildBackup(), null, 2), "application/json"); } catch (e) { toast.error((e as Error).message); } }}>
             <Download /> Pełna kopia JSON
           </Button>
-          <FileButton label="Przywróć z JSON" accept=".json,application/json" onFile={(f) => restore.mutate(f)} />
+          <FileButton label="Przywróć z JSON" accept=".json,application/json" onFile={handleRestoreFile} />
         </div>
         <p className="text-xs text-muted-foreground">Przywracanie pomija rekordy, które już istnieją — nigdy ich nie nadpisuje.</p>
         <div className="flex flex-wrap items-center gap-2">
