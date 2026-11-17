@@ -169,7 +169,7 @@ export default {
       const cached = await cache.match(cacheKey);
       if (cached) return cached;
       try {
-        const upstream = await fetch(`${ESPN_API}?dates=${date}&limit=1000`, { headers: { Accept: "application/json", "User-Agent": "MONEYBALL-Rebuild/1.0 (fixture aggregation)" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+        const upstream = await fetch(`${ESPN_API}?dates=${date}&limit=1000`, { headers: { Accept: "application/json, text/plain, */*", "Accept-Language": "en-US,en;q=0.9", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", Referer: "https://www.espn.com/soccer/scoreboard", Origin: "https://www.espn.com" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
         const body = await upstream.text();
         if (!upstream.ok) return json({ error: "espn_upstream_http_" + upstream.status }, upstream.status, origin);
         try { JSON.parse(body); } catch { return json({ error: "espn_invalid_json" }, 502, origin); }
