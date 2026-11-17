@@ -148,7 +148,7 @@ export function mapOpenLigaTeamForm(matches: OpenLigaHistoryMatch[], team: strin
     if (homeScore < 0 || awayScore < 0) return [];
     const goalsFor = isHome ? homeScore : awayScore;
     const goalsAgainst = isHome ? awayScore : homeScore;
-    const result = goalsFor > goalsAgainst ? "W" : goalsFor === goalsAgainst ? "D" : "L";
+    const result: FormMatch["result"] = goalsFor > goalsAgainst ? "W" : goalsFor === goalsAgainst ? "D" : "L";
     return [{
       date,
       opponent: isHome ? away : home,
@@ -171,7 +171,7 @@ export function mapOpenLigaTeamForm(matches: OpenLigaHistoryMatch[], team: strin
 }
 export async function loadOpenLigaRecentTeamForm(shortcut: string, season: string, team: string, beforeDate: string): Promise<TeamForm> {
   if (!/^[a-z0-9._-]+$/i.test(shortcut) || !/^\d{4}$/.test(season) || !team.trim()) throw new Error("Nieprawidłowe parametry historii OpenLigaDB");
-  const key = `moneyball.openliga-form.v1:${shortcut}:${season}:${normalizeTeam(team)}`;
+  const key = `moneyball.openliga-form.v1:${shortcut}:${season}:${normalizeTeam(team)}:${beforeDate}`;
   try {
     const cached = localStorage.getItem(key);
     if (cached) {
