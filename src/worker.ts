@@ -85,8 +85,10 @@ export default {
 
       const fixtureId = url.searchParams.get("fixtureId")?.trim();
       const strikerGameId = url.searchParams.get("strikerGameId")?.trim();
-      if (!fixtureId && !strikerGameId) return json({ error: "fixtureId or strikerGameId is required" }, 400, origin);
-      if ((fixtureId && !/^[a-zA-Z0-9_-]{3,100}$/.test(fixtureId)) || (strikerGameId && !/^[a-zA-Z0-9_-]{1,40}$/.test(strikerGameId))) {
+      const strikerDate = url.searchParams.get("strikerDate")?.trim();
+      if (!fixtureId && !strikerGameId && !strikerDate) return json({ error: "fixtureId, strikerGameId or strikerDate is required" }, 400, origin);
+      if (strikerGameId && strikerDate) return json({ error: "use either strikerGameId or strikerDate, not both" }, 400, origin);
+      if ((fixtureId && !/^[a-zA-Z0-9_-]{3,100}$/.test(fixtureId)) || (strikerGameId && !/^[a-zA-Z0-9_-]{1,40}$/.test(strikerGameId)) || (strikerDate && (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(strikerDate) || !Number.isFinite(Date.parse(`${strikerDate}T00:00:00Z`)) || new Date(`${strikerDate}T00:00:00Z`).toISOString().slice(0,10) !== strikerDate))) {
         return json({ error: "invalid_fixture_identifier" }, 400, origin);
       }
 
@@ -111,14 +113,14 @@ export default {
           }
         }
       }
-      if (strikerGameId) {
+      if (strikerGameId || strikerDate) {
         if (!env.STRIKERAPI_API_KEY) results.strikerapi = { status: "not_configured" };
         else {
           try {
             const response = await fetch(`${STRIKER_API}/v1/get_odds`, {
               method: "POST",
               headers: { "Content-Type": "application/json", Accept: "application/json", "x-api-key": env.STRIKERAPI_API_KEY },
-              body: JSON.stringify({ game_id: strikerGameId }),
+              body: JSON.stringify(strikerGameId ? { game_id: strikerGameId } : { date: strikerDate }),
               signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
             });
             const payload = await readJson(response) as { data?: { games?: Array<Record<string, unknown>> }; games?: Array<Record<string, unknown>> };
@@ -141,7 +143,7 @@ export default {
                 })),
               };
             });
-            results.strikerapi = { status: "ok", capturedAt: new Date().toISOString(), games: normalized };
+            results.strikerapi = { status: "ok", lookup: strikerGameId ? "game" : "utc_date", capturedAt: new Date().toISOString(), games: normalized };
           } catch (error) {
             results.strikerapi = { status: "error", error: error instanceof Error ? error.message : "upstream_error" };
           }
