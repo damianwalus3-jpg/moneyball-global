@@ -1,5 +1,5 @@
 import Papa from "papaparse";
-import { fetchAll, upsertSkipExisting } from "./db";
+import { fetchAll, fetchTrackerSourceAuditPage, restoreTrackerSourceAudit, upsertSkipExisting } from "./db";
 import { TABLES_IN_ORDER, type TableName } from "./types";
 
 export const BACKUP_FORMAT = "moneyball-global-2.0-backup";
@@ -9,12 +9,19 @@ export interface Backup {
   version: 1;
   exported_at: string;
   tables: Partial<Record<TableName, Record<string, unknown>[]>>;
+  tracker_source_audit?: Record<string, unknown>[];
 }
 
 export async function buildBackup(): Promise<Backup> {
   const tables: Backup["tables"] = {};
   for (const t of TABLES_IN_ORDER) tables[t] = (await fetchAll(t)) as unknown as Record<string, unknown>[];
-  return { format: BACKUP_FORMAT, version: 1, exported_at: new Date().toISOString(), tables };
+  const audit: Record<string, unknown>[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const page = await fetchTrackerSourceAuditPage(offset, 500);
+    audit.push(...page);
+    if (page.length < 500) break;
+  }
+  return { format: BACKUP_FORMAT, version: 1, exported_at: new Date().toISOString(), tables, tracker_source_audit: audit };
 }
 
 export function toCsv(rows: Record<string, unknown>[]): string {
@@ -79,6 +86,18 @@ export function validateBackup(data: unknown): { backup: Backup; counts: Partial
     }
     counts[tableName as TableName] = rows.length;
   }
+  if (candidate.tracker_source_audit !== undefined) {
+    if (!Array.isArray(candidate.tracker_source_audit)) throw new Error("Rejestr audytu w kopii musi być listą.");
+    const auditIds = new Set<string>();
+    for (const [index, row] of candidate.tracker_source_audit.entries()) {
+      if (!row || typeof row !== "object" || Array.isArray(row) || typeof (row as Record<string, unknown>)["id"] !== "string") {
+        throw new Error(`Nieprawidłowy wpis audytu nr ${index + 1}.`);
+      }
+      const id = String((row as Record<string, unknown>)["id"]);
+      if (auditIds.has(id)) throw new Error(`Powtórzony identyfikator wpisu audytu: ${id}.`);
+      auditIds.add(id);
+    }
+  }
   return { backup: candidate as Backup, counts };
 }
 
@@ -89,6 +108,9 @@ export async function restoreBackup(data: unknown): Promise<Record<string, numbe
   for (const t of TABLES_IN_ORDER) {
     const rows = b.tables[t];
     if (Array.isArray(rows) && rows.length) counts[t] = await upsertSkipExisting(t, rows);
+  }
+  if (b.tracker_source_audit?.length) {
+    counts["tracker_source_audit"] = await restoreTrackerSourceAudit(b.tracker_source_audit);
   }
   return counts;
 }
