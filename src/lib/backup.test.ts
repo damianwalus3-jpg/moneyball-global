@@ -34,6 +34,18 @@ describe("backup restore preflight", () => {
     expect(() => validateBackup(backup({ matches: [{ id: "same" }, { id: "same" }] }))).toThrow(/Powtórzone id/);
   });
 
+  it("validates audit trail rows and rejects duplicate audit IDs", () => {
+    const result = validateBackup({
+      ...backup({}),
+      tracker_source_audit: [{ id: "audit-1", entity_type: "prediction", new_source_class: "MODEL" }],
+    });
+    expect(result.backup.tracker_source_audit).toHaveLength(1);
+    expect(() => validateBackup({
+      ...backup({}),
+      tracker_source_audit: [{ id: "same" }, { id: "same" }],
+    })).toThrow(/Powtórzony identyfikator wpisu audytu/);
+  });
+
   it("rejects malformed top-level payloads", () => {
     expect(() => validateBackup(null)).toThrow(/Nieprawidłowy format/);
     expect(() => validateBackup([])).toThrow(/Nieprawidłowy format/);
