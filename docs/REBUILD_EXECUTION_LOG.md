@@ -745,3 +745,13 @@
 - Validation/deployment: pending CI and Cloudflare workflow completion on the latest branch HEAD. Stage 61 is not marked deployed until both are verified.
 
 - CI feedback loop for Stages 60–61: the first run caught two TypeScript-only issues in sequence (a redundant comparison against a fixed tuple length, then an unused callback argument in the updated test fixture). Both were corrected; the second correction is commit be4810ab09c1d26507b6c2d76b7b759fcbb43c67. Fresh CI and Cloudflare deployment runs on the latest HEAD are required; earlier failed/cancelled runs are not release evidence.
+
+
+## Stage 62 — repair CI regressions exposed by full test run (2026-11-18)
+- Retrieved full GitHub Actions job logs for the latest Stage 60–61 candidate. TypeScript passed, but unit tests exposed three fixture/expectation defects:
+  1. Two coupon candidate legs still declared 50% probability although their current KANDYDAT predictions were 80%; this correctly caused the new probability-integrity guard to refuse valuation. Updated fixture probabilities to 80% so the positive-path test now represents a valid eligible coupon.
+  2. Worker status test used an ODDS_PILOT_TOKEN shorter than the enforced 32-character minimum but expected pilotEnabled=true. Updated it to a valid-length dummy test secret.
+  3. Invalid-owner-token test configured a too-short server secret, so the Worker correctly returned 503 pilot_disabled before checking authorization. Updated configured secret to valid length while retaining a wrong supplied bearer token, so the test exercises 401 unauthorized.
+- Commits: coupon fixture 0900bb1984419db202b9c3b15196b27f610f0a39d; Worker auth fixtures 09f03e3bc7d7816c41d078bf72ac17c013f49ec5.
+- Earlier CI run reported 109 passing / 3 failing tests (112 total); these were test-data issues, not reasons to weaken the fail-closed security or prediction validation.
+- New CI and Cloudflare deployment checks on the latest branch HEAD are pending. No external odds API was called and no Tracker or bankroll data was modified.
