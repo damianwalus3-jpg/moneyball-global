@@ -66,12 +66,14 @@ export function validateBackup(data: unknown): { backup: Backup; counts: Partial
       throw new Error(`Dane tabeli ${tableName} muszą być listą rekordów.`);
     const ids = new Set<string>();
     for (const [index, row] of rows.entries()) {
-      if (!row || typeof row !== "object" || Array.isArray(row) ||
-          typeof (row as Record<string, unknown>).id !== "string" ||
-          !(row as Record<string, unknown>).id || !(row as Record<string, unknown>).id?.toString().trim()) {
+      if (!row || typeof row !== "object" || Array.isArray(row)) {
         throw new Error(`Nieprawidłowy rekord ${index + 1} w tabeli ${tableName}: wymagane jest id.`);
       }
-      const id = String((row as Record<string, unknown>).id);
+      const rawId = (row as Record<string, unknown>)["id"];
+      if (typeof rawId !== "string" || !rawId.trim()) {
+        throw new Error(`Nieprawidłowy rekord ${index + 1} w tabeli ${tableName}: wymagane jest id.`);
+      }
+      const id = rawId;
       if (ids.has(id)) throw new Error(`Powtórzone id ${id} w tabeli ${tableName}.`);
       ids.add(id);
     }
