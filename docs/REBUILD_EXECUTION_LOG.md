@@ -270,3 +270,11 @@
 - This fixes a real integration blocker: OpenLigaDB catalogues, match feeds and team-history requests can now reach the upstream API through the Worker. Zero-row league feeds remain provider-data gaps and are not treated as errors.
 - Final config commit: 6e4d0df0b7bf5211cf63ae5cb9d1fc5cc2105bd7 (fix(rebuild): route API requests through Worker before SPA assets).
 - Stage 19 is COMPLETE/DEPLOYED.
+
+## 2026-11-17 — Stage 20: live OpenLigaDB feed audit
+- Re-read the current OpenLigaDB 2026 catalogue after the Worker routing repair: 88 total catalogue entries, 35 accepted by the app's current European-football classification rules.
+- Queried all 35 accepted match feeds for season 2026 and filtered matchDateTimeUTC/matchDateTime to the Brussels calendar date 2026-11-17. OpenLigaDB returned two fixtures for that date: Denmark–Norway and Wales–Portugal (Nations League feed).
+- Several accepted feeds returned no season rows or no fixtures for this date. They remain visible as provider limitations rather than being silently counted as matches. Other providers (open-matchday and OpenFootball) are merged separately and can contribute additional matches.
+- Verified that the repaired Worker proxy serves the 88-entry catalogue and real league JSON, and that the UEFA Women's Champions League team-history endpoint returns six matches for FC Bayern München Frauen.
+- No source rows or probabilities were fabricated. A provider's empty response is not evidence that no match exists in all European football.
+- Stage 20 is COMPLETE as a source audit; no new code deployment was required beyond Stage 19.
