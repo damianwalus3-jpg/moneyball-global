@@ -27,7 +27,7 @@ describe("canonical schema contract", () => {
     expect(COLUMNS.predictions).not.toContain("prediction_type");
     expect(COLUMNS.predictions).not.toContain("pick");
     expect(COLUMNS.coupon_legs).toContain("prediction_id");
-    expect(COLUMNS.coupon_legs).not.toContain("match_id");
+    expect(COLUMNS.coupon_legs).toContain("match_id");
     expect(COLUMNS.odds_snapshots).toContain("prediction_id");
     expect(COLUMNS.bankroll_transactions).toContain("transaction_type");
   });
