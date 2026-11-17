@@ -24,7 +24,12 @@ function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCand
   if (typeof d.fixtureId !== "string" || typeof d.selection !== "string" || !["1","X","2"].includes(d.selection)) return null;
   const probabilities = [d.p1, d.px, d.p2];
   if (probabilities.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) return null;
-  const probability = d.selection === "1" ? d.p1 as number : d.selection === "X" ? d.px as number : d.p2 as number;
+  const [p1, px, p2] = probabilities as [number, number, number];
+  if (Math.abs(p1 + px + p2 - 1) > 0.0001) return null;
+  const ranked = [{ selection: "1", probability: p1 }, { selection: "X", probability: px }, { selection: "2", probability: p2 }]
+    .sort((a, b) => b.probability - a.probability);
+  if (d.selection !== ranked[0].selection) return null;
+  const probability = ranked[0].probability;
   if (probability < 0.75) return null;
   return {
     fixtureId: d.fixtureId,
