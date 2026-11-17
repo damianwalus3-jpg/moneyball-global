@@ -518,6 +518,13 @@ describe("coupon builder", () => {
     expect(validateBatch([noOdds], 3, false)).toEqual([]);
     expect(validateBatch([[prediction("a", "m1", 90, { odds: 1 }), prediction("b", "m2", 90), prediction("c", "m3", 90)]], 3, true).length).toBe(1);
   });
+  it("allows a single-pick coupon only when explicitly requested and requires a real price", () => {
+    const single = prediction("single", "m1", 90, { odds: 1.8 });
+    expect(validateCoupon([single], new Set(), 1, true)).toEqual([]);
+    expect(validateCoupon([single], new Set(), 3, true)).toContain("Kupon musi mieć dokładnie 3 zdarzenia.");
+    expect(validateCoupon([prediction("no-odds", "m2", 90, { odds: null })], new Set(), 1, true))
+      .toContain("Kupon MAIN/MEGA/EXTRA wymaga potwierdzonego kursu większego niż 1,00 dla każdego zdarzenia.");
+  });
   it("rejects incomplete coupons, duplicate matches, low probability and batch reuse", () => {
     expect(validateCoupon([prediction("a", "m1", 90), prediction("b", "m2", 90)])).toContain("Kupon musi mieć dokładnie 3 zdarzenia.");
     expect(validateCoupon([prediction("a", "m1", 90), prediction("b", "m1", 90), prediction("c", "m2", 90)])).toContain("Każde zdarzenie musi dotyczyć innego meczu.");
