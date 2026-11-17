@@ -9,13 +9,13 @@ LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path = ''
 AS $function$
   SELECT public.moneyball_is_geographic_europe_country(p_country)
     AND nullif(btrim(coalesce(p_competition,'')), '') IS NOT NULL
-    AND coalesce(p_competition,'') !~* '(^|[^a-z0-9])(uefa|fifa|nations league|champions league|europa league|conference league|international|world cup|euro|friendly|cup|copa|coppa|coupe|pokal|trophy|shield|super cup|ta[cç]a|kupa|kup|puchar|cupa|qualification|qualifying|play ?offs?)([^a-z0-9]|$)';
+    AND coalesce(p_competition,'') !~* '(^|[^a-z0-9])(uefa|fifa|nations league|champions league|europa league|conference league|international|world cup|euro|friendly|cup|copa|coppa|supercopa|supercoppa|supercup|coupe|pokal|trophy|shield|super cup|ta[cç]a|kupa|kup|puchar|cupa|qualification|qualifying|play ?offs?)([^a-z0-9]|$)';
 $function$;
 
 CREATE OR REPLACE FUNCTION public.moneyball_is_eligible_european_match(
   p_country text, p_competition text, p_gender text, p_home_team text, p_away_team text
 ) RETURNS boolean
-LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path = ''
+LANGUAGE sql IMMUTABLE SET search_path = ''
 AS $function$
   SELECT public.moneyball_is_geographic_europe_country(p_country)
     AND nullif(btrim(coalesce(p_competition,'')), '') IS NOT NULL
