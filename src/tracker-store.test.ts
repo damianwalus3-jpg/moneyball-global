@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { exportBackup, importBackup, readRecords, addRecord, validateBackup } from "./tracker-store";
+import { addRecord, addRecordsIfMissing, exportBackup, importBackup, readRecords, validateBackup } from "./tracker-store";
 
 const memory = new Map<string, string>();
 Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
@@ -33,5 +33,13 @@ describe("local tracker", () => {
   });
   it("rejects malformed backup", () => {
     expect(() => validateBackup({ version: 99 })).toThrow();
+    expect(() => validateBackup({ format: "moneyball-local-backup", version: 1, records: [{ id: "x", kind: "match", title: "bad", status: "x", details: [], createdAt: "now" }] })).toThrow();
+  });
+  it("stores scanned fixtures once and never overwrites an existing fixture row", () => {
+    const fixture = { kind: "match" as const, title: "Team A — Team B", status: "SCHEDULED", details: { fixtureId: "provider|fixture-1", date: "2026-11-17" } };
+    expect(addRecordsIfMissing([fixture], "fixtureId")).toBe(1);
+    expect(addRecordsIfMissing([{ ...fixture, title: "Changed title", status: "FINISHED" }], "fixtureId")).toBe(0);
+    expect(readRecords()).toHaveLength(1);
+    expect(readRecords()[0].title).toBe("Team A — Team B");
   });
 });
