@@ -183,3 +183,7 @@ Commit 269e85f78b0d7a608fd6d1a1c4c339d646c663a7 adds shared country-safe parser 
 
 ## Settlement-history scope fix — 2026-11-17
 Migration `20261117111000_filter_history_page_to_european_top_two.sql` applied; `moneyball_history_page` now filters to European senior-men domestic tier 1/2, preserving all underlying records. Auth-context regression: 0 ineligible rows, 80 done eligible history records, 0 pending settlement queue. This aligns history with the already filtered prediction/results/dashboard/statistics/match views.
+
+
+## Official European source audit — 2026-11-17
+Source-discovery coverage now 53/55 UEFA associations after verifying current official 2026/27 fixture/competition sources for 16 additional associations. Detailed sources, limitations and alias coverage: docs/EUROPEAN_SOURCE_AUDIT_2026-11-17.md. Belarus remains the only association with a domestic league lacking a verified current public fixture source; Liechtenstein has no national league. MONEYBALL aliases updated across domain, both Edge Functions and SQL. Supabase Edge Functions v50/v97. 53/55 is not a claim of automated importer coverage; no official-site scraping adapters are enabled yet.
