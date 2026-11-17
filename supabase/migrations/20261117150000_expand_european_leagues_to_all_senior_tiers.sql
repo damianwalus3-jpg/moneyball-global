@@ -1,3 +1,32 @@
+-- Canonical geographic Europe predicate (UN M49; provider-specific UK/Kosovo aliases).
+-- Deliberately excludes UEFA members located in Western/Central Asia.
+CREATE OR REPLACE FUNCTION public.moneyball_is_geographic_europe_country(p_country text)
+RETURNS boolean
+LANGUAGE sql IMMUTABLE SET search_path = ''
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+      FROM regexp_split_to_table(coalesce(p_country,''), '[,\\/;|]+') AS part(value)
+     WHERE regexp_replace(lower(btrim(part.value)), '[^a-z0-9]+', '', 'g') = ANY (ARRAY[
+       'albania','andorra','austria','belarus','belgium','bosnia','bosniaandherzegovina',
+       'bulgaria','croatia','czechia','czechrepublic','denmark','england','estonia',
+       'faroeislands','finland','france','germany','gibraltar','greece','guernsey',
+       'hungary','iceland','ireland','republicofireland','isleofman','italy','jersey',
+       'kosovo','latvia','liechtenstein','lithuania','luxembourg','malta','moldova',
+       'monaco','montenegro','netherlands','northmacedonia','macedonia','northernireland',
+       'norway','poland','portugal','romania','russia','russianfederation','sanmarino',
+       'scotland','serbia','slovakia','slovenia','spain','sweden','switzerland','ukraine',
+       'wales','unitedkingdom','unitedkingdomofgreatbritainandnorthernireland','greatbritain',
+       'alandislands','svalbardandjanmayenislands','holysee','vaticancity',
+       'alb','and','aut','blr','bel','bih','bgr','bul','hrv','cro','cze','dnk','est',
+       'fro','fin','fra','deu','ger','gib','grc','gre','ggy','hun','isl','irl','imn',
+       'ita','jey','lva','lie','ltu','lux','mlt','mda','mco','mne','nld','mkd','nor',
+       'pol','prt','por','rou','rus','smr','srb','svk','svn','esp','swe','che','sui',
+       'ukr','gbr','gb','uk','eng','sco','wal','nir','kos','xkx','ala','sjm','vat'
+     ])
+  );
+$function$;
+
 -- Expand from domestic tiers 1-2 to ALL senior men's domestic league tiers.
 -- Keep the historical function name as a compatibility wrapper for existing RPCs.
 -- Historical rows are intentionally preserved.
@@ -5,7 +34,7 @@
 CREATE OR REPLACE FUNCTION public.moneyball_is_european_top_two_league(
   p_country text, p_competition text
 ) RETURNS boolean
-LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path = ''
+LANGUAGE sql IMMUTABLE SET search_path = ''
 AS $function$
   SELECT public.moneyball_is_geographic_europe_country(p_country)
     AND nullif(btrim(coalesce(p_competition,'')), '') IS NOT NULL
