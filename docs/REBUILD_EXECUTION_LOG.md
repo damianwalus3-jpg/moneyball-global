@@ -684,3 +684,14 @@
 - Files added: `src/odds-value.ts` commit `7391f33b490b1539ea2d41e0c29f42743eb8f7df`; `src/odds-value.test.ts` commit `9d22aeed105ae8bde764ea281588515e9a13be15`.
 - This stage is the tested-by-design valuation module only; coupon UI, coupon persistence, stake/return settlement and bookmaker selection UI are intentionally not marked integrated yet.
 - No live provider requests were made and no credits were consumed. CI and Cloudflare deployment validation remain pending.
+
+
+## 2026-11-17 — Stage 21: three-leg coupon valuation
+- Added `src/coupon-value.ts` to value a three-leg candidate only when all three fixture legs have complete, valid and fresh 1X2 snapshots from the same explicitly selected bookmaker.
+- Uses each leg's newest stored prediction probabilities and the verified price for that leg's selected 1/X/2 outcome.
+- Calculates combined decimal AKO odds, combined model probability, coupon EV, stake, potential gross return and potential net profit.
+- Default paper stake is €4; invalid/non-positive stakes and any missing/stale/other-bookmaker leg fail closed.
+- Added tests for combined odds/EV/€4 return, same-bookmaker requirement, missing leg odds and stale snapshots.
+- Files added: `src/coupon-value.ts` commit `99e386923f10b79450700ee37bd4355a24d6e33a`; `src/coupon-value.test.ts` commit `33eacdbeed43423bd79b41fb0d20c124cd5d6fc3`.
+- Coupon valuation is a calculation module only. UI selection, persistence of bookmaker/odds/stake into coupon records, and settlement of priced paper coupons remain outstanding.
+- No real provider calls or credits consumed. CI and Cloudflare deployment validation remain pending.
