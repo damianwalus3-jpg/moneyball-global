@@ -313,3 +313,11 @@
 - Validation status: workflow committed; waiting for the first Actions run and its actual job result.
 
 - Follow-up hardening: offline navigation fallback now reads only the active MONEYBALL cache, and the 192px SVG icon declares matching intrinsic dimensions.
+
+
+## 2026-11-17 — Stage 25: CI workflow bootstrap correction
+- Audited the isolated verification workflow against the actual `package.json` and repository files.
+- Removed `actions/setup-node` npm cache configuration because this branch currently has no `package-lock.json` or other npm lockfile. Without a lockfile, the cache action can fail before dependency installation and prevent the actual typecheck/tests/build from running.
+- Kept Node 22 and the explicit install, typecheck, Vitest and production build steps. This is a bootstrap fix only; it does not establish that CI is green.
+- Commit: 78f5aa67e933415d550ae75994a03a15beaefc13.
+- Validation: awaiting the GitHub Actions run for this push; no claim of a successful pipeline or new Cloudflare deployment is made.
