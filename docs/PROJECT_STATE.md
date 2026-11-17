@@ -1458,3 +1458,13 @@ No new provider was enabled, no API key was added, and no provider credits were 
 - v250 function logs in the post-deployment window: 0 error-level rows; no logged `unavailable`/`failed` source messages found by the targeted search. Runtime boot/shutdown records include `EarlyDrop`; these are runtime lifecycle events and not treated as request failures. Function HTTP status remained 200 for all 113 observed requests.
 - Confirmed scheduled prediction invocations reached deployed version 250 in `eu-west-1` and returned HTTP 200 (e.g. 2026-11-17 16:38:01 UTC, execution_time_ms 1,845). No manual test scan was forced and no prediction, match, coupon, settlement or bankroll data was modified for this check.
 - Result: the v250 deployment is not only active but has post-deployment production traffic and a measurable reduction in slow-tail latency. Continue monitoring on subsequent scans; keep the comparison as observational because request mix and cache state are not controlled.
+
+
+## Cache lease recovery follow-up — 2026-11-17 17:47 Europe/Brussels
+
+- A final failure-mode review found that a worker crash after creating a pending cache row could otherwise leave that pending row fresh for 24 hours. Fixed the lease recovery: a pending row is reclaimed once its five-minute refresh lease expires, using a conditional owner-scoped update; a ready row remains cached for 24 hours.
+- Latest MAIN function commit: `c34fb2fd175fb92a3359c0c460a2c09a6a1bb39d`.
+- Redeployed the corrected source as `footynomad-sync v103`, ACTIVE, `verify_jwt=true` preserved. Supabase bundling succeeded.
+- Rechecked the production function registry: v103 ACTIVE. Rechecked cache table: RLS enabled, three owner-only policies, no production cache rows yet (expected until authenticated owner scan).
+- The earlier v102 deployment is superseded; v103 is the current target for the first authenticated scan.
+- Still pending: owner-authenticated POST scan and real cache write/read proof, then authenticated UI click-through. No user match, prediction, coupon, settlement or bankroll data changed.
