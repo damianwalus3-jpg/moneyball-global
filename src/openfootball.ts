@@ -75,7 +75,7 @@ function dateFromLine(line: string, seasonStartYear: number): string | null {
   return `${year}-${String(month).padStart(2,"0")}-${String(Number(match[2])).padStart(2,"0")}`;
 }
 export function parseOpenFootballMatches(text: string, feed: OpenFootballFeed, targetDate?: string): OpenFootballFixture[] {
-  const seasonYear=seasonStart(targetDate);
+  const seasonYear=seasonStart(targetDate ?? brusselsParts(new Date()).date);
   let currentDate="";
   const output: OpenFootballFixture[]=[];
   for (const raw of text.replace(/^\uFEFF/,"").split(/\r?\n/)) {
@@ -118,6 +118,91 @@ async function fetchText(url: string): Promise<string> {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.text();
 }
+const feedTextCache = new Map<string, { promise: Promise<string>; cachedAt: number }>();
+async function loadFeedText(feed: OpenFootballFeed, season: string, force = false): Promise<string> {
+  const key = `${feed.id}:${season}`;
+  const cached = feedTextCache.get(key);
+  if (!force && cached && Date.now() - cached.cachedAt < CACHE_MS) return cached.promise;
+  const promise = fetchText(feed.urlForSeason(season));
+  feedTextCache.set(key, { promise, cachedAt: Date.now() });
+  try { return await promise; }
+  catch (error) { feedTextCache.delete(key); throw error; }
+}
+
+export interface OpenFootballFormMatch {
+  date: string;
+  opponent: string;
+  venue: "H" | "A";
+  goalsFor: number;
+  goalsAgainst: number;
+  result: "W" | "D" | "L";
+  points: number;
+}
+export interface OpenFootballTeamForm {
+  team: string;
+  matches: OpenFootballFormMatch[];
+  home: OpenFootballFormMatch[];
+  away: OpenFootballFormMatch[];
+  source: string;
+  sourceUpdatedAt: string;
+}
+function normalizeTeamName(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+}
+function findFeed(feedId: string): OpenFootballFeed {
+  const feed=FEEDS.find(item=>item.id===feedId);
+  if (!feed) throw new Error("Nieznany kanał OpenFootball");
+  return feed;
+}
+export async function loadOpenFootballRecentTeamForm(feedId: string, team: string, beforeDate: string): Promise<OpenFootballTeamForm> {
+  const feed=findFeed(feedId);
+  const season=openFootballSeasonFolder(beforeDate);
+  const key=`moneyball.openfootball-form.v1:${feedId}:${season}:${normalizeTeamName(team)}:${beforeDate}`;
+  try {
+    const cached=localStorage.getItem(key);
+    if (cached) {
+      const parsed=JSON.parse(cached) as OpenFootballTeamForm & {cachedAt:number};
+      if (Date.now()-parsed.cachedAt<6*60*60*1000) return parsed;
+    }
+  } catch { /* ignore malformed cache */ }
+  const text=await loadFeedText(feed,season);
+  const target=normalizeTeamName(team);
+  const matches=parseOpenFootballMatches(text,feed).flatMap(match=>{
+    if (match.date>=beforeDate || match.homeGoals===null || match.awayGoals===null) return [];
+    const isHome=normalizeTeamName(match.home)===target;
+    const isAway=normalizeTeamName(match.away)===target;
+    if (!isHome&&!isAway) return [];
+    const goalsFor=isHome?match.homeGoals:match.awayGoals;
+    const goalsAgainst=isHome?match.awayGoals:match.homeGoals;
+    const result:OpenFootballFormMatch["result"]=goalsFor>goalsAgainst?"W":goalsFor===goalsAgainst?"D":"L";
+    return [{date:match.date,opponent:isHome?match.away:match.home,venue:isHome?"H" as const:"A" as const,goalsFor,goalsAgainst,result,points:result==="W"?3:result==="D"?1:0}];
+  }).sort((a,b)=>b.date.localeCompare(a.date));
+  const form:OpenFootballTeamForm={
+    team,
+    matches:matches.slice(0,5),
+    home:matches.filter(match=>match.venue==="H").slice(0,5),
+    away:matches.filter(match=>match.venue==="A").slice(0,5),
+    source:`OpenFootball · ${feed.competition}`,
+    sourceUpdatedAt:"dataset does not expose a per-file update timestamp",
+  };
+  try { localStorage.setItem(key,JSON.stringify({...form,cachedAt:Date.now()})); } catch { /* cache optional */ }
+  return form;
+}
+export interface OpenFootballVerifiedResult {
+  actual:"1"|"X"|"2";
+  homeGoals:number;
+  awayGoals:number;
+  date:string;
+  source:string;
+}
+export async function findOpenFootballFixtureResult(feedId:string,home:string,away:string,date:string):Promise<OpenFootballVerifiedResult|null>{
+  const feed=findFeed(feedId);
+  const text=await loadFeedText(feed,openFootballSeasonFolder(date));
+  const homeKey=normalizeTeamName(home),awayKey=normalizeTeamName(away);
+  const match=parseOpenFootballMatches(text,feed,date).find(item=>normalizeTeamName(item.home)===homeKey&&normalizeTeamName(item.away)===awayKey&&item.homeGoals!==null&&item.awayGoals!==null);
+  if(!match||match.homeGoals===null||match.awayGoals===null)return null;
+  return {actual:match.homeGoals>match.awayGoals?"1":match.homeGoals===match.awayGoals?"X":"2",homeGoals:match.homeGoals,awayGoals:match.awayGoals,date,source:"OpenFootball public-domain feed"};
+}
 export interface OpenFootballScan {
   fixtures: OpenFootballFixture[];
   checked: number;
@@ -137,7 +222,7 @@ export async function scanOpenFootball(date: string, force = false): Promise<Ope
   const season=openFootballSeasonFolder(date);
   const responses=await Promise.all(FEEDS.map(async feed=>{
     try {
-      const content=await fetchText(feed.urlForSeason(season));
+      const content=await loadFeedText(feed,season,force);
       return {fixtures:parseOpenFootballFixtures(content,feed,date),error:""};
     } catch(error) {
       return {fixtures:[] as OpenFootballFixture[],error:`${feed.competition}: ${error instanceof Error?error.message:"source error"}`};
