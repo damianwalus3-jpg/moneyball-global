@@ -46,7 +46,7 @@ function seasonStart(date: string): number {
 }
 export function openFootballSeasonFolder(date: string): string {
   const start = seasonStart(date);
-  return `${start}-${start + 1}`;
+  return `${start}-${String((start + 1) % 100).padStart(2,"0")}`;
 }
 function brusselsParts(date: Date): { date: string; time: string } {
   const parts = new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(date);
