@@ -1253,3 +1253,9 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 ## 17.11.2026 — exhaustive stale-country assertion sweep
 - A final source-wide scan of `src/lib/domain.test.ts` found one duplicate Israel `Liga Leumit` positive assertion remained because an earlier replacement changed only the first duplicate occurrence. Replaced all remaining positive assertions for Asia-classified countries/codes (Armenia, Azerbaijan, Cyprus, Georgia, Israel, Kazakhstan, Turkey/Türkiye and ISO-3 variants) with negative expectations. Albania is deliberately untouched and remains positive.
 - This is the final cleanup of duplicated UEFA-era test examples. The next CI run must prove zero stale positives remain; do not deploy before full success.
+
+
+## 17.11.2026 — dashboard selected-picks geographic guard
+- Cross-screen audit found the Matches page, Statistics page and coupon candidate logic use the canonical frontend geographic-Europe helper, but the MAIN panel's selected-picks RPC returns flattened pick rows without country/gender fields. That made it impossible for the panel component to independently enforce geography and left a potential dashboard leak if a legacy SQL RPC returned an Israel/Asia pick.
+- Fixed `fetchDashboardSelectedPicks` in `src/lib/db.ts`: after the date-scoped RPC returns its small list, fetch only the referenced match IDs through the existing owner-scoped `fetchMatchesByIds`, apply `isEligibleEuropeanMatch`, and return picks only for eligible match IDs. No full-table read, no new unscoped query, and no changes to history or bankroll.
+- This closes the remaining client-rendered selected-pick list without touching Supabase or rewriting historical rows. SQL summary aggregates and backend importers remain subject to the explicit deployment limitation documented above.

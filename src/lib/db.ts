@@ -694,7 +694,15 @@ export interface DashboardSelectedPick {
 export async function fetchDashboardSelectedPicks(): Promise<DashboardSelectedPick[]> {
   const { data, error } = await withRequestTimeout(requireSupabase().rpc("moneyball_dashboard_selected_picks"), "Pobieranie wybranych typów");
   if (error) throw new Error(humanizeError(error));
-  return (data ?? []) as DashboardSelectedPick[];
+  const picks = (data ?? []) as DashboardSelectedPick[];
+  // The database RPC may retain legacy UEFA-based country scope. Re-check only
+  // the small set of match IDs returned for this dashboard view using the
+  // canonical geographic-Europe helper before rendering any selected pick.
+  const matches = await fetchMatchesByIds(picks.map((pick) => pick.match_id));
+  const eligibleMatchIds = new Set(matches
+    .filter((match) => isEligibleEuropeanMatch(match))
+    .map((match) => match.id));
+  return picks.filter((pick) => eligibleMatchIds.has(pick.match_id));
 }
 
 function clean(row: Record<string, unknown>) {
