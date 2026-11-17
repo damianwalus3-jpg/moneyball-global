@@ -70,3 +70,16 @@ describe("European competition folders", () => {
     expect(isEuropeanCompetitionFolder("data/BRA_1_serie-a")).toBe(false);
   });
 });
+
+
+describe("OpenLigaDB European country shortcut coverage", () => {
+  it("recognizes two-letter European country prefixes used by league feeds", () => {
+    for (const shortcut of ["fr1", "nl1", "pt1", "gr1", "ch1", "cz1", "tr1", "at1", "dk1", "se1", "no1", "ro1", "pl1", "hr1", "ua1", "fi1", "hu1", "bg1", "rs1", "sk1", "si1"]) {
+      expect(isEuropeanOpenLiga({ leagueId: 100, leagueName: "League", leagueShortcut: shortcut, sport: { sportName: "Fußball" } }), shortcut).toBe(true);
+    }
+  });
+
+  it("does not admit arbitrary words that merely start with a country prefix", () => {
+    expect(isEuropeanOpenLiga({ leagueId: 101, leagueName: "Latin American Cup", leagueShortcut: "latam-cup", sport: { sportName: "Fußball" } })).toBe(false);
+  });
+});
