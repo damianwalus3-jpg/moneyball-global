@@ -195,6 +195,8 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "National League - North", home_team: "Oxford City", away_team: "Macclesfield" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Scotland", competition: "Football League - Lowland League", home_team: "Brechin", away_team: "Stirling University" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "EFL Trophy" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Czech Republic", competition: "3. liga - CFL B", home_team: "Pardubice II", away_team: "Horní Ředice" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Scotland", competition: "Football League - Lowland League", home_team: "Newton Stewart", away_team: "Celtic II" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bulgaria", competition: "efbet League" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Lithuania", competition: "TOPLYGA" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Moldova", competition: "Liga 7777" })).toBe(true);
