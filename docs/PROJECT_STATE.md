@@ -997,3 +997,49 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Fresh odds are still unavailable without an approved no-key source or user approval for a free provider key. MAIN/MEGA/EXTRA remain blocked; no stale or synthetic prices.
 - One historical 5 EUR TEST coupon marked won still has no recorded odds/payout; keep it financially incomplete rather than inventing a return.
 - Project is not complete. Do not deploy Vercel or TEST.
+
+## Atomic coupon finance, exact odds and source research — 2026-11-17 08:45–08:52 UTC
+
+### Owner-scoped financial operations deployed
+- Migration 20261117084010_owner_scoped_coupon_finance_rpcs created:
+  - `moneyball_reconcile_coupon_finance_for_owner(p_coupon_id)`: authenticated owner check, then invokes the existing service-role-only reconciliation function.
+  - `moneyball_cancel_coupon_for_owner(p_coupon_id)`: atomic owner-scoped cancellation, voids legs, refunds an existing stake once, and rebuilds ledger balances in one transaction.
+- Frontend `settlement.ts` no longer fetches the full bankroll ledger and recalculates every row after settlement. It calls the owner-scoped reconciliation RPC after leg updates.
+- Frontend `coupons.ts::cancelCoupon` now calls the atomic cancellation RPC instead of downloading all coupons, legs and transactions and updating balances client-side.
+- Security: authenticated can execute both wrappers; anon cannot. Cross-owner calls to both wrappers were tested and denied.
+- Rollback-only SQL test passed: pending 3-leg coupon → won; repeated reconcile creates exactly one stake and one return; cancellation refunds exactly once; ledger balance is rebuilt. Test coupons/transactions were rolled back and confirmed absent afterward.
+
+### Exact odds and payout calculation
+- Migration 20261117084525_align_coupon_odds_precision_and_payout aligns the reconciliation function with the finance summary: combined odds stored/displayed to 3 decimals; payout is calculated from the unrounded product of individual leg odds and rounded only to cents.
+- Migration 20261117084559_handle_void_legs_in_coupon_price_trigger makes the coupon-price trigger treat void legs as odds 1.00 and use the same exact payout rule.
+- Frontend `totalOdds` and `effectiveOdds` now use 3-decimal combined odds. `couponPayout` calculates stake × exact active-leg odds, then rounds the cash return to cents.
+- Regression case: 1.100 × 1.182 × 1.167 = 1.517 displayed odds; 4 EUR stake pays 6.07 EUR, not 6.08 EUR. Both SQL rollback-only tests and the new domain unit test cover this.
+- Price-trigger rollback test passed: inserting the three legs immediately stores combined_odds=1.517 and potential_return=6.07.
+- This fixes the former one-cent mismatch between the client calculation and the database finance summary.
+
+### Current bankroll / finance snapshot after all rollback tests
+- 9 bankroll transactions, 9 coupons, latest balance_after = 84.28 EUR. All rollback-only tests left production balances and records unchanged.
+- Finance summary: all history count=7, stake=23 EUR, payout=15.68 EUR, incomplete=1, net=NULL. Two zero-stake legacy test coupons are excluded from financial totals.
+- Week: count=3, stake=13 EUR, payout=15.68 EUR, net=+2.68 EUR.
+- MAIN: 1 coupon, stake=5 EUR, payout=5.25 EUR, net=+0.25 EUR.
+- TEST: 6 coupons, stake=18 EUR, payout=10.43 EUR, incomplete=1; net remains NULL because historical coupon `MONEYBALL AUTO TEST 2026-11-12` is marked won but has no odds/payout. Do not invent a payout or rewrite historical stake.
+
+### Public odds-source research — no compliant replacement found
+- Tested TipsAudit's public `GET /api/v1/predictions` from production Supabase via `net.http_get`; HTTP 200, generated_at 2026-11-17 08:48:39 UTC, 292 upcoming matches, 284 fresh fair-price records, 3 soft-value quotes.
+- Today's 9 entries were one Ukraine Persha Liga reserve-side fixture and eight UEFA Nations League matches; none matched our domestic European senior tier 1/2 scope. The only today's soft quote was 1xBet (not a Belgian bookmaker) and only a 0.64% monitor signal. The API provides mainly 1X2 fair odds, not a complete current Belgian bookmaker board for 1X2/DC/GOALS.
+- Official TipsAudit terms say free without API key, 60 requests/minute, ~5-minute prediction refresh, but require visible attribution. It is potentially a secondary 1X2 fair-market benchmark only, not a bookmaker price source and not sufficient for coupons.
+- A Flashscore-derived Apify actor advertises no key/login but charges from $0.79 per 1,000 matches; it is paid and scrapes Flashscore, so do not use under the user's no-paid-source constraint without explicit approval.
+- football-data.co.uk is historical, not a live bookmaker feed, and its terms are not suitable for automated app scraping. Bwin partner API still returned 403/partner access required; MoviOdds returned 401 without a key.
+- Therefore there is still no verified free, no-key, permitted source covering the required Belgian bookmaker prices and markets. MAIN/MEGA/EXTRA must remain blocked when prices are not fresh; never substitute fair odds, old detected prices or synthetic prices for current bookmaker odds.
+
+### Deployment / remaining verification
+- Latest commit: ee8e6eb1 (odds precision and void-leg trigger). GitHub CI run 44049531490 SUCCESS; Cloudflare production deploy run 44049531394 SUCCESS.
+- Production Worker root and login were reachable after the earlier frontend deployment; /panel remains login-protected. No authenticated browser session was available, so do not claim logged-in end-to-end UI verification.
+- Latest current balance remains 84.28 EUR. The project is not complete.
+
+### Remaining blockers
+1. Verify the 15:00 Europe/Brussels scan and its source/error/prediction counts.
+2. Keep issue #77 open until the full country-by-country FootyNomad tier 1/2 catalogue and authenticated MAIN UI have been verified.
+3. Find a compliant fresh odds source or obtain explicit approval for a free key/paid feed. Until then no MAIN/MEGA/EXTRA coupon from stale prices.
+4. Complete authenticated end-to-end scan → coupon → result → bankroll → statistics test in the user's existing session.
+5. Remaining small full-table reads are limited to Bankroll display and saveCouponBatch balance lookup; settlement and cancellation no longer read the full ledger.
