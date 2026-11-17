@@ -8,7 +8,7 @@ export default defineConfig({
       "/api/openligadb": {
         target: "https://api.openligadb.de",
         changeOrigin: true,
-        rewrite: path => path.replace(/^\/api\/openligadb\/leagues\//, "/getavailableleagues/").replace(/^\/api\/openligadb\/matches\//, "/getmatchdata/"),
+        rewrite: path => path.replace(/^\/api\/openligadb\/leagues\//, "/getavailableleagues/").replace(/^\/api\/openligadb\/matches\//, "/getmatchdata/").replace(/^\/api\/openligadb\/team-matches\//, "/getmatchdata/"),
       },
     },
   },
