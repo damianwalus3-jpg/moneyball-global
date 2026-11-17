@@ -734,3 +734,12 @@
 - Follow-up audit still required: confirm coupon save deduplication and paper-settlement financial arithmetic; verify all latest code commits with the isolated rebuild CI and Cloudflare deployment workflows. Do not use the unrelated Vercel status as a release signal.
 
 - CI feedback loop: the first TypeScript run on implementation commit 9777696 detected a redundant runtime length comparison against the statically fixed three-element tuple. Removed that impossible comparison in commit efbf610ddb3e676acc62f112c879274dd0fb2b8b; the distinct-fixture validation remains. A fresh CI and deployment run is required on the corrected HEAD.
+
+
+## Stage 61 — idempotent paper coupon creation (2026-11-17)
+- Continued the coupon workflow audit after Stage 60. The UI previously used addRecord directly, so repeated taps or revisiting the same candidate could create duplicate paper coupons and duplicate apparent exposure.
+- Added a stable couponKey based on Brussels scan date, the three fixture IDs and selections, and the selected bookmaker (or NO_ODDS). The UI now disables the save action once that exact coupon is already present.
+- Coupon writes now use addRecordsIfMissing keyed by couponKey. This is append-only and does not alter historical coupon rows or settlements.
+- Added a Tracker regression test proving repeated writes with the same couponKey create exactly one coupon.
+- Implementation commit: 0a4f12599d12efb51ec231a9ea1156a4ace33f0c; test commit: c32cfc01faa1a0b99bbc03d016ed43e6a3cf48a5.
+- Validation/deployment: pending CI and Cloudflare workflow completion on the latest branch HEAD. Stage 61 is not marked deployed until both are verified.
