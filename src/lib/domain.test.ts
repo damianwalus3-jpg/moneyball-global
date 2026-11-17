@@ -180,6 +180,13 @@ describe("European domestic league scope", () => {
       country: "Belgium",
     };
     expect(isEligibleEuropeanMatch(openMatchdayBase)).toBe(true);
+    // ISO-3 country codes must be treated consistently with the backend source filters.
+    expect(isEligibleEuropeanMatch({
+      ...openMatchdayBase,
+      country: "ISR",
+      competition: "Liga Leumit",
+      external_id: "om:ISR_2_liga-leumit:2026-11-17:club-a:club-b",
+    })).toBe(true);
     // FootyNomad's Northern Ireland Championship is a valid domestic second tier.
     expect(isEligibleEuropeanMatch({
       ...eligibleBase,
@@ -788,7 +795,11 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
   ["Ukraine", "Premier League"],
   ["Ukraine", "Persha Liga"],
   ["Wales", "Premier League"],
-  ["Wales", "FAW Championship"]
+  ["Wales", "FAW Championship"],
+  ["ISR", "Ligat Ha'Al"],
+  ["ISR", "Liga Leumit"],
+  ["Georgia", "E Rovnuli Liga"],
+  ["Bosnia", "Prva Liga Republike Srpske"]
   ];
   const rejected: Array<[string, string]> = [
   ["Croatia", "Second NL"],
@@ -833,7 +844,7 @@ describe("FootyNomad complete European tier 1/2 provider catalogue (2026-11-17)"
   ["England", "Premier League 2 Division One"]
   ];
 
-  it("accepts all 106 exact provider labels from UEFA domestic senior men's tiers 1 and 2", () => {
+  it("accepts all 110 exact provider labels from UEFA domestic senior men's tiers 1 and 2", () => {
     for (const [country, competition] of accepted) {
       expect(isEuropeanTopTwoLeague(country, competition), `${country}: ${competition}`).toBe(true);
     }
