@@ -43,18 +43,26 @@ function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCand
 }
 
 export function buildThreeLegCandidates(records: TrackerRecord[], date: string, limit = 30): ThreeLegCandidate[] {
-  // Do not depend on Tracker's array order: imported/legacy records may not be
-  // newest-first. Select the most recent eligible prediction for each fixture.
-  const newestByFixture = new Map<string, { candidate: CouponLegCandidate; createdAt: number }>();
+  // Resolve the latest prediction per fixture BEFORE eligibility filtering.
+  // Otherwise an older strong candidate could survive a newer rejected/weak row.
+  const newestPredictionByFixture = new Map<string, TrackerRecord>();
+  const createdAtByFixture = new Map<string, number>();
   for (const record of records) {
-    const candidate = candidateFromRecord(record, date);
-    if (!candidate) continue;
+    if (record.kind !== "prediction" || record.details.fixtureDate !== date
+      || typeof record.details.fixtureId !== "string" || !record.details.fixtureId) continue;
     const createdAt = Date.parse(record.createdAt);
     if (!Number.isFinite(createdAt)) continue;
-    const previous = newestByFixture.get(candidate.fixtureId);
-    if (!previous || createdAt > previous.createdAt) newestByFixture.set(candidate.fixtureId, { candidate, createdAt });
+    const fixtureId = record.details.fixtureId;
+    const previous = createdAtByFixture.get(fixtureId);
+    if (previous === undefined || createdAt > previous) {
+      newestPredictionByFixture.set(fixtureId, record);
+      createdAtByFixture.set(fixtureId, createdAt);
+    }
   }
-  const pool = [...newestByFixture.values()].map(item => item.candidate).sort((a, b) => b.probability - a.probability);
+  const pool = [...newestPredictionByFixture.values()]
+    .map(record => candidateFromRecord(record, date))
+    .filter((candidate): candidate is CouponLegCandidate => candidate !== null)
+    .sort((a, b) => b.probability - a.probability);
   const output: ThreeLegCandidate[] = [];
   for (let i = 0; i < pool.length - 2; i++) {
     for (let j = i + 1; j < pool.length - 1; j++) {
