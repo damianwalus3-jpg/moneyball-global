@@ -37,3 +37,11 @@
 - CI run `44106668871`: success; install, TypeScript typecheck, Vitest suite and production build all passed.
 - Cloudflare deploy run `44106669013`: success; same validation steps and static asset deployment passed.
 - Stage 02 is marked COMPLETE/DEPLOYED. The prediction engine is a tested calculation module, not yet fed by verified expected-goals data.
+
+## Stage 03 — free historical results and recent form
+- Added retrieval of public season results CSV by European domestic league.
+- Team recent form uses completed score rows strictly earlier than the fixture date; the current fixture and future rows are excluded.
+- Computes last five overall results plus separate home/away subsets, score, opponent, W/D/L and points.
+- UI exposes an on-demand "Forma 5" action on each listed fixture; result data is cached locally for six hours.
+- Source coverage and non-commercial limitations remain visible; missing result files are reported instead of synthesizing form.
+- Status: implementation committed; CI and Cloudflare deployment pending.
