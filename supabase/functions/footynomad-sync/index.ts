@@ -145,25 +145,30 @@ async function readFootballChartsFixtures(date:string,ownerId:string,token:strin
 
  let result:any;
  try{
-  // One durable refresh per owner per 24 hours: eight league requests total, not eight per scan.
-  const results=await Promise.allSettled(FOOTBALL_CHARTS_LEAGUES.map(async league=>{
-   const response=await fetch(FOOTBALL_CHARTS_BASE+"/leagues/"+league.code+"/fixtures/",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/1.0"},signal:AbortSignal.timeout(12000)});
-   if(!response.ok)throw new Error(league.code+" HTTP "+response.status);
-   const payload=await response.json(),matches=Array.isArray(payload?.matches)?payload.matches:[];
-   const fixtures=matches.flatMap((match:any)=>{
-    const matchDate=String(match?.match_date||""),time=String(match?.time||"");
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(matchDate)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return [];
-    const parsed=new Date(matchDate+"T"+time+":00Z");
-    if(!Number.isFinite(parsed.getTime()))return [];
-    const localDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(parsed);
-    const home=String(match?.home_team||"").trim(),away=String(match?.away_team||"").trim();
-    if(!home||!away)return [];
-    const statusRaw=String(match?.status||"scheduled").toLowerCase();
-    const status=/postpon/.test(statusRaw)?"postponed":/cancel/.test(statusRaw)?"cancelled":/live|in.progress/.test(statusRaw)?"live":/finished|complete|^ft$/.test(statusRaw)?"finished":"scheduled";
-    return [{external_id:"footballcharts:"+String(match?.slug||[league.code,matchDate,home,away].join(":")),source:"FootballCharts",date:localDate,competition:league.competition,country:league.country,gender:"men",home_team:home,away_team:away,kickoff_at:parsed.toISOString(),status,source_url:String(payload?.source_url||""),attribution:"Data by football-charts.com",provider_model_ignored:true}];
-   });
-   return {code:league.code,country:league.country,competition:league.competition,fixtures,received:matches.length,source_url:String(payload?.source_url||""),next_fixture_date:payload?.next_fixture_date||null,note:payload?.note||null};
-  }));
+  // The keyless provider has a strict 25-request/day/IP allowance. Keep
+  // concurrency low to avoid burst 429s; one batch is shared by all scans.
+  const results:any[]=new Array(FOOTBALL_CHARTS_LEAGUES.length);
+  await runLimited(FOOTBALL_CHARTS_LEAGUES.map((league,index)=>({league,index})),2,async item=>{
+   const {league,index}=item;
+   try{
+    const response=await fetch(FOOTBALL_CHARTS_BASE+"/leagues/"+league.code+"/fixtures/",{headers:{"Accept":"application/json","User-Agent":"MONEYBALL-GLOBAL/1.0"},signal:AbortSignal.timeout(12000)});
+    if(!response.ok)throw new Error(league.code+" HTTP "+response.status);
+    const payload=await response.json(),matches=Array.isArray(payload?.matches)?payload.matches:[];
+    const fixtures=matches.flatMap((match:any)=>{
+     const matchDate=String(match?.match_date||""),time=String(match?.time||"");
+     if(!/^\d{4}-\d{2}-\d{2}$/.test(matchDate)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(time))return [];
+     const parsed=new Date(matchDate+"T"+time+":00Z");
+     if(!Number.isFinite(parsed.getTime()))return [];
+     const localDate=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(parsed);
+     const home=String(match?.home_team||"").trim(),away=String(match?.away_team||"").trim();
+     if(!home||!away)return [];
+     const statusRaw=String(match?.status||"scheduled").toLowerCase();
+     const status=/postpon/.test(statusRaw)?"postponed":/cancel/.test(statusRaw)?"cancelled":/live|in.progress/.test(statusRaw)?"live":/finished|complete|^ft$/.test(statusRaw)?"finished":"scheduled";
+     return [{external_id:"footballcharts:"+String(match?.slug||[league.code,matchDate,home,away].join(":")),source:"FootballCharts",date:localDate,competition:league.competition,country:league.country,gender:"men",home_team:home,away_team:away,kickoff_at:parsed.toISOString(),status,source_url:String(payload?.source_url||""),attribution:"Data by football-charts.com",provider_model_ignored:true}];
+    });
+    results[index]={status:"fulfilled",value:{code:league.code,country:league.country,competition:league.competition,fixtures,received:matches.length,source_url:String(payload?.source_url||""),next_fixture_date:payload?.next_fixture_date||null,note:payload?.note||null}};
+   }catch(error){results[index]={status:"rejected",reason:error};}
+  });
   const allFixtures:any[]=[],errors:any[]=[],leagueStatus:any[]=[];
   for(let i=0;i<results.length;i++){
    const item=results[i],league=FOOTBALL_CHARTS_LEAGUES[i];
@@ -174,7 +179,11 @@ async function readFootballChartsFixtures(date:string,ownerId:string,token:strin
  }catch(error){
   result={state:"ready",ok:false,source:"FootballCharts",api_key_required:false,requests:FOOTBALL_CHARTS_LEAGUES.length,leagues_checked:FOOTBALL_CHARTS_LEAGUES.length,fixtures_count:0,fixtures:[],errors:[{code:"provider",error:String(error)}],league_status:[],attribution:"Data by football-charts.com",model_predictions_imported:false,stats_imported:false,odds_available:false};
  }
- const fetchedAt=new Date().toISOString(),expiresAt=new Date(Date.now()+FOOTBALL_CHARTS_CACHE_TTL_MS).toISOString();
+ // Successful snapshots last 24h. Partial/error snapshots remain usable as stale
+ // data but expire after 12h so a later scheduled/manual scan can recover.
+ const cacheTtlMs=(result.errors?.length||0)>0?12*60*60*1000:FOOTBALL_CHARTS_CACHE_TTL_MS;
+ if((result.errors?.length||0)>0)result.state="partial";
+ const fetchedAt=new Date().toISOString(),expiresAt=new Date(Date.now()+cacheTtlMs).toISOString();
  try{
   await db(base,token,"PATCH",{payload:result,fetched_at:fetchedAt,expires_at:expiresAt,refreshing_until:null,updated_at:fetchedAt});
  }catch(error){
