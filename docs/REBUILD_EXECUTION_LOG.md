@@ -295,3 +295,12 @@
 - Tracker writes emit a same-tab update event. The React app listens for same-tab updates and browser storage events, keeping open tabs/windows in sync without a server or overwriting existing records.
 - Added regression tests for nested malformed details and duplicate IDs within one backup.
 - Validation/deployment status: pending automated CI and separate rebuild Worker deployment. Cross-device sync remains a separate backend requirement; this stage only synchronizes tabs on the same browser origin.
+
+
+## 2026-11-17 — Stage 23: PWA cache and install metadata hardening
+- Reworked the service worker cache lifecycle so activation deletes only older MONEYBALL shell caches and never clears unrelated origin caches.
+- Fixture/API routes are now network-only at the service-worker layer; this prevents stale match lists or results from being served as if they were current. Offline navigation still falls back to the cached application shell.
+- Same-origin build assets use cache-first behavior; the hashed Vite asset names remain safe across deployments.
+- Expanded manifest scope and descriptions and declared dedicated 192×192 and 512×512 vector app icons for install surfaces; added favicon and Apple touch icon metadata.
+- This stage improves PWA installation metadata and offline shell behavior. Browser-specific installability and offline acceptance still require real device/browser testing.
+- Validation/deployment status: pending CI and Cloudflare deployment.
