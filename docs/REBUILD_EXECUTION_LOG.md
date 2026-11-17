@@ -525,3 +525,17 @@
 - Zapisano przekazanie do nowego czatu: `docs/NEW_CHAT_HANDOFF_2026-11-17.md`, zawierające rozdzielenie środowisk, stan produktu, ograniczenia, etapy 1–48, decyzje i kolejne kroki.
 - Nie wdrożono jeszcze żadnego odds providera, nie dodano sekretu ani klucza API i nie zmieniono kodu aplikacji. Powód: brak potwierdzonego feedu zero-key z wymaganym pokryciem; użytkownik wcześniej preferował rozwiązanie bez kluczy i bez opłat.
 - Następny krok po decyzji o dostępie do klucza: adapter provider-neutral w Workerze, snapshot history append-only, konserwatywne dopasowanie fixture, freshness/status UI, test coverage kilku lig. Bez klucza pozostawić moduł jawnie jako brak automatycznego feedu.
+
+
+## Stage 50 — rozszerzone przeszukanie forów, GitHub i alternatywnych odds feedów (2026-11-17)
+- Rozszerzono badanie o publiczne dyskusje Reddit/r/algobetting, projekty GitHub, katalogi API, Polymarket, OddsPapi i StrikerAPI oraz regulaminy OddsPortal/BetExplorer/football-data.co.uk.
+- Nowy kandydat nr 1: OddsPapi Free — 250 requestów/miesiąc, pre-game REST i historyczne odds, szeroka lista bookmakerów wg dostawcy; darmowy klucz wymagany, WebSocket nie jest w darmowym planie, brak gwarancji kursu na każdy mecz. Wymaga live testu coverage. Dane o liczbie bookmakerów i pełnym boardzie pochodzą głównie od dostawcy.
+- Nowy kandydat nr 2: StrikerAPI Free — 500 credits/miesiąc; get_odds kosztuje 5 credits dla meczu lub 10 credits dla dnia; odds aktualizowane co godzinę dla spotkań z najbliższych 4 dni; brak in-play; ograniczony zestaw europejskich lig. Dobry jako dodatkowy feed/benchmark, nie gwarantuje pełnej Europy.
+- Polymarket Gamma jest bez klucza, ale to prediction-market pricing, a nie bukmacherskie kursy; ewentualna integracja wyłącznie jako oddzielny benchmark z kontrolą płynności/spreadu.
+- FootballAPIs.com jest katalogiem porównawczym providerów, nie źródłem kursów.
+- OddsHarvester ma dojrzały kod Playwright i pobiera upcoming/historic odds z OddsPortal, ale regulamin OddsPortal zabrania automatycznych żądań, scrapingu/agregacji i publicznego wykorzystywania istotnej części bazy bez zgody. MIT licencjonuje kod, nie dane. Nie wdrażać bez pisemnej zgody.
+- BetExplorer ToS także zakazuje automatycznych żądań i scrapingu bez zgody. football-data.co.uk oferuje CSV odds, lecz warunki ograniczają użycie do prywatnego użytku i wykluczają komercyjne produkty/boty/scraping/AI training bez zgody. Nie podłączać do produkcji bez licencji.
+- Publiczne fora wskazują na blokady Cloudflare, zmiany HTML/XHR, regionalne różnice list bookmakerów i nieaktualne kursy. Nie obchodzić blokad rotacją VPN/proxy.
+- Raport rozszerzono w `docs/ODDS_PROVIDER_RESEARCH_2026-11-17.md`; handoff uzupełniono w `docs/NEW_CHAT_HANDOFF_2026-11-17.md`.
+- Nie zmieniono kodu aplikacji, nie dodano kluczy/secrets, nie wdrożono scrapera. Badanie nie może dowieść pokrycia wszystkich europejskich lig bez live testów providerów.
+- Rekomendowana następna bramka: użytkownik zgadza się na darmowy klucz OddsPapi i/lub StrikerAPI, następnie wykonujemy test coverage 5–10 spotkań z kilku krajów, sprawdzamy bukmacherów, timestampy, limity i dopasowanie do fixture; dopiero potem implementujemy Worker adapter.
