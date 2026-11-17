@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { addRecord, addRecordsIfMissing, exportBackup, importBackup, readRecords, validateBackup } from "./tracker-store";
+import { addRecord, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, validateBackup } from "./tracker-store";
 
 const memory = new Map<string, string>();
 Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
@@ -20,6 +20,13 @@ describe("local tracker", () => {
     addRecord({ kind: "prediction", title: "1X2", status: "candidate", details: { home: 0.5 } });
     expect(exportBackup().format).toBe("moneyball-local-backup");
     expect(exportBackup().records).toHaveLength(1);
+  });
+  it("exports all tracker fields as correctly escaped CSV", () => {
+    addRecord({ kind: "match", title: "Team, home", status: "scheduled", details: { fixtureId: "fx-1", note: "line one" } });
+    const csv = exportCsv();
+    expect(csv).toContain('"id","createdAt","kind","title","status","details"');
+    expect(csv).toContain('"Team, home"');
+    expect(csv).toContain('"fx-1"');
   });
   it("imports only missing IDs and preserves existing records", () => {
     addRecord({ kind: "match", title: "Original", status: "scheduled", details: {} });
