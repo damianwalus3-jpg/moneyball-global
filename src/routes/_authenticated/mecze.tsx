@@ -13,7 +13,7 @@ import { MatchForm } from "@/components/forms/MatchForm";
 import { OddsForm, ScanRunForm } from "@/components/forms/SimpleForms";
 import { deleteRow } from "@/lib/db";
 import { saveCouponBatch } from "@/lib/coupons";
-import { isActivePredictionVersion, isEligibleEuropeanMatch, dedupeEuropeanMatches, MATCH_STATUS_LABELS } from "@/lib/domain";
+import { isActivePredictionVersion, isEligibleEuropeanMatch, isMissingOddsRejectionReason, dedupeEuropeanMatches, MATCH_STATUS_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, matchLabel } from "@/lib/format";
 import { matchPageDataQuery, useAction } from "@/lib/queries";
 import { brusselsDayKey, fmtDateTime, fmtDayLong, fmtTime } from "@/lib/time";
@@ -699,7 +699,7 @@ function Mecze() {
                                       {p.odds == null && (
                                         <div className="mt-2 grid gap-2">
                                           <p className="text-[11px] text-muted-foreground">Nie zapisujemy zakładu bez potwierdzonego kursu bukmachera.</p>
-                                          {(p.verdict === "WYBRANY" || (p.rejection_reason ?? "").includes("Brak potwierdzonego kursu")) && (
+                                          {(p.verdict === "WYBRANY" || isMissingOddsRejectionReason(p.rejection_reason)) && (
                                             <Button size="sm" variant="outline" onClick={() => setOddsFor(m.id)}>Wprowadź kurs z Bwin / innego bukmachera</Button>
                                           )}
                                         </div>
