@@ -72,13 +72,13 @@ export default {
       if (oddsHealth) {
         return json({
           providers: configured,
-          pilotEnabled: Boolean(env.ODDS_PILOT_TOKEN),
+          pilotEnabled: typeof env.ODDS_PILOT_TOKEN === "string" && env.ODDS_PILOT_TOKEN.length >= 32,
           note: "Only configuration presence is reported; secrets are never returned.",
         }, 200, origin);
       }
 
       // Fail closed: provider credits cannot be consumed until an owner-only token is configured.
-      if (!env.ODDS_PILOT_TOKEN) return json({ error: "pilot_disabled", message: "Configure ODDS_PILOT_TOKEN in Cloudflare Worker secrets." }, 503, origin);
+      if (typeof env.ODDS_PILOT_TOKEN !== "string" || env.ODDS_PILOT_TOKEN.length < 32) return json({ error: "pilot_disabled", message: "Configure an ODDS_PILOT_TOKEN with at least 32 characters in Cloudflare Worker secrets." }, 503, origin);
       const authorization = request.headers.get("Authorization") ?? "";
       const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
       if (!constantTimeEqual(suppliedToken, env.ODDS_PILOT_TOKEN)) return json({ error: "unauthorized" }, 401, origin);
