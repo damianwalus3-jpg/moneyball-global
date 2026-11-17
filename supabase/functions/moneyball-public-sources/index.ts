@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
+import { isEligibleDomesticSeniorLeague } from "../_shared/domestic-league-scope.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -68,6 +69,11 @@ function localKickoffToIso(date:string,time:string,countryCode:string):string|nu
 
 function isEuropeanFixture(country: unknown, _competition?: unknown, _home?: unknown, _away?: unknown): boolean {
   return isGeographicEuropeCountry(country);
+}
+
+function isExcludedSeniorTeam(value: unknown): boolean {
+  const team=String(value??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  return /\\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico|u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23))\\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
 }
 
 function norm(s: unknown): string {
@@ -821,7 +827,10 @@ Deno.serve(async (req: Request) => {
       mergedByFixture.set(k,merged);
     }
     const deduped=[...mergedByFixture.values()];
-    const europeanFixtures = deduped.filter((f:any) => isEuropeanFixture(f.country,f.competition,f.home_team,f.away_team));
+    const europeanFixtures = deduped.filter((f:any) => isEuropeanFixture(f.country,f.competition,f.home_team,f.away_team)
+      && isEligibleDomesticSeniorLeague(f.country,f.competition||f.league)
+      && (!f.gender || String(f.gender).toLowerCase()==="men")
+      && !isExcludedSeniorTeam(f.home_team) && !isExcludedSeniorTeam(f.away_team));
     const sportsDbHistory=await sportsDbTeamHistory(europeanFixtures,date);
     for(const fixture of europeanFixtures){
       const homeForm=sportsDbHistory.forms.get(sportsDbTeamKey(fixture.home_team));
