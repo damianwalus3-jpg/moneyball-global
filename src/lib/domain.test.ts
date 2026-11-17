@@ -178,6 +178,21 @@ describe("European domestic league scope", () => {
       country: "Belgium",
     };
     expect(isEligibleEuropeanMatch(openMatchdayBase)).toBe(true);
+    // FootyNomad's Northern Ireland Championship is a valid domestic second tier.
+    expect(isEligibleEuropeanMatch({
+      ...eligibleBase,
+      country: "Northern Ireland",
+      competition: "Championship",
+      source: "FootyNomad",
+      external_id: "fn:nifl-championship-2026-11-17",
+    })).toBe(true);
+    expect(isEligibleEuropeanMatch({
+      ...eligibleBase,
+      country: "England",
+      competition: "National League - North",
+      source: "FootyNomad",
+      external_id: "fn:eng-national-league-north-2026-11-17",
+    })).toBe(false);
     expect(isEligibleEuropeanMatch({
       ...openMatchdayBase,
       external_id: "om:BEL_2_challenger-pro-league:2026-11-17:club-a:club-b",
