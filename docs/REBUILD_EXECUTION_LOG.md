@@ -569,3 +569,13 @@
 - Cloudflare deployment run `44187392628`: SUCCESS — krok deploy oddzielnego Worker zakończony powodzeniem.
 - Live smoke test endpointu `/api/odds/status` nie został potwierdzony: dostępne narzędzia nie mogły odczytać publicznego endpointu. Nie twierdzić, że Worker odpowiada ani że sekrety są skonfigurowane, dopóki endpoint nie zostanie sprawdzony z przeglądarki.
 - Kod/testy są wdrożone według statusu GitHub Actions, ale realne wywołanie dostawców, konfiguracja sekretów i coverage nadal czekają na smoke test.
+
+
+## Stage 53 — korekta autoryzacji OddsPapi i odpowiedzi CORS (2026-11-17)
+- Ponowna kontrola branch HEAD oraz workflow: commit `9e8289f22fecf61e9733485f0d7bc721c4d680c4` miał SUCCESS dla Rebuild CI, Rebuild Checks i Cloudflare deployment (runy `44187555051`, `44187555135`, `44187555077`).
+- Audyt kodu wykrył dwa problemy: preflight OPTIONS zwracał body przy statusie 204; OddsPapi było autoryzowane nagłówkiem `x-api-key`, podczas gdy oficjalna dokumentacja v4 wymaga parametru query `apiKey`.
+- Poprawiono OPTIONS na pustą odpowiedź 204 z nagłówkami CORS.
+- Poprawiono OddsPapi: klucz jest przekazywany jako query parameter wyłącznie z Worker (nie trafia do frontendu ani odpowiedzi). Dodano testy dla obu przypadków.
+- Oficjalna dokumentacja OddsPapi potwierdza parametr `apiKey` w query string: https://oddspapi.io/en/docs oraz https://oddspapi.io/us/docs/errors. Źródła: dokumentacja producenta.
+- Commity: Worker `ee80716922515e680acd701c11b63948e82a971f`; testy `ff3252aeed5c72bf127396aace5c360ff78c8d3a`.
+- Wymagane po commitach: potwierdzić CI i deployment dla najnowszego HEAD. Nie wykonywać jeszcze billable zapytań OddsPapi. Live endpoint status nadal nieosiągalny w narzędziach; obecność sekretów i rzeczywiste działanie providerów pozostają niepotwierdzone.
