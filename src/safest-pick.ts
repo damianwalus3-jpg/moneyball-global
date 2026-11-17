@@ -36,7 +36,7 @@ export function getSafestPick(records: TrackerRecord[], minimum = 0.8): SafestPi
   for (const row of newest.values()) {
     const d = row.details;
     if (row.status !== "KANDYDAT" || typeof d.fixtureDate !== "string" || typeof d.fixtureTime !== "string") continue;
-    if (d.fixtureDate < now.date || (d.fixtureDate === now.date && d.fixtureTime <= now.time)) continue;
+    if (!hasKnownKickoff(d.fixtureDate, d.fixtureTime)) continue;\n    if (d.fixtureDate < now.date || (d.fixtureDate === now.date && d.fixtureTime <= now.time)) continue;
     const markets: Array<{ market: SafestPick["market"]; probability: unknown }> = [
       { market: "1X", probability: d.dc1x },
       { market: "X2", probability: d.dcx2 },
