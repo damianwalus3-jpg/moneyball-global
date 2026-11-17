@@ -84,3 +84,29 @@ it("uses the historical fixture season when parsing yearless date headings", () 
   const matches = parseOpenFootballMatches(text, france, undefined, "2026-03-01");
   expect(matches[0].date).toBe("2026-02-27");
 });
+
+
+describe("dynamic European OpenFootball catalogue", () => {
+  it("discovers current-season country and competition feeds from the repository tree", async () => {
+    const { buildEuropeanOpenFootballFeeds } = await import("./openfootball");
+    const feeds = buildEuropeanOpenFootballFeeds([
+      "france/2026-27_fr1.txt",
+      "france/2024-25_fr2.txt",
+      "norway/2026_no1.txt",
+      "poland/2026-27_pl2.txt",
+      "rsssf/belg2025.txt",
+      "brazil/2026_br1.txt",
+    ], "2026-11-18");
+    expect(feeds.map(feed => feed.id)).toHaveLength(3);
+    expect(feeds.map(feed => feed.countryCode)).toEqual(["FRA", "NOR", "POL"]);
+    expect(feeds[0].competition).toContain("FR1");
+    expect(feeds[0].urlForSeason("ignored")).toContain("france/2026-27_fr1.txt");
+  });
+
+  it("discovers calendar-year seasons for Nordic leagues", async () => {
+    const { buildEuropeanOpenFootballFeeds } = await import("./openfootball");
+    const feeds = buildEuropeanOpenFootballFeeds(["finland/2026_fi1.txt", "finland/2025_fi1.txt"], "2026-07-10");
+    expect(feeds).toHaveLength(1);
+    expect(feeds[0].countryCode).toBe("FIN");
+  });
+});
