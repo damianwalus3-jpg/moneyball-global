@@ -43,8 +43,9 @@ function parseResults(csv: string): CsvRow[] {
     return Object.fromEntries(headers.map((header, i) => [header, cells[i] ?? ""]));
   });
 }
-async function loadLeagueResults(folder: string): Promise<{ rows: CsvRow[]; generatedAt: string }> {
-  const key = CACHE_PREFIX + folder;
+async function loadLeagueResults(folder: string, beforeDate: string): Promise<{ rows: CsvRow[]; generatedAt: string }> {
+  const season = seasonCode(beforeDate);
+  const key = `${CACHE_PREFIX}${folder}:${season}`;
   try {
     const cached = localStorage.getItem(key);
     if (cached) {
@@ -55,7 +56,7 @@ async function loadLeagueResults(folder: string): Promise<{ rows: CsvRow[]; gene
   const indexResponse = await fetch(`${ROOT}/build_summary.json`);
   if (!indexResponse.ok) throw new Error(`Indeks wyników niedostępny (HTTP ${indexResponse.status})`);
   const index = await indexResponse.json() as { generated_utc: string };
-  const response = await fetch(`${ROOT}/data/${folder}/results_${seasonCode(new Date().toISOString().slice(0, 10))}.csv`);
+  const response = await fetch(`${ROOT}/data/${folder}/results_${season}.csv`);
   if (!response.ok) throw new Error(`Brak pliku wyników dla ligi (HTTP ${response.status})`);
   const rows = parseResults(await response.text());
   const value = { rows, generatedAt: index.generated_utc, cachedAt: Date.now() };
@@ -84,7 +85,7 @@ function mapMatch(row: CsvRow, team: string): FormMatch | null {
 }
 export async function loadRecentTeamForm(folder: string, team: string, beforeDate: string): Promise<TeamForm> {
   if (!/^[A-Z]{3}_\d+_[a-z0-9-]+$/.test(folder)) throw new Error("Nieprawidłowy identyfikator ligi");
-  const { rows, generatedAt } = await loadLeagueResults(folder);
+  const { rows, generatedAt } = await loadLeagueResults(folder, beforeDate);
   const matches = rows
     .filter(row => row.date < beforeDate)
     .map(row => mapMatch(row, team))
