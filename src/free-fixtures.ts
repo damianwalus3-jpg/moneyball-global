@@ -1,7 +1,8 @@
 export interface FreeFixture {
   id: string;
   competition: string;
-  countryCode: string;\n  leagueFolder: string;
+  countryCode: string;
+  leagueFolder: string;
   date: string;
   time: string;
   home: string;
@@ -32,7 +33,8 @@ function parseCsvLine(line: string): string[] {
   return out;
 }
 function parseCsv(text: string): Array<Record<string,string>> {
-  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(Boolean);
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?
+/).filter(Boolean);
   if (!lines.length) return [];
   const headers = parseCsvLine(lines[0]);
   return lines.slice(1).map(line => {
@@ -94,7 +96,8 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       const fixtures = parseCsv(csv).filter(row => row.date === date).map(row => ({
         id: `${folder}|${row.gw}|${row.date}|${row.time}|${row.home}|${row.away}`,
         competition: league.league,
-        countryCode: folder.split("_")[0],\n        leagueFolder: folder,
+        countryCode: folder.split("_")[0],
+        leagueFolder: folder,
         date: row.date,
         time: row.time,
         home: row.home,
