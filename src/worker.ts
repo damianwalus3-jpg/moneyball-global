@@ -30,7 +30,12 @@ async function readJson(response: Response): Promise<unknown> {
 export default {
   async fetch(request: Request, env: Env, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<Response> {
     const url = new URL(request.url);
-    if (request.method === "OPTIONS") return json({}, 204, url.origin);
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: {
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": url.origin,
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    } });
 
     const oddsHealth = url.pathname === "/api/odds/status";
     const oddsPilot = url.pathname === "/api/odds/pilot";
