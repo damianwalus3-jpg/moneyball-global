@@ -22,7 +22,7 @@ describe("three-leg coupon candidates", () => {
     const candidates = buildThreeLegCandidates([
       prediction("a", 0.80), prediction("b", 0.81), prediction("c", 0.90),
       prediction("d", 0.74), prediction("a-duplicate", 0.95),
-    ]);
+    ], "2026-11-17");
     expect(candidates.length).toBe(1);
     expect(candidates[0].legs).toHaveLength(3);
     expect(new Set(candidates[0].legs.map(leg => leg.fixtureId)).size).toBe(3);
@@ -33,7 +33,7 @@ describe("three-leg coupon candidates", () => {
   it("does not mix different dates or duplicate fixtures", () => {
     const candidates = buildThreeLegCandidates([
       prediction("a", 0.9), prediction("b", 0.9), prediction("c", 0.9, "2026-11-18"),
-    ]);
+    ], "2026-11-17");
     expect(candidates).toHaveLength(0);
   });
 });
