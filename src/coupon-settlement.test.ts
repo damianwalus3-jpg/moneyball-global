@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluatePaperCoupon } from "./coupon-settlement";
+import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
 import type { TrackerRecord } from "./tracker-store";
 
 const coupon: TrackerRecord = {
