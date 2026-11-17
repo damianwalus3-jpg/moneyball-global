@@ -125,7 +125,9 @@ Deno.serve(async(req)=>{
   const normTeam=(v:any)=>{const key=String(v||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();return ({"turkiye":"turkey"} as Record<string,string>)[key]||key;};
   const localDay=(v:any)=>{const raw=String(v||"");if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const d=new Date(raw);return Number.isNaN(d.getTime())?raw.slice(0,10):new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);};
   const fixtureDate=(f:any)=>{const explicit=String(f.date||"").slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(explicit))return explicit;const fromTime=localDay(f.kickoff_at);if(fromTime)return fromTime;return /:([0-9]{4}-[0-9]{2}-[0-9]{2}):/.exec(String(f.external_id||""))?.[1]||"";};
-  const fixtureBaseKey=(f:any)=>normTeam(f.home_team)+"|"+normTeam(f.away_team)+"|"+fixtureDate(f)+"|"+String(f.competition||"").trim().toLowerCase();
+  // Provider league labels differ (e.g. "EFL Championship" vs "Championship").
+  // Match identity is date + ordered teams; gender compatibility is checked separately.
+  const fixtureBaseKey=(f:any)=>normTeam(f.home_team)+"|"+normTeam(f.away_team)+"|"+fixtureDate(f);
   const fixtureGender=(f:any)=>["men","women"].includes(String(f.gender||"").toLowerCase())?String(f.gender).toLowerCase():"unknown";
   const fixtureKey=(f:any)=>fixtureBaseKey(f)+"|"+fixtureGender(f);
   const genderCompatible=(a:any,b:any)=>fixtureGender(a)===fixtureGender(b)||fixtureGender(a)==="unknown"||fixtureGender(b)==="unknown";
@@ -231,6 +233,6 @@ Deno.serve(async(req)=>{
    try{resultSync=syncText?JSON.parse(syncText):{ok:false,error:"Empty result-sync response"};}catch(_){resultSync={ok:false,error:syncText.slice(0,500)};}
    if(!syncResponse.ok)resultSync={...resultSync,ok:false,http_status:syncResponse.status};
   }catch(e){resultSync={ok:false,error:String(e)};}
-  return new Response(JSON.stringify({ok:true,date,total_found:result.total_found,fixtures_count:result.fixtures.length,combined_count:combined.length,public_fixtures:publicFixtures.length,enriched,public_only:publicOnly,public_source_status:publicSourceStatus,inserted,updated,settled,matched_by_fixture:matchedByFixture,promoted_to_primary:promotedToPrimary,scan_run_id:run.id,result_sync:resultSync}),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
+  return new Response(JSON.stringify({ok:true,date,total_found:result.total_found,fixtures_count:result.fixtures.length,combined_count:combined.length,public_fixtures:publicFixtures.length,openmatchday_fixtures:publicFixtures.filter((f:any)=>String(f.source||"").toLowerCase()==="openmatchday").length,enriched,public_only:publicOnly,public_source_status:publicSourceStatus,inserted,updated,settled,matched_by_fixture:matchedByFixture,promoted_to_primary:promotedToPrimary,scan_run_id:run.id,result_sync:resultSync}),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
  }catch(e){return new Response(JSON.stringify({error:String(e)}),{status:400,headers:{...cors,"Content-Type":"application/json"}});}
 });
