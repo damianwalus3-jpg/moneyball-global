@@ -68,3 +68,19 @@ After the fix, exactly 26 expected tier-1/tier-2 labels remain accepted across 1
 3. Verify the authenticated MAIN UI in a real existing user session.
 4. Do not claim full coverage or close issue #77 until the country-by-country source → database → RPC → authenticated UI chain is proven.
 5. Do not invent odds; current sources provide no fresh Belgian bookmaker prices. MAIN/MEGA/EXTRA remain blocked until fresh odds are available.
+
+## Additional source discovered: Football Charts (2026-11-17 10:20 Europe/Brussels)
+
+Football Charts' official API catalogue lists 98 leagues in 44 countries, including 31 UEFA associations. It adds Azerbaijan, Bulgaria, Estonia, Hungary, Latvia, Lithuania and Serbia to the previous combined catalogue. Coverage evidence rises from 30/55 to at least 37/55; 18 associations remain without a verified current tier-1/tier-2 domestic source: Albania, Andorra, Armenia, Belarus, Bosnia and Herzegovina, Faroe Islands, Georgia, Gibraltar, Iceland, Israel, Kosovo, Liechtenstein, Luxembourg, Malta, Moldova, Montenegro, North Macedonia and San Marino.
+
+Docs: https://www.football-charts.com/developers ; terms: https://www.football-charts.com/terms
+
+No-key limit is 25 requests/day per IP. The free API updates daily around 06:00 UTC and fixture endpoints expose only the next few days. Free use is personal/private with attribution; if other people use the app, Commercial plan is required. Raw data cannot be redistributed. No free-tier odds or per-match xG/shots/passes.
+
+MONEYBALL allowlists only eight league IDs: Azerbaijan Premier League, Bulgaria efbet League, Estonia Meistriliiga, Hungary NB I and NB II, Latvia Virsliga, Lithuania TOPLYGA, Serbia Mozzart Bet Super Liga. The authenticated importer filters to the exact Europe/Brussels day, parses UTC timestamps, stores minimal fixture data and attribution, discards the provider's model predictions and does not import stats or odds. Owner UUID gate keeps the personal-use source away from other accounts. It is not exposed via the public fixture aggregator.
+
+All eight endpoints returned valid JSON. On 17 Nov there were no same-day matches among these leagues; upcoming fixtures were present for 20–23 Nov in several countries, next-known fixtures for Estonia and Lithuania, and none within three days for Latvia. Endpoint validation only; authenticated database import still pending.
+
+FotMob and SofaScore were rejected for automated extraction/re-use restrictions: https://github.com/probberechts/soccerdata/issues/918 and https://www.sofascore.com/terms-and-conditions (2.8–2.9). TheSportsDB adds no missing UEFA coverage in the checked sample. OpenFootball Europe files for many missing associations are 2024–25/2025; only France, Netherlands and Portugal show 2026–27 in the current index.
+
+Implementation commits: 2d1ae325a7d8ad4bbaf4d2697434c5e6a2b62acb (integration and aliases), f382cab9cb8228ef64ad154a602966e9037edf42 (owner gate). Migration 20261117102000_add_footballcharts_bulgaria_lithuania_aliases.sql applied. SQL 15/15; CI 44053372684 and Cloudflare MAIN deploy 44053372690 SUCCESS; Supabase footynomad-sync v88. Authenticated import remains pending.

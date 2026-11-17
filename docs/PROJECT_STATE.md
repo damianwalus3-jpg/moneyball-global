@@ -1074,3 +1074,38 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 3. Complete authenticated MAIN UI E2E in an existing user session. No password or fabricated identity.
 4. Fresh Belgian bookmaker odds remain unavailable from current no-key sources. Do not create MAIN/MEGA/EXTRA from stale/fair/synthetic odds; no real-money betting.
 5. Project is not complete. Do not close issue #77, deploy Vercel/TEST, delete historical rows or rewrite historical finance.
+
+## Football Charts provider evaluation and restricted fallback — 2026-11-17 10:20 Europe/Brussels
+
+### Provider facts verified
+- Official docs: https://www.football-charts.com/developers ; API base https://footballcharts-backend.onrender.com/api/v1.
+- API catalogue: 98 leagues in 44 countries; 31 UEFA associations in the European subset.
+- Free no-key tier: 25 requests/day per IP, 20/min. Free key: 200/day after email confirmation, but MONEYBALL does not use a key.
+- API updates once daily after overnight run, about 06:00 UTC; fixture endpoint returns upcoming fixtures for the next few days, with no date parameter.
+- Free plan is for personal/private projects with attribution. If other people use the app/site/bot, Commercial plan is required. Raw API responses/data may not be redistributed. Terms: https://www.football-charts.com/terms
+- No free-tier odds or per-match xG/shots/pass stats. Provider model predictions are deliberately discarded.
+
+### Coverage gain
+- Seven previously uncovered UEFA associations gain a tier-1/2 catalogue source: Azerbaijan, Bulgaria, Estonia, Hungary, Latvia, Lithuania and Serbia.
+- Combined catalogue evidence rises from 30/55 to at least 37/55. The 18 remaining associations without a verified current tier-1/2 national domestic source: Albania, Andorra, Armenia, Belarus, Bosnia and Herzegovina, Faroe Islands, Georgia, Gibraltar, Iceland, Israel, Kosovo, Liechtenstein, Luxembourg, Malta, Moldova, Montenegro, North Macedonia and San Marino.
+- Only eight league IDs are allowlisted: azer, bulgaria1, estonia, hungary1, hungary2, latvia, lithuania, serbia1. Women's, youth, third-tier, regional and exhibition competitions are excluded.
+- All eight fixture endpoints returned valid JSON. The 17 Nov sample had no same-day fixture among these eight; upcoming fixtures were present for 20–23 Nov in Bulgaria/Azerbaijan/Hungary/Serbia, Hungary II on 21–22 Nov, next-known dates 21 Nov Lithuania and 22 Nov Estonia; Latvia had no fixture in the next three days. This is endpoint validation, not a completed database import.
+- TheSportsDB check: all-leagues returned only 10 rows; 21 Nov events-day returned 3 events (two Brazil, one Sweden), adding no missing UEFA country.
+- OpenFootball Europe index: 207 files, mostly 2024–25 or 2025 calendar seasons. Only France, Netherlands and Portugal show 2026–27 entries. CC0/public domain, useful for historical research but not a current feed for the remaining gap.
+- FotMob and SofaScore were not adopted despite technically reachable endpoints. FotMob's terms prohibit automated retrieval without permission; SofaScore terms prohibit database extraction/re-use without express consent. References: https://github.com/probberechts/soccerdata/issues/918 and https://www.sofascore.com/terms-and-conditions (2.8–2.9). Do not repeat scraping probes or integrate without written permission.
+
+### Implementation in MAIN
+- Commit 2d1ae325a7d8ad4bbaf4d2697434c5e6a2b62acb adds the Football Charts fallback to authenticated footynomad-sync, provider aliases and regression tests. It calls only eight allowlisted league endpoints, filters to the exact Europe/Brussels date, parses documented UTC timestamps, stores minimal fixture fields and source URL/attribution, and discards the provider model and stats.
+- Commit f382cab9cb8228ef64ad154a602966e9037edf42 adds an owner-only gate for personal-use licensing. The feed is fetched only for owner UUID 668d578c-40dd-4767-8b9d-6b17c7eeebb5; other signed-in accounts skip it. It is not exposed through public moneyball-public-sources.
+- Cache: 12 hours after full success, 30 minutes after partial failure. Eight requests per scan; two scans could use up to 16 of 25 keyless daily requests if isolate cache is cold. Repeated manual scans can exhaust the limit; failures do not block FootyNomad.
+- Migration 20261117102000_add_footballcharts_bulgaria_lithuania_aliases.sql applied. SQL now accepts Bulgaria efbet League and Lithuania TOPLYGA.
+- SQL regression 15/15 passed. Frontend tests, Edge Function type-check and build passed.
+- GitHub CI 44053372684 SUCCESS; Cloudflare MAIN deploy 44053372690 SUCCESS for f382cab9. Supabase footynomad-sync v88 deployed with verify_jwt=true; deployed source inspection confirms allowlist, owner gate, attribution and model exclusion.
+- Worker root and /login load; /panel returns login_required without a user session. Authenticated post-deploy scan is still pending, so DB import is not yet proven end-to-end.
+
+### Next actions
+1. Verify footynomad-sync v88 on the next authenticated MAIN scan (15:00 Europe/Brussels): provider status, requests, eligible fixture count, inserts, deduplication and predictions. Do not fabricate a user session or request credentials.
+2. Monitor the 25/IP daily keyless request budget; keep to eight allowlisted leagues. No key is stored or required.
+3. Find lawful current feeds for the 18 remaining associations. Do not treat old OpenFootball files as current fixtures or scrape FotMob/SofaScore.
+4. Fresh Belgian bookmaker odds remain unavailable; MAIN/MEGA/EXTRA stay blocked when verified odds are absent.
+5. Issue #77 stays OPEN; project is not complete.
