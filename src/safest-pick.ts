@@ -20,7 +20,7 @@ function brusselsNowParts(): { date: string; time: string } {
 }
 
 export function hasKnownKickoff(date: string, time: string): boolean {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !/^\\d{2}:\\d{2}$/.test(time)) return false;
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(date) || !/^[0-9]{2}:[0-9]{2}$/.test(time)) return false;
   const parsed = Date.parse(`${date}T${time}:00Z`);
   return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === date;
 }
