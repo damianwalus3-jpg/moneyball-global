@@ -1,6 +1,6 @@
 import { requireSupabase } from "./supabase";
 import { COLUMNS, OWNER_COLUMN } from "./schema";
-import type { TableName, TableRows } from "./types";
+import type { TableName, TableRows, TrackerCategorySummary } from "./types";
 import { brusselsDayKey, brusselsInputToISO } from "./time";
 import { isEligibleEuropeanMatch } from "./domain";
 
@@ -156,6 +156,16 @@ export async function fetchJackpotEntries(): Promise<TableRows["moneyball_jackpo
   );
   if (error) throw new Error(humanizeError(error, "moneyball_jackpot_entries"));
   return (data ?? []) as unknown as TableRows["moneyball_jackpot_entries"][];
+}
+
+/** Aggregate category, decision, source and settlement counts inside Postgres. */
+export async function fetchTrackerCategorySummary(): Promise<TrackerCategorySummary> {
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().rpc("moneyball_tracker_category_summary"),
+    "Pobieranie statystyk Trackera",
+  );
+  if (error) throw new Error(humanizeError(error, "moneyball_tracker_category_summary"));
+  return data as TrackerCategorySummary;
 }
 
 
