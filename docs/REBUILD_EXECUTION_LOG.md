@@ -21,3 +21,12 @@
 - Tracker now runs locally in browser storage with versioned JSON export/import; backups merge only missing IDs.
 - Added daily Europe/Brussels fixture retrieval from open-matchday's free public CSV dataset, restricted to European domestic league folders. Source is non-commercial and coverage limitations must be shown.
 - Added a separate Cloudflare Worker static-assets deployment workflow. It uses the existing repository Cloudflare secrets and a distinct Worker name; it does not bind the production D1 database or alter the existing production Worker.
+
+## First free deployment — 2026-11-17
+- Clean rebuild deployed successfully to the separate Cloudflare Worker: https://moneyball-global-rebuild.damianwalus3.workers.dev
+- Worker: `moneyball-global-rebuild`; version ID: `9a0162d4-f82e-4ff4-86bd-ee049f707291`.
+- GitHub Actions deployment run: `44103378010`, conclusion: success.
+- Verified pipeline steps: dependency install, TypeScript typecheck, 9 unit tests (2 files), Vite production build, static asset upload and Cloudflare Worker deployment.
+- The deployed build is isolated from the existing production `moneyball-global` Worker and its D1 database.
+- Public URL was issued by Cloudflare deployment output. Automated browser-level visual verification is still outstanding.
+- No paid resources were provisioned.
