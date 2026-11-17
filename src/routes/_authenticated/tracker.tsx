@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { formatJackpotSequence, makeTrackerCategoryKey } from "@/lib/tracker-domain";
-import { insertRow, updateRow } from "@/lib/db";
+import { classifyTrackerSource, fetchTrackerUnclassifiedPage, insertRow, updateRow } from "@/lib/db";
 import {
   couponFinanceQuery, dashboardSelectedPicksQuery, dashboardSummaryQuery, latestScanRunQuery,
   trackerCategoriesQuery, jackpotEntriesQuery, trackerCategorySummaryQuery, tableQuery, useAction
@@ -68,6 +68,17 @@ function TrackerPage() {
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState("");
   const [editingCategoryDescription, setEditingCategoryDescription] = useState("");
+  const [legacyOffset, setLegacyOffset] = useState(0);
+  const [legacySelected, setLegacySelected] = useState<string[]>([]);
+  const [legacyEntityType, setLegacyEntityType] = useState<"prediction" | "coupon">("prediction");
+  const [legacySourceClass, setLegacySourceClass] = useState<"USER" | "MODEL" | "PAPER">("MODEL");
+  const [legacyNote, setLegacyNote] = useState("");
+  const legacyRows = useQuery({
+    queryKey: ["tracker-unclassified", legacyOffset],
+    queryFn: () => fetchTrackerUnclassifiedPage(legacyOffset, 51),
+    staleTime: 30_000,
+    refetchInterval: false,
+  });
   const addJackpot = useAction(
     async (args: { couponId: string; title: string }) => insertRow("moneyball_jackpot_entries", {
       coupon_id: args.couponId,
@@ -96,6 +107,14 @@ function TrackerPage() {
   const toggleCategory = useAction(
     async (args: { id: string; is_active: boolean }) => updateRow("moneyball_tracker_categories", args.id, { is_active: args.is_active }),
     { success: "Zmieniono status kategorii Trackera" },
+  );
+  const classifyLegacy = useAction(
+    async (args: { entityType: "prediction" | "coupon"; ids: string[]; sourceClass: "USER" | "MODEL" | "PAPER"; note: string }) =>
+      classifyTrackerSource({ entityType: args.entityType, ids: args.ids, sourceClass: args.sourceClass, note: args.note }),
+    {
+      success: (count) => `Jawnie sklasyfikowano ${count} rekordów; zapisano ślad audytowy.`,
+      onDone: () => { setLegacySelected([]); setLegacyNote(""); void legacyRows.refetch(); void categorySummary.refetch(); },
+    },
   );
   const updateCategory = useAction(
     async (args: { id: string; name: string; description: string }) => updateRow("moneyball_tracker_categories", args.id, {
@@ -355,6 +374,72 @@ function TrackerPage() {
           </div>
           <p className="mt-2 text-xs text-muted-foreground">Numer #001, #002… nadaje baza. Numeru, właściciela ani powiązanego kuponu nie można zmienić; wpisów nie można usuwać przez aplikację.</p>
         </div>
+      </section>
+
+      <section className="surface-card p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="font-display text-xl font-bold uppercase">Klasyfikacja historii · USER / MODEL / PAPER</h2>
+            <p className="text-xs text-muted-foreground">Wybierz rekordy jednego rodzaju i przypisz im źródło. Każda zmiana jest zapisywana w nieusuwalnym rejestrze audytowym.</p>
+          </div>
+          <span className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground">bez automatycznych zgadywanek</span>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={legacyEntityType} onChange={(event) => { setLegacyEntityType(event.target.value as "prediction" | "coupon"); setLegacySelected([]); setLegacyOffset(0); }}>
+            <option value="prediction">Prognozy</option>
+            <option value="coupon">Kupony</option>
+          </select>
+          <select className="h-10 rounded-md border border-input bg-background px-3 text-sm" value={legacySourceClass} onChange={(event) => setLegacySourceClass(event.target.value as "USER" | "MODEL" | "PAPER")}>
+            <option value="MODEL">MODEL</option>
+            <option value="USER">USER</option>
+            <option value="PAPER">PAPER</option>
+          </select>
+          <Input value={legacyNote} onChange={(event) => setLegacyNote(event.target.value)} placeholder="Notatka audytowa (opcjonalnie)" maxLength={500} />
+        </div>
+        {legacyRows.isPending ? <p className="mt-3 text-sm text-muted-foreground">Ładowanie nieprzypisanych rekordów…</p> : legacyRows.error ? (
+          <p className="mt-3 text-sm text-destructive">{legacyRows.error.message}</p>
+        ) : (
+          <>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span>Strona {Math.floor(legacyOffset / 50) + 1} · wybrano {legacySelected.length}</span>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" disabled={legacyOffset === 0} onClick={() => { setLegacyOffset(Math.max(0, legacyOffset - 50)); setLegacySelected([]); }}>Poprzednia</Button>
+                <Button size="sm" variant="outline" disabled={(legacyRows.data?.length ?? 0) <= 50} onClick={() => { setLegacyOffset(legacyOffset + 50); setLegacySelected([]); }}>Następna</Button>
+              </div>
+            </div>
+            <div className="mt-2 max-h-[420px] overflow-auto rounded-lg border border-border">
+              {(legacyRows.data ?? []).filter((row) => row.entity_type === legacyEntityType).map((row) => (
+                <label key={row.entity_id} className="flex cursor-pointer items-start gap-3 border-b border-border p-3 last:border-b-0 hover:bg-secondary/30">
+                  <input
+                    type="checkbox"
+                    className="mt-1 size-4 accent-primary"
+                    checked={legacySelected.includes(row.entity_id)}
+                    onChange={(event) => setLegacySelected((current) => event.target.checked ? [...current, row.entity_id] : current.filter((id) => id !== row.entity_id))}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block break-words text-sm font-semibold">{row.label}</span>
+                    <span className="block text-xs text-muted-foreground">{row.detail} · {dateLabel(row.created_at)}</span>
+                  </span>
+                  <span className="text-[10px] font-semibold text-warning">NIEPRZYPISANE</span>
+                </label>
+              ))}
+              {!(legacyRows.data ?? []).some((row) => row.entity_type === legacyEntityType) && <p className="p-4 text-sm text-muted-foreground">Na tej stronie nie ma więcej nieprzypisanych rekordów tego rodzaju.</p>}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">Maksymalnie 100 rekordów w jednej operacji. Przypisanie jest trwałe i odnotowane w audycie.</p>
+              <Button
+                disabled={!legacySelected.length || legacySelected.length > 100 || classifyLegacy.isPending}
+                onClick={() => {
+                  if (window.confirm(`Potwierdź przypisanie ${legacySelected.length} rekordów ${legacyEntityType === "prediction" ? "prognoz" : "kuponów"} do źródła ${legacySourceClass}. Operacja zostanie zapisana w audycie.`)) {
+                    classifyLegacy.mutate({ entityType: legacyEntityType, ids: legacySelected, sourceClass: legacySourceClass, note: legacyNote });
+                  }
+                }}
+              >
+                {classifyLegacy.isPending ? "Zapisywanie…" : `Przypisz źródło · ${legacySelected.length}`}
+              </Button>
+            </div>
+          </>
+        )}
       </section>
 
       <section>
