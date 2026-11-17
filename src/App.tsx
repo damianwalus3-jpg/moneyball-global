@@ -85,6 +85,7 @@ export default function App() {
   const [newTitle, setNewTitle] = useState("");
   const [newKind, setNewKind] = useState<TrackerKind>("match");
   const [notice, setNotice] = useState("");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [fixtureScan, setFixtureScan] = useState<FixtureScan | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -261,8 +262,10 @@ export default function App() {
       <header className="topbar">
         <button className="mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Otwórz menu"><Menu size={21}/></button>
         <div className="breadcrumb"><span>WORKSPACE</span><ChevronRight size={14}/><b>{nav.find(n => n.id === active)?.label}</b></div>
-        <div className="top-actions"><span className="timezone"><span className="live-pulse"/> EUROPE / BRUSSELS</span><button className="icon-button" aria-label="Powiadomienia"><Bell size={18}/></button></div>
+        <div className="top-actions"><span className="timezone"><span className="live-pulse"/> EUROPE / BRUSSELS</span><button className="icon-button" aria-label="Status powiadomień" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(value => !value)}><Bell size={18}/></button></div>
       </header>
+
+      {notificationsOpen && <div className="module-status" role="status" style={{ margin: "12px 24px 0", maxWidth: 520 }}><span className="status-dot"/> Powiadomienia Push nie są jeszcze skonfigurowane. Aplikacja nie wysyła obecnie alertów w tle ani na inne urządzenia.</div>}
 
       <div className="content">
         <section className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line"/>{current.eyebrow}</div><h1>{current.title}</h1><p>{current.subtitle}</p></div><div className="build-chip"><span/> CLEAN BUILD <b>0.1.0</b></div></section>
