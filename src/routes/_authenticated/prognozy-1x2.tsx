@@ -1,7 +1,0 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { PredictionsView } from "@/components/app/PredictionsView";
-
-export const Route = createFileRoute("/_authenticated/prognozy-1x2")({
-  head: () => ({ meta: [{ title: "Prognozy 1X2 — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Prognozy 1X2: wybrane i odrzucone." }, { property: "og:title", content: "Prognozy 1X2 — MONEYBALL" }, { property: "og:description", content: "Prognozy 1X2." }] }),
-  component: () => <PredictionsView market="1X2" />,
-});

@@ -1,6 +1,0 @@
-project_id = "gzgeklcukrclgwbsmbsp"
-
-# This function only aggregates public fixture/form/Elo feeds and returns no private user data.
-# It is called server-to-server with the new Supabase secret key, not a user JWT.
-[functions.moneyball-public-sources]
-verify_jwt = false
