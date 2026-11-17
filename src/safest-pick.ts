@@ -19,7 +19,7 @@ function brusselsNowParts(): { date: string; time: string } {
   return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
 }
 
-export function getSafestPick(records: TrackerRecord[], minimum = 0.8): SafestPick | null {
+export function hasKickoffPassed(date: string, time: string): boolean {\n  if (time === "—" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !/^\\d{2}:\\d{2}$/.test(time)) return false;\n  const now = brusselsNowParts();\n  return date < now.date || (date === now.date && time <= now.time);\n}\n\nexport function getSafestPick(records: TrackerRecord[], minimum = 0.8): SafestPick | null {
   const now = brusselsNowParts();
   const newest = new Map<string, TrackerRecord>();
   for (const row of records) {
