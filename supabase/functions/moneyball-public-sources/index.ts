@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -31,8 +32,6 @@ function csvRows(text: string): string[][] {
 }
 
 
-const EUROPE_ISO3 = new Set(["ALB","AND","ARM","AUT","AZE","BLR","BEL","BIH","BUL","CRO","CYP","CZE","DNK","ENG","EST","FRO","FIN","FRA","GEO","DEU","GER","GIB","GRC","GRE","HUN","ISL","IRL","ITA","KAZ","KOS","LVA","LIE","LTU","LUX","MLT","MDA","MNE","NLD","MKD","NIR","NOR","POL","PRT","POR","ROU","RUS","SMR","SCO","SRB","SVK","SVN","ESP","SWE","CHE","SUI","TUR","UKR","WAL","GBR","UK"]);
-const EUROPE_COUNTRIES = new Set(["albania","andorra","armenia","austria","azerbaijan","belarus","belgium","bosnia and herzegovina","bulgaria","croatia","cyprus","czechia","czech republic","denmark","england","estonia","faroe islands","finland","france","georgia","germany","gibraltar","greece","hungary","iceland","ireland","republic of ireland","isle of man","israel","italy","kazakhstan","kosovo","latvia","liechtenstein","lithuania","luxembourg","malta","moldova","monaco","montenegro","netherlands","north macedonia","northern ireland","norway","poland","portugal","romania","russia","san marino","scotland","serbia","slovakia","slovenia","spain","sweden","switzerland","turkey","türkiye","turkiye","ukraine","wales","united kingdom","uk","europe","uefa"]);
 const TIME_ZONE_BY_COUNTRY: Record<string,string> = {
   ENG:"Europe/London", SCO:"Europe/London", WAL:"Europe/London", NIR:"Europe/London",
   IRE:"Europe/Dublin", IRL:"Europe/Dublin", POR:"Europe/Lisbon", PRT:"Europe/Lisbon",
@@ -67,14 +66,8 @@ function localKickoffToIso(date:string,time:string,countryCode:string):string|nu
   return new Date(instant).toISOString();
 }
 
-function isEuropeanFixture(country: unknown, competition: unknown, home?: unknown, away?: unknown): boolean {
- const norm=(v:unknown)=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
- const c=norm(country), comp=norm(competition), teams=norm(String(home??"")+" "+String(away??""));
- const countryParts=c.split(/[\\/,;|]+/).map((x:string)=>x.trim()).filter(Boolean);
- if(EUROPE_COUNTRIES.has(c)||countryParts.some((x:string)=>EUROPE_COUNTRIES.has(x)||EUROPE_ISO3.has(x.toUpperCase()))||EUROPE_ISO3.has(String(country??"").trim().toUpperCase()))return true;
- if(/\buefa\b|european (championship|qualif|league)|uefa nations|uefa champions|uefa europa|uefa conference/.test(comp))return true;
- if(/\bu20 elite league\b/.test(comp) && /\b(england|italy|portugal|czech republic|germany|france|spain|netherlands|belgium|sweden|norway|denmark|finland|iceland|poland|croatia|serbia|austria|switzerland|scotland|wales|ireland)\b/.test(teams))return true;
- return false;
+function isEuropeanFixture(country: unknown, _competition?: unknown, _home?: unknown, _away?: unknown): boolean {
+  return isGeographicEuropeCountry(country);
 }
 
 function norm(s: unknown): string {
@@ -178,7 +171,7 @@ async function openMatchday(date: string) {
     const folder = m[1], tier = folder.match(/^([A-Z]{3})_([12])_[A-Za-z0-9-]+$/i);
     const country = m[3].trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const league = m[2].trim();
-    return !!tier && EUROPE_COUNTRIES.has(country) && !["europe", "uefa"].includes(country)
+    return !!tier && isGeographicEuropeCountry(country)
       && !/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series|cup|copa|trophy|youth|academy|reserves?)\b/i.test(folder + " " + league);
   });
   const folders = eligibleIndexRows.map(m => m[1]);
