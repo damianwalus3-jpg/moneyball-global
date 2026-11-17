@@ -1,6 +1,14 @@
 import { hasFreshConfirmedOdds, isEligibleCouponPrediction, stakeBalances, totalOdds, validateBatch } from "./domain";
 import { cancelCouponForOwner, deleteRow, fetchAll, insertRow, insertRows, updateRow } from "./db";
-import type { CouponType, Prediction } from "./types";
+import type { CouponType, Prediction, SourceClass } from "./types";
+
+export function getCouponSourceClass(couponType: CouponType): SourceClass {
+  return couponType === "TEST" ? "PAPER" : "MODEL";
+}
+
+export function shouldRecordCouponStake(couponType: CouponType, recordStake?: boolean): boolean {
+  return recordStake === true && getCouponSourceClass(couponType) !== "PAPER";
+}
 
 export interface SaveBatchOptions {
   namePrefix: string;
@@ -20,8 +28,8 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
   if (targetLegs !== 1 && targetLegs !== 3) throw new Error("MONEYBALL zapisuje wyłącznie single albo kupony 3-zdarzeniowe.");
   if (targetLegs === 1 && options.couponType !== "MAIN") throw new Error("Pojedynczy typ musi być zapisany jako kupon MAIN.");
   const couponType = options.couponType ?? "TEST";
-  const sourceClass = couponType === "TEST" ? "PAPER" : "MODEL";
-  const recordStake = options.recordStake === true && sourceClass !== "PAPER";
+  const sourceClass = getCouponSourceClass(couponType);
+  const recordStake = shouldRecordCouponStake(couponType, options.recordStake);
   const requireOdds = options.couponType != null && options.couponType !== "TEST";
   // Enforce selection rules again at the persistence boundary. UI filtering is not a data-integrity boundary.
   if (coupons.some((coupon) => coupon.some((prediction) => !isEligibleCouponPrediction(prediction)))) {
