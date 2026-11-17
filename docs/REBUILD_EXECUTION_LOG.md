@@ -743,3 +743,5 @@
 - Added a Tracker regression test proving repeated writes with the same couponKey create exactly one coupon.
 - Implementation commit: 0a4f12599d12efb51ec231a9ea1156a4ace33f0c; test commit: c32cfc01faa1a0b99bbc03d016ed43e6a3cf48a5.
 - Validation/deployment: pending CI and Cloudflare workflow completion on the latest branch HEAD. Stage 61 is not marked deployed until both are verified.
+
+- CI feedback loop for Stages 60–61: the first run caught two TypeScript-only issues in sequence (a redundant comparison against a fixed tuple length, then an unused callback argument in the updated test fixture). Both were corrected; the second correction is commit be4810ab09c1d26507b6c2d76b7b759fcbb43c67. Fresh CI and Cloudflare deployment runs on the latest HEAD are required; earlier failed/cancelled runs are not release evidence.
