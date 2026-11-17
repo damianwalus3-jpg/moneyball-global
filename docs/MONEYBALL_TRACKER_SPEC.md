@@ -164,12 +164,22 @@ All seven are additive. They do not rewrite historical matches, predictions, cou
 - Cloudflare MAIN deployment workflow completed successfully for the current Tracker release.
 - The `/tracker` route remains behind the existing authentication guard; unauthenticated route fetches return `login_required`.
 
-### Remaining work
+### Additional delivery — 2026-11-17
 
-- Validate the rendered page and create the first real Jackpot entry through an authenticated user session.
-- Category rename/description controls and separate PAPER count reporting are implemented.
-- Add an explicit, audited workflow for classifying selected legacy rows as USER / MODEL / PAPER; do not bulk infer source from legacy labels.
-- Verify PAPER finance/settlement behavior with controlled non-production fixtures; do not fabricate production rows.
-- Continue full authenticated UI, backup/restore and settlement regression testing before declaring the whole Tracker complete.
+- Added an owner-scoped, paginated queue for legacy predictions and coupons with NULL source class. The queue filters by entity type before pagination, so the large predictions history cannot starve the coupon queue.
+- Added explicit multi-select classification for up to 100 records per operation. The authenticated RPC locks each selected row, requires the source class to still be NULL, updates only the selected owner records, and writes audit entries in the same database transaction. Allowed values are USER, MODEL and PAPER.
+- Added the append-only table `moneyball_tracker_source_audit` with RLS and owner-only read access. The Tracker shows the latest 25 audit events with entity type, prior/new class, note and timestamp. No legacy records were classified automatically.
+- JSON backups now export the full source-classification audit history, validate audit UUIDs, entity types, source classes and timestamps before any restore writes, preview audit row counts, and restore audit rows idempotently in bounded batches. Existing rows remain skipped, never overwritten.
+- Pagination is reset to the first page after a classification operation to avoid skipping rows as the unclassified queue shrinks.
+- Added four additive migrations for the audit table/RPC, type-filtered queue, audit backup/restore and accurate idempotent restore counts. Tracker-specific migration count is now 12.
+- Production read-only snapshot: 15 system categories, 14 aliases, 19,201 predictions, 9 coupons, 9 bankroll transactions, 0 Jackpot entries, 0 audit entries, 18,724 unclassified predictions and 9 unclassified coupons. No historical source values were changed by this delivery.
+- CI passed: 92 tests across 9 test files, Supabase Edge Function type-check, application TypeScript check and production build. The latest successful CI commit is `196f2b0`; its Cloudflare deploy job is being re-run after an overlapping later commit cancelled the original deployment attempt.
 
-The Tracker is therefore deployed as a working first release, not declared fully complete.
+### Remaining verification
+
+- Confirm the re-run Cloudflare deployment for the latest CI-passing commit before calling this release fully deployed.
+- Verify the rendered Tracker page and perform an authenticated classification/backup round-trip through a real signed-in user session. Unauthenticated production requests correctly return `login_required`; no credentials are requested or stored in chat.
+- Verify PAPER settlement behavior with controlled non-production fixtures. Production rows are not fabricated or mutated for testing.
+- Existing Supabase advisor findings outside the Tracker remain: internal tables without authenticated policies, `pg_net` in the public schema, leaked-password protection disabled, and pre-existing SECURITY DEFINER RPC warnings. The new owner-scoped classification and audit restore RPCs are also SECURITY DEFINER by design; their grants are restricted to authenticated users and their bodies enforce the caller's own user ID. These findings are documented, not silently represented as resolved.
+
+The Tracker is deployed as a working release with audited legacy classification and backup support. It is not declared fully complete until the remaining authenticated UI and controlled settlement/restore checks are verified.
