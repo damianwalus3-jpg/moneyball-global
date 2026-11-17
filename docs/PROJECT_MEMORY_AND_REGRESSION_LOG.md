@@ -1492,3 +1492,13 @@ No new provider was enabled, no API key was added, and no provider credits were 
 - Current Football Charts official docs confirm the keyless limit is 25 requests/day per IP and the provider updates once daily; free use requires personal/research use and attribution, with no raw-data redistribution. The existing hard owner gate remains; no key or paid plan was added. Source: https://www.football-charts.com/developers
 - Not yet proven: an authenticated owner POST scan after v102 deployment, persistence/readback of a real provider cache row, and signed-in visual click-through of Matches/Predictions. Available browser profiles have no recorded sign-in for the Worker domain. Do not claim those acceptance checks passed; keep issue #77 open until the user completes sign-in and the screens are verified.
 - No matches, predictions, coupons, settlement rows, or bankroll values were changed.
+
+
+## Cache lease recovery follow-up — 2026-11-17 17:47 Europe/Brussels
+
+- A final failure-mode review found that a worker crash after creating a pending cache row could otherwise leave that pending row fresh for 24 hours. Fixed the lease recovery: a pending row is reclaimed once its five-minute refresh lease expires, using a conditional owner-scoped update; a ready row remains cached for 24 hours.
+- Latest MAIN function commit: `c34fb2fd175fb92a3359c0c460a2c09a6a1bb39d`.
+- Redeployed the corrected source as `footynomad-sync v103`, ACTIVE, `verify_jwt=true` preserved. Supabase bundling succeeded.
+- Rechecked the production function registry: v103 ACTIVE. Rechecked cache table: RLS enabled, three owner-only policies, no production cache rows yet (expected until authenticated owner scan).
+- The earlier v102 deployment is superseded; v103 is the current target for the first authenticated scan.
+- Still pending: owner-authenticated POST scan and real cache write/read proof, then authenticated UI click-through. No user match, prediction, coupon, settlement or bankroll data changed.
