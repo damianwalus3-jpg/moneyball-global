@@ -5,8 +5,6 @@ DECLARE
   new_translate text := $q$translate(lower(coalesce(p_competition,'')), 'áéíóúüñçöäåë', 'aeiouuncoaae')$q$;
   old_aliases text := '|a lyga|i lyga|virsliga|';
   new_aliases text := '|a lyga|1 lyga|i lyga|1 snl|virsliga|';
-  old_regex_end text := '|welsh premier league)';
-  new_regex_end text := '|welsh premier league)';
 BEGIN
   SELECT pg_get_functiondef('public.moneyball_is_european_top_two_league(text,text)'::regprocedure)
     INTO definition;
@@ -14,7 +12,7 @@ BEGIN
   IF position('1 lyga' IN definition) > 0
     AND position('1 snl' IN definition) > 0
     AND position('öäåë' IN definition) > 0
-    AND position("n.comp = 'campionato'" IN definition) > 0 THEN
+    AND position('n.comp = ''campionato''' IN definition) > 0 THEN
     RAISE NOTICE 'European aliases already updated';
     RETURN;
   END IF;
@@ -29,15 +27,9 @@ BEGIN
   END IF;
   definition := replace(definition, old_aliases, new_aliases);
 
-  IF position(old_regex_end IN definition) = 0 THEN
-    RAISE EXCEPTION 'Allowlist regex end missing';
+  IF position($q$AND (n.comp ~* $q$ IN definition) = 0 THEN
+    RAISE EXCEPTION 'Allowlist expression insertion point missing';
   END IF;
-  definition := replace(
-    definition,
-    old_regex_end,
-    '|welsh premier league)'
-  );
-
   definition := replace(
     definition,
     $q$AND (n.comp ~* $q$,
