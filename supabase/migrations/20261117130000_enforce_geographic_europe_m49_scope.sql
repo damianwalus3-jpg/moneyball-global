@@ -29,7 +29,6 @@ AS $function$
     'pol','prt','por','rou','rus','smr','srb','svk','svn','esp','swe','che','sui',
     'ukr','gbr','gb','uk','eng','sco','wal','nir','kos','ala','sjm','vat'
   ])
-  OR value = ANY (ARRAY['gb','uk','eng','sco','wal','nir','kos','alb','and','aut','blr','bel','bih','bgr','bul','hrv','cro','cze','dnk','est','fro','fin','fra','deu','ger','gib','grc','gre','ggy','hun','isl','irl','imn','ita','jey','lva','lie','ltu','lux','mlt','mda','mco','mne','nld','mkd','nor','pol','prt','por','rou','rus','smr','srb','svk','svn','esp','swe','che','sui','ukr','gbr','ala','sjm','vat'])
   OR EXISTS (
     SELECT 1
     FROM regexp_split_to_table((SELECT value FROM raw), '[,;/|]') AS part

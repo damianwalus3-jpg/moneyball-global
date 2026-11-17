@@ -24,12 +24,11 @@ const EUROPEAN_COUNTRY_NAMES = new Set([
 const EUROPEAN_COUNTRY_CODES = new Set([
   "alb", "and", "aut", "blr", "bel", "bih", "bgr", "bul", "hrv", "cro",
   "cze", "dnk", "est", "fro", "fin", "fra", "deu", "ger", "gib", "grc",
-  "gre", "ggy", "hun", "isl", "irl", "imn", "ita", "jey", "jey",
-  "lva", "lie", "ltu", "lux", "mlt", "mda", "mco", "mne", "nld", "mkd",
-  "nor", "pol", "prt", "por", "rou", "rus", "smr", "srb", "svk", "svn",
-  "esp", "swe", "che", "sui", "ukr", "gbr", "gb", "uk",
-  "eng", "sco", "wal", "nir", "kos", "ala", "sjm", "vat",
-  "jey", "ggy", "jey",
+  "gre", "ggy", "hun", "isl", "irl", "imn", "ita", "jey", "lva", "lie",
+  "ltu", "lux", "mlt", "mda", "mco", "mne", "nld", "mkd", "nor", "pol",
+  "prt", "por", "rou", "rus", "smr", "srb", "svk", "svn", "esp", "swe",
+  "che", "sui", "ukr", "gbr", "gb", "uk", "eng", "sco", "wal", "nir",
+  "kos", "ala", "sjm", "vat",
 ]);
 function normalizeCountry(value: unknown): string {
   return String(value ?? "")

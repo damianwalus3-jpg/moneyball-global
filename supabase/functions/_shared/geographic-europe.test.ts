@@ -5,7 +5,7 @@ Deno.test("geographic Europe includes M49 European countries and football aliase
     "Albania", "ALB", "Andorra", "Austria", "Belgium", "Bosnia and Herzegovina",
     "Bulgaria", "BGR", "Croatia", "Czechia", "Denmark", "England", "Estonia",
     "Faroe Islands", "Finland", "France", "Germany", "Gibraltar", "Greece",
-    "Hungary", "Iceland", "Ireland", "Isle of Man", "Italy", "Latvia",
+    "Hungary", "Iceland", "Ireland", "Isle of Man", "Italy", "Jersey", "JEY", "Guernsey", "GGY", "Latvia",
     "Liechtenstein", "Lithuania", "Luxembourg", "Malta", "Moldova", "Monaco",
     "Montenegro", "Netherlands", "North Macedonia", "Northern Ireland", "Norway",
     "Poland", "Portugal", "Romania", "Russia", "San Marino", "Scotland",
