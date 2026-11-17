@@ -1,4 +1,4 @@
-export type TrackerKind = "scan" | "match" | "prediction" | "coupon" | "result" | "odds" | "ledger" | "category" | "jackpot";
+export type TrackerKind = "scan" | "match" | "prediction" | "coupon" | "result" | "odds" | "ledger" | "category" | "jackpot" | "bet";
 export interface TrackerRecord {
   id: string;
   kind: TrackerKind;
@@ -15,7 +15,7 @@ export interface MoneyballBackup {
 }
 type NewTrackerRecord = Omit<TrackerRecord, "id" | "createdAt">;
 const STORAGE_KEY = "moneyball.local.tracker.v1";
-const VALID_KINDS: TrackerKind[] = ["scan","match","prediction","coupon","result","odds","ledger","category","jackpot"];
+const VALID_KINDS: TrackerKind[] = ["scan","match","prediction","coupon","result","odds","ledger","category","jackpot","bet"];
 
 function isRecord(value: unknown): value is TrackerRecord {
   if (!value || typeof value !== "object") return false;
