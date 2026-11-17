@@ -34,6 +34,37 @@ describe("paper coupon settlement", () => {
     expect(settled?.correctLegs).toBe(1);
     expect(settled?.legResults.find(row => row.fixtureId === "a")?.actual).toBe("2");
   });
+  it("calculates gross return and net profit for a priced winning coupon", () => {
+    const priced = { ...coupon, status: "PAPER_WITH_ODDS", details: { ...coupon.details, bookmaker: "Book A", odds: 10, stake: 4 } };
+    const evaluated = evaluatePaperCoupon(priced, results)!;
+    const row = buildPaperCouponSettlementRecord(priced, { ...evaluated, status: "PAPER_HIT", correctLegs: 3 });
+    expect(row.details.potentialReturn).toBe(40);
+    expect(row.details.profitLoss).toBe(36);
+    expect(row.details.stake).toBe(4);
+  });
+  it("records the full stake loss for a priced losing coupon", () => {
+    const priced = { ...coupon, status: "PAPER_WITH_ODDS", details: { ...coupon.details, bookmaker: "Book A", odds: 10, stake: 4 } };
+    const evaluated = evaluatePaperCoupon(priced, results)!;
+    const row = buildPaperCouponSettlementRecord(priced, evaluated);
+    expect(row.status).toBe("PAPER_MISS");
+    expect(row.details.potentialReturn).toBe(0);
+    expect(row.details.profitLoss).toBe(-4);
+  });
+  it("keeps all financial values null for legacy coupons without verified odds", () => {
+    const evaluated = evaluatePaperCoupon(coupon, results)!;
+    const row = buildPaperCouponSettlementRecord(coupon, evaluated);
+    expect(row.details.odds).toBeNull();
+    expect(row.details.stake).toBeNull();
+    expect(row.details.profitLoss).toBeNull();
+    expect(row.details.potentialReturn).toBeNull();
+  });
+  it("fails closed on malformed prices and stakes", () => {
+    const priced = { ...coupon, status: "PAPER_WITH_ODDS", details: { ...coupon.details, odds: 1, stake: -4 } };
+    const evaluated = evaluatePaperCoupon(priced, results)!;
+    const row = buildPaperCouponSettlementRecord(priced, evaluated);
+    expect(row.details.profitLoss).toBeNull();
+    expect(row.details.potentialReturn).toBeNull();
+  });
   it("marks three correct legs as paper hit", () => {
     const allCorrect = results.map((row, index) => index === 2 ? { ...row, details: { fixtureId: "c", actual: "2" } } : row);
     expect(evaluatePaperCoupon(coupon, allCorrect)?.status).toBe("PAPER_HIT");
