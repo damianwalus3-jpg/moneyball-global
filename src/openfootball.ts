@@ -129,7 +129,7 @@ async function discoverEuropeanOpenFootballFeeds(date: string): Promise<OpenFoot
   return feeds;
 }
 const MONTHS: Record<string, number> = { Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12 };
-const CACHE_KEY = "moneyball.openfootball.v1:";
+const CACHE_KEY = "moneyball.openfootball.v2:";
 const CACHE_MS = 15 * 60 * 1000;
 
 function seasonStart(date: string): number {
@@ -299,20 +299,24 @@ export interface OpenFootballScan {
 }
 export async function scanOpenFootball(date: string, force = false): Promise<OpenFootballScan> {
   const cacheKey=CACHE_KEY+date;
-  if (!force) {
-    try {
-      const cached=localStorage.getItem(cacheKey);
-      if (cached) {
-        const value=JSON.parse(cached) as OpenFootballScan & {cachedAt:number};
-        if (Date.now()-value.cachedAt<CACHE_MS) return value;
-      }
-    } catch { /* ignore malformed cache */ }
-  }
   const season=openFootballSeasonFolder(date);
   let discovered: OpenFootballFeed[] = [];
   let catalogueError = "";
   try { discovered = await discoverEuropeanOpenFootballFeeds(date); }
   catch(error) { catalogueError = "OpenFootball Europe catalogue: " + (error instanceof Error ? error.message : "catalogue unavailable"); }
+  if (!force) {
+    try {
+      const cached=localStorage.getItem(cacheKey);
+      if (cached) {
+        const value=JSON.parse(cached) as OpenFootballScan & {cachedAt:number};
+        if (Date.now()-value.cachedAt<CACHE_MS) return {
+          ...value,
+          checked: value.checked + (catalogueError ? 1 : 0),
+          failed: [...value.failed, ...(catalogueError ? [catalogueError] : [])],
+        };
+      }
+    } catch { /* ignore malformed cache */ }
+  }
   const feedMap = new Map<string, OpenFootballFeed>();
   for (const feed of [...FEEDS, ...discovered]) feedMap.set(feed.id, feed);
   const feeds = [...feedMap.values()];
