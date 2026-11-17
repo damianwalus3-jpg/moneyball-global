@@ -1,0 +1,34 @@
+import { describe, expect, it } from "vitest";
+import { evaluatePaperCoupon } from "./coupon-settlement";
+import type { TrackerRecord } from "./tracker-store";
+
+const coupon: TrackerRecord = {
+  id: "c1", kind: "coupon", title: "Paper coupon", status: "PAPER_NO_ODDS", createdAt: "2026-11-17T08:00:00Z",
+  details: { legsJson: JSON.stringify([
+    { fixtureId: "a", selection: "1" },
+    { fixtureId: "b", selection: "X" },
+    { fixtureId: "c", selection: "2" },
+  ]) },
+};
+const results: TrackerRecord[] = [
+  { id: "r1", kind: "result", title: "a", status: "SETTLED", createdAt: "x", details: { fixtureId: "a", actual: "1" } },
+  { id: "r2", kind: "result", title: "b", status: "SETTLED", createdAt: "x", details: { fixtureId: "b", actual: "X" } },
+  { id: "r3", kind: "result", title: "c", status: "SETTLED", createdAt: "x", details: { fixtureId: "c", actual: "1" } },
+];
+
+describe("paper coupon settlement", () => {
+  it("marks a three-leg coupon as hit or miss only when all results exist", () => {
+    const settled = evaluatePaperCoupon(coupon, results);
+    expect(settled?.status).toBe("PAPER_MISS");
+    expect(settled?.correctLegs).toBe(2);
+  });
+  it("does not settle incomplete or malformed coupons", () => {
+    expect(evaluatePaperCoupon(coupon, results.slice(0, 2))).toBeNull();
+    const malformed = { ...coupon, details: { legsJson: "[]" } };
+    expect(evaluatePaperCoupon(malformed, results)).toBeNull();
+  });
+  it("marks three correct legs as paper hit", () => {
+    const allCorrect = results.map((row, index) => index === 2 ? { ...row, details: { fixtureId: "c", actual: "2" } } : row);
+    expect(evaluatePaperCoupon(coupon, allCorrect)?.status).toBe("PAPER_HIT");
+  });
+});
