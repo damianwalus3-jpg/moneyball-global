@@ -41,8 +41,7 @@ AS $function$
     and m.kickoff_at < ((((now() at time zone 'Europe/Brussels')::date + 1)::timestamp) at time zone 'Europe/Brussels')
   order by m.kickoff_at asc nulls last, p.created_at desc
   limit 100;
-$function$
-
+$function$;
 
 CREATE OR REPLACE FUNCTION public.moneyball_dashboard_summary()
  RETURNS jsonb
@@ -122,8 +121,7 @@ select jsonb_build_object(
     )) from market_stats
   ), '{}'::jsonb)
 );
-$function$
-
+$function$;
 
 CREATE OR REPLACE FUNCTION public.moneyball_prediction_scan_page(p_owner_id uuid, p_date date, p_cursor_kickoff_at timestamp with time zone, p_cursor_match_id uuid, p_limit integer, p_token text)
  RETURNS jsonb
