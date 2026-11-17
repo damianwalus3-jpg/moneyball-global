@@ -23,7 +23,7 @@ export function valueThreeLegCoupon(
   stake = 4,
 ): ValuedThreeLegCoupon | null {
   if (!bookmaker.trim() || !Number.isFinite(stake) || stake <= 0) return null;
-  if (candidate.legs.length !== 3 || new Set(candidate.legs.map(leg => leg.fixtureId)).size !== 3) return null;
+  if (new Set(candidate.legs.map(leg => leg.fixtureId)).size !== 3) return null;
   const valuations = candidate.legs.map(leg => {
     const fixturePredictions = records
       .filter(row => row.kind === "prediction" && row.details.fixtureId === leg.fixtureId)
