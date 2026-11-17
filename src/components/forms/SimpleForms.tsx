@@ -186,6 +186,14 @@ export function OddsForm({
     const odd = parseDecimal(form.odds);
     if (odd == null || odd <= 1) next["odds"] = "Kurs musi być większy niż 1,00.";
     if (!brusselsInputToISO(form.captured)) next["captured"] = "Podaj czas.";
+    try {
+      const sourceUrl = new URL(form.source_url.trim());
+      if (!["http:", "https:"].includes(sourceUrl.protocol) || !sourceUrl.hostname) {
+        next["source_url"] = "Podaj poprawny adres URL źródła (http/https).";
+      }
+    } catch {
+      next["source_url"] = "Podaj poprawny adres URL źródła (http/https).";
+    }
     setErrors(next);
     if (!Object.keys(next).length) save.mutate(undefined);
   }
@@ -206,7 +214,7 @@ export function OddsForm({
         <Field label="Bukmacher" error={errors["bookmaker"]}><Input value={form.bookmaker} onChange={(event) => setForm({ ...form, bookmaker: event.target.value })} /></Field>
         <Field label="Kurs" error={errors["odds"]}><Input inputMode="decimal" className="num" value={form.odds} onChange={(event) => setForm({ ...form, odds: event.target.value })} /></Field>
         <Field label="Czas (Bruksela)" error={errors["captured"]}><Input type="datetime-local" value={form.captured} onChange={(event) => setForm({ ...form, captured: event.target.value })} /></Field>
-        <Field label="URL źródła (wymagany do zatwierdzenia)"><Input value={form.source_url} onChange={(event) => setForm({ ...form, source_url: event.target.value })} placeholder="https://…" /></Field>
+        <Field label="URL źródła (wymagany do zatwierdzenia)" error={errors["source_url"]}><Input value={form.source_url} onChange={(event) => setForm({ ...form, source_url: event.target.value })} placeholder="https://…" /></Field>
       </div>
     </FormDialog>
   );
