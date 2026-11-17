@@ -539,3 +539,12 @@
 - Raport rozszerzono w `docs/ODDS_PROVIDER_RESEARCH_2026-11-17.md`; handoff uzupełniono w `docs/NEW_CHAT_HANDOFF_2026-11-17.md`.
 - Nie zmieniono kodu aplikacji, nie dodano kluczy/secrets, nie wdrożono scrapera. Badanie nie może dowieść pokrycia wszystkich europejskich lig bez live testów providerów.
 - Rekomendowana następna bramka: użytkownik zgadza się na darmowy klucz OddsPapi i/lub StrikerAPI, następnie wykonujemy test coverage 5–10 spotkań z kilku krajów, sprawdzamy bukmacherów, timestampy, limity i dopasowanie do fixture; dopiero potem implementujemy Worker adapter.
+
+
+## Stage 51 — przygotowanie równoległego pilota OddsPapi + StrikerAPI (2026-11-17)
+- Użytkownik wyraźnie zaakceptował użycie obu darmowych kluczy API: OddsPapi i StrikerAPI.
+- Zweryfikowano aktualną dokumentację: OddsPapi v4 `/v4/tournaments`, `/v4/fixtures`, `/v4/odds`; limit Free 250 requestów/miesiąc, billable calls liczone także przy błędach endpointu. StrikerAPI `POST /v1/get_odds`; 10 credits za dzień lub 5 za mecz; 500 credits/miesiąc; obsługiwane ligi są ograniczone.
+- Dodano plan testu `docs/ODDS_PROVIDER_PILOT_TEST_2026-11-17.md` z limitami zapytań, próbą 5–8 meczów, kryteriami fixture matching, 1X2, bookmakerów, freshness, błędów i kosztu quota.
+- Klucze muszą być utworzone przez użytkownika w darmowych kontach i zapisane bezpośrednio w Cloudflare Worker Secrets jako `ODDSPAPI_API_KEY` i `STRIKERAPI_API_KEY`. Nie wolno przesyłać ich przez czat, commitować do repo ani umieszczać w frontendzie.
+- Na tym etapie nie wykonano live requestów, ponieważ klucze nie zostały jeszcze wygenerowane/ustawione. Nie stworzono kont, nie włączono billing i nie dodano sekretów. Nie ma jeszcze wyniku coverage.
+- Następna bramka: po ustawieniu obu Worker Secrets uruchomić ograniczony live pilot na 5–8 rzeczywistych fixture'ach, bez zapisywania danych testowych do P/L. Dopiero raport wyników zdecyduje, czy którykolwiek provider nadaje się do integracji.
