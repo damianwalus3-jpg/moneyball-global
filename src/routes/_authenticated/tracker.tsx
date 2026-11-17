@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
 import { fmtMoney, fmtPct } from "@/lib/format";
+import { TRACKER_CATEGORIES } from "@/lib/tracker-domain";
 import {
   couponFinanceQuery, dashboardSelectedPicksQuery, dashboardSummaryQuery, latestScanRunQuery
 } from "@/lib/queries";
@@ -127,6 +128,23 @@ function TrackerPage() {
         ) : (
           <p className="text-sm text-muted-foreground">Brak rozliczonych kategorii kuponów w podsumowaniu.</p>
         )}
+        <div className="mt-4">
+          <h3 className="mb-2 text-sm font-semibold uppercase">Kategorie docelowe Trackera</h3>
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+            {TRACKER_CATEGORIES.filter((category) => category.group !== "LEGACY").map((category) => (
+              <div key={category.key} className="rounded-lg border border-border bg-background/40 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="text-sm font-semibold">{category.label}</span>
+                  <span className={category.persisted ? "text-[10px] font-semibold text-success" : "text-[10px] font-semibold text-muted-foreground"}>
+                    {category.persisted ? "DANE HISTORYCZNE" : "DO REJESTRACJI"}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">{category.description}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">Historyczne etykiety pozostają oddzielone od nowych kategorii: {TRACKER_CATEGORIES.filter((category) => category.group === "LEGACY").map((category) => category.label).join(" · ")}. Nie przypisuję automatycznie starego MAIN do MAIN A ani MAIN B.</p>
+        </div>
         <div className="mt-3 rounded-lg border border-dashed border-border p-3">
           <div className="flex items-center gap-2 font-semibold"><Trophy className="size-4 text-primary" /> JACKPOT</div>
           <p className="mt-1 text-sm text-muted-foreground">Dedykowany rejestr z niezmienną numeracją #001, #002… wymaga jeszcze bezpiecznej, dodatkowej tabeli. Nie udaję, że jest już aktywny — najpierw sprawdzę zależności i przygotuję migrację bez naruszania starych kuponów.</p>
