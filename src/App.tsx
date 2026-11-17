@@ -517,6 +517,21 @@ export default function App() {
             <p className="source-note">Najpierw ustaw identyczny sekret <b>ODDS_PILOT_TOKEN</b> w Cloudflare Workerze <b>moneyball-global-rebuild</b>. Token pozostaje w lokalnej pamięci tej przeglądarki; nie wklejaj go do czatu. Data StrikerAPI jest w UTC, a dopasowanie odbywa się po dacie i godzinie Europe/Brussels. Zapytanie uruchamia się wyłącznie po kliknięciu.</p>
             {oddsNotice && <div className="tracker-notice">{oddsNotice}</div>}
             {oddsAudit && <p className="source-note">Ostatni audyt · UTC {oddsAudit.utcDate} · dopasowane {oddsAudit.matched} · niejednoznaczne {oddsAudit.ambiguous} · bez dopasowania {oddsAudit.unmatched} · nowe snapshoty {oddsAudit.snapshots}.</p>}
+            <h3>Ostatnie snapshoty kursów</h3>
+            <div className="tracker-table">
+              <div className="tracker-head"><span>BUKMACHER</span><span>MECZ</span><span>1</span><span>X</span><span>2</span></div>
+              {records.filter(row => row.kind === "odds").slice(0, 20).map(row => {
+                const price = (value: unknown) => typeof value === "number" && value > 1 ? value.toFixed(2) : "—";
+                return <div className="tracker-row" key={row.id}>
+                  <span>{String(row.details.bookmaker ?? "—")}</span>
+                  <b>{row.title}</b>
+                  <span>{price(row.details.odds1)}</span>
+                  <span>{price(row.details.oddsX)}</span>
+                  <span>{price(row.details.odds2)}</span>
+                </div>;
+              })}
+              {!records.some(row => row.kind === "odds") && <div className="tracker-empty">Brak zapisanych kursów. Po skonfigurowaniu tokenu uruchom ręczne pobieranie kursów dnia.</div>}
+            </div>
           </article>
           {(() => {
             const bets = records.filter(row => row.kind === "bet");
