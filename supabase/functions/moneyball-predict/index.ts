@@ -446,10 +446,27 @@ async function readGitHubPublicTeamHistory(){
 let historicalXgCache:any=null;let historicalXgCacheAt=0;
 async function readOpenPlayXgData(){
  if(historicalXgCache&&Date.now()-historicalXgCacheAt<30*60*1000)return historicalXgCache;
- const teams:Record<string,any>={};let openplay:any=null,statsbomb:any=null,asa:any=null;
- try{const r=await fetch("https://raw.githubusercontent.com/damianwalus3-jpg/moneyball-global-web/main/public-data/openplay-xg.json",{headers:{"Accept":"application/json","Cache-Control":"no-cache"},signal:AbortSignal.timeout(18000)});if(r.ok){const data=await r.json();if(data?.schema_version===1&&data?.teams&&Object.keys(data.teams).length>=100)openplay=data;else throw new Error("OpenPlay xG validation failed");}}catch(e){console.error("OpenPlay xG history unavailable:",String(e));}
- try{const r=await fetch("https://raw.githubusercontent.com/damianwalus3-jpg/moneyball-global-web/main/public-data/statsbomb-xg.json",{headers:{"Accept":"application/json","Cache-Control":"no-cache"},signal:AbortSignal.timeout(18000)});if(r.ok){const data=await r.json();if(data?.schema_version===1&&data?.teams&&Object.keys(data.teams).length>=80)statsbomb=data;}}catch(e){console.error("StatsBomb xG history unavailable:",String(e));}
- try{const r=await fetch("https://raw.githubusercontent.com/damianwalus3-jpg/moneyball-global-web/main/public-data/asa-xg.json",{headers:{"Accept":"application/json","Cache-Control":"no-cache"},signal:AbortSignal.timeout(18000)});if(r.ok){const data=await r.json();if(data?.schema_version===1&&data?.teams&&Object.keys(data.teams).length>=20)asa=data;}}catch(e){console.error("American Soccer Analysis xG history unavailable:",String(e));}
+ const teams:Record<string,any>={};
+ const loadXgDataset=async(url:string,minTeams:number,label:string)=>{
+  const response=await fetch(url,{headers:{"Accept":"application/json","Cache-Control":"no-cache"},signal:AbortSignal.timeout(18000)});
+  if(!response.ok)throw new Error(label+" HTTP "+response.status);
+  const data=await response.json();
+  if(data?.schema_version!==1||!data?.teams||Object.keys(data.teams).length<minTeams)throw new Error(label+" validation failed");
+  return data;
+ };
+ // These public archives are independent. Fetch concurrently so a cold Edge
+ // isolate pays the slowest source latency, not the sum of all three timeouts.
+ const [openplayResult,statsbombResult,asaResult]=await Promise.allSettled([
+  loadXgDataset("https://raw.githubusercontent.com/damianwalus3-jpg/moneyball-global-web/main/public-data/openplay-xg.json",100,"OpenPlay xG"),
+  loadXgDataset("https://raw.githubusercontent.com/damianwalus3-jpg/moneyball-global-web/main/public-data/statsbomb-xg.json",80,"StatsBomb xG"),
+  loadXgDataset("https://raw.githubusercontent.com/damianwalus3-jpg/moneyball-global-web/main/public-data/asa-xg.json",20,"American Soccer Analysis xG"),
+ ]);
+ const openplay=openplayResult.status==="fulfilled"?openplayResult.value:null;
+ const statsbomb=statsbombResult.status==="fulfilled"?statsbombResult.value:null;
+ const asa=asaResult.status==="fulfilled"?asaResult.value:null;
+ if(openplayResult.status==="rejected")console.error("OpenPlay xG history unavailable:",String(openplayResult.reason));
+ if(statsbombResult.status==="rejected")console.error("StatsBomb xG history unavailable:",String(statsbombResult.reason));
+ if(asaResult.status==="rejected")console.error("American Soccer Analysis xG history unavailable:",String(asaResult.reason));
  for(const [source,defaultGender] of [[openplay,"men"],[statsbomb,null],[asa,null]] as any[]){
   for(const [key,entry] of Object.entries(source?.teams||{})){
    const sourceGender=defaultGender||(entry as any).gender||"unknown";
