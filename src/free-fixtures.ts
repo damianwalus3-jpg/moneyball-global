@@ -31,7 +31,7 @@ interface OpenLigaMatch {
   team2?: { teamName?: string | null };
 }
 const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
-const OPENLIGA = "https://api.openligadb.de";
+const OPENLIGA = "/api/openligadb";
 const SOURCE = "open-matchday + OpenLigaDB (darmowe źródła publiczne)";
 const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","ISR","KOS","UEFA"]);
 const CACHE_KEY = "moneyball.free-fixtures.v3";
@@ -173,7 +173,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   // Source 2: OpenLigaDB's season catalogue and match feeds. Respect its 60 req/min fair-use limit.
   try {
     const year = Number(date.slice(0, 4));
-    const leagues = (await fetchJson<OpenLigaLeague[]>(`${OPENLIGA}/getavailableleagues/${year}`)).filter(isEuropeanOpenLiga);
+    const leagues = (await fetchJson<OpenLigaLeague[]>(`${OPENLIGA}/leagues/${year}`)).filter(isEuropeanOpenLiga);
     let nextRequestAt = 0;
     const throttledMatches = await pooled(leagues, 4, async league => {
       const wait = Math.max(0, nextRequestAt - Date.now());
@@ -182,7 +182,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       const shortcut = league.leagueShortcut ?? "";
       const season = league.leagueSeason ?? String(year);
       try {
-        const matches = await fetchJson<OpenLigaMatch[]>(`${OPENLIGA}/getmatchdata/${encodeURIComponent(shortcut)}/${encodeURIComponent(season)}`);
+        const matches = await fetchJson<OpenLigaMatch[]>(`${OPENLIGA}/matches/${encodeURIComponent(shortcut)}/${encodeURIComponent(season)}`);
         const fixtures = matches.flatMap(match => {
           const kickoff = match.matchDateTimeUTC || match.matchDateTime;
           const home = match.team1?.teamName?.trim();
