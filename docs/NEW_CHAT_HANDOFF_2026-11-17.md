@@ -85,3 +85,13 @@ Użytkownik zaakceptował oba darmowe klucze. Przygotowano plan: `docs/ODDS_PROV
 - Live testing is BLOCKED until the user creates free accounts/keys and sets both secrets directly in Cloudflare dashboard for Worker `moneyball-global-rebuild`. Never ask for keys in chat and never commit them.
 - No provider code integration or production odds storage has been deployed yet. Do not count pilot samples as real bets/P&L.
 - After secrets exist, run small sample across available European leagues, report fixture match coverage, complete 1X2 coverage, bookmaker names (especially Belgian-relevant books), timestamps/freshness, API errors and quota cost. Never infer complete Europe coverage.
+
+
+## Stage 52 — Worker proxy dla pilota kursów
+- Dodano `GET /api/odds/status`: pokazuje tylko flagi konfiguracyjne dla OddsPapi/StrikerAPI, nigdy wartości sekretów.
+- Dodano `GET /api/odds/pilot?fixtureId=PROVIDER_ODDSPAPI_ID&strikerGameId=PROVIDER_STRIKER_ID`; można podać jeden lub oba identyfikatory. Endpoint wykonuje tylko wskazane zapytania, nie skanuje automatycznie meczów.
+- OddsPapi: `GET https://api.oddspapi.io/v4/odds`; StrikerAPI: `POST https://mcp.strikerapi.com/v1/get_odds`. Kursy StrikerAPI moneyline są normalizowane do decimal dla home/draw/away.
+- Sekrety Worker: `ODDSPAPI_API_KEY`, `STRIKERAPI_API_KEY`. Ich obecność należy sprawdzić po wdrożeniu przez `/api/odds/status`; nie mamy bezpośredniego odczytu Cloudflare Secret Store.
+- Testy dodane w `src/worker.test.ts`. Commity kodu: `a6cd74c18d20a63b1c9ed6b2f81edd096fd20270`, testy: `acc8dd051946c6d23967dea6aa388905034740bf`; dziennik Stage 52: `f9f5e0cfbe4df2141acf3c2a40e2a80d904decbb`.
+- CI run `44187285622` wystartował dla commita Worker; status końcowy i deploy wymagają ponownego sprawdzenia. Pilot live, fixture matching, snapshot storage i UI odds pozostają NIEZREALIZOWANE.
+- Ważne: StrikerAPI wymaga własnego `game_id`; nie podawać lokalnego ID Moneyball, chyba że potwierdzono mapowanie.
