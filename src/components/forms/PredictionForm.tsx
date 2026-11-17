@@ -70,6 +70,9 @@ export function PredictionForm({
 
   const save = useAction(
     async () => {
+      const stake = prediction
+        ? (prediction.verdict !== "WYBRANY" && form.verdict === "WYBRANY" ? 4 : Number(prediction.stake ?? 4))
+        : 4;
       const row = {
         match_id: form.match_id,
         model_version: form.model_version.trim() || "MANUAL",
@@ -81,6 +84,10 @@ export function PredictionForm({
         rationale: form.rationale.trim() || null,
         group_name: form.group_name,
         odds,
+        stake,
+        potential_return: form.verdict === "WYBRANY" && odds != null && odds > 1
+          ? Math.round(stake * odds * 100) / 100
+          : null,
         settlement_status: prediction?.settlement_status ?? "pending",
         verified: prediction?.verified ?? false,
         note: form.note.trim() || null,
