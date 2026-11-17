@@ -786,3 +786,13 @@
 - Added regression tests for a newer rejected prediction and a newer weak prediction superseding an older strong candidate.
 - Commits: implementation 5fc3d8470089d1c01a2cad0f8b7d3175fc883d7b; tests 1ee2f7d9aef18e12ab19a4b486410aab3e0a3d9d.
 - Validation/deployment: pending latest branch workflow results. Existing Tracker rows are read-only; no records or bankroll values were changed.
+
+
+- Stage 64 validation: CI and Cloudflare deployment both succeeded on commit 958ca5e543c5710618cfb1fdade6fd33771bcfa7 (MONEYBALL rebuild CI run 44196031052; rebuild checks 44196030890; deployment run 44196031053). Typecheck, unit tests and production build passed. The updated coupon eligibility logic is live on the REBUILD Worker.
+
+## Stage 65 — safe settlement of manually selected bets (2026-11-18)
+- Audited buildBetSettlementRows and found that imported or malformed Tracker rows could be settled with invalid odds/stakes, producing misleading or non-finite P/L. The result map also relied on array order rather than timestamps.
+- Settlement now chooses the newest valid result by createdAt, accepts only known decisions and supported 1X2/Double Chance selections, and refuses to create a financial settlement for selected bets unless odds are finite and >1 and stake is finite and positive.
+- Added regression tests for invalid odds, negative stake and out-of-order result records.
+- Commits: implementation aeb700e3bff9b4efcc4d4107b706aecb5975911a; tests 45221e63ebd330a14122d05f68587a886e1cf812.
+- Validation/deployment pending latest CI and Cloudflare workflow results. No historical Tracker records or bankroll values were modified.
