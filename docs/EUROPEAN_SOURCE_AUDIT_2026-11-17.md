@@ -47,7 +47,7 @@ Production migrations applied for these alias additions: `20261117102000` (Bulga
 
 These official pages prove current league identity and provide fixtures/calendars, but they have NOT all been wired as automated MONEYBALL feed adapters. The live automatic feed remains FootyNomad; Football Charts is an owner-only private-use fallback for eight allowlisted leagues. Official sites above are future adapter candidates only after their access terms, robots policy, data reuse permissions, update frequency and stable page/API structure are checked. Do not copy or scrape them into production merely because pages are publicly readable.
 
-Do not claim 53-country automated import. Current source discovery is 53/55; production importer coverage remains narrower and requires source-by-source integration and authenticated end-to-end verification.
+Do not claim 53-country automated import. Current source discovery is 54/55; production importer coverage remains narrower and requires source-by-source integration and authenticated end-to-end verification.
 
 ## Belarus and 21 November live parser regression — 2026-11-17
 
