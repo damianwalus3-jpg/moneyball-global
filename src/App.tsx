@@ -6,6 +6,7 @@ import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
 import { buildThreeLegCandidates } from "./coupon-engine";
 import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from "./openfootball";
 import { evaluatePaperCoupon } from "./coupon-settlement";
+import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
@@ -148,15 +149,7 @@ export default function App() {
     if (settlementLock.current) return;
     settlementLock.current = true;
     const all = readRecords();
-    const settledIds = new Set(all.filter(row => row.kind === "result" && typeof row.details.fixtureId === "string").map(row => row.details.fixtureId as string));
-    // Fetch a result only once when legacy/duplicate prediction rows exist.
-    const pendingByFixture = new Map<string, TrackerRecord>();
-    for (const row of all) {
-      const fixtureId = row.details.fixtureId;
-      if (row.kind !== "prediction" || typeof fixtureId !== "string" || settledIds.has(fixtureId) || pendingByFixture.has(fixtureId)) continue;
-      pendingByFixture.set(fixtureId, row);
-    }
-    const pending = [...pendingByFixture.values()];
+    const pending = uniquePendingPredictions(all);
     setSettling(true);
     setSettleProgress(0);
     let processed = 0;
