@@ -10,13 +10,13 @@ describe("Cloudflare OpenLigaDB proxy", () => {
     const upstream = vi.fn().mockResolvedValue(new Response('[{"matchID":1}]', { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", upstream);
     const waitUntil = vi.fn();
-    const request = new Request("https://moneyball.example/api/openligadb/matches/bl1/2026");
+    const request = new Request("https://moneyball.example/api/openligadb/matches/bl1/2026", { headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } });
     const response = await worker.fetch(request, { ASSETS: { fetch: vi.fn() } }, { waitUntil });
     expect(upstream).toHaveBeenCalledWith("https://api.openligadb.de/getmatchdata/bl1/2026", expect.any(Object));
     expect(response.status).toBe(200);
     expect(response.headers.get("X-MONEYBALL-SOURCE")).toBe("OpenLigaDB");
     expect(response.headers.get("Cache-Control")).toBe("public, max-age=900");
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://moneyball.example");
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://moneyball-global-rebuild.damianwalus3.workers.dev");
     expect(cache.put).toHaveBeenCalledTimes(1);
     expect(waitUntil).toHaveBeenCalledTimes(1);
   });
@@ -50,7 +50,7 @@ describe("Cloudflare OpenLigaDB proxy", () => {
 
 describe("odds provider pilot proxy", () => {
   it("answers preflight with an empty 204 response", async () => {
-    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot", { method: "OPTIONS" }), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot", { method: "OPTIONS", headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
     expect(response.status).toBe(204);
     expect(await response.text()).toBe("");
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://moneyball.example");
@@ -59,17 +59,49 @@ describe("odds provider pilot proxy", () => {
   it("reports only whether secrets are configured and never exposes their values", async () => {
     const secret = "do-not-return-this";
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/status"), {
-      ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: secret, STRIKERAPI_API_KEY: secret,
+      ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: secret, STRIKERAPI_API_KEY: secret, ODDS_PILOT_TOKEN: "pilot-secret",
     }, { waitUntil: vi.fn() });
     const body = await response.text();
     expect(body).toContain('"oddspapi":true');
     expect(body).toContain('"strikerapi":true');
+    expect(body).toContain('"pilotEnabled":true');
     expect(body).not.toContain(secret);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
+
+  it("fails closed when the owner pilot token is not configured", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?fixtureId=fixture-123"), {
+      ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "configured-provider-key",
+    }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ error: "pilot_disabled" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid owner token before contacting providers", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?fixtureId=fixture-123", {
+      headers: { Authorization: "Bearer wrong-token" },
+    }), { ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "configured-provider-key", ODDS_PILOT_TOKEN: "correct-token" }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: "unauthorized" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not grant CORS access to arbitrary origins", async () => {
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/status", {
+      headers: { Origin: "https://attacker.example" },
+    }), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+
   it("rejects a pilot request without provider fixture identifiers", async () => {
-    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot"), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot", { headers: { Authorization: "Bearer test-pilot-token" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "fixtureId or strikerGameId is required" });
   });
@@ -77,8 +109,8 @@ describe("odds provider pilot proxy", () => {
   it("requests OddsPapi odds only from the Worker and returns provider data without the key", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ fixtureId: "fixture-123", hasOdds: true }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
-    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?fixtureId=fixture-123"), {
-      ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "private-key-value",
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?fixtureId=fixture-123", { headers: { Authorization: "Bearer test-pilot-token" } }), {
+      ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "private-key-value", ODDS_PILOT_TOKEN: "test-pilot-token",
     }, { waitUntil: vi.fn() });
     const body = await response.text();
     expect(fetchMock.mock.calls[0][0].toString()).toContain("/v4/odds?fixtureId=fixture-123");
@@ -95,8 +127,8 @@ describe("odds provider pilot proxy", () => {
       books: [{ provider: "ExampleBook", source: "live", captured_at: "2026-11-17T18:00:00Z", home_ml_close: 100, draw_ml_close: -110, away_ml_close: 250 }],
     }] } }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
-    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?strikerGameId=game-1"), {
-      ASSETS: { fetch: vi.fn() }, STRIKERAPI_API_KEY: "private-key-value",
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?strikerGameId=game-1", { headers: { Authorization: "Bearer test-pilot-token" } }), {
+      ASSETS: { fetch: vi.fn() }, STRIKERAPI_API_KEY: "private-key-value", ODDS_PILOT_TOKEN: "test-pilot-token",
     }, { waitUntil: vi.fn() });
     const body = await response.json() as { results: { strikerapi: { games: Array<{ bookmakers: Array<{ odds1: number; oddsX: number; odds2: number; complete1X2: boolean }> }> } } };
     const book = body.results.strikerapi.games[0].bookmakers[0];
@@ -110,7 +142,7 @@ describe("odds provider pilot proxy", () => {
   it("does not call a provider when its Worker secret is missing", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?fixtureId=fixture-123"), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?fixtureId=fixture-123"), { ASSETS: { fetch: vi.fn() }, ODDS_PILOT_TOKEN: "test-pilot-token" }, { waitUntil: vi.fn() });
     const body = await response.json() as { results: { oddspapi: { status: string } } };
     expect(body.results.oddspapi.status).toBe("not_configured");
     expect(fetchMock).not.toHaveBeenCalled();
