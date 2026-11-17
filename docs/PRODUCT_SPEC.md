@@ -28,8 +28,8 @@ MONEYBALL — Trust the Process is a mobile-first installable PWA for football m
 6. Tracker — complete searchable registry of scans, matches, predictions, odds, coupons, coupon legs, results, bankroll transactions, categories and Jackpot entries; JSON/CSV import/export and validated backup/restore.
 
 ## Prediction and scan requirements
-- Scope: European domestic senior football leagues, configurable by country/tier; default scan is today's fixtures in Europe/Brussels.
-- Sources: fixture discovery can use FootyNomad and other public sources; independent verification via reputable public results providers. xG sources include OpenPlay, StatsBomb Open Data and other explicitly scoped datasets. Odds are a separate input class.
+- Scope: every discoverable football match played in Europe, with no competition-type exclusions: senior and youth, men's and women's, domestic leagues at every tier, regional/amateur leagues, domestic cups, super cups, and UEFA competitions. Default scan is today's fixtures by Europe/Brussels date. Source coverage must be measured and reported; never describe the feed as literally exhaustive unless independently proven.
+- Fixture sources: combine open-matchday public CSV and OpenLigaDB keyless API; expand with additional free/public sources only after checking coverage, terms, reliability and update cadence. Preserve each provider's match ID, source, timestamp and failures. The catalogue must include cups and youth categories rather than silently excluding them. No single free provider is assumed to cover all Europe. xG sources include OpenPlay, StatsBomb Open Data and other explicitly scoped datasets. Odds are a separate input class.
 - Store source URL/provider, fetched_at, source status, competition coverage and normalization decisions.
 - Models: 1X2, Double Chance as a separately displayed market derived transparently from 1X2 unless a separately trained model is later validated, and a separate goals/Poisson model.
 - Display probabilities, model version, sample size, missing inputs and coverage. Coverage is not confidence.
