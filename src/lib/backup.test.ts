@@ -43,7 +43,9 @@ describe("backup restore preflight", () => {
     expect(() => validateBackup({
       ...backup({}),
       tracker_source_audit: [{ id: "same" }, { id: "same" }],
-    })).toThrow(/Powtórzony identyfikator wpisu audytu/);
+    })).toThrow(/Nieprawidłowe pola wpisu audytu/);
+    const valid = { id: "123e4567-e89b-42d3-a456-426614174000", entity_id: "123e4567-e89b-42d3-a456-426614174001", changed_by: "123e4567-e89b-42d3-a456-426614174002", entity_type: "prediction", new_source_class: "MODEL", changed_at: "2026-11-17T13:00:00Z" };
+    expect(() => validateBackup({ ...backup({}), tracker_source_audit: [valid, valid] })).toThrow(/Powtórzony identyfikator wpisu audytu/);
   });
 
   it("rejects malformed top-level payloads", () => {
