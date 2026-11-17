@@ -10,12 +10,15 @@ import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
 import { shouldAppendPrediction } from "./prediction-record";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
+import { auditOddsFixtureMatches } from "./odds-matching";
 import { buildBetSettlementRows } from "./bet-settlement";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
   ShieldCheck, Sparkles, Ticket, Trophy, X
 } from "lucide-react";
+
+const ODDS_PILOT_TOKEN_KEY = "moneyball.oddsPilotToken";
 
 type Tab = "dashboard" | "matches" | "pick" | "coupons" | "intelligence" | "bets" | "tracker";
 
@@ -94,6 +97,11 @@ export default function App() {
   const [betInputs, setBetInputs] = useState<Record<string, { market: string; odds: string; stake: string }>>({});
   const [newKind, setNewKind] = useState<TrackerKind>("match");
   const [notice, setNotice] = useState("");
+  const [oddsPilotToken, setOddsPilotToken] = useState(() => { try { return localStorage.getItem(ODDS_PILOT_TOKEN_KEY) ?? ""; } catch { return ""; } });
+  const [oddsTokenSaved, setOddsTokenSaved] = useState(() => { try { return Boolean(localStorage.getItem(ODDS_PILOT_TOKEN_KEY)); } catch { return false; } });
+  const [oddsLoading, setOddsLoading] = useState(false);
+  const [oddsNotice, setOddsNotice] = useState("");
+  const [oddsAudit, setOddsAudit] = useState<{ matched: number; unmatched: number; ambiguous: number; snapshots: number; utcDate: string } | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [fixtureScan, setFixtureScan] = useState<FixtureScan | null>(null);
   const [scanLoading, setScanLoading] = useState(false);
@@ -260,6 +268,130 @@ export default function App() {
     } catch (error) { setScanError(error instanceof Error ? error.message : "Nie udało się pobrać terminarza."); }
     finally { setScanLoading(false); }
   };
+  const saveOddsPilotToken = () => {
+    const token = oddsPilotToken.trim();
+    if (token.length < 32) {
+      setOddsNotice("Token powinien mieć co najmniej 32 znaki. Ustaw ten sam sekret ODDS_PILOT_TOKEN w Cloudflare Worker.");
+      setOddsTokenSaved(false);
+      return;
+    }
+    try {
+      localStorage.setItem(ODDS_PILOT_TOKEN_KEY, token);
+      setOddsPilotToken(token);
+      setOddsTokenSaved(true);
+      setOddsNotice("Token zapisany lokalnie w tej przeglądarce. Nie jest dodawany do Trackera ani wysyłany do repozytorium.");
+    } catch {
+      setOddsTokenSaved(false);
+      setOddsNotice("Przeglądarka nie pozwoliła zapisać tokenu lokalnie.");
+    }
+  };
+  const clearOddsPilotToken = () => {
+    try { localStorage.removeItem(ODDS_PILOT_TOKEN_KEY); } catch { /* storage may be unavailable */ }
+    setOddsPilotToken("");
+    setOddsTokenSaved(false);
+    setOddsNotice("Lokalny token został usunięty z tej przeglądarki.");
+  };
+  const fetchDailyOdds = async () => {
+    if (!fixtureScan) {
+      setOddsNotice("Najpierw uruchom skan dzisiejszych meczów.");
+      return;
+    }
+    const token = oddsPilotToken.trim();
+    if (!oddsTokenSaved || token.length < 32) {
+      setOddsNotice("Najpierw zapisz token dostępu. Musi być identyczny z sekretem ODDS_PILOT_TOKEN w Cloudflare.");
+      return;
+    }
+    setOddsLoading(true);
+    setOddsNotice("");
+    try {
+      const utcDate = fixtureScan.date;
+      const response = await fetch(`/api/odds/pilot?strikerDate=${encodeURIComponent(utcDate)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const payload = await response.json() as {
+        error?: string;
+        message?: string;
+        results?: { strikerapi?: {
+          status?: string;
+          error?: string;
+          capturedAt?: string;
+          games?: Array<{
+            gameId: string;
+            startsAt: string;
+            home: string;
+            away: string;
+            bookmakers?: Array<{
+              name: string | null;
+              source: string | null;
+              capturedAt: string | null;
+              odds1: number | null;
+              oddsX: number | null;
+              odds2: number | null;
+              complete1X2: boolean;
+            }>;
+          }>;
+        } };
+      };
+      if (!response.ok) throw new Error(payload.message || payload.error || `Worker HTTP ${response.status}`);
+      const striker = payload.results?.strikerapi;
+      if (!striker || striker.status !== "ok") throw new Error(striker?.error || "StrikerAPI nie zwrócił poprawnych danych.");
+      const games = (striker.games ?? []).filter(game =>
+        typeof game.gameId === "string" && typeof game.startsAt === "string"
+        && typeof game.home === "string" && typeof game.away === "string"
+      );
+      const audit = auditOddsFixtureMatches(fixtureScan.fixtures, games);
+      const fixtureById = new Map(fixtureScan.fixtures.map(fixture => [fixture.id, fixture]));
+      const gameById = new Map(games.map(game => [game.gameId, game]));
+      const snapshots = audit.matched.flatMap(match => {
+        const fixture = fixtureById.get(match.fixtureId);
+        const game = gameById.get(match.gameId);
+        if (!fixture || !game || hasKickoffPassed(fixture.date, fixture.time)) return [];
+        return (game.bookmakers ?? []).flatMap(book => {
+          if (!book.name) return [];
+          const capturedAt = book.capturedAt || striker.capturedAt || new Date().toISOString();
+          const snapshotKey = [fixture.id, "StrikerAPI", book.name, capturedAt].join("|");
+          return [{
+            kind: "odds" as const,
+            title: `${fixture.home} vs ${fixture.away} · ${book.name}`,
+            status: book.complete1X2 ? "COMPLETE_1X2" : "INCOMPLETE_1X2",
+            details: {
+              snapshotKey,
+              fixtureId: fixture.id,
+              fixtureDate: fixture.date,
+              fixtureTime: fixture.time,
+              competition: fixture.competition,
+              provider: "StrikerAPI",
+              providerGameId: game.gameId,
+              bookmaker: book.name,
+              market: "1X2",
+              odds1: book.odds1,
+              oddsX: book.oddsX,
+              odds2: book.odds2,
+              complete1X2: book.complete1X2,
+              capturedAt,
+              providerSource: book.source,
+              utcDate,
+              kickoffDifferenceMinutes: match.kickoffDifferenceMinutes,
+            },
+          }];
+        });
+      });
+      const added = addRecordsIfMissing(snapshots, "snapshotKey");
+      setRecords(readRecords());
+      setOddsAudit({
+        matched: audit.matched.length,
+        unmatched: audit.unmatchedFixtureIds.length,
+        ambiguous: audit.ambiguousFixtureIds.length,
+        snapshots: added,
+        utcDate,
+      });
+      setOddsNotice(`Pobrano ${games.length} meczów z StrikerAPI. Dopasowano ${audit.matched.length}; niejednoznaczne ${audit.ambiguousFixtureIds.length}; zapisano ${added} nowych snapshotów kursów. Nie dopasowane mecze nie są zgadywane.`);
+    } catch (error) {
+      setOddsNotice(error instanceof Error ? error.message : "Nie udało się pobrać dziennych kursów.");
+    } finally {
+      setOddsLoading(false);
+    }
+  };
   useEffect(() => {
     void runFixtureScan();
     void settlePendingResults();
@@ -374,6 +506,18 @@ export default function App() {
 
         {active === "bets" && <section className="module-panel bets-module">
           <div className="module-icon"><Ticket/></div><h2>Bilans wybranych zakładów</h2>
+          <article className="panel">
+            <div className="panel-heading"><div><h3>Automatyczne kursy · StrikerAPI</h3><p>Dzienny odczyt zbiorczy UTC · 10 kredytów za zapytanie</p></div><ShieldCheck size={18}/></div>
+            <div className="tracker-form">
+              <input type="password" autoComplete="off" value={oddsPilotToken} onChange={event => { setOddsPilotToken(event.target.value); setOddsTokenSaved(false); }} placeholder="ODDS_PILOT_TOKEN · min. 32 znaki" aria-label="Token dostępu do pilota kursów"/>
+              <button onClick={saveOddsPilotToken}>Zapisz token</button>
+              <button onClick={clearOddsPilotToken} disabled={!oddsTokenSaved && !oddsPilotToken}>Usuń</button>
+              <button className="primary-button" onClick={() => void fetchDailyOdds()} disabled={!fixtureScan || oddsLoading || !oddsTokenSaved}>{oddsLoading ? "Pobieranie kursów…" : "Pobierz kursy dnia"}</button>
+            </div>
+            <p className="source-note">Najpierw ustaw identyczny sekret <b>ODDS_PILOT_TOKEN</b> w Cloudflare Workerze <b>moneyball-global-rebuild</b>. Token pozostaje w lokalnej pamięci tej przeglądarki; nie wklejaj go do czatu. Data StrikerAPI jest w UTC, a dopasowanie odbywa się po dacie i godzinie Europe/Brussels. Zapytanie uruchamia się wyłącznie po kliknięciu.</p>
+            {oddsNotice && <div className="tracker-notice">{oddsNotice}</div>}
+            {oddsAudit && <p className="source-note">Ostatni audyt · UTC {oddsAudit.utcDate} · dopasowane {oddsAudit.matched} · niejednoznaczne {oddsAudit.ambiguous} · bez dopasowania {oddsAudit.unmatched} · nowe snapshoty {oddsAudit.snapshots}.</p>}
+          </article>
           {(() => {
             const bets = records.filter(row => row.kind === "bet");
             const selected = bets.filter(row => row.details.decision === "SELECTED");
