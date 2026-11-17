@@ -20,6 +20,11 @@ describe("European fixture source classification", () => {
     expect(isEuropeanOpenLiga({ leagueId: 18, leagueName: "LaLiga EA Sports", leagueShortcut: "la1" })).toBe(true);
     expect(isEuropeanOpenLiga({ leagueId: 19, leagueName: "Nations League 2026", leagueShortcut: "nla" })).toBe(true);
     expect(isEuropeanOpenLiga({ leagueId: 20, leagueName: "DFB U21", leagueShortcut: "u21dfb" })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 24, leagueName: "UEFA Women's Champions League", leagueShortcut: "WCL", sport: { sportName: "Frauenfußball" } })).toBe(true);
+  });
+
+  it("does not treat arbitrary la-prefixed feeds as European", () => {
+    expect(isEuropeanOpenLiga({ leagueId: 25, leagueName: "Latin American Cup", leagueShortcut: "latam-cup" })).toBe(false);
   });
 
   it("rejects known OpenLigaDB test and synthetic Bundesliga feeds", () => {
