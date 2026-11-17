@@ -1125,9 +1125,9 @@ export interface TrackerUnclassifiedRecord {
   created_at: string;
 }
 
-export async function fetchTrackerUnclassifiedPage(offset = 0, limit = 51): Promise<TrackerUnclassifiedRecord[]> {
+export async function fetchTrackerUnclassifiedPage(entityType: "prediction" | "coupon", offset = 0, limit = 51): Promise<TrackerUnclassifiedRecord[]> {
   const { data, error } = await withRequestTimeout(
-    requireSupabase().rpc("moneyball_tracker_unclassified_page", { p_limit: limit, p_offset: offset }),
+    requireSupabase().rpc("moneyball_tracker_unclassified_page", { p_entity_type: entityType, p_limit: limit, p_offset: offset }),
     "Pobieranie nieprzypisanych źródeł Trackera",
   );
   if (error) throw new Error(humanizeError(error, "moneyball_tracker_unclassified_page"));
