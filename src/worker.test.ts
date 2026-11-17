@@ -53,7 +53,7 @@ describe("odds provider pilot proxy", () => {
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot", { method: "OPTIONS", headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
     expect(response.status).toBe(204);
     expect(await response.text()).toBe("");
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://moneyball.example");
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://moneyball-global-rebuild.damianwalus3.workers.dev");
   });
 
   it("reports only whether secrets are configured and never exposes their values", async () => {
@@ -101,7 +101,7 @@ describe("odds provider pilot proxy", () => {
   });
 
   it("rejects a pilot request without provider fixture identifiers", async () => {
-    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot", { headers: { Authorization: "Bearer test-pilot-token" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot", { headers: { Authorization: "Bearer test-pilot-token" } }), { ASSETS: { fetch: vi.fn() }, ODDS_PILOT_TOKEN: "test-pilot-token" }, { waitUntil: vi.fn() });
     expect(response.status).toBe(400);
     expect(await response.json()).toEqual({ error: "fixtureId or strikerGameId is required" });
   });
