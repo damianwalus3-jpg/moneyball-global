@@ -1178,3 +1178,34 @@ export async function fetchTrackerSourceAudit(): Promise<TrackerSourceAuditRow[]
   if (error) throw new Error(humanizeError(error, "moneyball_tracker_source_audit"));
   return (data ?? []) as TrackerSourceAuditRow[];
 }
+
+
+export async function fetchTrackerSourceAuditPage(offset = 0, limit = 500): Promise<TrackerSourceAuditRow[]> {
+  const uid = await currentUserId();
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().from("moneyball_tracker_source_audit")
+      .select("id,entity_type,entity_id,previous_source_class,new_source_class,note,changed_by,changed_at")
+      .eq(OWNER_COLUMN, uid)
+      .order("changed_at", { ascending: true })
+      .order("id", { ascending: true })
+      .range(offset, offset + limit - 1),
+    "Eksport audytu klasyfikacji źródeł",
+  );
+  if (error) throw new Error(humanizeError(error, "moneyball_tracker_source_audit"));
+  return (data ?? []) as TrackerSourceAuditRow[];
+}
+
+export async function restoreTrackerSourceAudit(rows: Record<string, unknown>[]): Promise<number> {
+  if (!rows.length) return 0;
+  let restored = 0;
+  for (let index = 0; index < rows.length; index += 500) {
+    const chunk = rows.slice(index, index + 500);
+    const { data, error } = await withRequestTimeout(
+      requireSupabase().rpc("moneyball_tracker_restore_source_audit", { p_rows: chunk }),
+      "Przywracanie audytu klasyfikacji źródeł",
+    );
+    if (error) throw new Error(humanizeError(error, "moneyball_tracker_restore_source_audit"));
+    restored += Number(data ?? 0);
+  }
+  return restored;
+}
