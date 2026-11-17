@@ -36,7 +36,7 @@ AS $function$
     and m.owner_id = (select auth.uid())
     and (p.model_version = 'MONEYBALL GLOBAL 3.8' or p.model_version like 'MANUAL%')
     and p.verdict = 'WYBRANY'
-    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_european_top_two_league(m.country, coalesce(m.competition,m.league))
+    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
     and m.kickoff_at >= (((now() at time zone 'Europe/Brussels')::date)::timestamp at time zone 'Europe/Brussels')
     and m.kickoff_at < ((((now() at time zone 'Europe/Brussels')::date + 1)::timestamp) at time zone 'Europe/Brussels')
   order by m.kickoff_at asc nulls last, p.created_at desc
@@ -57,7 +57,7 @@ active_predictions as (
   join public.matches m on m.id = p.match_id and m.owner_id = p.owner_id
   join owner_scope o on p.owner_id = o.owner_id
   where (p.model_version = 'MONEYBALL GLOBAL 3.8' or p.model_version like 'MANUAL%')
-    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_european_top_two_league(m.country, coalesce(m.competition,m.league))
+    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
 ),
 market_stats as (
   select market,
@@ -76,7 +76,7 @@ candidate_count as (
     and m.kickoff_at >= (((now() at time zone 'Europe/Brussels')::date)::timestamp at time zone 'Europe/Brussels')
     and m.kickoff_at < ((((now() at time zone 'Europe/Brussels')::date + 1)::timestamp) at time zone 'Europe/Brussels')
     and m.status not in ('finished','postponed','cancelled','live')
-    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_european_top_two_league(m.country, coalesce(m.competition,m.league))
+    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
 ),
 bankroll as (
   select case when count(*) = 0 then null
@@ -96,7 +96,7 @@ select jsonb_build_object(
     join owner_scope o on m.owner_id = o.owner_id
     where m.kickoff_at >= (((now() at time zone 'Europe/Brussels')::date)::timestamp at time zone 'Europe/Brussels')
       and m.kickoff_at < ((((now() at time zone 'Europe/Brussels')::date + 1)::timestamp) at time zone 'Europe/Brussels')
-      and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_european_top_two_league(m.country, coalesce(m.competition,m.league))
+      and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
   ),
   'bankroll', (select balance from bankroll),
   'coupons_in_play', (
@@ -109,7 +109,7 @@ select jsonb_build_object(
     select count(*)::integer from public.matches m
     join owner_scope o on m.owner_id = o.owner_id
     where m.kickoff_at < now() and m.status not in ('finished','postponed','cancelled')
-      and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_european_top_two_league(m.country, coalesce(m.competition,m.league))
+      and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
       and not exists (
         select 1 from public.match_results r
         where r.match_id = m.id and r.owner_id = m.owner_id and r.verified
