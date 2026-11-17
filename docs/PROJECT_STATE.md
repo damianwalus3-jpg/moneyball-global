@@ -1325,3 +1325,14 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - Verify next scheduled `moneyball-free-feed` refresh uses v52's updated all-tier audit note.
 - Perform an authenticated click-through of the app's Matches and Predictions screens after the user signs in, confirming the 40 canonical fixtures are visible and non-European/cup/youth/women/reserve rows are hidden.
 - Keep issue #77 open until that authenticated UI check is completed. Overall MONEYBALL GLOBAL is not declared finished by this fixture-scope repair alone.
+
+
+### Country-alias parity and final feed refresh — 2026-11-17
+
+- Added Bosnia & Herzegovina / Bosnia-Herzegovina aliases to shared TypeScript and frontend geographic-Europe country sets. SQL country matching now applies Unicode NFD normalization before matching aliases; Åland Islands is handled consistently. Israel and Türkiye remain excluded.
+- Applied SQL migration `normalize_geographic_europe_country_aliases`, Supabase version `20261117114432`. Live SQL proof: Bosnia & Herzegovina=true, Bosnia-Herzegovina=true, Åland Islands=true, Bosnia domestic league=true, Israel=false, Türkiye=false.
+- Redeployed backend functions from current MAIN sources. Active versions: `footynomad-sync v101` (JWT true), `moneyball-free-feed v53` (JWT true), `moneyball-predict v248` (JWT false), `moneyball-public-sources v65` (JWT false). Existing JWT settings preserved.
+- Scheduled feed refresh 2026-11-17 11:46:02 UTC succeeded with 31/31 eligible FootyNomad fixtures and the updated note confirming all senior domestic league tiers. No stale/non-matching cache rows were removed.
+- Post-deploy public-sources smoke test: ok=true, 22 raw fixtures, 11 eligible European senior domestic fixtures; all returned rows pass country/gender scope.
+- Latest code commit `07b2111e0aadd8c4d86edb3b3c23c56febd37c5d`; CI #44076707101 SUCCESS; Cloudflare MAIN deploy #44076707261 SUCCESS.
+- Older issue #76 (tier 1/2 only) is closed as superseded by broader all-tier issue #77. Issue #77 remains open only for authenticated UI screen verification.
