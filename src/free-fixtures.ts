@@ -242,7 +242,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
             home,
             away,
             source: "OpenLigaDB",
-            sourceUpdatedAt: new Date().toISOString(),
+            sourceUpdatedAt: match.lastUpdateDateTime || "not provided by OpenLigaDB",
           } satisfies FreeFixture];
         });
         cacheOpenLigaTeamForms(matches, fixtures.flatMap(fixture => [fixture.home, fixture.away]), shortcut, season, date);
