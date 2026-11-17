@@ -1,43 +1,25 @@
-# MONEYBALL — initial domain model
+# MONEYBALL — zero-cost local-first domain model
 
-This is the clean-slate logical model. Physical migrations will be authored and validated against a newly provisioned backend; no existing production database is reused or truncated.
+The initial application is deliberately local-first. It does not provision Supabase, PostgreSQL, D1, or another paid/hosted database. Tracker records are stored in browser storage and can be exported/imported as versioned JSON. Records do not sync between devices automatically.
 
-## Identity and ownership
-- `profiles`: one row per authenticated user, locale, timezone, preferences.
-- Every private row has `owner_id` and owner-scoped access policy.
-- Provider catalog and competition/team reference data may be shared read-only; user tracking records are private.
+## Core entities stored in the browser
+- Scan run: requested Europe/Brussels date, source, retrieval time, coverage and errors.
+- Fixture: provider/source identifier, competition, home/away teams, kickoff and observed status.
+- Prediction: fixture, immutable model version, market, selection, probabilities, data coverage, rationale and missing inputs.
+- Odds snapshot: bookmaker, market, selection, decimal odds, source timestamp.
+- Coupon and legs: exact three unique fixtures, selection, odds snapshot, paper stake, potential return and settlement.
+- Result: score, provider and verification time.
+- Paper ledger transaction: stake/return/adjustment and idempotency key.
+- Tracker category and Jackpot entry.
 
-## Football reference and ingestion
-- `providers`, `competitions`, `teams`, `seasons`
-- `fixtures`: provider identifiers, normalized home/away teams, kickoff UTC, competition, status, neutral venue, deduplication fingerprint.
-- `fixture_sources`: fixture provenance, source URL, fetched_at, payload hash, verification state.
-- `team_form`, `team_match_stats`, `xg_observations`, `lineup_observations`, `injury_observations`, `odds_observations`: typed observations, each with source and timestamp.
+## Rules
+- European domestic leagues only; daily scans use the Europe/Brussels calendar date.
+- Never invent fixtures, results, xG, lineups, injuries, odds or probabilities.
+- Every imported fact carries provider/source and retrieval timestamp.
+- 1X2 probabilities must be finite, in [0,1], and sum to 1. Double Chance is separately displayed and derived transparently.
+- Standard coupon: exactly three distinct fixtures. Odds must be > 1.00.
+- Import is merge-only: only IDs not already present are added; existing local records are never overwritten.
+- Browser-local data is not cloud synchronized. Users should export backups before clearing browser data or changing devices.
 
-## Model and scan
-- `scan_runs`: requested date/timezone/scope, started/finished, provider coverage, counts, errors.
-- `model_versions`: immutable model/config version and changelog.
-- `predictions`: fixture, model version, market, selection, probabilities, coverage, sample size, rationale, missing inputs, status.
-- `prediction_evaluations`: result, correctness, scored_at, Brier/log-loss contributions and evaluation version.
-- `calibration_reports`: out-of-sample period, sample size, metrics and reliability bins.
-
-## Coupons and paper finance
-- `coupons`, `coupon_legs`: immutable snapshot of selection and odds at creation; unique fixture per coupon.
-- `coupon_settlements`: idempotent settlement event and source provenance.
-- `paper_ledger_transactions`: append-only stake/return/adjustment ledger.
-- `odds_snapshots`: bookmaker, market, selection, decimal odds, source timestamp and fetched_at.
-- `jackpot_pools`, `jackpot_entries`, `jackpot_entry_legs`: isolated from normal coupons and finance.
-
-## Tracker and audit
-- `tracker_categories`: owner-defined category tree and archive state.
-- `tracker_annotations`: manual classifications and notes linked to source records.
-- `audit_events`: actor, action, entity, before/after hashes, timestamp.
-- `backup_manifests`: backup format version, counts, checksum and created_at.
-
-## Data integrity constraints
-- Unique provider fixture ID within provider.
-- Unique coupon leg fixture within a coupon.
-- Decimal odds > 1.0; probabilities in [0,1] and sum to 1 for complete 1X2 predictions.
-- Kickoff stored in UTC; display in Europe/Brussels by default.
-- All source observations preserve provider and retrieval timestamp.
-- Settlement and ledger operations are transactional and idempotent.
-- No deletes/overwrites of model predictions after publication; corrections create superseding records and audit events.
+## Later optional expansion
+If free resources become available and the user explicitly approves, the local data model can be synchronized through a free-tier backend. No backend is required to use the local Tracker.
