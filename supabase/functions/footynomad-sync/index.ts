@@ -1,46 +1,11 @@
 import { footyNomadSectionAt } from "../_shared/footynomad-section.ts";
 import { extractBearerToken } from "../_shared/bearer-token.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
+import { isEligibleDomesticSeniorLeague } from "../_shared/domestic-league-scope.ts";
 function isExcludedSeniorTeam(value: unknown): boolean {
  const team=String(value??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
  return /\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico|u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23))\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
 }
-
-function isTopTwoTierLeague(competition: unknown, country?: unknown): boolean {
-  const scopeCountry = String(country ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
-  const scopeLabel = String(competition ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  // OpenMatchday competition slugs encode English tiers as ENG_1..ENG_n; only ENG_1 and ENG_2 are in scope.
-  if ((["england", "eng"].includes(scopeCountry) && /^eng (?:[3-9]|[1-9][0-9]+)\b/.test(scopeLabel))) return false;
-  if ((["croatia", "cro"].includes(scopeCountry) && scopeLabel === "hnl") || (["san marino", "smr"].includes(scopeCountry) && scopeLabel === "campionato")) return true;
-  if ((["scotland", "sco"].includes(scopeCountry) && /\b(lowland league|highland league)\b/.test(scopeLabel))
-    || (["turkey", "turkiye", "tur"].includes(scopeCountry) && /\b2 lig\b/.test(scopeLabel))
-    || (["denmark", "dnk", "norway", "nor", "belarus", "blr"].includes(scopeCountry) && /\b2 division\b/.test(scopeLabel))
-    || (["denmark", "dnk"].includes(scopeCountry) && /\b2nd division\b/.test(scopeLabel))
-    || (["russia", "rus"].includes(scopeCountry) && /\bsecond league\b/.test(scopeLabel))
-    || (["spain", "esp"].includes(scopeCountry) && /\b(primera division rfef|segunda division rfef)\b/.test(scopeLabel))
-    || (["switzerland", "sui", "che"].includes(scopeCountry) && /\b1 liga (promotion|classic)\b/.test(scopeLabel))
-    || (["sweden", "swe"].includes(scopeCountry) && /\bdivision [12]\b/.test(scopeLabel))
-    || (["albania", "alb"].includes(scopeCountry) && /\b2nd division\b/.test(scopeLabel))
-    || (["croatia", "cro"].includes(scopeCountry) && /\bsecond nl\b/.test(scopeLabel))
-    || (["estonia", "est"].includes(scopeCountry) && /\besiliiga b\b/.test(scopeLabel))
-    || (["greece", "gre", "grc"].includes(scopeCountry) && /\bfootball league\b/.test(scopeLabel))
-    || (["poland", "pol"].includes(scopeCountry) && /\b(ii|2) liga\b/.test(scopeLabel))) return false;
- const comp=String(competition??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
- const c=String(country??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
- if(!comp)return false;
-
-  if (/\bserie c\b|\bserie d\b|\blega pro\b|\bserie c1\b|\bserie c2\b/.test(comp)) return false;
- if (/\bleague one\b|\bleague two\b|\bleague three\b/.test(comp)) return false;
- if (/\b(uefa|nations league|champions league|europa league|conference league|world cup|international|national [2-5]|cup|copa|trophy|play ?offs?)\b/.test(comp)) return false;
- if(/\b(premier league 2|pl2|professional development league|u(?:17|18|19|20|21|23)|under ?(?:17|18|19|20|21|23)|youth|junior(?:s)?|academy|juvenil|jugend|reserve|reserves|b team|damallsvenskan|wsl|liga f|summer series)\b/.test(comp))return false;
- if(/\b(?:3|4|5|6|7|8|9|iii|iv|v|vi)\s*(?:\.\s*)?(?:liga|league|division|div|bundesliga|serie|snl|hnl|federal|federation)\b|\b(?:third|fourth|fifth|regional|regionalliga|oberliga|national league north|national league south|non league|non-league)\b/.test(comp))return false;
- return /\b(?:premier league|premiership|championship|super league 2|super league|superliga|super lig|pro league|jupiler pro league|challenger pro league|bundesliga|2 bundesliga|austrian 2 liga|2 liga|ligue 1|ligue 2|serie a|serie b|la liga|laliga|primera division|segunda division|segunda liga|segunda divisao|liga portugal 2|liga portugal|eredivisie|eerste divisie|keuken kampioen divisie|primeira liga|ekstraklasa|i liga|1 lig|2 lig|1 liga|2 liga|liga i|liga ii|liga 1|liga 2|liga e pare|prva liga|first league|second league|fnl|first division|second division|division 1|division 2|div 1|div 2|1st division|2nd division|1st league|2nd league|a lyga|1 lyga|i lyga|1 snl|virsliga|meistriliiga|esiliiga|veikkausliiga|ykkosliiga|allsvenskan|superettan|eliteserien|obos ligaen|1 divisjon|premier division|league of ireland premier|league of ireland first|scottish championship|challenge league|tff first league|national football league|football league|nb i|nb ii|nemzeti bajnoksag i|nemzeti bajnoksag ii|kategoria superiore|kategoria e pare|premyer liqa|i liqa|p1 liga|1 deild|cymru premier|cymru north|cymru south|e rovnuli liga|erovnuli liga|erovnuli liga 2|persha liga|first nl|prva nl|2 snl|first professional football league|second professional football league|bulgarian second league|first division a|first division b|1 division|2 division|divizia nationala|divizia a|1a divisio|2a divisio|primera divisio|segunda divisio|albanian superliga|armenian premier league|belarusian premier league|belarusian first league|premijer liga|first professional league|meistaradeildin|besta deild|urvalsdeild|national division|super liga|super liga 2|super liga Srbije|superliga kosovo|campionato sammarinese|2 mfl|vtora mfl|prva makedonska|super league greece|super liga romania|liga 1 romania|liga 2 romania|montenegro first league|azerbaijan premier league|premyer liqasi|super league albania|lliga multisegur assegurances|lliga grup pirineu|abissnet superiore|bgl ligue|promotion d honneur|albi mall superliga|vbet malta premier league|malta premier league|czech liga|liga nacional|liga i|liga ii|vysshaya liga|pervaya liga|birinci dasta|birinci liqa|azerbaijan first division|azerbaijan first league|liga leumit|ligat haal|ligat ha al|israeli national league|kazakhstan first division|kazakhstan first league|qazaqstan first league|division d honneur|luxembourg division of honour|division of honour|moldovan super liga|moldova liga 1|liga 1 moldova|liga 7777|ligat winner|winner league|meistaradeildin|meistara deildin|lengjudeild karla|1 deild menn|montenegrin second league|second league montenegro|meridianbet 1 cfl|prva mfl|first mfl|wwin liga bih|wwin liga bosne i hercegovine|first league federation of bih|first league of the federation of bih|first league of republika srpska|prva liga federacije bih|prva liga republike srpske|efbet liga|efbet league|toplyga|cyprus second division|cypriot second division|cyprus league b|league b cyprus|1 deild karla|league of ireland first division|league of ireland premier division|nifl championship|nifl premiership|gibraltar football league|gibraltar second division|malta challenge league|challenge league malta|premier league malta|superliga e shqiperise|armenian first league|bosnian premier league|premijer liga bih|croatian first football league|first football league croatia|prva nogometna liga|czech first league|chance liga|dansk superliga|superligaen|danish 1st division|danish first division|finnish first division|greek super league|premier division ireland|island premier league|israeli premier league|liga leumit|lithuanian a lyga|lithuanian i lyga|latvian higher league|latvian first league|maltese premier league|maltese challenge league|norwegian first division|serbian super liga|slovak first football league|nike liga|prva slovenska nogometna liga|druga slovenska nogometna liga|swiss super league|swiss challenge league|turkish first league|ukrainian premier league|welsh premier league)\b/.test(comp);
-}
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-const SUPABASE_URL="https://gzgeklcukrclgwbsmbsp.supabase.co";
-const KEY=Deno.env.get("SUPABASE_ANON_KEY")||Deno.env.get("SUPABASE_PUBLISHABLE_KEY")||"";
-const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-requested-with, prefer, cache-control, pragma","Access-Control-Allow-Methods":"GET, POST, OPTIONS","Access-Control-Max-Age":"86400","Vary":"Origin"};
-
 
 function isEuropeanFixture(country: unknown, _competition?: unknown, _home?: unknown, _away?: unknown): boolean {
   return isGeographicEuropeCountry(country);
@@ -61,7 +26,7 @@ async function readFixtures(date:string){
   const {countryHtml,summaryHtml}=footyNomadSectionAt(html,m.index);
   const country=countryHtml?textOf(countryHtml).replace(/\s+\d+$/,"").trim():null;
   const league=textOf((summaryHtml.match(/href=["']\/league\/[^"']+["'][^>]*>([\s\S]*?)<\/a>/i)||[])[1]||"");
-  if(!isEuropeanFixture(country,league,home,away)||!isTopTwoTierLeague(league,country))continue;
+  if(!isEuropeanFixture(country,league,home,away)||!isEligibleDomesticSeniorLeague(country,league))continue;
     if (isExcludedSeniorTeam(home) || isExcludedSeniorTeam(away)) continue;
   const cls=(attrs.match(/class=["']([^"']+)/i)||[])[1]||"",status=cls.includes("ticket-live")?"live":cls.includes("ticket-ft")?"finished":cls.includes("ticket-pst")?"postponed":cls.includes("ticket-canc")?"cancelled":"scheduled";
   const hs=(body.match(/class=["'][^"']*ticket-hs[^"']*["'][^>]*>([0-9]+)</i)||[])[1],as=(body.match(/class=["'][^"']*ticket-as[^"']*["'][^>]*>([0-9]+)</i)||[])[1];
@@ -118,9 +83,9 @@ async function readFootballChartsFixtures(date:string){
  return {...result,cache:"miss"};
 }
 
-function isOpenMatchdayTopTwoFixture(f:any):boolean {
+function isEligibleOpenMatchdayFixture(f:any):boolean {
  const folder=String(f?.source_competition_id||"");
- const tier=folder.match(/^([A-Z]{3})_([12])_[A-Za-z0-9-]+$/i);
+ const tier=folder.match(/^([A-Z]{3})_([1-9][0-9]*)_[A-Za-z0-9-]+$/i);
  const country=String(f?.country||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
  const competition=String(f?.competition||f?.league||"");
  if(String(f?.source||"").toLowerCase()!=="openmatchday"||!tier||!country||["europe","uefa"].includes(country)||!isEuropeanFixture(country,competition,f?.home_team||f?.home,f?.away_team||f?.away))return false;
@@ -130,7 +95,7 @@ function isOpenMatchdayTopTwoFixture(f:any):boolean {
 function isEligiblePublicFixture(f:any):boolean {
  const country=f?.country,competition=f?.league||f?.competition,home=f?.home_team||f?.home,away=f?.away_team||f?.away;
  return isEuropeanFixture(country,competition,home,away)
-  && (isOpenMatchdayTopTwoFixture(f)||isTopTwoTierLeague(competition,country))
+  && (isEligibleOpenMatchdayFixture(f)||isEligibleDomesticSeniorLeague(country,competition))
   && (!f.gender||String(f.gender).toLowerCase()==="men")
   && !isExcludedSeniorTeam(home)&&!isExcludedSeniorTeam(away);
 }
