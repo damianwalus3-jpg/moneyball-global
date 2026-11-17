@@ -64,7 +64,7 @@ function Ustawienia() {
       const preview = validateBackup(parsed);
       const entries = Object.entries(preview.counts).filter(([, count]) => (count ?? 0) > 0);
       const total = entries.reduce((sum, [, count]) => sum + (count ?? 0), 0);
-      const summary = entries.map(([table, count]) => `${TABLE_LABELS[table as TableName]}: ${count}`).join("\\n");
+      const summary = entries.map(([table, count]) => `${table === "tracker_source_audit" ? "Audyt klasyfikacji" : TABLE_LABELS[table as TableName]}: ${count}`).join("\\n");
       const confirmed = window.confirm(
         `Kopia zawiera ${total} rekordów w ${entries.length} tabelach.\\n\\n${summary}\\n\\nPrzywracanie dopisze tylko rekordy o nieistniejących identyfikatorach. Istniejące rekordy nie zostaną nadpisane. Kontynuować?`,
       );
