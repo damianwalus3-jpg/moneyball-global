@@ -862,3 +862,8 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Test endpointu publicznego: GET 17.11 zwrócił sukces, `ok=true`, `source_count=4`, 11 surowych i 8 europejskich fixture rows. OpenMatchday sprawdził 38 kwalifikujących się folderów, ale nie zwrócił meczów na tę datę; 8 fixture rows ma formę, 0 ma Elo, prawdziwe xG, składy, kontuzje lub kursy. To potwierdza działanie endpointu, nie pełne pokrycie lig.
 - Weryfikacja E2E wywołania z cron pozostaje otwarta do kolejnego skanu o 15:00 Brussels: oczekiwane `public_source_error=null` i brak 401. Nie wymuszać skanu.
 - 500 z 16.11 pochodziły ze starych wersji funkcji 217/218 (invalid cron token i permission denied dla `moneyball_cron_owner_id`); monitorować bieżące wersje oddzielnie.
+
+## Utwardzenie hooków React w statystykach — 17.11.2026
+- Audyt statyczny wykrył, że `Statystyki` wywoływały `useMemo` dopiero po wczesnym return dla loading/error. Mogło to zmieniać liczbę hooków między renderem początkowym a renderem z danymi.
+- Przeniesiono `useMemo` oraz bezpieczne wartości domyślne nad wszystkie wczesne returny; zachowano dotychczasowy UI loading/error i logikę statystyk.
+- Commit `e5fe44f5f61072c59603168694b12bfaaa3dc922`; kod pobrany ponownie z GitHub i potwierdzono bezwarunkowe wywołanie hooka. Status Vercel pokazuje build-rate-limit failure; nie jest to potwierdzenie ani zaprzeczenie wdrożenia Cloudflare. Brak potwierdzonego CI SUCCESS/Cloudflare deploy dla tego commitu.
