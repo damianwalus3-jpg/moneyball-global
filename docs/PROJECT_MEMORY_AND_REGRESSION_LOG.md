@@ -854,3 +854,11 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - CI/produkcja: status Vercel nie jest dowodem deployu Cloudflare. Dla tych dwóch commitów nie ma jeszcze potwierdzonego CI SUCCESS ani Cloudflare deploy SUCCESS. Nie oznaczać poprawki jako wdrożonej.
 - `MONEYBALL GLOBAL 3.8` to wersja modelu predykcji, a Supabase Edge Function `v242` to numer wdrożenia funkcji — różne numeracje.
 - Projekt nadal w toku. Nie zmieniać zakresu lig ani reguł kuponów; nie usuwać historii; nie tworzyć kuponów bez aktualnego kursu.
+
+## Naprawa 401 źródeł publicznych — 17.11.2026 08:10 Brussels
+- Logi pierwszego skanu v242 pokazały `Public sources HTTP 401`. Potwierdzona przyczyna: nowy klucz secret/service był wysyłany jako `Authorization: Bearer`, a funkcja `moneyball-public-sources` miała `verify_jwt=true`; gateway nie widział prawidłowego JWT (`jwt_role=""`) i blokował żądanie przed handlerem.
+- `moneyball-public-sources` agreguje wyłącznie publiczne dane i nie zwraca danych prywatnych, dlatego wdrożono ją jako ACTIVE v62 z `verify_jwt=false`. Dodano trwałą konfigurację w `supabase/config.toml` (commit `48e390e87ee68c2030641b6dfe1a609f4993abf4`).
+- W `moneyball-predict` usunięto secret bearer z wywołania publicznego endpointu; zostaje tylko publishable `apikey`. Usunięto nieużywany global `CRON_JWT_TOKEN`. Commit `9d71b6e01e5f84f364eb41bb8fc8c464cf9094553`; produkcyjna funkcja `moneyball-predict` ACTIVE v243, `verify_jwt=false` (weryfikacja tokenu harmonogramu w handlerze pozostaje).
+- Test endpointu publicznego: GET 17.11 zwrócił sukces, `ok=true`, `source_count=4`, 11 surowych i 8 europejskich fixture rows. OpenMatchday sprawdził 38 kwalifikujących się folderów, ale nie zwrócił meczów na tę datę; 8 fixture rows ma formę, 0 ma Elo, prawdziwe xG, składy, kontuzje lub kursy. To potwierdza działanie endpointu, nie pełne pokrycie lig.
+- Weryfikacja E2E wywołania z cron pozostaje otwarta do kolejnego skanu o 15:00 Brussels: oczekiwane `public_source_error=null` i brak 401. Nie wymuszać skanu.
+- 500 z 16.11 pochodziły ze starych wersji funkcji 217/218 (invalid cron token i permission denied dla `moneyball_cron_owner_id`); monitorować bieżące wersje oddzielnie.
