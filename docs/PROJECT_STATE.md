@@ -1271,3 +1271,57 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - Consequently, lower-tier eligibility remains false in the live database predicate until the backend migration and matching Edge Function versions are activated through an authorized backend deployment path. Do not repeat a manual scan yet and expect all tiers.
 - External fixture evidence: FootyNomad 17 Nov 2026 (`https://footynomad.com/fixtures/2026-11-17`, `https://footynomad.com/list?date=2026-11-17`), OpenMatchday league index (`https://github.com/oladeeayo/open-matchday/blob/master/LEAGUE_INDEX.md`), Non-League Ranking (`https://www.nonleagueranking.com/fixtures.php?Date=2026-11-17&game=all`). These sources support the lower-tier examples; they do not prove exhaustive Europe-wide daily coverage.
 - Issue #77 remains OPEN. No historical data, coupon, settlement or bankroll row was deleted or rewritten.
+
+
+## Backend activation and all-tier production verification — 2026-11-17
+
+### Authorization and deployed backend
+- User explicitly authorized production deployment of the all-tier SQL migration and matching Supabase Edge Functions.
+- Supabase project: `gzgeklcukrclgwbsmbsp`. No Vercel or TEST environment was used.
+- Applied SQL migration `expand_european_leagues_to_all_senior_tiers`, recorded by Supabase as version `20261117112345`.
+- Applied regression-only SQL migration `validate_real_fixture_reserve_exclusions`, recorded as `20261117113722`.
+- Active Edge Functions after deployment, with existing JWT settings preserved:
+  - `footynomad-sync` v100, `verify_jwt=true`
+  - `moneyball-free-feed` v52, `verify_jwt=true`
+  - `moneyball-predict` v247, `verify_jwt=false`
+  - `moneyball-public-sources` v64, `verify_jwt=false`
+- All functions deployed as self-contained one-file bundles containing the exact committed shared helper sources. This avoids the earlier relative shared-import bundle-resolution problem. No secrets or auth settings were changed.
+
+### Source audit for 2026-11-17
+- FootyNomad day page reported 172 fixtures across 20 countries. Its domestic European senior league headings included:
+  - France National 2 — 1 fixture
+  - Czech 3. liga - CFL B — 1 fixture
+  - England — 21 senior league fixtures across National League North/South and four Non League Premier regional divisions; additionally EFL Trophy (1), Premier League Cup (1), Professional Development League (4), all excluded
+  - Northern Ireland Championship — 2 fixtures
+  - Scotland Lowland League — 8 fixtures, including Newton Stewart v Celtic II, which is excluded as a reserve side
+- The Czech 3. liga fixture was Pardubice II v Horní Ředice; it is correctly excluded because Pardubice II is a reserve team. Thus the FootyNomad accepted count is 31, not 33.
+- The accepted 31 comprise England 21, France 1, Northern Ireland 2, Scotland 7.
+- Other FootyNomad competitions on the date included international/national-team competitions, U17/U19/U21, non-European domestic leagues, cups and U23. These remain excluded.
+- Independent checks: BetExplorer, SportPremi, SKORGOL/Koraview for Pardubice II v Horní Ředice; official Scottish Lowland Football League match centre and Flashscore/SoccerPunter for Lowland fixtures.
+
+### Production feed and database proof
+- Scheduled `moneyball-free-feed` run at 2026-11-17 11:31:01 UTC completed successfully and stored 31 FootyNomad fixtures for the Brussels date; 0 missing kickoff timestamps.
+- Feed grouping: England National League North 5, National League South 2, Non League Premier Isthmian 4, Northern 4, Southern Central 3, Southern South 3; France National 2 1; Northern Ireland Championship 2; Scotland Lowland League 7.
+- Public-source endpoint returned 22 raw fixtures from four sources and 11 eligible geographic-European senior domestic fixtures after filtering; the 11 were OpenMatchday rows. ESPN Nations League and other non-domestic/non-European rows were rejected.
+- Production scheduled importer log at 11:35:08 UTC: `feed_rows=31`, `public_rows=11`, `eligible_rows=31`, `inserted=0`, `skipped_existing=31`, `deduplicated_candidates=0`, no feed or public-source error. This confirms the feed rows already existed in the main matches table and were recognized as eligible.
+- Main match registry for 2026-11-17: 110 rows for the owner, 43 eligible rows before duplicate collapse, 67 rejected, 11 date-only rows. The prediction page's canonical deduplication yields 40 unique eligible senior men's fixtures (3 duplicate source rows collapsed).
+- Live SQL eligibility tests passed: France National 2, England National League North, Scotland Lowland League, Northern Ireland Championship accepted; Albania accepted; Israel/Türkiye/Cyprus and World/Nations League, EFL Trophy, U23 and reserve sides rejected.
+- Regression discovered and fixed in validation: synthetic team name `Club B` looked like a B-team suffix and was correctly rejected; senior-league validation fixtures now use neutral team names. Actual reserve checks for Pardubice II and Celtic II pass as excluded.
+
+### Production prediction scan
+- The prior scan state had been marked completed after only 2 fixtures and a 6-hour cooldown. After confirming no active lease, the current-day scan's `next_scan_at` was advanced to now (no match/history/coupon/bankroll rows were changed) so the existing minute scheduler could reprocess the full day.
+- Scheduled `moneyball-predict` production scan completed successfully: 4 batches, 40 fixtures processed, status `completed`, no error, lease released. Next scheduled run is 2026-11-17 14:00 UTC = 15:00 Europe/Brussels.
+- For all 40 canonical eligible fixtures, database verification found: 40/40 have a 1X2 prediction, 40/40 have all three separate Double Chance selections, and 40/40 have at least one Goals prediction.
+- The model's weak predictions remain recorded as `ODRZUCONY`; they are not silently omitted. No coupon or bankroll data was altered by this task.
+
+### Cloudflare MAIN and UI smoke test
+- Latest code commit before this documentation update: `5ab413e6f05c6ae9c63307bb4bc6e3797413e000`.
+- GitHub CI #44075655027 SUCCESS; Cloudflare MAIN deploy #44075655122 SUCCESS.
+- Production Worker root and `/login` return the expected app pages. Unauthenticated `/panel` and `/mecze` correctly return `login_required`.
+- Frontend geographic/all-tier filtering is deployed and covered by CI. A signed-in visual browser session was not available during this run, so the final authenticated screen-level check remains open; do not claim that visual session was performed.
+- Supabase advisors show existing unrelated warnings (service-only RLS tables without user policies, pg_net in public, selected SECURITY DEFINER RPCs, leaked-password protection disabled). No unrelated security policy, auth setting, or extension was changed in this repair.
+
+### Remaining completion check
+- Verify next scheduled `moneyball-free-feed` refresh uses v52's updated all-tier audit note.
+- Perform an authenticated click-through of the app's Matches and Predictions screens after the user signs in, confirming the 40 canonical fixtures are visible and non-European/cup/youth/women/reserve rows are hidden.
+- Keep issue #77 open until that authenticated UI check is completed. Overall MONEYBALL GLOBAL is not declared finished by this fixture-scope repair alone.
