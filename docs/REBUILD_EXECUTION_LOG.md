@@ -373,3 +373,10 @@
 - Added a regression test with conflicting result rows and an explicit correct-leg count assertion.
 - Commits: implementation `ee2ae8d8db177cc06408a3c7180f3b6acae37a0d`; test updates `3834bdc39e1348d87aed93cc78e36feb22f9a6e9`, `09066643243f1b542da74c7b987b899fe2891c5e`, `8f9a1476fd86da75f918dee1a2380704a1d574a3`.
 - CI and Cloudflare deployment pending on the latest branch push.
+
+## Stage 33 — unique prediction weighting in Intelligence
+- Hardened model audit to use only the newest prediction per fixture, matching the Tracker newest-first convention. This prevents duplicate/legacy prediction records from overweighting accuracy, Brier score, log loss and calibration.
+- Invalid newest prediction rows remain unmatched rather than silently falling back to an older prediction.
+- Added a regression test proving duplicate predictions for one fixture count once.
+- Commits: implementation `8d4b9970e34a07ef15d185eb55cd08212b9f9a45`; test `9a884abcfcd4280e88620e6053b1372e2a6b7538`.
+- CI and deployment pending on latest branch commit.
