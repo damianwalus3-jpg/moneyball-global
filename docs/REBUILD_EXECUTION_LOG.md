@@ -402,3 +402,10 @@
 - Added a regression test for an invalid result record followed by a valid pending prediction.
 - Commit: `8b9518b0f644636ea1529adbcdef86e81ca44f8a`; test: `fb7dc5913a8320338c89cca72b8ca37b4c73b216`.
 - CI and Cloudflare deployment pending for the next consolidated commit.
+
+## Stage 37 — verified result can replace malformed legacy result
+- Follow-up audit found an interaction between stages 34 and 36: retry selection correctly ignored malformed result rows, but the generic idempotent insert still treated any existing fixtureId as a duplicate, preventing the verified result from being saved.
+- Result-key deduplication now ignores legacy result rows unless actual is one of 1/X/2. Valid results remain idempotent.
+- Added regression coverage for malformed legacy result followed by verified result and a repeated verified insert.
+- Implementation commit: `13ba2dfaf9cc04e3830d076342a3b33a5faa102e`; test commit: `53d70ca157be88ecf8b670e5d566d8be3a4b8626`.
+- CI and deployment pending for the final log commit.
