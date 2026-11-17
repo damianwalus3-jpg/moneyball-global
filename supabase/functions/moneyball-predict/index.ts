@@ -49,7 +49,7 @@ function isOpenMatchdayTopTwoMatch(m:any):boolean {
  const folder=(String(m?.external_id||"").match(/^om:([^:]+):/)||[])[1]||"";
  const tier=folder.match(/^([A-Z]{3})_([12])_[A-Za-z0-9-]+$/i);
  const competition=String(m?.competition||m?.league||"");
- const country=String(m?.country||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().trim();
+ const country=String(m?.country||"").toLowerCase().trim();
  if(String(m?.source||"").toLowerCase()!=="openmatchday"||!tier||["europe","uefa"].includes(country))return false;
  if(!isEuropeanFixture(m?.country,competition,m?.home_team,m?.away_team))return false;
  if(/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\b/i.test(folder+" "+competition))return false;
