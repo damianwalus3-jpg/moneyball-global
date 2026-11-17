@@ -36,4 +36,22 @@ describe("three-leg coupon candidates", () => {
     ], "2026-11-17");
     expect(candidates).toHaveLength(0);
   });
+  it("uses the newest eligible prediction per fixture even when Tracker rows are out of order", () => {
+    const older = { ...prediction("a-old", 0.92), createdAt: "2026-11-17T08:00:00Z" };
+    const newer = {
+      ...prediction("a-new", 0.78),
+      createdAt: "2026-11-17T12:00:00Z",
+      details: { ...prediction("a-new", 0.78).details, fixtureId: "a" },
+    };
+    const rows = [
+      older,
+      prediction("b", 0.85),
+      prediction("c", 0.86),
+      newer,
+    ];
+    const candidates = buildThreeLegCandidates(rows, "2026-11-17");
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].legs.find(leg => leg.fixtureId === "a")?.probability).toBe(0.78);
+  });
+
 });

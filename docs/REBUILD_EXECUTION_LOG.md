@@ -416,3 +416,11 @@
 - The test used the current wall-clock time for the existing Tracker row but a fixed earlier timestamp for the imported backup row, while asserting that the imported row must sort first. On the CI runner the existing row was correctly newer.
 - Corrected the test fixture to use a deterministic future timestamp for the imported newest row. Production sorting behavior is unchanged.
 - Stage 37 implementation remains in place; final CI and Cloudflare deployment must pass on the corrected branch HEAD before marking this stage deployed.
+
+
+### Stage 38 — deterministic newest prediction for coupon generation (2026-11-17)
+- Coupon candidate generation no longer assumes Tracker rows are newest-first. This matters for older/imported records, which can arrive in a different order.
+- For each fixture, the engine now explicitly selects the eligible prediction with the latest valid `createdAt` timestamp before constructing three-leg combinations.
+- Added regression coverage with an older high-probability prediction appearing before a newer lower-probability prediction for the same fixture; the newer prediction must be selected.
+- Preserves the existing rules: same selected date, exactly three distinct fixtures, each selected outcome probability at least 75%, and no bookmaker odds claim.
+- CI and Cloudflare deployment are required before this stage is marked complete/deployed.

@@ -38,12 +38,18 @@ function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCand
 }
 
 export function buildThreeLegCandidates(records: TrackerRecord[], date: string, limit = 30): ThreeLegCandidate[] {
-  const unique = new Map<string, CouponLegCandidate>();
+  // Do not depend on Tracker's array order: imported/legacy records may not be
+  // newest-first. Select the most recent eligible prediction for each fixture.
+  const newestByFixture = new Map<string, { candidate: CouponLegCandidate; createdAt: number }>();
   for (const record of records) {
     const candidate = candidateFromRecord(record, date);
-    if (candidate && !unique.has(candidate.fixtureId)) unique.set(candidate.fixtureId, candidate);
+    if (!candidate) continue;
+    const createdAt = Date.parse(record.createdAt);
+    if (!Number.isFinite(createdAt)) continue;
+    const previous = newestByFixture.get(candidate.fixtureId);
+    if (!previous || createdAt > previous.createdAt) newestByFixture.set(candidate.fixtureId, { candidate, createdAt });
   }
-  const pool = [...unique.values()].sort((a, b) => b.probability - a.probability);
+  const pool = [...newestByFixture.values()].map(item => item.candidate).sort((a, b) => b.probability - a.probability);
   const output: ThreeLegCandidate[] = [];
   for (let i = 0; i < pool.length - 2; i++) {
     for (let j = i + 1; j < pool.length - 1; j++) {
