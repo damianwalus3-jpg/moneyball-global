@@ -54,4 +54,20 @@ describe("three-leg coupon candidates", () => {
     expect(candidates[0].legs.find(leg => leg.fixtureId === "a")?.probability).toBe(0.78);
   });
 
+
+  it("rejects non-normalized probabilities and a selection that is not the model's top outcome", () => {
+    const validB = prediction("b", 0.85);
+    const validC = prediction("c", 0.86);
+    const invalidSum = {
+      ...prediction("a", 0.90),
+      details: { ...prediction("a", 0.90).details, p1: 0.9, px: 0.2, p2: 0.2 },
+    };
+    const wrongSelection = {
+      ...prediction("a", 0.90),
+      details: { ...prediction("a", 0.90).details, selection: "X" },
+    };
+    expect(buildThreeLegCandidates([invalidSum, validB, validC], "2026-11-17")).toHaveLength(0);
+    expect(buildThreeLegCandidates([wrongSelection, validB, validC], "2026-11-17")).toHaveLength(0);
+  });
+
 });
