@@ -10,30 +10,30 @@ AS $function$
   WITH raw AS (
     SELECT lower(btrim(coalesce(p_country,''))) AS value
   ), normalized AS (
-    SELECT regexp_replace(translate(value, 'áéíóúüñç', 'aeiouunc'), '[^a-z0-9]+', ' ', 'g') AS value
+    SELECT btrim(regexp_replace(translate(value, 'áéíóúüñç', 'aeiouunc'), '[^a-z0-9]+', ' ', 'g')) AS value
     FROM raw
   )
   SELECT value = ANY (ARRAY[
     'albania','andorra','austria','belarus','belgium','bosnia','bosnia and herzegovina',
     'bulgaria','croatia','czechia','czech republic','denmark','england','estonia',
     'faroe islands','finland','france','germany','gibraltar','greece','guernsey','hungary',
-    'iceland','ireland','isle of man','italy','jersey','kosovo','latvia','liechtenstein',
+    'iceland','ireland','republic of ireland','isle of man','italy','jersey','kosovo','latvia','liechtenstein',
     'lithuania','luxembourg','malta','moldova','monaco','montenegro','netherlands',
     'north macedonia','macedonia','northern ireland','norway','poland','portugal','romania',
     'russia','san marino','scotland','serbia','slovakia','slovenia','spain','sweden',
-    'switzerland','ukraine','wales','united kingdom','great britain','uk',
+    'switzerland','ukraine','wales','united kingdom','united kingdom of great britain and northern ireland','great britain','uk',
     'aland islands','svalbard and jan mayen islands','holy see','vatican city',
     'alb','and','aut','blr','bel','bih','bgr','bul','hrv','cro','cze','dnk','est',
     'fro','fin','fra','deu','ger','gib','grc','gre','ggy','hun','isl','irl','imn',
-    'ita','je y','lva','lie','ltu','lux','mlt','mda','mco','mne','nld','mkd','nor',
+    'ita','jey','lva','lie','ltu','lux','mlt','mda','mco','mne','nld','mkd','nor',
     'pol','prt','por','rou','rus','smr','srb','svk','svn','esp','swe','che','sui',
     'ukr','gbr','gb','uk','eng','sco','wal','nir','kos','ala','sjm','vat'
   ])
-  OR value = ANY (ARRAY['gb','uk','eng','sco','wal','nir','kos','alb','and','aut','blr','bel','bih','bgr','bul','hrv','cro','cze','dnk','est','fro','fin','fra','deu','ger','gib','grc','gre','ggy','hun','isl','irl','imn','ita','je y','lva','lie','ltu','lux','mlt','mda','mco','mne','nld','mkd','nor','pol','prt','por','rou','rus','smr','srb','svk','svn','esp','swe','che','sui','ukr','gbr','ala','sjm','vat'])
+  OR value = ANY (ARRAY['gb','uk','eng','sco','wal','nir','kos','alb','and','aut','blr','bel','bih','bgr','bul','hrv','cro','cze','dnk','est','fro','fin','fra','deu','ger','gib','grc','gre','ggy','hun','isl','irl','imn','ita','jey','lva','lie','ltu','lux','mlt','mda','mco','mne','nld','mkd','nor','pol','prt','por','rou','rus','smr','srb','svk','svn','esp','swe','che','sui','ukr','gbr','ala','sjm','vat'])
   OR EXISTS (
     SELECT 1
     FROM regexp_split_to_table((SELECT value FROM raw), '[,;/|]') AS part
-    WHERE regexp_replace(translate(lower(btrim(part)), 'áéíóúüñç', 'aeiouunc'), '[^a-z0-9]+', ' ', 'g') = ANY (ARRAY[
+    WHERE btrim(regexp_replace(translate(lower(btrim(part)), 'áéíóúüñç', 'aeiouunc'), '[^a-z0-9]+', ' ', 'g')) = ANY (ARRAY[
       'albania','andorra','austria','belarus','belgium','bosnia','bosnia and herzegovina',
       'bulgaria','croatia','czechia','czech republic','denmark','england','estonia',
       'faroe islands','finland','france','germany','gibraltar','greece','guernsey','hungary',
