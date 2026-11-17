@@ -10,7 +10,7 @@ function prediction(id: string, probability: number, date = "2026-11-17"): Track
     status: "KANDYDAT",
     createdAt: "2026-11-17T08:00:00Z",
     details: {
-      fixtureId: id, fixtureDate: date, competition: "Test league", model: "test-v1",
+      fixtureId: id === "a-duplicate" ? "a" : id, fixtureDate: date, competition: "Test league", model: "test-v1",
       selection: "1", p1: probability, px: 0.1, p2: 1 - probability - 0.1,
       strongCandidate: true, source: "test",
     },
