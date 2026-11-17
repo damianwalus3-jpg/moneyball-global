@@ -39,6 +39,12 @@ const bucketOf = (p: number | null) => {
 
 function Statystyki() {
   const statsQuery = useQuery(statisticsPageDataQuery());
+  const matches = statsQuery.data?.matches ?? [];
+  const preds = statsQuery.data?.predictions ?? [];
+  const coupons = statsQuery.data?.coupons ?? [];
+  const legs = statsQuery.data?.legs ?? [];
+  // Hooks must run before loading/error early returns to preserve hook order.
+  const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
   if (statsQuery.isPending) {
     return (
       <div>
@@ -55,7 +61,6 @@ function Statystyki() {
       />
     );
   }
-  const { matches, predictions: preds, coupons, legs } = statsQuery.data;
   const scopedMatchIds = new Set(matches
     .filter((match) => isEligibleEuropeanMatch(match))
     .map((match) => match.id));
@@ -88,8 +93,6 @@ function Statystyki() {
   const singleStakeSum = settledSinglePicks.reduce((sum, p) => sum + (Number(p.stake ?? 4) || 0), 0);
   const singlePayoutSum = singleStakeSum + singlePickProfit;
   const singleRoi = singleStakeSum > 0 && !singleProfitIncomplete ? Math.round((singlePickProfit / singleStakeSum) * 1000) / 10 : null;
-  const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
-
   const settledCoupons = scopedCoupons.filter((c) => c.status === "won" || c.status === "lost" || c.status === "void");
   const staked = settledCoupons.filter((c) => c.stake != null);
   const stakeSum = staked.reduce((s, c) => s + Number(c.stake), 0);
