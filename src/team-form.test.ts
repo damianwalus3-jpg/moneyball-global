@@ -13,7 +13,7 @@ afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("historical team form", () => {
   it("returns five most recent completed matches before fixture date", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
+    vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: true,
       json: async () => ({ generated_utc: "2026-11-17T00:00:00Z" }),
       text: async () => csv,
