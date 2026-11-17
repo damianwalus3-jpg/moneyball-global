@@ -169,9 +169,19 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (x: T) => Promise<R
 }
 async function openMatchday(date: string) {
   const index = await safeText(LEAGUE_INDEX);
-  const indexRows = [...index.matchAll(/^\|\s*`([A-Za-z0-9_-]+)`\s*\|\s*([^|]+)\|/gm)];
+  // OpenMatchday folders encode the official competition tier: <COUNTRY>_<TIER>_<slug>.
+  // Use human-readable league/country labels downstream, while retaining the folder ID.
+  const indexRows = [...index.matchAll(/^\\|\\s*`([A-Za-z0-9_-]+)`\\s*\\|\\s*([^|]+)\\|\\s*([^|]+)\\|/gm)];
   const leagueNameByFolder = new Map(indexRows.map(m => [m[1], m[2].trim()]));
-  const folders = indexRows.map(m => m[1]);
+  const countryNameByFolder = new Map(indexRows.map(m => [m[1], m[3].trim()]));
+  const eligibleIndexRows = indexRows.filter(m => {
+    const folder = m[1], tier = folder.match(/^([A-Z]{3})_([12])_[A-Za-z0-9-]+$/i);
+    const country = m[3].trim().normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase();
+    const league = m[2].trim();
+    return !!tier && EUROPE_COUNTRIES.has(country) && !["europe", "uefa"].includes(country)
+      && !/\\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\\b/i.test(folder + " " + league);
+  });
+  const folders = eligibleIndexRows.map(m => m[1]);
   const unique = [...new Set(folders)];
   const githubHistoryPromise = readGithubTeamHistory();
   const results = await mapLimit(unique, 8, async (folder) => {
@@ -182,12 +192,17 @@ async function openMatchday(date: string) {
     const headers = rows[0].map(x => x.trim().toLowerCase());
     const ix = (key: string) => headers.indexOf(key);
     const countryCode=folder.split("_")[0];
+    const leagueName=leagueNameByFolder.get(folder)||folder;
+    const countryName=countryNameByFolder.get(folder)||countryCode;
+    const tier=Number((folder.match(/^[A-Z]{3}_([12])_/)||[])[1]||0);
     return rows.slice(1).filter(r => norm(r[ix("date")]) === date).map(r => ({
       external_id: "om:" + folder + ":" + date + ":" + norm(r[ix("home")]) + ":" + norm(r[ix("away")]),
       source: "OpenMatchday",
-      competition: folder,
-      country: countryCode,
-      gender: /women|womens|female|frauen|femenin|femenina|damallsvenskan|wsl/i.test(folder + " " + (leagueNameByFolder.get(folder) || "")) ? "women" : "men",
+      source_competition_id: folder,
+      source_tier: tier,
+      competition: leagueName,
+      country: countryName,
+      gender: /women|womens|female|frauen|femenin|femenina|damallsvenskan|wsl/i.test(folder + " " + leagueName) ? "women" : "men",
       home_team: norm(r[ix("home")]),
       away_team: norm(r[ix("away")]),
       // CSV kickoff is venue-local. Convert using the competition's IANA timezone;
