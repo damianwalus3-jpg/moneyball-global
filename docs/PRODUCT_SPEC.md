@@ -3,6 +3,12 @@
 ## Product
 MONEYBALL — Trust the Process is a mobile-first installable PWA for football match analysis, transparent prediction tracking, coupon management, live/result monitoring and performance intelligence. Polish is the default language; Europe/Brussels is the default timezone.
 
+## Cost constraints
+- Zero paid subscriptions, paid APIs, paid hosting, or paid database provisioning.
+- Deploy the independent static app to Cloudflare Workers Free within published quotas; no D1/Supabase provisioning is required for the local-first version.
+- Persist Tracker data in browser storage with user-controlled JSON backups. Explain that browser-local data does not sync automatically between devices.
+- Use public, keyless sources only where their license permits the intended non-commercial hobby use; preserve attribution and source timestamps.
+
 ## Product principles
 - Build as a new application with a clean working tree and clean data model.
 - Never fabricate fixtures, results, odds, xG, lineups, injuries, probabilities or source coverage.
