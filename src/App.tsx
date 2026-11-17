@@ -10,6 +10,7 @@ import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
 import { shouldAppendPrediction } from "./prediction-record";
 import { getSafestPick, hasKickoffPassed } from "./safest-pick";
+import { buildBetSettlementRows } from "./bet-settlement";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
@@ -215,6 +216,7 @@ export default function App() {
         }] : [];
       });
       addRecordsIfMissing(settlementRows, "parentCouponId");
+      addRecordsIfMissing(buildBetSettlementRows(latest), "parentBetId");
       setSettling(false);
       settlementLock.current = false;
       setRecords(readRecords());
@@ -370,12 +372,13 @@ export default function App() {
             const bets = records.filter(row => row.kind === "bet");
             const selected = bets.filter(row => row.details.decision === "SELECTED");
             const rejected = bets.filter(row => row.details.decision === "REJECTED");
-            const settled = selected.filter(row => ["WON","LOST","VOID"].includes(row.status));
+            const betSettlements = new Map(bets.filter(row => typeof row.details.parentBetId === "string").map(row => [String(row.details.parentBetId), row]));
+            const settled = selected.map(row => betSettlements.get(row.id)).filter((row): row is TrackerRecord => !!row && ["WON","LOST","VOID"].includes(row.status));
             const wins = settled.filter(row => row.status === "WON").length;
             const losses = settled.filter(row => row.status === "LOST").length;
             const profit = settled.reduce((sum,row) => sum + (typeof row.details.profitLoss === "number" ? row.details.profitLoss : 0),0);
             const stake = settled.reduce((sum,row) => sum + (typeof row.details.stake === "number" ? row.details.stake : 0),0);
-            const rejectedSettled = rejected.filter(row => ["ODRZUCONY_TRAFIŁ","ODRZUCONY_NIE_TRAFIŁ"].includes(row.status));
+            const rejectedSettled = rejected.map(row => betSettlements.get(row.id)).filter((row): row is TrackerRecord => !!row && ["ODRZUCONY_TRAFIŁ","ODRZUCONY_NIE_TRAFIŁ"].includes(row.status));
             const rejectedHits = rejectedSettled.filter(row => row.status === "ODRZUCONY_TRAFIŁ").length;
             const currency = (value: number) => new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(value);
             return <>
@@ -393,7 +396,7 @@ export default function App() {
               <p>Przy każdym zapisanym typie można odnotować kurs. Dla odrzuconego stawka wynosi 0; jego trafność liczymy wyłącznie hipotetycznie.</p>
               <div className="tracker-table">
                 <div className="tracker-head"><span>DECYZJA</span><span>MECZ / TYP</span><span>KURS</span><span>STAWKA</span><span>STATUS / P/L</span></div>
-                {bets.map(row => <div className="tracker-row bet-row" key={row.id}>
+                {bets.filter(row => typeof row.details.parentBetId !== "string").map(row => { const settlement = betSettlements.get(row.id); return <div className="tracker-row bet-row" key={row.id}>
                   <span>{row.details.decision === "SELECTED" ? "WYBRANY" : "ODRZUCONY"}</span>
                   <b>{row.title} · {String(row.details.market ?? "")}</b>
                   <span>{Number(row.details.odds).toFixed(2)}</span>
