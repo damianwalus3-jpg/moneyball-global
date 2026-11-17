@@ -290,7 +290,7 @@ function Panel() {
             })}
           </div>
         ) : (
-          <p className="rounded-lg bg-secondary/30 p-3 text-sm text-muted-foreground">Nie ma jeszcze zatwierdzonych typów na dziś. Otwórz terminarz i uruchom skan oraz analizę.</p>
+          <p className="rounded-lg bg-secondary/30 p-3 text-sm text-muted-foreground">Brak zatwierdzonych typów na dziś. To nie musi oznaczać błędu skanu: typ jest zatwierdzany wyłącznie przy prawdopodobieństwie powyżej 75%, wystarczającym pokryciu danych i potwierdzonych danych rynkowych. Mecze bez wymaganych danych lub kursów pozostają w rejestrze jako ODRZUCONY. Otwórz Terminarz, aby sprawdzić przyczynę przy każdym meczu.</p>
         )}
         <div className="mt-3 flex justify-end">
           <Link to="/kupony" className="text-sm font-semibold text-primary">Przejdź do kuponów i singli <ChevronRight className="inline size-4" /></Link>

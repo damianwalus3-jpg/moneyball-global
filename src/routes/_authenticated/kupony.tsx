@@ -219,7 +219,7 @@ function Kupony() {
         </div>
         {preview.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
-            Wybierz „Generuj kupony”, aby zobaczyć podgląd, albo od razu „GENERUJ I ZAPISZ KUPONY”. Potrzeba minimum 3 różnych dzisiejszych meczów z WYBRANY i prawdopodobieństwem ściśle powyżej 75%.
+            Dostępne kwalifikujące się mecze: {uniqueCandidateMatches}. Do kuponu potrzeba minimum 3 różnych spotkań z WYBRANY i prawdopodobieństwem powyżej 75%. Jeśli liczba jest mniejsza, sprawdź powody odrzucenia w Terminarzu. Nie tworzymy kuponów MAIN/MEGA/EXTRA bez wystarczających danych i potwierdzonych kursów.
           </p>
         ) : (
           <>
