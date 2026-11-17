@@ -660,3 +660,12 @@
 - CI `44192192529` and Cloudflare deployment `44192192228` passed; all 100 tests across 18 test files passed.
 - No real provider call was made. Production `/api/odds/status` still reports both provider keys configured and `pilotEnabled:false` because the owner token has not yet been configured. Therefore the UI cannot fetch live odds until the user sets the Worker secret and enters the same token in the app.
 - Visual browser click-through was not completed because the browser automation wallet had a zero balance. The code build, unit tests and deployment did pass.
+
+
+## 2026-11-17 — Stage 19: enforce strong odds pilot secret
+- Hardened the rebuild Worker so an absent or shorter-than-32-character `ODDS_PILOT_TOKEN` keeps the odds pilot disabled (HTTP 503) before any provider call.
+- `/api/odds/status` now reports `pilotEnabled: true` only when the configured secret meets the minimum length; it still never returns secret values.
+- Added regression coverage for a weak configured token and updated successful test fixtures to use strong-length tokens.
+- No real OddsPapi or StrikerAPI request was made and no provider credits were consumed.
+- Code commits: `a1d97fdf18c09d10977f0e1980bdbd99e06dac1d` and `26576025587354f4d5a67f0581ea02f2b1c8ee9d`.
+- CI and Cloudflare deployment verification: pending; do not mark this stage deployed until both pass.
