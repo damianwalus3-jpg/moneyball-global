@@ -1,6 +1,6 @@
 import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient, useSuspenseQuery, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun, fetchCouponPageData, fetchMatchPageData, fetchMatchesByIds, fetchCouponLegsByPredictionIds, fetchResultsPage, fetchHistoryPage, fetchStatisticsPageData, fetchTrackerCategories, fetchJackpotEntries } from "./db";
+import { fetchAll, fetchDashboardSelectedPicks, fetchDashboardSummary, fetchCouponFinanceSummary, fetchLatestScanRun, fetchCouponPageData, fetchMatchPageData, fetchMatchesByIds, fetchCouponLegsByPredictionIds, fetchResultsPage, fetchHistoryPage, fetchStatisticsPageData, fetchTrackerCategories, fetchJackpotEntries, fetchTrackerCategorySummary } from "./db";
 import type { HistoryPageCursor, ResultsPageCursor } from "./db";
 import type { TableName, TableRows } from "./types";
 
@@ -203,6 +203,17 @@ export function jackpotEntriesQuery() {
     queryFn: fetchJackpotEntries,
     retry: false,
     staleTime: 30_000,
+    gcTime: 600_000,
+    refetchInterval: false,
+  });
+}
+
+export function trackerCategorySummaryQuery() {
+  return queryOptions({
+    queryKey: ["tracker-category-summary"] as const,
+    queryFn: fetchTrackerCategorySummary,
+    retry: false,
+    staleTime: 60_000,
     gcTime: 600_000,
     refetchInterval: false,
   });
