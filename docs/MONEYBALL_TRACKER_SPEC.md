@@ -155,8 +155,9 @@ The first production Tracker release is implemented on the existing MAIN applica
 - `20261117131322_tracker_source_audit_backup_restore`
 - `20261117131434_fix_tracker_source_audit_restore_count`
 - `20261117143000_harden_tracker_source_classification_rpc`
+- `20261117144500_guard_legacy_paper_classification_and_audit_restore`
 
-All 13 Tracker migrations are additive. They do not rewrite historical matches, predictions, coupons, coupon legs, results or bankroll transactions.
+All 14 Tracker migrations are additive. They do not rewrite historical matches, predictions, coupons, coupon legs, results or bankroll transactions.
 
 ### Verification snapshot
 
@@ -176,8 +177,9 @@ All 13 Tracker migrations are additive. They do not rewrite historical matches, 
 - Added the append-only table `moneyball_tracker_source_audit` with RLS and owner-only read access. The Tracker shows the latest 25 audit events with entity type, prior/new class, note and timestamp. No legacy records were classified automatically.
 - JSON backups now export the full source-classification audit history, validate audit UUIDs, entity types, source classes and timestamps before any restore writes, preview audit row counts, and restore audit rows idempotently in bounded batches. Existing rows remain skipped, never overwritten.
 - Pagination is reset to the first page after a classification operation to avoid skipping rows as the unclassified queue shrinks.
-- Added five additive migrations for the audit table/RPC, type-filtered queue, audit backup/restore, accurate idempotent restore counts and SECURITY DEFINER hardening. Tracker-specific migration count is now 13.
-- Ran rollback-only production SQL regression checks using existing owner records as temporary fixtures: PAPER settlement and cancellation did not write bankroll transactions or issue refunds; explicit prediction/coupon classification wrote the audit entries; audit restore inserted once and then returned zero on repeat; invalid null entity types were rejected. All fixture mutations were rolled back. Production counts remained unchanged.
+- Added six additive migrations for the audit table/RPC, type-filtered queue, audit backup/restore, accurate idempotent restore counts, SECURITY DEFINER hardening and protection against classifying ledger-backed legacy coupons as PAPER. Audit restore now also requires the restored source class to match the existing owner record. Tracker-specific migration count is now 14.
+- The PAPER classification guard was based on a read-only audit of all 9 legacy coupons: 6 have existing bankroll transactions and must retain USER/MODEL classification unless the user explicitly chooses a different financial-history policy. The UI explains this restriction.
+- Ran rollback-only production SQL regression checks using existing owner records as temporary fixtures: PAPER settlement and cancellation did not write bankroll transactions or issue refunds; explicit prediction/coupon classification wrote audit entries; PAPER classification was allowed for a coupon with no ledger rows and blocked for a coupon with existing ledger rows; audit restore inserted once and then returned zero on repeat; source-class mismatches and invalid null entity types were rejected. All fixture mutations were rolled back. Production counts remained unchanged.
 - Production read-only snapshot: 15 system categories, 14 aliases, 19,201 predictions, 9 coupons, 9 bankroll transactions, 0 Jackpot entries, 0 audit entries, 18,724 unclassified predictions and 9 unclassified coupons. No historical source values were changed by this delivery.
 - CI passed: 92 tests across 9 test files, Supabase Edge Function type-check, application TypeScript check and production build. The release commit `06f7c23` passed CI and Cloudflare deployment: 92 tests across 9 files, Supabase Edge Function type-check, application TypeScript check, Cloudflare build and deploy all succeeded.
 
