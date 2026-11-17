@@ -380,3 +380,11 @@
 - Added a regression test proving duplicate predictions for one fixture count once.
 - Commits: implementation `8d4b9970e34a07ef15d185eb55cd08212b9f9a45`; test `9a884abcfcd4280e88620e6053b1372e2a6b7538`.
 - CI and deployment pending on latest branch commit.
+
+## Stage 34 — idempotent automatic result and coupon settlement
+- Automatic result retrieval now inserts a result only when no result record for that fixture already exists, using the Tracker's fixture key.
+- Paper coupon settlement rows are inserted idempotently by parentCouponId, preventing repeated refresh cycles from creating duplicate child settlement records.
+- Added Tracker-store regression coverage for repeated result and coupon settlement writes.
+- This is best-effort browser-local deduplication; localStorage is not a transactional cross-device database, so it does not promise atomic multi-device writes.
+- Commits: App integration `d453b6ef41a1daf1f1c13dc4f3da9d31772f25eb`; tests `eaed5b016a6fe6675fe13e115bb5d11fa4c5f603`.
+- CI and Cloudflare deployment pending for the final stage commit.
