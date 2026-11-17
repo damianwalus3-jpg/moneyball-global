@@ -25,4 +25,18 @@ describe("tracker model audit", () => {
     expect(audit.metrics).toBeNull();
     expect(audit.unmatchedPredictions).toBe(1);
   });
+  it("uses the newest result when duplicate settlement rows exist", () => {
+    const newer: TrackerRecord = { ...result, id: "r-new", details: { fixtureId: "f1", actual: "2" } };
+    const older = { ...result, id: "r-old", createdAt: "2026-11-16T20:00:00Z", details: { fixtureId: "f1", actual: "1" } };
+    const audit = auditTrackerPredictions([prediction, newer, older]);
+    expect(audit.metrics?.accuracy).toBe(0);
+  });
+  it("excludes malformed or non-normalized probability rows without crashing the audit", () => {
+    const malformed: TrackerRecord = { ...prediction, id: "p-bad", details: { fixtureId: "f2", p1: 1.4, px: -0.2, p2: -0.2 } };
+    const badResult: TrackerRecord = { ...result, id: "r-bad", details: { fixtureId: "f2", actual: "X" } };
+    const audit = auditTrackerPredictions([malformed, badResult]);
+    expect(audit.settledPredictions).toBe(0);
+    expect(audit.unmatchedPredictions).toBe(1);
+    expect(audit.metrics).toBeNull();
+  });
 });
