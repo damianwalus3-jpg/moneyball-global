@@ -52,8 +52,8 @@ const CATEGORY_BY_LEGACY_VALUE: Record<string, string> = {
 /** Exact legacy labels are preserved; unknown values remain visible as unknown. */
 export function resolveTrackerCategory(raw: string | null | undefined): string {
   const value = raw?.trim().replace(/\s+/g, " ").toLocaleUpperCase("pl-BE");
-  if (!value) return "UNKNOWN";
-  return CATEGORY_BY_LEGACY_VALUE[value] ?? "UNKNOWN";
+  if (!value) return "UNCLASSIFIED";
+  return CATEGORY_BY_LEGACY_VALUE[value] ?? "UNCLASSIFIED";
 }
 
 /** Map only unambiguous legacy verdicts; do not invent WATCH/LEAN/PAPER labels. */
