@@ -698,3 +698,36 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Dodatkowa macierz 50 nazw providerowych dla lig z krajów europejskich: **50/50 PASS**; uwzględnia m.in. Gibraltar Premier Division, Albania 1st Division, Armenia First League, Azerbaijan Birinci Dasta, Belarus 1 Division i wykluczenie 2 Division, Bulgaria First/Second League, Estonia Esiliiga A/B, Faroe 1 Deild, Georgia Erovnuli Liga 2, Hungary NB I/II, Iceland 1 Deild, Ireland First Division, Israel Liga Leumit, Kazakhstan 1 Division, Latvia 1 Liga, Luxembourg National Division, Malta Challenge League, Moldova Liga 1, Montenegro First/Second League, North Macedonia First/Second League, Poland I Liga, Romania Liga II, Serbia Prva Liga, Slovakia 2 Liga i Wales FAW Championship.
 - Poprzednia macierz brakujących aliasów/wykluczeń pozostaje **20/20 PASS**. Edge Functions ACTIVE: `footynomad-sync v83`, `moneyball-free-feed v40`, `moneyball-predict v236`.
 - Nie przywracano Vercel. Ongoing audit pozostaje w issue #76; cały projekt MONEYBALL nie jest uznany za zakończony.
+
+
+## 2026-11-17 — Full FootyNomad Europe catalog audit, Polish tier correction, production smoke test
+
+### Provider coverage and exact league labels
+- Re-read the live FootyNomad browse directory and resolved its country slugs. The provider has country pages for all 55 UEFA member associations; Bosnia is exposed as `/country/bosnia` and North Macedonia as `/country/macedonia`. Liechtenstein's directory contains only a cup, not a domestic league.
+- Built a country-scoped senior men's domestic tier-1/tier-2 matrix from the actual provider labels. SQL helper result: **106/106 expected league labels accepted**.
+- Built a negative matrix for cups, international competitions, women's/youth/reserve football, and tier 3+. Initial run found one real false positive: Poland's `II Liga` (third tier) matched the SQL helper's unbounded `i liga` substring.
+- Corrected the country-specific exception for Poland `II Liga` / `2 Liga`, including regional labels. Kept Poland's `I Liga` (second tier) accepted.
+- Final SQL regression: **106/106 positive labels accepted; 40/40 negative labels rejected**.
+- Added the same Poland exception to the frontend and all three duplicated Edge scope filters. Added frontend tests for the 106 provider labels and 40 negative cases, including Poland `II Liga East/West` and `2 Liga` variants.
+
+### Code, migration and production deploy
+- Scope-fix code commit: `db047d79599acd09adcfd16704b7c178e089e8e3`.
+- Applied SQL migration: `20261117043500_exclude_polish_ii_liga_from_top_two_scope.sql`; repository migration-file commit: `cef41635c3ec91eda2376341106cc82b0ef2109a`.
+- Supabase Edge Functions ACTIVE after redeploy: `footynomad-sync v84`, `moneyball-free-feed v41`, `moneyball-predict v237`. Existing JWT verification settings were preserved.
+- Cloudflare workflow **#647 SUCCESS** on main; CI **#1061 SUCCESS**. Production fingerprint confirmed: `europe-top-two-2026-11-17-footynomad-106case-polish-ii-liga`.
+- Production Worker home, login page and PWA manifest return successfully at `https://moneyball-global.damianwalus3.workers.dev/`. Private app routes correctly require login.
+
+### Live production data and financial checks (Europe/Brussels, 2026-11-17)
+- FootyNomad feed's latest scheduled fetch returned HTTP 200 and exactly 2 eligible senior men's domestic tier-1/tier-2 fixtures for today: Rathfriland–Moyola Park and Warrenpoint Town–Glenavon FC, both Northern Ireland Championship. The broader fixture table contains lower tiers, cups, international and reserve records; the frontend and SQL scope filters keep them out of the active eligible list.
+- Each eligible fixture has 12 predictions across 1X2, Double Chance and Goals. All 12 per match are `ODRZUCONY`; there are **0 selected picks**. No coupon was generated because there are only two eligible matches and no confirmed candidates. Do not fabricate a third leg or weaken the rules.
+- The results sync Edge Function `moneyball-results-sync v71` is ACTIVE. Latest cron response was HTTP 200: 173 source fixtures fetched, no finished matches to settle today, financial reconciliation checked 7 coupons with 0 errors.
+- Cron schedule confirmed: FootyNomad feed every 15 minutes; results sync every 5 minutes; prediction scheduler checks every minute but correctly respects its next eligible scan time of 08:00 Europe/Brussels. Do not bypass the scheduler cooldown.
+- Bankroll ledger reconciles to **€84.28** across 9 transactions: €91.60 opening balance, €23.00 recorded stakes and €15.68 returns. Two €4.00 TEST coupons were won and settled; the earlier €5.00 stakes remain in the historical ledger. Future coupon stake remains €4.00.
+- One historical cron startup timeout occurred at 2026-11-16 23:25 UTC; subsequent repeated runs succeeded. Current feed, results and prediction endpoints return HTTP 200.
+
+### Remaining checks (do not mark the whole project complete)
+1. After the scheduled 08:00 Brussels scan, verify that newly ingested fixtures use the corrected Poland exclusion and the full 106-label allowlist; do not manually bypass cooldown.
+2. Continue live ingestion/odds coverage and verify that confirmed odds are fresh before any coupon selection.
+3. On the next finished eligible match, verify result settlement, coupon payout and bankroll reconciliation end-to-end.
+4. Security advisor still reports leaked-password protection disabled; enable it in Supabase Auth settings when account access permits. Keep backend-only RLS tables closed. Do not move `pg_net` out of `public` without a migration plan because the active cron jobs depend on it.
+5. Keep issue #76 OPEN as the ongoing catalog/production regression tracker. The full MONEYBALL GLOBAL project is not yet declared complete.
