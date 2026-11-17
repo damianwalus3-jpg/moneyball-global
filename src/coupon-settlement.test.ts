@@ -31,6 +31,7 @@ describe("paper coupon settlement", () => {
     const newest = { ...results[0], id: "new", details: { fixtureId: "a", actual: "2" as const } };
     const settled = evaluatePaperCoupon(coupon, [newest, ...results]);
     expect(settled?.status).toBe("PAPER_MISS");
+    expect(settled?.correctLegs).toBe(1);
     expect(settled?.legResults.find(row => row.fixtureId === "a")?.actual).toBe("2");
   });
   it("marks three correct legs as paper hit", () => {
