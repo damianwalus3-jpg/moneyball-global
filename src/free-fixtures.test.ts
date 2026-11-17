@@ -17,6 +17,15 @@ describe("European fixture source classification", () => {
     expect(isEuropeanOpenLiga({ leagueId: 15, leagueName: "Admiral Bundesliga Österreich", leagueShortcut: "öbl" })).toBe(true);
     expect(isEuropeanOpenLiga({ leagueId: 16, leagueName: "Premier League 2026/2027", leagueShortcut: "pl" })).toBe(true);
     expect(isEuropeanOpenLiga({ leagueId: 17, leagueName: "DFB Frauen Supercup", leagueShortcut: "wsc" })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 18, leagueName: "LaLiga EA Sports", leagueShortcut: "la1" })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 19, leagueName: "Nations League 2026", leagueShortcut: "nla" })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 20, leagueName: "DFB U21", leagueShortcut: "u21dfb" })).toBe(true);
+  });
+
+  it("rejects known OpenLigaDB test and synthetic Bundesliga feeds", () => {
+    expect(isEuropeanOpenLiga({ leagueId: 21, leagueName: "Bundesliga", leagueShortcut: "bl1test" })).toBe(false);
+    expect(isEuropeanOpenLiga({ leagueId: 22, leagueName: "BLClaude", leagueShortcut: "blclaude" })).toBe(false);
+    expect(isEuropeanOpenLiga({ leagueId: 23, leagueName: "BL12026", leagueShortcut: "bl12026" })).toBe(false);
   });
 
   it("rejects a non-football sport even when the league name looks European", () => {
