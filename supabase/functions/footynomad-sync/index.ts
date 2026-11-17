@@ -75,7 +75,7 @@ async function readFixtures(date:string){
 }
 const FOOTBALL_CHARTS_BASE = "https://footballcharts-backend.onrender.com/api/v1";
 const FOOTBALL_CHARTS_LEAGUES = [
- {code:"azer",country:"Azerbaijan",competition:"Premier League"},
+ {code:"austria2",country:"Austria",competition:"2. Liga"},
  {code:"bulgaria1",country:"Bulgaria",competition:"efbet League"},
  {code:"estonia",country:"Estonia",competition:"Meistriliiga"},
  {code:"hungary1",country:"Hungary",competition:"NB I."},
