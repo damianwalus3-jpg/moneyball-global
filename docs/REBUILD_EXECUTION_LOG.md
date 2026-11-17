@@ -154,3 +154,14 @@
 - CI run `44113070380`: SUCCESS — typecheck, all tests and production build passed.
 - Cloudflare deploy run `44113070381`: SUCCESS — separate rebuild Worker deployment passed.
 - Stage 09 is COMPLETE/DEPLOYED as a verified-result settlement workflow. End-to-end visual testing and live source coverage validation remain outstanding.
+
+## 2026-11-17 — Stage 10: paper coupon settlement
+- Added a pure paper-coupon evaluator that requires exactly three unique fixture IDs and three corresponding verified result records.
+- When all three outcomes are available, the coupon is recorded as PAPER_HIT (3/3) or PAPER_MISS (0–2/3). Incomplete or malformed coupons remain unsettled.
+- The verified-result action now settles pending paper coupons after recording final match outcomes and stores the parent coupon ID, correct-leg count and per-leg results JSON.
+- No bookmaker odds, stakes, returns or bankroll changes are fabricated; paper coupons remain explicitly no-odds.
+- Added tests for full hit, partial miss, incomplete results and malformed coupon data.
+- Final code commit: `16410e19bd7239e9909b4b6647b6de00de48e295` (`feat(rebuild): settle saved paper coupons after verified match results`).
+- CI run `44113308266`: SUCCESS — TypeScript, all tests and production build passed.
+- Cloudflare deploy run `44113307906`: SUCCESS — separate rebuild Worker deployment passed.
+- Stage 10 is COMPLETE/DEPLOYED. Automatic paper result tracking is now connected end-to-end for saved coupons; real bookmaker odds and any real-money accounting remain out of scope.
