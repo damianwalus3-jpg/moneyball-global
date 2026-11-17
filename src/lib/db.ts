@@ -366,6 +366,23 @@ export async function fetchPredictionsPage(args: {
   return data as PredictionPageResult;
 }
 
+/** Fetch only coupon-leg references for the prediction rows currently displayed.
+ * This keeps the edit/delete safety guard without downloading every historical leg. */
+export async function fetchCouponLegsByPredictionIds(predictionIds: string[]): Promise<TableRows["coupon_legs"][]> {
+  const ids = [...new Set(predictionIds.filter(Boolean))];
+  if (ids.length === 0) return [];
+  const uid = await currentUserId();
+  const sb = requireSupabase();
+  return fetchInChunks<TableRows["coupon_legs"]>(ids, 100, async (chunk) => {
+    const { data, error } = await withRequestTimeout(
+      sb.from("coupon_legs").select(READ_COLUMNS.coupon_legs.join(",")).eq(OWNER_COLUMN, uid).in("prediction_id", chunk),
+      "Sprawdzanie powiązań prognoz z kuponami",
+    );
+    if (error) throw new Error(humanizeError(error, "coupon_legs"));
+    return (data ?? []) as unknown as TableRows["coupon_legs"][];
+  });
+}
+
 /** Fetch only the match rows referenced by the currently visible prediction pages. */
 export async function fetchMatchesByIds(matchIds: string[]): Promise<TableRows["matches"][]> {
   const ids = [...new Set(matchIds.filter(Boolean))];
