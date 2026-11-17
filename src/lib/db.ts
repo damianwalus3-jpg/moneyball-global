@@ -1152,3 +1152,29 @@ export async function classifyTrackerSource(args: {
   if (error) throw new Error(humanizeError(error, "moneyball_tracker_classify_source"));
   return Number(data ?? 0);
 }
+
+
+export interface TrackerSourceAuditRow {
+  id: string;
+  entity_type: "prediction" | "coupon";
+  entity_id: string;
+  previous_source_class: string | null;
+  new_source_class: "USER" | "MODEL" | "PAPER";
+  note: string | null;
+  changed_by: string;
+  changed_at: string;
+}
+
+export async function fetchTrackerSourceAudit(): Promise<TrackerSourceAuditRow[]> {
+  const uid = await currentUserId();
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().from("moneyball_tracker_source_audit")
+      .select("id,entity_type,entity_id,previous_source_class,new_source_class,note,changed_by,changed_at")
+      .eq(OWNER_COLUMN, uid)
+      .order("changed_at", { ascending: false })
+      .limit(25),
+    "Pobieranie audytu klasyfikacji źródeł",
+  );
+  if (error) throw new Error(humanizeError(error, "moneyball_tracker_source_audit"));
+  return (data ?? []) as TrackerSourceAuditRow[];
+}
