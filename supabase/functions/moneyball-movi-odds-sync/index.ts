@@ -58,6 +58,7 @@ Deno.serve(async(req)=>{
  if(req.method!=="POST")return json({error:"POST required"},405);
  try{
   if(!(await authorized(req.headers.get("x-cron-token")||"")))return json({error:"Unauthorized"},401);
+  if(!MOVI_KEY)return json({ok:true,skipped:true,reason:"MOVIODDS_API_KEY is not configured; no provider request was made and no odds were changed.",provider:"MoviOdds",key_configured:false},200);
   const body=await req.json().catch(()=>({}));
   const now=new Date(),day=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
   const owner=String(body.owner_id||"");
