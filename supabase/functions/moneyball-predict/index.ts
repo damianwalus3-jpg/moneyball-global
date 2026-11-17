@@ -194,7 +194,7 @@ async function readFotbalInfoForm(m:any){
  }catch(_){return null;}
 }
 
-function xgoalsSlug(value:string){return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");}
+function xgoalsSlug(value:string){const slug=String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/&/g," and ").replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"");const aliases:Record<string,string>={"rathfriland-rangers":"rathfriland","glenavon":"glenavon-fc"};return aliases[slug]||slug;}
 async function readXgoalsTeamForm(team:string,country:string,kickoff:string){
  try{
   const countrySlug=xgoalsSlug(country||"france"),teamSlug=xgoalsSlug(team);
@@ -600,10 +600,11 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  // These reads do not depend on one another. Run them together to avoid paying
  // the sum of several network round-trips for every analysis batch.
  const providerOddsQuery=matches.length?db("provider_odds?select=match_id,mapped_market,mapped_selection,odds,bookmaker,provider,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&suspended=eq.false&phase=eq.prematch&captured_at=gte."+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+"&mapped_market=not.is.null&mapped_selection=not.is.null&match_id=in.("+matches.map((x:any)=>x.id).join(",")+")&order=captured_at.desc",token).catch(()=>[]):Promise.resolve([]);
- const [historyTimed,footyCacheRows,fotbalCacheRows,publicForms,marketRows,providerOddsRows,tipsAudit]=await Promise.all([
+ const [historyTimed,footyCacheRows,fotbalCacheRows,xgoalsCacheRows,publicForms,marketRows,providerOddsRows,tipsAudit]=await Promise.all([
   db("matches?"+historyFields+"&owner_id=eq."+encodeURIComponent(ownerId)+"&kickoff_at=gte."+encodeURIComponent(historySince)+"&kickoff_at=lt."+encodeURIComponent(date+"T23:59:59Z")+"&order=kickoff_at.desc&limit=1500",token).catch((e:any)=>{console.error("Timed history query unavailable:",String(e));return [];}),
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FootyNomad"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FotbalInfo"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
+  pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.XGoalsPro"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
   readPublicSourceForms(date,requestToken),
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.StrikerAPI"+pageMatchFilter,token):Promise.resolve([]),
   providerOddsQuery,
@@ -625,6 +626,7 @@ const internationalForms=internationalHistoryResult.status==="fulfilled"&&intern
 const history=historyTimed||[];
  const footyCacheMap=new Map((footyCacheRows||[]).map((row:any)=>[row.match_id,row.provider_data]));
  const fotbalCacheMap=new Map<string,any>((fotbalCacheRows||[]).map((row:any)=>[row.match_id,row.provider_data]));
+ const xgoalsCacheMap=new Map<string,any>((xgoalsCacheRows||[]).map((row:any)=>[row.match_id,row.provider_data]));
  const marketMap=new Map((marketRows||[]).map((x:any)=>[x.match_id,x.provider_data]));
  const providerOddsMap=new Map<string,any>();
  for(const quote of (providerOddsRows||[])){
@@ -636,7 +638,39 @@ const history=historyTimed||[];
 
  if(!matches.length){const scanState=await finishScheduledScan(all.length);return out({ok:true,date,total:0,matches:0,offset:analysisOffset,batch_size:batchSize,has_more:moreAvailable,predictions:0,created:0,updated:0,preserved:0,covered:0,missing:0,selected:0,scheduled:scheduledMode,scan_state:scanState,message:moreAvailable?"Brak kwalifikujących się meczów w tej partii; skan przechodzi dalej.":"Brak kolejnych kwalifikujących się meczów."});}
  // Add a no-key public score-history fallback for teams missing recent verified results.
- const xgoalsTeamForms=new Map<string,any>();
+ const xgoalsTeamForms=new Map<string,any>(),xgoalsCandidates=new Map<string,{team:string,country:string,kickoff:string}>();
+ for(const m of matches){
+  if(fixtureGender(m)!=="men"||!["scheduled","unknown"].includes(String(m.status||""))||!m.kickoff_at||new Date(m.kickoff_at).getTime()<=Date.now())continue;
+  const cached=xgoalsCacheMap.get(m.id),age=cached?.fetched_at?Date.now()-Date.parse(cached.fetched_at):Infinity;
+  if(cached?.source==="XGOALSPRO_PUBLIC_RESULTS"&&age>=0&&age<6*60*60*1000){
+   if(cached.home?.last10?.length>=3)xgoalsTeamForms.set(normTeam(m.home_team),cached.home);
+   if(cached.away?.last10?.length>=3)xgoalsTeamForms.set(normTeam(m.away_team),cached.away);
+  }
+  for(const team of [String(m.home_team||""),String(m.away_team||"")]){
+   const key=normTeam(team);
+   if(team&&key&&!xgoalsTeamForms.has(key)&&!xgoalsCandidates.has(key))xgoalsCandidates.set(key,{team,country:String(m.country||""),kickoff:String(m.kickoff_at)});
+  }
+ }
+ // xGoalsPro publishes public, keyless team results pages. Fetch each missing team once per batch.
+ // Concurrency is bounded and successful forms are cached by fixture for six hours.
+ const xgoalsResults=await limitedSettled([...xgoalsCandidates.values()].slice(0,20),4,async(item:any)=>({
+  ...item,form:await readXgoalsTeamForm(item.team,item.country,item.kickoff)
+ }));
+ for(const result of xgoalsResults){
+  if(result.status!=="fulfilled"||!result.value?.form)continue;
+  const value=result.value;
+  xgoalsTeamForms.set(normTeam(value.team),{...value.form,fetched_at:new Date().toISOString()});
+ }
+ const xgoalsCacheWrites:any[]=[];
+ for(const m of matches){
+  const home=xgoalsTeamForms.get(normTeam(m.home_team)),away=xgoalsTeamForms.get(normTeam(m.away_team));
+  if(!home&&!away)continue;
+  const providerData={source:"XGOALSPRO_PUBLIC_RESULTS",home:home||null,away:away||null,fetched_at:new Date().toISOString()};
+  xgoalsCacheWrites.push({owner_id:ownerId,match_id:m.id,source:"XGoalsPro",provider_data:providerData,captured_at:providerData.fetched_at});
+ }
+ if(xgoalsCacheWrites.length){
+  await db("match_market_data?on_conflict=owner_id,match_id,source",token,"POST",xgoalsCacheWrites,"resolution=merge-duplicates,return=minimal").catch((e:any)=>console.error("xGoalsPro form cache write failed:",String(e)));
+ }
  const footyForms=new Map<string,any>(),footyCandidates:any[]=[];
  for(const m of matches){
   const cached=readCachedFootyForm(footyCacheMap.get(m.id),String(m.home_team),String(m.away_team));
