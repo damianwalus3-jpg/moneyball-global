@@ -32,3 +32,37 @@ export function evaluatePaperCoupon(coupon: TrackerRecord, records: TrackerRecor
   const correctLegs = legResults.filter(leg => leg.correct).length;
   return { couponId: coupon.id, status: correctLegs === 3 ? "PAPER_HIT" : "PAPER_MISS", correctLegs, totalLegs: 3, legResults };
 }
+
+
+/** Builds an append-only Tracker row with verified paper P/L; legacy unpriced coupons retain null financial values. */
+export function buildPaperCouponSettlementRecord(
+  coupon: TrackerRecord,
+  settlement: PaperCouponSettlement,
+): Omit<TrackerRecord, "id" | "createdAt"> {
+  const rawOdds = coupon.details.odds;
+  const rawStake = coupon.details.stake;
+  const priced = coupon.status === "PAPER_WITH_ODDS"
+    && typeof rawOdds === "number" && Number.isFinite(rawOdds) && rawOdds > 1
+    && typeof rawStake === "number" && Number.isFinite(rawStake) && rawStake > 0;
+  const odds = priced ? rawOdds as number : null;
+  const stake = priced ? rawStake as number : null;
+  const hit = settlement.status === "PAPER_HIT";
+  const potentialReturn = priced ? (hit ? stake! * odds! : 0) : null;
+  const profitLoss = priced ? (hit ? stake! * (odds! - 1) : -stake!) : null;
+  return {
+    kind: "coupon",
+    title: `${coupon.title} · ${settlement.correctLegs}/3`,
+    status: settlement.status,
+    details: {
+      parentCouponId: coupon.id,
+      correctLegs: settlement.correctLegs,
+      totalLegs: settlement.totalLegs,
+      legResultsJson: JSON.stringify(settlement.legResults),
+      bookmaker: priced ? coupon.details.bookmaker ?? null : null,
+      odds,
+      stake,
+      profitLoss,
+      potentialReturn,
+    },
+  };
+}
