@@ -127,8 +127,8 @@ The first production Tracker release is implemented on the existing MAIN applica
 
 - Authenticated route `/tracker` is registered in TanStack Router and exposed in desktop/mobile navigation.
 - Overview reads the existing dashboard summary, selected picks, coupon finance summary and latest scan. It does not download the full predictions history.
-- Category registry is persisted in `moneyball_tracker_categories`: 14 global read-only system categories plus owner-scoped custom-category support.
-- Legacy category mapping is persisted in `moneyball_tracker_category_aliases` (13 aliases). Historical `MAIN` remains a separate legacy category and is never silently rewritten as `MAIN A` or `MAIN B`.
+- Category registry is persisted in `moneyball_tracker_categories`: 15 global read-only system categories (including `UNCLASSIFIED`) plus owner-scoped custom-category support.
+- Legacy category mapping is persisted in `moneyball_tracker_category_aliases` (14 aliases, including missing `group_name` values). Historical `MAIN` remains a separate legacy category and is never silently rewritten as `MAIN A` or `MAIN B`.
 - Jackpot register is persisted in `moneyball_jackpot_entries`, linked to an existing coupon with an owner-scoped foreign key. Sequence numbers are owner-scoped, allocated under a transaction advisory lock, immutable after insert and not deletable through the authenticated API.
 - Jackpot sequence allocation also preserves explicit sequence numbers during JSON backup restore; the next new entry continues at max(sequence)+1.
 - Added nullable `predictions.decision_status`, `predictions.source_class` and `coupons.source_class`. Existing rows remain NULL/unclassified; no bulk historical relabeling occurred.
@@ -147,7 +147,7 @@ All three are additive. They do not rewrite historical matches, predictions, cou
 
 ### Verification snapshot
 
-- 14 system categories; 13 legacy aliases.
+- 15 system categories; 14 legacy aliases.
 - 0 Jackpot entries at deployment time — no synthetic entries were created.
 - 19,201 predictions; 9 coupons; 9 bankroll transactions remained unchanged by the migrations.
 - New tables have RLS enabled with owner/system-specific policies. No new Supabase health lints or security-advisor findings were introduced by the Tracker tables.
