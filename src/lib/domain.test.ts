@@ -189,6 +189,9 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Luxembourg", competition: "BGL Ligue" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Malta", competition: "VBet Malta Premier League" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Kosovo", competition: "Albi Mall Superliga" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Andorra", competition: "Lliga Multisegur Assegurances" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Andorra", competition: "Lliga Grup Pirineu" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Georgia", competition: "Erovnuli Liga 2" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya II" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya B" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Real Madrid Castilla" })).toBe(false);
@@ -290,6 +293,9 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Luxembourg", "Promotion d'Honneur")).toBe(true);
     expect(isEuropeanTopTwoLeague("Malta", "VBet Malta Premier League")).toBe(true);
     expect(isEuropeanTopTwoLeague("Kosovo", "Albi Mall Superliga")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Andorra", "Lliga Multisegur Assegurances")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Andorra", "Lliga Grup Pirineu")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga 2")).toBe(true);
     expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Liqa")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "Vysshaya Liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("Belarus", "Pervaya Liga")).toBe(true);
