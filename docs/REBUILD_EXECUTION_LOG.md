@@ -672,3 +672,15 @@
 
 - Follow-up test-fixture correction: `c89db32c15af9630c151862acc7b1c9d18ca05be` updates the status endpoint test to use a strong-length pilot secret.
 - GitHub combined status for the latest code commit currently exposes only a failing `Vercel` context with a build-rate-limit URL. This is not the required Cloudflare rebuild deployment check and is not treated as a successful CI/deploy result. Stage 19 remains PENDING verification; no Vercel deployment was requested or attempted.
+
+
+## 2026-11-17 — Stage 20: conservative odds valuation engine
+- Added `src/odds-value.ts` as a pure valuation layer over append-only Tracker odds snapshots.
+- Valuation requires the exact fixture ID and an explicitly selected bookmaker; it only accepts rows marked complete 1X2 with all three valid decimal prices.
+- Selects the newest eligible snapshot, rejects snapshots older than six hours by default or captured in the future, and rejects invalid/non-normalized model probability distributions.
+- Removes bookmaker margin by normalizing the three reciprocal prices (proportional no-vig method), then calculates selection expected value as `modelProbability × decimalOdds − 1`.
+- Added bookmaker discovery restricted to complete, valid and fresh snapshots.
+- Added tests for EV, no-vig probability, newest snapshot choice, bookmaker isolation, incomplete/stale/future/invalid odds and malformed model probabilities.
+- Files added: `src/odds-value.ts` commit `7391f33b490b1539ea2d41e0c29f42743eb8f7df`; `src/odds-value.test.ts` commit `9d22aeed105ae8bde764ea281588515e9a13be15`.
+- This stage is the tested-by-design valuation module only; coupon UI, coupon persistence, stake/return settlement and bookmaker selection UI are intentionally not marked integrated yet.
+- No live provider requests were made and no credits were consumed. CI and Cloudflare deployment validation remain pending.
