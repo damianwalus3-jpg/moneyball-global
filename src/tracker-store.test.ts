@@ -49,7 +49,7 @@ describe("local tracker", () => {
     expect(readRecords().filter(row => row.kind === "coupon")).toHaveLength(1);
   });
   it("sorts merged backup history newest-first without overwriting existing IDs", () => {
-    const now = "2026-11-17T20:00:00.000Z";
+    const now = "2999-11-17T20:00:00.000Z";
     addRecord({ kind: "match", title: "Existing", status: "scheduled", details: {} });
     const backup = { format: "moneyball-local-backup", version: 1, exportedAt: now, records: [
       { id: "old", kind: "result", title: "Older", status: "SETTLED", details: {}, createdAt: "2026-11-16T10:00:00.000Z" },
