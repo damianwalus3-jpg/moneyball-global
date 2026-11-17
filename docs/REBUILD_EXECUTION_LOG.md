@@ -100,3 +100,18 @@
 - Final Cloudflare deploy run `44111021721`: SUCCESS — rebuild Worker deployment passed.
 - Stage 05 is COMPLETE/DEPLOYED. Prediction generation currently runs when the user presses “Forma 5 + typ” on a match; it is not yet an automatic bulk prediction for every fixture. Matches without enough verified history are not assigned invented probabilities.
 - Runtime visual verification and live upstream API smoke tests remain outstanding. The public feeds' actual catalogue coverage must still be audited country by country; no claim of exhaustive 100% coverage is made.
+
+## 2026-11-17 — Stage 06: exact three-match paper coupon builder
+- Added a coupon-candidate engine that reads only persisted 1X2 prediction records for the selected Brussels scan date.
+- Eligibility requires a top 1X2 probability >=75%, a recorded strong-candidate flag, valid normalized probabilities, and a unique fixture ID.
+- Generated candidates contain exactly three different matches. Duplicate prediction records for the same fixture are collapsed; fixtures from another date and weaker predictions are excluded.
+- Candidate ordering uses the product of model probabilities. This is explicitly **not** bookmaker odds and is not represented as an AKO quote.
+- Added a Kupony module listing up to 10 best candidates and a local action to save a paper coupon record. No real-money bet is placed.
+- Coupon records store their legs as JSON text because Tracker's details schema intentionally accepts only primitive values.
+- No real odds feed is connected yet. Coupon UI clearly says that odds and potential return are unavailable; no odds or winnings are fabricated.
+- Added unit tests for the exact-three rule, unique fixtures, 75% threshold, same-day filter and no-odds status.
+- CI had two failed test iterations: first, a test helper omitted the required scan date; second, floating-point arithmetic generated a tiny negative probability for a 90% case. Both test defects were corrected. A typecheck issue from storing nested arrays in primitive Tracker details was also corrected by serializing the legs.
+- Final verified code commit: `0d164b2b17221fea7979710c47d7f2b3db5a905e`.
+- Final CI run `44111904914`: SUCCESS — typecheck, all 33 unit tests and production build passed.
+- Cloudflare deployment run `44111904679`: deploy step SUCCESS — separate rebuild Worker deployment completed. Workflow post-job cleanup was still finalizing at time of log update.
+- Stage 06 is code-complete and deployed; live browser/UI verification remains outstanding.
