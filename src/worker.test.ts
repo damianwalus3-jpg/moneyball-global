@@ -59,7 +59,7 @@ describe("odds provider pilot proxy", () => {
   it("reports only whether secrets are configured and never exposes their values", async () => {
     const secret = "do-not-return-this";
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/status"), {
-      ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: secret, STRIKERAPI_API_KEY: secret, ODDS_PILOT_TOKEN: "pilot-secret-0123456789-abcdef",
+      ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: secret, STRIKERAPI_API_KEY: secret, ODDS_PILOT_TOKEN: "pilot-secret-0123456789-abcdef-extra",
     }, { waitUntil: vi.fn() });
     const body = await response.text();
     expect(body).toContain('"oddspapi":true');
@@ -97,7 +97,7 @@ describe("odds provider pilot proxy", () => {
     vi.stubGlobal("fetch", fetchMock);
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?fixtureId=fixture-123", {
       headers: { Authorization: "Bearer wrong-token" },
-    }), { ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "configured-provider-key", ODDS_PILOT_TOKEN: "correct-token-0123456789-abcdef" }, { waitUntil: vi.fn() });
+    }), { ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "configured-provider-key", ODDS_PILOT_TOKEN: "correct-token-0123456789-abcdef-extra" }, { waitUntil: vi.fn() });
     expect(response.status).toBe(401);
     expect(await response.json()).toEqual({ error: "unauthorized" });
     expect(fetchMock).not.toHaveBeenCalled();
