@@ -941,3 +941,10 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Final checks for a5eb5db: Deno Edge type-check SUCCESS, 67/67 unit tests SUCCESS, TypeScript SUCCESS, build SUCCESS, GitHub Cloudflare deploy SUCCESS, Cloudflare Workers Build SUCCESS.
 - Post-deploy production smoke: root page and login page both load; /panel correctly requires login when unauthenticated. This confirms the latest deployed frontend shell and route guard. Authenticated workflow remains pending.
 - Existing daily audit automation 6afbeb034e4c81919dd6ad7d554497e0 was updated again at 08:41 Brussels: explicitly distinguishes MAIN single target_legs=1 from 3-leg AKO, verifies recordStake=true, one stake/one return, database unique match guard, and avoids SQL join fan-out by pre-aggregating legs and ledger separately. Schedule remains daily 08:15 Europe/Brussels; next run 18 Nov 2026.
+
+
+## Results-sync v72 follow-up sample — 2026-11-17 08:45 Brussels
+- Fourth observed v72 production request returned HTTP 200 in 3.249s.
+- Reschedule reconciliation skipped in 80ms; parallel discovery 207ms; ESPN selection 53ms; TheSportsDB 22ms; OpenMatchday 67ms; alternate total 353ms; main match load 343ms; financial reconciliation checked 7 coupons in 128ms with 0 failures.
+- 173 FootyNomad fixtures fetched, 3 alternate observations matched/persisted, 0 results matched/saved and 0 predictions/coupon legs settled. No error; absence of settlement reflects no new verified result for the currently due matches, not a failed sync.
+- This is a fourth sample only; retain monitoring and compare p50/p95 after a full 24h on v72.

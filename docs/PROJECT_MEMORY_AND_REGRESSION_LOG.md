@@ -929,3 +929,9 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Final checks a5eb5db: Deno Edge typecheck SUCCESS, 67/67 testów SUCCESS, TypeScript SUCCESS, build SUCCESS, deploy GitHub SUCCESS, Cloudflare Workers Build SUCCESS.
 - Smoke po deployu: root i /login działają; /panel bez sesji zwraca login_required. Potwierdza aktualny frontend shell i ochronę routingu, nie zalogowane E2E.
 - Zaktualizowano istniejący prompt automatyzacji 6afbeb034e4c81919dd6ad7d554497e0: osobne przepływy MAIN singiel 1 noga i AKO 3 różne mecze, recordStake=true, jedna stake/return, unique match guard oraz zakaz fałszywych agregatów SQL przez join fan-out. Harmonogram pozostaje codziennie 08:15 Europe/Brussels; następny run 18.11.
+
+
+## 17.11.2026 08:45 Brussels — próbka results-sync v72
+- Czwarty request v72: HTTP200, 3.249s. Reschedule skip80ms, parallel discovery207ms, ESPN53ms, TheSportsDB22ms, OpenMatchday67ms, alternate total353ms, main match load343ms, financial reconciliation 7 kuponów/128ms/0 błędów.
+- FootyNomad pobrał 173 fixtures, 3 alternate observations dopasowano i zapisano; 0 wyników dopasowano/zapisano i 0 predykcji/nóg rozliczono. Brak błędów; brak rozliczeń oznacza brak nowego potwierdzonego wyniku, nie awarię synchronizacji.
+- To dopiero czwarta próbka; porównać p50/p95 po pełnych 24h v72.

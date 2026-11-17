@@ -103,3 +103,7 @@ OpenFootball's current 2026/27 mirror has limited league coverage and no 17 Nov 
 ## Final single-pick guard and daily audit update — 2026-11-17
 - Final frontend guard requires target_legs=1 to use coupon_type MAIN. The first attempt's TypeScript scope error was caught by CI and fixed; final commit a5eb5db passed all checks and production smoke.
 - Daily 08:15 audit now explicitly verifies separate MAIN single (one leg, EUR 4, immediate stake transaction) and 3-leg AKO (three distinct matches, EUR 4), one stake/one return, unique match constraint and pre-aggregated ledger checks.
+
+
+## Results-sync v72 monitoring — 2026-11-17
+Fourth production sample: HTTP 200 in 3.249s, no errors, 7 coupon reconciliations with 0 failures. 3 alternate result observations persisted, no current due result settled. Continue 24h p50/p95 monitoring.
