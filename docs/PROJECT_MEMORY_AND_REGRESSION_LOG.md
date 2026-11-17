@@ -642,3 +642,22 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Nie użyto ani nie przywrócono Vercel; właściwym workflow jest `.github/workflows/deploy-cloudflare.yml`.
 - Status prac: filtry i aliasy są wdrożone na produkcji; Supabase Edge Functions ACTIVE v81/v38/v234; produkcyjny cache ma 2 kwalifikujące się spotkania i 0 false-positive rows; SQL scope 51/51 PASS. Pełny dzienny prediction scan dla kolejnej partii pozostaje zgodny z cooldown do 08:00 Europe/Brussels.
 - Issue #76 pozostaje otwarte wyłącznie jako ciągły audit kompletności aliasów/katalogu FootyNomad; nie powtarzać już wdrożonych poprawek, migracji ani testów bez nowej regresji. Punkt startowy dalszej pracy: issue #76 i ten dziennik.
+
+
+## Naprawa pustej alternatywy regex w frontendzie i alias Czech Liga — 2026-11-17
+- Dalszy odczyt pełnego katalogu FootyNomad po poprzednim audycie ujawnił aktualne etykiety lig krajowych. Katalog Czech zawiera link do ligi `czech-liga` (Czech Liga), a oficjalna struktura rozgrywek Czech potwierdza Czech First League jako poziom 1; FNL pozostaje poziomem 2. Źródła: https://footynomad.com/country/czech-republic ; https://en.wikipedia.org/wiki/Czech_First_League.
+- Potwierdzono też nazwy bośniackie `1st League - FBiH` i `1st League - RS`. Obie są poziomem 2; istniejący alias `1st league` już je obejmuje, a testy frontendowe i SQL potwierdziły oba warianty. Nie dodawano zbędnych duplikatów.
+- **Krytyczna regresja:** w aktualnym `src/lib/domain.ts` allowlista zawierała pustą alternatywę `super league albania||vysshaya liga`. Backendowe regexy nie zawierały tej konkretnej pustej alternatywy, ale frontend mógł przez nią akceptować dowolną nieznaną nazwę ligi w obsługiwanym kraju. Poprawiono wzorzec do `super league albania|czech liga|vysshaya liga`.
+- Commity:
+  - frontend domain fix + Czech alias: `79667a14f257c4f8ae60e04034da07a9834a95c2`
+  - testy regresyjne: `75432a95d592c4ad3903e247ee7423b010e48c2f`
+  - FootyNomad sync: `3e5e90728269fa61469d8a275298c0aa8b6e534a`
+  - free feed: `60965f9c9ef81079381e9367b835bf63cebe68da`
+  - prediction engine: `87918da33052301fcc19b8aa223de19022ab98bc`
+  - migracja SQL `20261117030000_add_footynomad_czech_liga_alias.sql`: `4a74c73a4c161f30943272d0f4e21d64afb00fba`
+- Testy frontendowe rozszerzono o Czech Liga dla aliasów Czechia/Czech Republic, Bosnia 1st League RS i FBiH oraz negatywne testy Belgium Provincial/Unknown Regional Competition. Ostatnie dwa testy są regresją zabezpieczającą przed ponownym wprowadzeniem pustej alternatywy.
+- Migracja SQL zastosowana produkcyjnie. Nowa macierz SQL: **14/14 PASS**, w tym Czech Liga = true, FNL = true, oba bośniackie First League = true, Belgian Provincial/Unknown = false, Czech 3. Liga = false, France National 2 = false, England League One = false, Scotland Lowland = false, Spain RFEF tier 3 = false i Switzerland 1. Liga Classic = false.
+- Edge Functions wdrożone i ACTIVE: `footynomad-sync v82`, `moneyball-free-feed v39`, `moneyball-predict v235`.
+- GitHub Actions Cloudflare run #627, ID `44010100845`, dla commita migracji `4a74c73a4c161f30943272d0f4e21d64afb00fba` był w trakcie wykonywania podczas zapisu. Poprzedni run #623 został anulowany przez concurrency po nowszych commitach. **Nie uznawać jeszcze frontendu za wdrożony**: wymagane zielone CI/Vitest/TypeScript/build/deploy i ponowny test produkcyjnego Workera po zakończeniu najnowszego runu.
+- Produkcyjny Worker nadal zwracał poprzedni fingerprint `europe-top-two-2026-11-17-51case` przy ostatnim odczycie przed zakończeniem runu; to oczekiwane przed nowym deployem. Nie zmieniać ani nie odtwarzać Vercel.
+- Issue #76 pozostaje OPEN. Następny krok: sprawdzić wynik najnowszego Cloudflare workflow po commicie dokumentacji, zweryfikować fingerprint nowego buildu i kontynuować audyt wszystkich pozostałych nazw tier 1/2 z FootyNomad. Nie powtarzać już tej poprawki, migracji ani testu 14-case bez nowej regresji.
