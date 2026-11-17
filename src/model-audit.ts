@@ -16,8 +16,11 @@ export interface ModelAudit {
 
 export function auditTrackerPredictions(records: TrackerRecord[]): ModelAudit {
   const results = new Map<string, "1" | "X" | "2">();
+  // Tracker records are newest-first. Keep the newest valid result if a
+  // fixture has duplicate/legacy settlement rows instead of letting an older
+  // row silently overwrite it during iteration.
   for (const record of records) {
-    if (record.kind !== "result" || typeof record.details.fixtureId !== "string") continue;
+    if (record.kind !== "result" || typeof record.details.fixtureId !== "string" || results.has(record.details.fixtureId)) continue;
     const actual = record.details.actual;
     if (actual === "1" || actual === "X" || actual === "2") results.set(record.details.fixtureId, actual);
   }
@@ -26,7 +29,9 @@ export function auditTrackerPredictions(records: TrackerRecord[]): ModelAudit {
     const d = record.details;
     const actual = results.get(d.fixtureId as string);
     const p = [d.p1, d.px, d.p2];
-    if (!actual || p.some(value => typeof value !== "number" || !Number.isFinite(value))) return [];
+    if (!actual || p.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) return [];
+    const sum = (d.p1 as number) + (d.px as number) + (d.p2 as number);
+    if (Math.abs(sum - 1) > 0.0001) return [];
     return [{
       probabilities: { home: d.p1 as number, draw: d.px as number, away: d.p2 as number },
       actual,
