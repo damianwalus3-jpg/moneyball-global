@@ -201,3 +201,41 @@ export async function loadOpenLigaRecentTeamForm(shortcut: string, season: strin
   try { localStorage.setItem(key, JSON.stringify({ ...form, cachedAt: Date.now() })); } catch { /* cache is optional */ }
   return form;
 }
+
+export interface VerifiedFixtureResult {
+  actual: "1" | "X" | "2";
+  homeGoals: number;
+  awayGoals: number;
+  date: string;
+  source: string;
+}
+function normalizedName(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+export async function findOpenMatchdayResult(folder: string, home: string, away: string, date: string): Promise<VerifiedFixtureResult | null> {
+  if (!/^[A-Z]{3}_\d+_[a-z0-9-]+$/.test(folder)) throw new Error("Nieprawidłowy identyfikator ligi");
+  const { rows } = await loadLeagueResults(folder, date);
+  const row = rows.find(item => item.date === date && normalizedName(item.home) === normalizedName(home) && normalizedName(item.away) === normalizedName(away));
+  if (!row || row.ft_home?.trim() === "" || row.ft_away?.trim() === "") return null;
+  const homeGoals = Number(row.ft_home), awayGoals = Number(row.ft_away);
+  if (!Number.isInteger(homeGoals) || !Number.isInteger(awayGoals) || homeGoals < 0 || awayGoals < 0) return null;
+  return { actual: homeGoals > awayGoals ? "1" : homeGoals === awayGoals ? "X" : "2", homeGoals, awayGoals, date, source: "open-matchday results CSV" };
+}
+export async function findOpenLigaFixtureResult(shortcut: string, season: string, home: string, away: string, date: string): Promise<VerifiedFixtureResult | null> {
+  if (!/^[a-z0-9._-]+$/i.test(shortcut) || !/^\d{4}$/.test(season)) throw new Error("Nieprawidłowe parametry OpenLigaDB");
+  const response = await fetch(`/api/openligadb/matches/${encodeURIComponent(shortcut)}/${encodeURIComponent(season)}`, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(`OpenLigaDB wyniki niedostępne (HTTP ${response.status})`);
+  const matches = await response.json() as OpenLigaHistoryMatch[];
+  const match = matches.find(item => {
+    const kickoff = item.matchDateTimeUTC || item.matchDateTime;
+    return item.matchIsFinished === true && kickoff && brusselsDate(kickoff) === date
+      && normalizedName(item.team1?.teamName ?? "") === normalizedName(home)
+      && normalizedName(item.team2?.teamName ?? "") === normalizedName(away);
+  });
+  if (!match) return null;
+  const finalResult = match.matchResults?.find(row => row.resultTypeID === 2 || /endresult|endergebnis|final/i.test(row.resultName ?? ""))
+    ?? [...(match.matchResults ?? [])].sort((a,b) => (b.resultOrderID ?? 0) - (a.resultOrderID ?? 0))[0];
+  const homeGoals = finalResult?.pointsTeam1, awayGoals = finalResult?.pointsTeam2;
+  if (!Number.isInteger(homeGoals) || !Number.isInteger(awayGoals) || (homeGoals as number) < 0 || (awayGoals as number) < 0) return null;
+  return { actual: (homeGoals as number) > (awayGoals as number) ? "1" : homeGoals === awayGoals ? "X" : "2", homeGoals: homeGoals as number, awayGoals: awayGoals as number, date, source: "OpenLigaDB" };
+}
