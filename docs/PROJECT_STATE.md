@@ -1407,3 +1407,28 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - Public source evaluation: OpenMatchday is free/no-key and daily but has limited competition coverage; OpenFootball is public-domain but only a partial/uneven current-season fixture catalogue; API-Football's 1,200+ competition catalogue is not a no-key solution; third-party Flashscore scraper is unofficial and not approved as a production dependency without terms/reliability review; automated FotMob/SofaScore scraping remains rejected. Official association/league pages have been verified for source discovery but are not yet automated adapters.
 - No production data, predictions, coupons, settlements or bankroll were changed during this audit. No new deployment was made.
 - Next steps: (1) fix FootballCharts cache/rate-limit behavior or disable its repeated fetches safely; (2) verify the 17 Nov scan continues to maintain 40 canonical fixture predictions with the postponed match handled separately; (3) continue dated FootyNomad source-vs-import reconciliation for all European domestic tiers; (4) complete authenticated UI click-through of Matches and Predictions with the user's existing session. Keep issue #77 open until authenticated UI acceptance is completed. Preserve all historical data.
+
+
+## Additional tracker evaluation — 2026-11-17 17:10 Europe/Brussels
+
+The following candidates were checked against the existing no-API-key / no-paid-provider project constraint:
+
+| Candidate | Current public facts | Decision for MAIN |
+|---|---|---|
+| PitchAPI | Official site states 77 leagues, free/no paid tier and unlimited requests, but every call requires an API key. | Best future candidate for xG, shots, lineups and stats if the user explicitly permits a free API key. Not enabled under the current no-key constraint. |
+| StrikerAPI | Official docs state 500 free credits/month, every request requires an API key; paid tiers start at $19/month. | Not suitable for full Europe-wide polling; keep disabled and do not consume credits. |
+| API-Football | Official coverage lists 1,251 competitions, but the free plan is limited to 100 requests/day and requires an API key. | Catalogue is broad, quota is too small for a frequent all-Europe scan; do not enable under current no-key constraint. |
+| Football Charts | No-key tier is limited to 25 requests/day and private/personal use; 8 allowlisted competitions are currently integrated. The 17 Nov scan returned 429 for 4 of 8 leagues. | Keep optional and owner-only only after durable caching and controlled request cadence; never let it block FootyNomad. |
+| Flashscore third-party scraper | An unofficial scraper claims broad Flashscore competition coverage and no account/API key. | Do not add as a production dependency until the scraper's terms, source access, uptime, rate limits and redistribution rights are independently cleared. Use Flashscore as a manual verification source only. |
+| FotMob / SofaScore | Existing project checks found unstable/restricted automated access; current research does not justify bypassing their controls. | Do not scrape or bypass blocks. |
+| Fotbalinfo + Jina Reader | Current test function fetches one hard-coded Slovenian 2. SNL match page through a text proxy. | A one-match parser experiment, not a general European fixture tracker; do not enable for production ingestion. |
+| OpenMatchday | Free/no-key daily CSV source with a fixed published competition index; useful for results/history and some fixtures, but not every European league. | Keep as an independent supplemental feed, with date, status and eligibility reconciliation. |
+
+Official provider references checked:
+- PitchAPI: https://pitchapi.dev/
+- StrikerAPI docs/pricing: https://strikerapi.com/docs and https://strikerapi.com/
+- API-Football coverage/pricing: https://www.api-football.com/coverage and https://www.api-football.com/pricing
+- Flashscore scraper candidate: https://github.com/clearfetch/flashscore-football-scraper
+- OpenMatchday: https://github.com/oladeeayo/open-matchday
+
+No new provider was enabled, no API key was added, and no provider credits were consumed. The current best no-key primary fixture source remains FootyNomad, with OpenMatchday and carefully limited Football Charts as supplemental sources. The 54/55 official source-discovery audit remains distinct from automated importer coverage.
