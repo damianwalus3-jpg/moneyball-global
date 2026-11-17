@@ -24,7 +24,7 @@ export default {
         headers: { Accept: "application/json" },
       });
       const headers = new Headers(upstream.headers);
-      headers.set("Cache-Control", "public, max-age=28800");
+      headers.set("Cache-Control", matches ? "public, max-age=900" : "public, max-age=28800");
       headers.set("X-MONEYBALL-SOURCE", "OpenLigaDB");
       headers.set("Access-Control-Allow-Origin", url.origin);
       const response = new Response(upstream.body, {
