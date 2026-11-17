@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getSafestPick, hasKickoffPassed } from "./safest-pick";
+import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import type { TrackerRecord } from "./tracker-store";
 
 function prediction(overrides: Partial<TrackerRecord["details"]> = {}, status = "KANDYDAT"): TrackerRecord {
@@ -37,11 +37,15 @@ describe("safest daily pick", () => {
     expect(getSafestPick([prediction({}, "ODRZUCONY")])).toBeNull();
     expect(getSafestPick([prediction({ dc1x: 0.79, dcx2: 0.77, dc12: 0.78 })])).toBeNull();
     expect(getSafestPick([prediction({ fixtureDate: "2000-01-01" })])).toBeNull();
+    expect(getSafestPick([prediction({ fixtureTime: "—" })])).toBeNull();
   });
 
   it("compares kickoff using Brussels wall-clock date and time", () => {
     expect(hasKickoffPassed("2000-01-01", "12:00")).toBe(true);
     expect(hasKickoffPassed("2099-06-01", "12:00")).toBe(false);
     expect(hasKickoffPassed("2099-06-01", "—")).toBe(false);
+    expect(hasKnownKickoff("2099-06-01", "18:00")).toBe(true);
+    expect(hasKnownKickoff("2099-06-01", "—")).toBe(false);
+    expect(hasKnownKickoff("2099-02-31", "18:00")).toBe(false);
   });
 });
