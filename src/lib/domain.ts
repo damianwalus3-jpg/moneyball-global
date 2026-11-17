@@ -298,7 +298,9 @@ export function canPromoteManualOdds(prediction: Prediction, match: Match | unde
   const homeMatches = Number(coverage["home_history_matches"]);
   const awayMatches = Number(coverage["away_history_matches"]);
   const modelSource = String(coverage["model_source_type"] ?? "");
-  if (!Number.isFinite(modelCoverage) || modelCoverage < 55 || homeMatches < 3 || awayMatches < 3) return false;
+  const historyCovered = Number.isFinite(homeMatches) && Number.isFinite(awayMatches) && homeMatches >= 3 && awayMatches >= 3;
+  const marketCovered = coverage["market_odds"] === true;
+  if (!Number.isFinite(modelCoverage) || modelCoverage < 55 || (!historyCovered && !marketCovered)) return false;
   if (coverage["baseline_only"] === true || modelSource === "BASELINE_ONLY" || modelSource === "BEYONDELO_ONLY") return false;
   if (!prediction.data_source || !prediction.rationale?.trim()) return false;
   return isCouponCandidate({ ...prediction, verdict: "WYBRANY" }, match, nowMs);
