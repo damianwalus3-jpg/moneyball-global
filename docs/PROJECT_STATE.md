@@ -868,3 +868,14 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Supabase Securing Edge Functions: https://supabase.com/docs/guides/functions/auth
 - Supabase database indexes: https://supabase.com/docs/guides/database/postgres/indexes
 - Cloudflare Workers deployment: https://developers.cloudflare.com/workers/wrangler/commands/workers/
+
+
+## Release verification — 2026-11-17 08:19 Europe/Brussels
+
+- Latest main commit at verification: `86874887068d9b8052df10fe547f08aab4f6d14a`.
+- GitHub Actions Moneyball validate completed SUCCESS: run `44037653263` (Deno Edge Function check, tests, TypeScript, build). Cloudflare deploy completed SUCCESS: run `44037653210`. This is the first confirmed Cloudflare release containing the €4 database/UI changes, statistics scope/hook fixes, MoviOdds v7 no-key guard source changes in repo, and project context index.
+- Post-deploy public smoke test: Worker root page HTTP-success and displays MONEYBALL GLOBAL 2.0 / €4; `/login` renders the login form; `/panel` returns `login_required` for unauthenticated access. This confirms public shell, login route and protected-route gate only. Authenticated click-through/E2E is still untested.
+- Supabase current active versions: `moneyball-public-sources v62`, `moneyball-predict v243`, `moneyball-movi-odds-sync v7`; the latter's health endpoint reports `key_configured=false`. The 15:00 Brussels scheduled scan is still required to prove the v243→v62 service call has `public_source_error=null` and no 401.
+- Supabase advisors were rerun after the migration. Health: no lints. Security warnings unchanged (five service-only RLS tables with no policies, pg_net in public, leaked-password protection disabled). Performance: 24 unused-index INFO findings. No unsafe policy or index changes were made.
+- Continuity: existing daily audit automation `6afbeb034e4c81919dd6ad7d554497e0` was updated to read `PROJECT_CONTEXT_INDEX.md`, `PROJECT_STATE.md`, `PROJECT_MEMORY_AND_REGRESSION_LOG.md`, README and recent MAIN state before every run, recover prior project decisions when available, and avoid repeating completed work. It remains daily 08:15 Europe/Brussels, next run 18 Nov 2026.
+- Project remains IN PROGRESS until the authenticated user workflows and next scheduled import are verified. No production fixture/pick/coupon was fabricated to test finance.

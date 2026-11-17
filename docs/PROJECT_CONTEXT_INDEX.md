@@ -82,3 +82,7 @@ Użytkownik wielokrotnie i jednoznacznie wymagał, aby MONEYBALL GLOBAL:
 - Po każdym potwierdzonym fixie: zapisz commit, migrację, test, wdrożenie, wynik runtime i nierozwiązane ryzyka w obu dokumentach.
 - Jeśli test lub deploy jest w toku, oznacz go jako pending/in progress; nigdy nie wpisuj SUCCESS przed wynikiem.
 - W razie sprzeczności historii i stanu live, prawdą jest aktualny kod + baza + logi produkcyjne; historię zachowaj jako kontekst, nie jako dowód obecnego działania.
+
+
+## Continuity automation — 2026-11-17
+The existing daily 08:15 Brussels audit automation (`6afbeb034e4c81919dd6ad7d554497e0`) now explicitly reads this index, PROJECT_STATE, PROJECT_MEMORY_AND_REGRESSION_LOG and README before work, checks prior project conversations when available, and avoids repeating verified work. Keep its schedule unchanged.

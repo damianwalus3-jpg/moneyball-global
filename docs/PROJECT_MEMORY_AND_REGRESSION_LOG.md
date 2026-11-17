@@ -882,3 +882,12 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Supabase project ACTIVE_HEALTHY. Health advisor: brak lints. Security: pięć tabel RLS-enabled/no policies (`match_result_sources`, `moneyball_password_recovery`, `moneyball_prediction_scan_state`, `moneyball_reschedule_sync_state`, `project_work_log`); privilege check: anon/authenticated bez SELECT, service_role z SELECT — to celowe tabele serwisowe, nie dodawać publicznych policies.
 - Pozostałe security warnings: leaked-password protection disabled; rozszerzenie `pg_net` w schemacie public. Performance advisor: 24 unused indexes; nie usuwać bez testu obciążenia i EXPLAIN, bo część to świeżo dodane indeksy. Nie zastosowano niebezpiecznych zmian.
 - Dokumentacja zewnętrzna sprawdzona: Supabase auth headers / securing Edge Functions / Postgres indexes i Cloudflare Wrangler deploy. Linki są w PROJECT_STATE.
+
+
+## 17.11.2026 08:19 Brussels — potwierdzenie release i ciągłości projektu
+- Commit MAIN `86874887068d9b8052df10fe547f08aab4f6d14a`: Moneyball CI validate run `44037653263` SUCCESS (Deno, testy, TypeScript, build), Cloudflare production deploy run `44037653210` SUCCESS.
+- Po deployu Worker root odpowiada i pokazuje MONEYBALL GLOBAL 2.0 oraz 4 EUR; `/login` renderuje formularz logowania; `/panel` bez sesji zwraca login_required. To smoke test public shell/login/protected route, nie test zalogowanego panelu ani E2E.
+- Supabase aktywne: public-sources v62, predict v243, movi-odds-sync v7. Movi GET health potwierdza `key_configured=false`. Połączenie predykcji v243 z public-sources v62 wymaga jeszcze następnego skanu 15:00 Brussels i `public_source_error=null`.
+- Ponowne advisors po migracji: Health bez lints; security warnings bez zmian; 24 unused indexes INFO. Nie dodano publicznych RLS policies i nie usuwano indeksów.
+- Zaktualizowano prompt codziennego audytu `6afbeb034e4c81919dd6ad7d554497e0`: przed pracą ma czytać PROJECT_CONTEXT_INDEX, PROJECT_STATE, PROJECT_MEMORY_AND_REGRESSION_LOG i README, odzyskiwać poprzednie decyzje projektu, sprawdzać latest main/deploy i nie powtarzać potwierdzonych napraw. Harmonogram bez zmian: codziennie 08:15 Europe/Brussels, następny run 18.11.
+- Projekt nadal IN PROGRESS. Brak zalogowanego E2E, nie tworzono fikcyjnych produkcyjnych meczów, typów ani kuponów.
