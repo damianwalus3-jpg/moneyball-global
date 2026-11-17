@@ -247,3 +247,15 @@
 - Cloudflare deployment run 44118446658: SUCCESS — separate rebuild Worker deployment passed.
 - The catalogue is still community-maintained and incomplete. This stage improves the set of recognized European feeds; it does not establish exhaustive coverage of every European country, division, women's/youth league or amateur competition.
 - Stage 17 is COMPLETE/DEPLOYED.
+
+## 2026-11-17 — Stage 18: dashboard status, activity and source attribution
+- Replaced the obsolete dashboard progress labels (which still showed Tracker as NEXT and other modules as WAIT) with the actual current platform state: foundation and Tracker complete; source coverage, form/prediction/coupon workflows active; final audit and mobile visual verification still in progress.
+- Dashboard metrics now calculate active paper coupons from local records rather than displaying a hard-coded zero.
+- Dashboard activity now lists the latest five local Tracker records instead of always showing an empty placeholder.
+- Added visible source links and attribution for open-matchday, OpenLigaDB and OpenFootball. The open-matchday non-commercial restriction is disclosed in the dashboard and match source notes.
+- Clarified that an empty downloaded fixture list does not prove there are no European matches.
+- Final UI commit: e2f8f46b6a9e416bc8fb10f06dcf69e59148e7cf (style(rebuild): make public data source attributions readable; includes dashboard update 90d7297029282d2995b87336f3da49157febc9cb).
+- CI run 44119268126: SUCCESS — TypeScript, all tests and production build passed.
+- Cloudflare deployment run 44119268133: SUCCESS — separate rebuild Worker deployment passed.
+- Public Worker smoke check confirmed the updated dashboard copy, progress labels and source links. The text fetch does not execute the client-side React app or prove fixture data loading; visual/mobile E2E and live browser scan validation remain outstanding.
+- Stage 18 is COMPLETE/DEPLOYED.
