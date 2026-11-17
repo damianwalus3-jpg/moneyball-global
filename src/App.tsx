@@ -16,7 +16,7 @@ import {
   ShieldCheck, Sparkles, Ticket, Trophy, X
 } from "lucide-react";
 
-type Tab = "dashboard" | "matches" | "pick" | "coupons" | "intelligence" | "tracker";
+type Tab = "dashboard" | "matches" | "pick" | "coupons" | "intelligence" | "bets" | "tracker";
 
 const nav: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -24,6 +24,7 @@ const nav: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "pick", label: "Typ dnia", icon: Sparkles },
   { id: "coupons", label: "Kupony", icon: Ticket },
   { id: "intelligence", label: "Intelligence", icon: BarChart3 },
+  { id: "bets", label: "Stawki", icon: Ticket },
   { id: "tracker", label: "Tracker", icon: ClipboardList },
 ];
 
@@ -33,6 +34,7 @@ const descriptions: Record<Tab, { eyebrow: string; title: string; subtitle: stri
   pick: { eyebrow: "SELEKCJA DNIA", title: "Typ dnia", subtitle: "Jedna selekcja oparta na danych — albo uczciwa informacja, że dziś brak przewagi." },
   coupons: { eyebrow: "ZARZĄDZANIE KUPONAMI", title: "Kupony", subtitle: "Buduj, zapisuj i rozliczaj kupony analityczne. Bez obstawiania za prawdziwe pieniądze." },
   intelligence: { eyebrow: "ANALITYKA MODELU", title: "Intelligence", subtitle: "Skuteczność, kalibracja, jakość danych i wyniki według lig oraz rynków." },
+  bets: { eyebrow: "REJESTR ZAKŁADÓW", title: "Stawki i wyniki", subtitle: "Wybrane i odrzucone typy, kursy, stawki oraz rzeczywisty bilans zysków i strat." },
   tracker: { eyebrow: "REJESTR GŁÓWNY", title: "Tracker", subtitle: "Jedno miejsce dla skanów, prognoz, kursów, kuponów, wyników i historii." },
 };
 
@@ -88,6 +90,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [records, setRecords] = useState<TrackerRecord[]>(() => readRecords());
   const [newTitle, setNewTitle] = useState("");
+  const [betInputs, setBetInputs] = useState<Record<string, { market: string; odds: string; stake: string }>>({});
   const [newKind, setNewKind] = useState<TrackerKind>("match");
   const [notice, setNotice] = useState("");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -272,6 +275,50 @@ export default function App() {
   const safestPick = useMemo(() => getSafestPick(records), [records]);
   const visibleRecords = useMemo(() => records.filter(row => (active === "tracker" ? true : row.kind === (active === "matches" ? "match" : active === "coupons" ? "coupon" : active === "pick" ? "prediction" : "scan")) && (row.title.toLowerCase().includes(query.toLowerCase()) || row.status.toLowerCase().includes(query.toLowerCase()))), [records, active, query]);
   const refreshRecords = () => setRecords(readRecords());
+  const betInputFor = (prediction: TrackerRecord) => betInputs[String(prediction.details.fixtureId)] ?? {
+    market: typeof prediction.details.selection === "string" ? prediction.details.selection : "1",
+    odds: "",
+    stake: "5",
+  };
+  const recordBetDecision = (prediction: TrackerRecord, decision: "SELECTED" | "REJECTED") => {
+    const fixtureId = String(prediction.details.fixtureId ?? "");
+    const input = betInputFor(prediction);
+    const odds = Number(input.odds);
+    const stake = decision === "SELECTED" ? Number(input.stake) : 0;
+    if (!fixtureId || !input.market || !Number.isFinite(odds) || odds <= 1) {
+      setNotice("Wpisz prawidłowy kurs dziesiętny większy niż 1.00.");
+      return;
+    }
+    if (decision === "SELECTED" && (!Number.isFinite(stake) || stake <= 0)) {
+      setNotice("Dla wybranego zakładu wpisz stawkę większą od zera.");
+      return;
+    }
+    const prior = records.find(row => row.kind === "bet" && row.details.fixtureId === fixtureId && row.details.decision === decision);
+    if (prior) {
+      setNotice("Ten typ ma już zapisany taki wpis. Nie dodaję duplikatu.");
+      return;
+    }
+    addRecord({
+      kind: "bet",
+      title: prediction.title,
+      status: decision === "SELECTED" ? "OPEN" : "ODRZUCONY",
+      details: {
+        fixtureId,
+        decision,
+        market: input.market,
+        odds,
+        stake,
+        potentialReturn: decision === "SELECTED" ? stake * odds : 0,
+        potentialProfit: decision === "SELECTED" ? stake * (odds - 1) : 0,
+        selection: input.market,
+        modelProbability: typeof prediction.details.topProbability === "number" ? prediction.details.topProbability : null,
+        rejectionReason: decision === "REJECTED" ? String(prediction.details.reason ?? "Typ odrzucony przez użytkownika.") : null,
+        competition: prediction.details.competition ?? null,
+      },
+    });
+    setRecords(readRecords());
+    setNotice(decision === "SELECTED" ? "Zapisano wybrany zakład. Wynik i P/L zostaną rozliczone po potwierdzeniu rezultatu meczu." : "Zapisano odrzucony typ do statystyk porównawczych.");
+  };
   const saveRecord = () => { if (!newTitle.trim()) return; addRecord({ kind: newKind, title: newTitle.trim(), status: "draft", details: {} }); setNewTitle(""); refreshRecords(); setNotice("Zapisano lokalnie na tym urządzeniu."); };
   const downloadBackup = () => { const blob = new Blob([JSON.stringify(exportBackup(), null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "moneyball-backup.json"; a.click(); URL.revokeObjectURL(url); };
   const downloadCsv = () => { const blob = new Blob(["\uFEFF", exportCsv()], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "moneyball-tracker.csv"; a.click(); URL.revokeObjectURL(url); };
@@ -317,6 +364,70 @@ export default function App() {
 
         {active === "matches" && <section className="tracker-panel"><div className="tracker-toolbar"><div><h2>Europejski terminarz</h2><p>{fixtureScan ? `${fixtureScan.fixtures.length} meczów na ${fixtureScan.date} · ${fixtureScan.leaguesChecked} pozycji katalogu w skanie` : "Darmowe źródło danych, bez klucza API"}</p></div><div className="match-toolbar-actions"><button className="primary-button" onClick={() => void runFixtureScan(true)} disabled={scanLoading || bulkLoading}>{scanLoading ? "Skanowanie…" : "Skanuj dzisiaj"}</button><button onClick={() => void analyzeAllFixtures()} disabled={!fixtureScan || bulkLoading || scanLoading || fixtureScan.fixtures.length === 0}>{bulkLoading ? `Analiza ${bulkProgress}/${fixtureScan?.fixtures.length ?? 0}` : `Analizuj wszystkie (${fixtureScan?.fixtures.length ?? 0})`}</button></div></div>{scanError && <p className="scan-error">{scanError}</p>}{bulkLoading && <p className="source-note">Przetworzono {bulkProgress} z {fixtureScan?.fixtures.length ?? 0} meczów.</p>}{fixtureScan && <p className="source-note">Źródła — open-matchday: {fixtureScan.coverage.openMatchday.cataloguesChecked} katalogów, {fixtureScan.coverage.openMatchday.fixtures} meczów, {fixtureScan.coverage.openMatchday.errors} błędów · OpenLigaDB: {fixtureScan.coverage.openLigaDB.competitionsChecked} rozgrywek, {fixtureScan.coverage.openLigaDB.fixtures} meczów, {fixtureScan.coverage.openLigaDB.errors} błędów · openfootball: {fixtureScan.coverage.openFootball.feedsChecked} plików, {fixtureScan.coverage.openFootball.fixtures} meczów, {fixtureScan.coverage.openFootball.errors} błędów. Duplikaty źródeł są scalane.</p>}{fixtureScan && <p className="source-note">Zakres pokrycia zależy od dostępności publicznych katalogów i plików. Brak błędów pobierania nie oznacza kompletności wszystkich lig, poziomów regionalnych, kobiecych ani młodzieżowych w Europie.</p>}{fixtureScan?.leaguesFailed.length ? <details className="scan-warnings"><summary>Błędy pobierania: {fixtureScan.leaguesFailed.length} źródeł lub rozgrywek</summary>{fixtureScan.leaguesFailed.map(error => <p key={error}>{error}</p>)}</details> : null}<div className="tracker-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Szukaj drużyny lub ligi…"/><span>{fixtureScan?.fixtures.filter(m => `${m.home} ${m.away} ${m.competition}`.toLowerCase().includes(query.toLowerCase())).length ?? 0} meczów</span></div><div className="fixture-list">{fixtureScan?.fixtures.filter(m => `${m.home} ${m.away} ${m.competition}`.toLowerCase().includes(query.toLowerCase())).map(match => <div className="fixture-row fixture-row-expanded" key={match.id}><time>{match.time}</time><div><b>{match.home}</b><span>{match.away}</span></div><small>{match.competition}</small>{match.leagueFolder || (match.leagueShortcut && match.leagueSeason) || match.openFootballFeedId ? <button className="form-button" onClick={() => void loadFixtureForms(match)} disabled={teamForms[match.id]?.loading}>{teamForms[match.id]?.loading ? "Ładowanie…" : "Forma 5 + typ"}</button> : <small className="source-note">Historia formy niedostępna w tym źródle</small>}{teamForms[match.id]?.error && <p className="scan-error">{teamForms[match.id].error}</p>}{records.find(row => row.kind === "prediction" && row.details.fixtureId === match.id)?.status === "ODRZUCONY" && <p className="scan-error">TYP ODRZUCONY: {String(records.find(row => row.kind === "prediction" && row.details.fixtureId === match.id)?.details.reason ?? "Brak uzasadnienia — wymaga ponownej analizy.")}</p>}{teamForms[match.id]?.home && teamForms[match.id]?.away && <div className="team-form-panel"><div><b>{match.home} · ostatnie mecze</b>{teamForms[match.id].home!.matches.map((item,i)=><small key={item.date+i}>{item.date} · {item.venue==="H"?"D":"W"} · {item.goalsFor}:{item.goalsAgainst} · {item.result} · {item.opponent}</small>)}</div><div><b>{match.away} · ostatnie mecze</b>{teamForms[match.id].away!.matches.map((item,i)=><small key={item.date+i}>{item.date} · {item.venue==="H"?"D":"W"} · {item.goalsFor}:{item.goalsAgainst} · {item.result} · {item.opponent}</small>)}</div><p>Źródła: {teamForms[match.id].home!.source} / {teamForms[match.id].away!.source} · tylko zakończone mecze przed datą spotkania. D=dom, W=wyjazd.</p>{teamForms[match.id].prediction && <div className="form-prediction"><b>Prognoza 1X2 · {teamForms[match.id].prediction!.pick} ({Math.round(teamForms[match.id].prediction!.topProbability * 100)}%)</b><span>1: {Math.round(teamForms[match.id].prediction!.prediction.probabilities.home * 100)}% · X: {Math.round(teamForms[match.id].prediction!.prediction.probabilities.draw * 100)}% · 2: {Math.round(teamForms[match.id].prediction!.prediction.probabilities.away * 100)}%</span><span>DC: 1X {Math.round(teamForms[match.id].prediction!.prediction.doubleChance.oneX * 100)}% · X2 {Math.round(teamForms[match.id].prediction!.prediction.doubleChance.xTwo * 100)}% · 12 {Math.round(teamForms[match.id].prediction!.prediction.doubleChance.oneTwo * 100)}%</span><small>λ: {teamForms[match.id].prediction!.prediction.expectedGoals.home.toFixed(2)}–{teamForms[match.id].prediction!.prediction.expectedGoals.away.toFixed(2)} · próby: {teamForms[match.id].prediction!.samples.homeAttack}/{teamForms[match.id].prediction!.samples.awayAttack}</small><small>{teamForms[match.id].prediction!.note}</small>{teamForms[match.id].prediction!.strongCandidate && <small>Najwyższe prawdopodobieństwo ≥75% — kandydat do puli, nie gwarancja.</small>}</div>}{teamForms[match.id].predictionError && <p className="scan-error">Prognoza niedostępna: {teamForms[match.id].predictionError}</p>}</div>}</div>)}{fixtureScan && fixtureScan.fixtures.length === 0 && <div className="tracker-empty">Brak meczów w pobranych źródłach na dziś. Nie oznacza to, że wszystkie europejskie rozgrywki zostały potwierdzone.</div>}</div><p className="source-note">Źródła: <a href="https://github.com/oladeeayo/open-matchday" target="_blank" rel="noreferrer">open-matchday</a> (CSV, użytek niekomercyjny) + <a href="https://www.openligadb.de/" target="_blank" rel="noreferrer">OpenLigaDB</a> (API) + <a href="https://github.com/openfootball/europe" target="_blank" rel="noreferrer">OpenFootball</a> (public domain). Puchary, rozgrywki młodzieżowe i kobiece są uwzględniane, gdy dostawca publikuje feed. Pokrycie zależy od dostępności danych; błędy i braki są raportowane.</p></section>}
 
+        {active === "bets" && <section className="module-panel bets-module">
+          <div className="module-icon"><Ticket/></div><h2>Bilans wybranych zakładów</h2>
+          {(() => {
+            const bets = records.filter(row => row.kind === "bet");
+            const selected = bets.filter(row => row.details.decision === "SELECTED");
+            const rejected = bets.filter(row => row.details.decision === "REJECTED");
+            const settled = selected.filter(row => ["WON","LOST","VOID"].includes(row.status));
+            const wins = settled.filter(row => row.status === "WON").length;
+            const losses = settled.filter(row => row.status === "LOST").length;
+            const profit = settled.reduce((sum,row) => sum + (typeof row.details.profitLoss === "number" ? row.details.profitLoss : 0),0);
+            const stake = settled.reduce((sum,row) => sum + (typeof row.details.stake === "number" ? row.details.stake : 0),0);
+            const rejectedSettled = rejected.filter(row => ["ODRZUCONY_TRAFIŁ","ODRZUCONY_NIE_TRAFIŁ"].includes(row.status));
+            const rejectedHits = rejectedSettled.filter(row => row.status === "ODRZUCONY_TRAFIŁ").length;
+            const currency = (value: number) => new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(value);
+            return <>
+              <div className="audit-metrics bet-metrics">
+                <article><small>Wybrane zakłady</small><b>{selected.length}</b></article>
+                <article><small>Rozliczone</small><b>{settled.length}</b></article>
+                <article><small>Bilans netto</small><b className={profit >= 0 ? "profit-positive" : "profit-negative"}>{currency(profit)}</b></article>
+                <article><small>ROI</small><b>{stake > 0 ? `${(profit/stake*100).toFixed(1)}%` : "—"}</b></article>
+                <article><small>Wygrane / przegrane</small><b>{wins} / {losses}</b></article>
+                <article><small>Odrzucone typy</small><b>{rejected.length}</b></article>
+                <article><small>Odrzucone, które weszły</small><b>{rejectedSettled.length ? `${rejectedHits}/${rejectedSettled.length}` : "—"}</b></article>
+                <article><small>Średni kurs wybranych</small><b>{selected.length ? (selected.reduce((s,r)=>s+(Number(r.details.odds)||0),0)/selected.length).toFixed(2) : "—"}</b></article>
+              </div>
+              <h3>Rejestr wybranych i odrzuconych</h3>
+              <p>Przy każdym zapisanym typie można odnotować kurs. Dla odrzuconego stawka wynosi 0; jego trafność liczymy wyłącznie hipotetycznie.</p>
+              <div className="tracker-table">
+                <div className="tracker-head"><span>DECYZJA</span><span>MECZ / TYP</span><span>KURS</span><span>STAWKA</span><span>STATUS / P/L</span></div>
+                {bets.map(row => <div className="tracker-row bet-row" key={row.id}>
+                  <span>{row.details.decision === "SELECTED" ? "WYBRANY" : "ODRZUCONY"}</span>
+                  <b>{row.title} · {String(row.details.market ?? "")}</b>
+                  <span>{Number(row.details.odds).toFixed(2)}</span>
+                  <span>{currency(Number(row.details.stake)||0)}</span>
+                  <span>{row.status}{typeof row.details.profitLoss === "number" ? ` · ${currency(row.details.profitLoss)}` : ""}</span>
+                </div>)}
+                {!bets.length && <div className="tracker-empty">Nie ma jeszcze zapisanych decyzji. Wygeneruj prognozy, a następnie oznacz typ jako wybrany lub odrzucony w tym panelu.</div>}
+              </div>
+              <h3>Typy gotowe do decyzji</h3>
+              <div className="bet-entry-list">
+                {records.filter(row => row.kind === "prediction" && typeof row.details.fixtureId === "string").map(prediction => {
+                  const input = betInputFor(prediction);
+                  const already = bets.some(row => row.details.fixtureId === prediction.details.fixtureId);
+                  return <article className="bet-entry" key={prediction.id}>
+                    <div><b>{prediction.title}</b><small>{String(prediction.details.competition ?? "Liga nieustalona")} · {prediction.status} · {String(prediction.details.reason ?? "Brak powodu odrzucenia")}</small></div>
+                    <div className="bet-entry-controls">
+                      <select value={input.market} onChange={e=>setBetInputs(v=>({...v,[String(prediction.details.fixtureId)]:{...input,market:e.target.value}}))}>
+                        <option value="1">1</option><option value="X">X</option><option value="2">2</option><option value="1X">1X</option><option value="X2">X2</option><option value="12">12</option>
+                      </select>
+                      <input type="number" min="1.01" step="0.01" placeholder="Kurs" value={input.odds} onChange={e=>setBetInputs(v=>({...v,[String(prediction.details.fixtureId)]:{...input,odds:e.target.value}}))}/>
+                      <input type="number" min="0.01" step="0.01" placeholder="Stawka €" value={input.stake} onChange={e=>setBetInputs(v=>({...v,[String(prediction.details.fixtureId)]:{...input,stake:e.target.value}}))}/>
+                      <button disabled={already} onClick={()=>recordBetDecision(prediction,"SELECTED")}>Wybieram</button>
+                      <button disabled={already} onClick={()=>recordBetDecision(prediction,"REJECTED")}>Odrzucam</button>
+                    </div>
+                    {already && <small>Decyzja już zapisana w rejestrze.</small>}
+                  </article>;
+                })}
+                {!records.some(row=>row.kind==="prediction") && <div className="tracker-empty">Najpierw uruchom analizę meczów, aby pojawiły się prognozy.</div>}
+              </div>
+              <p className="source-note">Bilans uwzględnia wyłącznie rozliczone, wybrane zakłady. Odrzucone typy są porównaniem hipotetycznym i nigdy nie zwiększają ani nie zmniejszają salda.</p>
+            </>;
+          })()}
+          {notice && <div className="tracker-notice">{notice}</div>}
+        </section>}
         {active === "tracker" && <section className="tracker-panel"><div className="tracker-toolbar"><div><h2>Twój lokalny rejestr</h2><p>Dane są zapisywane w pamięci tej przeglądarki. Eksportuj kopię, aby ich nie utracić.</p></div><div className="backup-actions"><button onClick={downloadBackup}>Eksport JSON</button><button onClick={downloadCsv}>Eksport CSV</button><button onClick={() => fileRef.current?.click()}>Import JSON</button><input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={e => void loadBackup(e.target.files?.[0])}/></div></div><div className="tracker-form"><select value={newKind} onChange={e => setNewKind(e.target.value as TrackerKind)}><option value="match">Mecz</option><option value="prediction">Prognoza</option><option value="coupon">Kupon</option><option value="scan">Skan</option><option value="result">Wynik</option><option value="odds">Kurs</option><option value="ledger">Bankroll</option><option value="category">Kategoria</option><option value="jackpot">Jackpot</option></select><input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Dodaj wpis do Trackera…"/><button onClick={saveRecord} disabled={!newTitle.trim()}><Plus size={16}/> Zapisz</button></div>{notice && <div className="tracker-notice">{notice}</div>}<div className="tracker-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Szukaj wpisów…"/><span>{visibleRecords.length} wpisów</span></div><div className="tracker-table"><div className="tracker-head"><span>TYP</span><span>NAZWA</span><span>STATUS</span><span>DATA</span><span/></div>{visibleRecords.map(row => <div className="tracker-row" key={row.id}><span>{row.kind}</span><b>{row.title}</b><span>{row.status}</span><time>{new Date(row.createdAt).toLocaleString("pl-BE")}</time><button aria-label="Usuń wpis" onClick={() => { removeRecord(row.id); refreshRecords(); }}>×</button></div>)}{visibleRecords.length === 0 && <div className="tracker-empty">Brak wpisów. Dodaj pierwszy rekord lub zaimportuj kopię zapasową.</div>}</div></section>}
 
         {active === "coupons" && <section className="module-panel coupon-module">
