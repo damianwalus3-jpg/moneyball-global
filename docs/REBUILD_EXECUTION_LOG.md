@@ -344,3 +344,11 @@
 - Manual Intelligence action remains available for an immediate check.
 - Commit: 3bad5f6f59f25948a8d7e7c53b83417ba5dbc3c8.
 - Validation: pending CI and Cloudflare deployment for this change; no live result-feed completeness claim.
+
+## Stage 29 — model-audit integrity hardening
+- Fixed result joining so duplicate settlement rows cannot cause an older result to overwrite the newest result during audit calculations. Tracker ordering is newest-first; the audit now keeps the first valid result per fixture.
+- Added defensive probability validation before calibration and metric calculations. Malformed, out-of-range or non-normalized probability rows are excluded and remain counted as unmatched instead of breaking the Intelligence view.
+- Added regression tests for newest-result precedence and malformed probability rows.
+- Source commit: `b7c85a529ab5e704c74117e2aff1eec3ebf5d0aa`.
+- Test commit: `f1f3e5311f316a2ffe72f9257a9cc7e4c936656d`.
+- Validation and Cloudflare deployment are triggered by the latest branch push; stage remains pending until those workflows complete successfully.
