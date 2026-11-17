@@ -119,7 +119,7 @@ function TrackerPage() {
       classifyTrackerSource({ entityType: args.entityType, ids: args.ids, sourceClass: args.sourceClass, note: args.note }),
     {
       success: (count) => `Jawnie sklasyfikowano ${count} rekordów; zapisano ślad audytowy.`,
-      onDone: () => { setLegacySelected([]); setLegacyNote(""); void legacyRows.refetch(); void categorySummary.refetch(); },
+      onDone: () => { setLegacySelected([]); setLegacyNote(""); setLegacyOffset(0); void categorySummary.refetch(); },
     },
   );
   const updateCategory = useAction(
