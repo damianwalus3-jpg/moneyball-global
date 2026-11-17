@@ -187,6 +187,28 @@ export interface JackpotEntry {
   created_at: string;
 }
 
+export interface TrackerCount {
+  label: string;
+  count: number;
+}
+
+export interface TrackerCategoryCount {
+  category_key: string;
+  display_name: string;
+  category_group: "CORE" | "SPORT" | "LEGACY";
+  prediction_count: number;
+  coupon_count: number;
+}
+
+export interface TrackerCategorySummary {
+  categories: TrackerCategoryCount[];
+  decisions: TrackerCount[];
+  prediction_sources: TrackerCount[];
+  coupon_sources: TrackerCount[];
+  prediction_settlements: TrackerCount[];
+  coupon_settlements: TrackerCount[];
+}
+
 export interface TableRows {
   scan_runs: ScanRun;
   matches: Match;
