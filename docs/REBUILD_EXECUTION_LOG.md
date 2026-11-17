@@ -586,3 +586,15 @@
 - Finalne workflow dla tego samego HEAD: MONEYBALL rebuild CI `44189226174` SUCCESS; MONEYBALL Rebuild Checks `44189226170` SUCCESS; Cloudflare deployment `44189226159` SUCCESS.
 - Zmiany OPTIONS i OddsPapi query authentication są więc w finalnym wdrożeniu REBUILD. Poprzednie runy dla commitów pośrednich zakończone failure/cancelled nie są aktualnym stanem; finalny HEAD ma komplet SUCCESS.
 - Nadal niepotwierdzone: publiczny smoke test `/api/odds/status`, obecność obu sekretów, live odpowiedź OddsPapi/StrikerAPI oraz coverage i fixture matching. Nie wykonywano billable zapytań do OddsPapi.
+
+
+## Stage 54 — odds pilot access hardening — 2026-11-17
+- Audit found the public `/api/odds/pilot` endpoint could call configured paid/credit-metered providers without owner authentication. This could allow third parties to consume the user's provider quota.
+- Added fail-closed `ODDS_PILOT_TOKEN` bearer authentication. When the secret is absent the pilot returns HTTP 503 without contacting either provider; an invalid token returns HTTP 401.
+- Restricted CORS grants to the exact production REBUILD origin. Arbitrary origins no longer receive Access-Control-Allow-Origin. OPTIONS allows the Authorization header.
+- Added a 10-second upstream timeout to OddsPapi, StrikerAPI and OpenLigaDB fetches.
+- Kept `/api/odds/status` read-only; it reports only whether provider secrets and the pilot token are configured, never their values.
+- Added unit tests for disabled pilot, invalid token, arbitrary-origin CORS denial, authenticated provider requests and secret non-disclosure.
+- Code commits: Worker `e204fc4ead9b9a661802a9ffe672faee0a50121d`; tests `f9058ab38a2dcea1f8bd8902fef98e62073c8da3`.
+- Required before live provider pilot: set a strong random `ODDS_PILOT_TOKEN` secret on the separate `moneyball-global-rebuild` Worker. Until then the provider pilot is intentionally disabled, even though provider keys are configured.
+- CI and Cloudflare deployment must pass for the test commit before marking Stage 54 deployed. No provider credits were consumed and no Tracker, coupon, settlement or bankroll records were changed.
