@@ -173,7 +173,7 @@ All seven are additive. They do not rewrite historical matches, predictions, cou
 - Pagination is reset to the first page after a classification operation to avoid skipping rows as the unclassified queue shrinks.
 - Added four additive migrations for the audit table/RPC, type-filtered queue, audit backup/restore and accurate idempotent restore counts. Tracker-specific migration count is now 12.
 - Production read-only snapshot: 15 system categories, 14 aliases, 19,201 predictions, 9 coupons, 9 bankroll transactions, 0 Jackpot entries, 0 audit entries, 18,724 unclassified predictions and 9 unclassified coupons. No historical source values were changed by this delivery.
-- CI passed: 92 tests across 9 test files, Supabase Edge Function type-check, application TypeScript check and production build. The latest successful CI commit is `196f2b0`; its Cloudflare deploy job is being re-run after an overlapping later commit cancelled the original deployment attempt.
+- CI passed: 92 tests across 9 test files, Supabase Edge Function type-check, application TypeScript check and production build. The final docs commit `12e77d2` was subsequently verified through CI and deployed successfully to Cloudflare MAIN.
 
 ### Remaining verification
 
@@ -182,4 +182,4 @@ All seven are additive. They do not rewrite historical matches, predictions, cou
 - Verify PAPER settlement behavior with controlled non-production fixtures. Production rows are not fabricated or mutated for testing.
 - Existing Supabase advisor findings outside the Tracker remain: internal tables without authenticated policies, `pg_net` in the public schema, leaked-password protection disabled, and pre-existing SECURITY DEFINER RPC warnings. The new owner-scoped classification and audit restore RPCs are also SECURITY DEFINER by design; their grants are restricted to authenticated users and their bodies enforce the caller's own user ID. These findings are documented, not silently represented as resolved.
 
-The Tracker is deployed as a working release with audited legacy classification and backup support. It is not declared fully complete until the remaining authenticated UI and controlled settlement/restore checks are verified.
+The Tracker release with audited legacy classification and audit-aware JSON backup is deployed to Cloudflare MAIN. Latest commit `12e77d2` passed CI (92 tests across 9 test files, Supabase Edge Function type-check, application type-check and production build) and the Cloudflare deployment workflow completed successfully. Authenticated user-session checks and controlled settlement/restore regression checks remain the final verification items; the full project is not marked complete until those are verified.
