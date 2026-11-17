@@ -200,7 +200,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       nextRequestAt = Math.max(Date.now(), nextRequestAt) + 1050;
       if (wait) await new Promise(resolve => setTimeout(resolve, wait));
       const shortcut = league.leagueShortcut ?? "";
-      const season = league.leagueSeason ?? String(year);
+      const season = league.leagueSeason ?? String(seasonYears[0]);
       try {
         const matches = await fetchJson<OpenLigaMatch[]>(`${OPENLIGA}/matches/${encodeURIComponent(shortcut)}/${encodeURIComponent(season)}`);
         const fixtures = matches.flatMap(match => {
