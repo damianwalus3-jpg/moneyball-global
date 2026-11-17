@@ -103,7 +103,7 @@ describe("odds provider pilot proxy", () => {
   it("rejects a pilot request without provider fixture identifiers", async () => {
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot", { headers: { Authorization: "Bearer test-pilot-token" } }), { ASSETS: { fetch: vi.fn() }, ODDS_PILOT_TOKEN: "test-pilot-token" }, { waitUntil: vi.fn() });
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "fixtureId or strikerGameId is required" });
+    expect(await response.json()).toEqual({ error: "fixtureId, strikerGameId or strikerDate is required" });
   });
 
   it("requests OddsPapi odds only from the Worker and returns provider data without the key", async () => {
@@ -147,4 +147,43 @@ describe("odds provider pilot proxy", () => {
     expect(body.results.oddspapi.status).toBe("not_configured");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("fetches all StrikerAPI odds for one UTC date in a single batch request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { games: [
+      {
+        game_id: "game-1", starts_at: "2026-11-18T18:00:00Z",
+        home: { name: "Home FC" }, away: { name: "Away FC" },
+        books: [{ provider: "ExampleBook", source: "live", captured_at: "2026-11-17T18:00:00Z", home_ml_close: 100, draw_ml_close: -110, away_ml_close: 250 }],
+      },
+      {
+        game_id: "game-2", starts_at: "2026-11-18T20:00:00Z",
+        home: { name: "Other Home" }, away: { name: "Other Away" }, books: [],
+      },
+    ] } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?strikerDate=2026-11-18", {
+      headers: { Authorization: "Bearer test-pilot-token" },
+    }), { ASSETS: { fetch: vi.fn() }, STRIKERAPI_API_KEY: "private-key-value", ODDS_PILOT_TOKEN: "test-pilot-token" }, { waitUntil: vi.fn() });
+    const body = await response.json() as { results: { strikerapi: { lookup: string; games: Array<{ gameId: string }> } } };
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ date: "2026-11-18" });
+    expect(body.results.strikerapi.lookup).toBe("utc_date");
+    expect(body.results.strikerapi.games.map(game => game.gameId)).toEqual(["game-1", "game-2"]);
+  });
+
+  it("rejects invalid or conflicting StrikerAPI date and game lookups before provider calls", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const env = { ASSETS: { fetch: vi.fn() }, STRIKERAPI_API_KEY: "configured-provider-key", ODDS_PILOT_TOKEN: "test-pilot-token" };
+    const invalidDate = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?strikerDate=2026-02-31", {
+      headers: { Authorization: "Bearer test-pilot-token" },
+    }), env, { waitUntil: vi.fn() });
+    const conflict = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?strikerDate=2026-11-18&strikerGameId=game-1", {
+      headers: { Authorization: "Bearer test-pilot-token" },
+    }), env, { waitUntil: vi.fn() });
+    expect(invalidDate.status).toBe(400);
+    expect(conflict.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
 });
