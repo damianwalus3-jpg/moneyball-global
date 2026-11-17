@@ -732,3 +732,5 @@
 - Commits: implementation 9777696caeabe226b791be45f91b935fe641253b; tests d9747d31d50a9f9d6f7bc49623144d2948ee3539.
 - Validation: source and test changes are committed to moneyball-rebuild. CI and Cloudflare deployment status for the resulting branch HEAD must be checked before marking this stage verified/deployed. No provider requests, credits, Tracker records or bankroll values were changed.
 - Follow-up audit still required: confirm coupon save deduplication and paper-settlement financial arithmetic; verify all latest code commits with the isolated rebuild CI and Cloudflare deployment workflows. Do not use the unrelated Vercel status as a release signal.
+
+- CI feedback loop: the first TypeScript run on implementation commit 9777696 detected a redundant runtime length comparison against the statically fixed three-element tuple. Removed that impossible comparison in commit efbf610ddb3e676acc62f112c879274dd0fb2b8b; the distinct-fixture validation remains. A fresh CI and deployment run is required on the corrected HEAD.
