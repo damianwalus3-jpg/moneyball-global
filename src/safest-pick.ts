@@ -19,8 +19,14 @@ function brusselsNowParts(): { date: string; time: string } {
   return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
 }
 
+export function hasKnownKickoff(date: string, time: string): boolean {
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date) || !/^\\d{2}:\\d{2}$/.test(time)) return false;
+  const parsed = Date.parse(`${date}T${time}:00Z`);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === date;
+}
+
 export function hasKickoffPassed(date: string, time: string): boolean {
-  if (time === "—" || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return false;
+  if (!hasKnownKickoff(date, time)) return false;
   const now = brusselsNowParts();
   return date < now.date || (date === now.date && time <= now.time);
 }
@@ -36,7 +42,8 @@ export function getSafestPick(records: TrackerRecord[], minimum = 0.8): SafestPi
   for (const row of newest.values()) {
     const d = row.details;
     if (row.status !== "KANDYDAT" || typeof d.fixtureDate !== "string" || typeof d.fixtureTime !== "string") continue;
-    if (!hasKnownKickoff(d.fixtureDate, d.fixtureTime)) continue;\n    if (d.fixtureDate < now.date || (d.fixtureDate === now.date && d.fixtureTime <= now.time)) continue;
+    if (!hasKnownKickoff(d.fixtureDate, d.fixtureTime)) continue;
+    if (d.fixtureDate < now.date || (d.fixtureDate === now.date && d.fixtureTime <= now.time)) continue;
     const markets: Array<{ market: SafestPick["market"]; probability: unknown }> = [
       { market: "1X", probability: d.dc1x },
       { market: "X2", probability: d.dcx2 },
