@@ -220,7 +220,23 @@ export default function App() {
         status: "SCHEDULED",
         details: { fixtureId: match.id, date: match.date, time: match.time, competition: match.competition, source: match.source, sourceUpdatedAt: match.sourceUpdatedAt ?? null },
       })), "fixtureId");
-      addRecord({ kind: "scan", title: `Skan europejski ${scan.date}`, status: scan.leaguesFailed.length ? "WITH_WARNINGS" : "OK", details: { fixtures: scan.fixtures.length, catalogueEntries: scan.leaguesChecked, errors: scan.leaguesFailed.length, source: scan.source } });
+      const scanKey = [scan.date, scan.source, scan.fixtures.length, scan.leaguesChecked, scan.leaguesFailed.join("|")].join("::");
+      addRecordsIfMissing([{
+        kind: "scan",
+        title: `Skan europejski ${scan.date}`,
+        status: scan.leaguesFailed.length ? "WITH_WARNINGS" : "OK",
+        details: {
+          scanKey,
+          fixtures: scan.fixtures.length,
+          catalogueEntries: scan.leaguesChecked,
+          errors: scan.leaguesFailed.length,
+          failedSources: scan.leaguesFailed.join(" | "),
+          openMatchdayFixtures: scan.coverage.openMatchday.fixtures,
+          openLigaDBFixtures: scan.coverage.openLigaDB.fixtures,
+          openFootballFixtures: scan.coverage.openFootball.fixtures,
+          source: scan.source,
+        },
+      }], "scanKey");
       setRecords(readRecords());
     } catch (error) { setScanError(error instanceof Error ? error.message : "Nie udało się pobrać terminarza."); }
     finally { setScanLoading(false); }

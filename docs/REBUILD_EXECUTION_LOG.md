@@ -434,3 +434,12 @@
 - Added regression tests for first attempt, duplicate failure suppression, recovery after source data becomes available, valid-record protection, and fixture isolation.
 - Existing history is append-only; no rows are deleted or overwritten. Intelligence already selects the newest prediction per fixture.
 - CI and Cloudflare deployment required before marking complete.
+
+
+## Stage 40 — meaningful, deduplicated fixture scan history
+- The 15-minute fixture refresh previously appended an identical Tracker scan row every cycle, steadily growing local history without adding information.
+- Scan summaries are now idempotent by a stable signature containing Brussels date, source set, fixture count, checked catalogue count and the failed-source list. A materially changed scan still creates a new append-only history row.
+- Retained source-level fixture counts (open-matchday, OpenLigaDB, OpenFootball) and failed-source names in each scan record to improve later coverage audits.
+- Added regression coverage proving identical summaries are deduplicated while changed scan outcomes remain visible.
+- No fixture, prediction, result, coupon or historical Tracker row is deleted or overwritten.
+- CI and Cloudflare deployment required before marking deployed.

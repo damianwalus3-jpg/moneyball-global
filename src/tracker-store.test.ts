@@ -82,6 +82,14 @@ describe("local tracker", () => {
     expect(readRecords()).toHaveLength(1);
     expect(readRecords()[0].title).toBe("First");
   });
+  it("deduplicates identical scheduled scan summaries but preserves changed scan outcomes", () => {
+    const first = { kind: "scan" as const, title: "Skan europejski 2026-11-17", status: "OK", details: { scanKey: "2026-11-17::source::100::40::", fixtures: 100 } };
+    const changed = { ...first, status: "WITH_WARNINGS", details: { scanKey: "2026-11-17::source::98::40::feed unavailable", fixtures: 98 } };
+    expect(addRecordsIfMissing([first], "scanKey")).toBe(1);
+    expect(addRecordsIfMissing([first], "scanKey")).toBe(0);
+    expect(addRecordsIfMissing([changed], "scanKey")).toBe(1);
+    expect(readRecords().filter(row => row.kind === "scan")).toHaveLength(2);
+  });
   it("stores scanned fixtures once and never overwrites an existing fixture row", () => {
     const fixture = { kind: "match" as const, title: "Team A — Team B", status: "SCHEDULED", details: { fixtureId: "provider|fixture-1", date: "2026-11-17" } };
     expect(addRecordsIfMissing([fixture], "fixtureId")).toBe(1);
