@@ -74,8 +74,8 @@ function TrackerPage() {
   const [legacySourceClass, setLegacySourceClass] = useState<"USER" | "MODEL" | "PAPER">("MODEL");
   const [legacyNote, setLegacyNote] = useState("");
   const legacyRows = useQuery({
-    queryKey: ["tracker-unclassified", legacyOffset],
-    queryFn: () => fetchTrackerUnclassifiedPage(legacyOffset, 51),
+    queryKey: ["tracker-unclassified", legacyEntityType, legacyOffset],
+    queryFn: () => fetchTrackerUnclassifiedPage(legacyEntityType, legacyOffset, 51),
     staleTime: 30_000,
     refetchInterval: false,
   });
@@ -408,7 +408,7 @@ function TrackerPage() {
               </div>
             </div>
             <div className="mt-2 max-h-[420px] overflow-auto rounded-lg border border-border">
-              {(legacyRows.data ?? []).filter((row) => row.entity_type === legacyEntityType).map((row) => (
+              {(legacyRows.data ?? []).map((row) => (
                 <label key={row.entity_id} className="flex cursor-pointer items-start gap-3 border-b border-border p-3 last:border-b-0 hover:bg-secondary/30">
                   <input
                     type="checkbox"
@@ -423,7 +423,7 @@ function TrackerPage() {
                   <span className="text-[10px] font-semibold text-warning">NIEPRZYPISANE</span>
                 </label>
               ))}
-              {!(legacyRows.data ?? []).some((row) => row.entity_type === legacyEntityType) && <p className="p-4 text-sm text-muted-foreground">Na tej stronie nie ma więcej nieprzypisanych rekordów tego rodzaju.</p>}
+              {!(legacyRows.data ?? []).length && <p className="p-4 text-sm text-muted-foreground">Na tej stronie nie ma więcej nieprzypisanych rekordów tego rodzaju.</p>}
             </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-muted-foreground">Maksymalnie 100 rekordów w jednej operacji. Przypisanie jest trwałe i odnotowane w audycie.</p>
