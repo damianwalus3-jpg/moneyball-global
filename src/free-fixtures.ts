@@ -16,7 +16,7 @@ interface LeagueIndex {
 const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const SOURCE = "open-matchday (public CSV; non-commercial terms)";
 const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","UEFA"]);
-const CACHE_KEY = "moneyball.free-fixtures.v1";
+const CACHE_KEY = "moneyball.free-fixtures.v2";
 
 function parseCsvLine(line: string): string[] {
   const out: string[] = [];
