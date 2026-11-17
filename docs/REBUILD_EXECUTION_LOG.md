@@ -388,3 +388,10 @@
 - This is best-effort browser-local deduplication; localStorage is not a transactional cross-device database, so it does not promise atomic multi-device writes.
 - Commits: App integration `d453b6ef41a1daf1f1c13dc4f3da9d31772f25eb`; tests `eaed5b016a6fe6675fe13e115bb5d11fa4c5f603`.
 - CI and Cloudflare deployment pending for the final stage commit.
+
+## Stage 35 — newest-first history after backup import
+- Fixed Tracker backup merge ordering: after importing previously unseen rows, the combined history is sorted by createdAt descending, preserving the newest-first contract used by result and prediction selection.
+- Existing records with matching IDs remain unchanged; only missing IDs are merged.
+- Added regression coverage for chronological ordering and preservation of an existing record.
+- Commits: implementation `ad83e9112a8d2d15befddc3869c4d39d503d2076`; test `aefa6649637d55d3351fb56a115274a046259349`.
+- CI and Cloudflare deployment pending for the latest branch commit.
