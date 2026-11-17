@@ -538,43 +538,38 @@ export async function fetchMatchSettlementContext(matchId: string): Promise<Matc
   };
 }
 
+export type StatisticsMatch = Pick<
+  TableRows["matches"],
+  "id" | "competition" | "country" | "gender" | "home_team" | "away_team" | "kickoff_at" | "league" | "kickoff_date"
+> & { home_score?: number | null; away_score?: number | null };
+
+export type StatisticsPrediction = Pick<
+  TableRows["predictions"],
+  "id" | "match_id" | "model_version" | "market" | "selection" | "probability" | "verdict" |
+  "odds" | "settlement_status" | "verified" | "stake" | "potential_return" | "profit_loss"
+>;
+
+export type StatisticsCoupon = Pick<TableRows["coupons"], "id" | "status" | "stake">;
+export type StatisticsCouponLeg = Pick<TableRows["coupon_legs"], "id" | "coupon_id" | "match_id" | "odds" | "status">;
+
 export interface StatisticsPageData {
-  matches: TableRows["matches"][];
-  predictions: TableRows["predictions"][];
-  coupons: TableRows["coupons"][];
-  legs: TableRows["coupon_legs"][];
+  matches: StatisticsMatch[];
+  predictions: StatisticsPrediction[];
+  coupons: StatisticsCoupon[];
+  legs: StatisticsCouponLeg[];
 }
 
-/** Statistics need the full eligible sample, but not predictions for every
- * historical fixture/model version. Keep the exact league rule in the domain
- * layer and fetch active-model predictions only for eligible match IDs. */
+/** One owner-scoped RPC returns only eligible matches, active-model predictions,
+ * scoped coupons/legs, verified scores and stored financial fields. */
 export async function fetchStatisticsPageData(): Promise<StatisticsPageData> {
-  // Use the shared keyset-paginated table loader here: direct PostgREST selects
-  // are capped at 1,000 rows and would silently truncate the 2,596-match universe.
-  const [matches, coupons, legs] = await Promise.all([
-    fetchAll("matches"),
-    fetchAll("coupons"),
-    fetchAll("coupon_legs"),
-  ]);
-  const uid = await currentUserId();
-  const sb = requireSupabase();
-  const eligibleMatchIds = matches
-    .filter((match) => isEligibleEuropeanMatch(match))
-    .map((match) => match.id);
-  const predictions = eligibleMatchIds.length === 0 ? [] : await fetchInChunks<TableRows["predictions"]>(
-    eligibleMatchIds, 100, async (chunk) => {
-      const { data, error } = await withRequestTimeout(
-        sb.from("predictions").select(READ_COLUMNS.predictions.join(","))
-          .eq(OWNER_COLUMN, uid)
-          .in("match_id", chunk)
-          .or('model_version.eq."MONEYBALL GLOBAL 3.8",model_version.like.MANUAL%'),
-        "Pobieranie aktywnych prognoz do statystyk",
-      );
-      if (error) throw new Error(humanizeError(error, "predictions"));
-      return (data ?? []) as unknown as TableRows["predictions"][];
-    },
+  const { data, error } = await withRequestTimeout(
+    requireSupabase().rpc("moneyball_statistics_page_data"),
+    "Pobieranie statystyk",
+    30_000,
   );
-  return { matches, predictions, coupons, legs };
+  if (error) throw new Error(humanizeError(error));
+  if (!data || typeof data !== "object") throw new Error("Brak danych statystycznych.");
+  return data as StatisticsPageData;
 }
 
 export async function fetchDashboardSummary(): Promise<DashboardSummary> {
@@ -834,7 +829,7 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
         // Use the latest prediction price when the leg was saved before odds arrived.
         // This is a read-time fallback; it never fabricates or overwrites stored prices.
         odds: leg.odds ?? prediction?.odds ?? null,
-        match_id: prediction?.match_id ?? null,
+        match_id: leg.match_id ?? prediction?.match_id ?? null,
         prediction_type: prediction?.market === "DOUBLE_CHANCE" ? "DC" : prediction?.market === "GOALS" ? "GOALS" : "1X2",
         pick: prediction?.selection ?? "—",
         probability: prediction?.probability ?? null,

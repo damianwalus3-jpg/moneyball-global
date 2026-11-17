@@ -7,7 +7,8 @@ import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } 
 import { ACTIVE_MODEL_VERSION, couponPayout, groupHitRates, hitRate, isActivePredictionVersion, isEligibleEuropeanMatch, modelHitRate, probabilityQuality, probabilityQualityBySelection, multiclass1X2Quality, PICK_LABELS, type HitRate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { statisticsPageDataQuery } from "@/lib/queries";
-import type { Market, Prediction } from "@/lib/types";
+import type { Market } from "@/lib/types";
+import type { StatisticsMatch, StatisticsPrediction } from "@/lib/db";
 
 export const Route = createFileRoute("/_authenticated/statystyki")({
   head: () => ({
@@ -151,7 +152,7 @@ function Statystyki() {
   );
 }
 
-function MarketBlock({ type, preds, leagueOf, matchOf }: { type: Market; preds: Prediction[]; leagueOf: (p: Prediction) => string; matchOf: (id: string) => any }) {
+function MarketBlock({ type, preds, leagueOf, matchOf }: { type: Market; preds: StatisticsPrediction[]; leagueOf: (p: StatisticsPrediction) => string; matchOf: (id: string) => StatisticsMatch | undefined }) {
   const [detailFilter, setDetailFilter] = useState<"model" | "selected" | "rejected" | "settled" | "pending" | null>(null);
   const sel = preds.filter((prediction) => prediction.verdict === "WYBRANY");
   const rej = preds.filter((prediction) => prediction.verdict === "ODRZUCONY");
