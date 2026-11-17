@@ -648,3 +648,15 @@
 - Added six regression tests for normalized club names, Brussels timezone conversion, kickoff tolerance, wrong date/order, ambiguity and missing time.
 - CI `44191916368` passed TypeScript, all tests and production build; 100 tests across 18 test files passed. Cloudflare deployment `44191916355` completed successfully.
 - The matcher is a tested module and is not yet connected to the user-facing odds panel or automatic Tracker snapshot creation. No provider request or credits were used.
+
+
+## Stage 59 — user-facing StrikerAPI odds workflow — 2026-11-17 (CI/deploy verified)
+- Added a protected odds connection panel to the Stawki workspace. The user can enter the same `ODDS_PILOT_TOKEN` configured as a Cloudflare Worker secret; the token is stored only in this browser's localStorage and never written to Tracker or repository.
+- Added an explicit manual daily StrikerAPI batch action. It calls only `/api/odds/pilot?strikerDate=YYYY-MM-DD` after a click; no automatic provider calls occur on app load or refresh.
+- The UI explains the UTC date semantics and 10-credit daily call cost. It blocks an accidental second call for the same date unless the user explicitly unlocks another request.
+- Uses the Stage 58 conservative fixture matcher. Only unambiguous future fixtures with exact normalized home/away names, same Brussels date and kickoff within 30 minutes are linked.
+- Saves each bookmaker's 1X2 prices as append-only Tracker odds snapshots with fixture/provider IDs, bookmaker, source, capture time, completeness flag and matching time difference. Existing records are never overwritten.
+- Added a recent-snapshots table in the Stawki workspace. Incomplete prices remain visibly incomplete; they are not silently treated as complete 1X2 odds.
+- CI `44192192529` and Cloudflare deployment `44192192228` passed; all 100 tests across 18 test files passed.
+- No real provider call was made. Production `/api/odds/status` still reports both provider keys configured and `pilotEnabled:false` because the owner token has not yet been configured. Therefore the UI cannot fetch live odds until the user sets the Worker secret and enters the same token in the app.
+- Visual browser click-through was not completed because the browser automation wallet had a zero balance. The code build, unit tests and deployment did pass.
