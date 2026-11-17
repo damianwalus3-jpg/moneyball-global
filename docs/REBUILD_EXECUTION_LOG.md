@@ -629,3 +629,13 @@
 - Final commit: `f87a0b44eabcf454c8ad0df7a07379b8f8da0a27`.
 - CI `44191380721`, rebuild checks `44191380973`, and Cloudflare deployment `44191380659` all completed successfully. TypeScript, production build and all 92 tests across 17 test files passed.
 - No existing Tracker rows, coupons, settlements, bankroll or historical records were rewritten.
+
+
+## Stage 57 — StrikerAPI daily batch odds lookup — 2026-11-17 (verified)
+- Added a protected `strikerDate=YYYY-MM-DD` lookup mode to the existing pilot endpoint. The Worker sends one `POST /v1/get_odds` request with `{ date }` and normalizes all returned games/bookmakers using the same decimal-odds adapter as the single-game mode.
+- Retained the single-game `strikerGameId` mode. The API rejects malformed dates and requests that supply both date and game ID, before contacting the provider.
+- Response identifies the lookup as `utc_date`; the warning explicitly requires conversion of `startsAt` to Europe/Brussels before fixture matching. The provider's date parameter is UTC, not the user's local calendar date.
+- Official StrikerAPI documentation states that `get_odds` costs 5 credits for one game or 10 credits for a date lookup, and that the date parameter is UTC. Reference: https://strikerapi.com/docs/get-odds and https://strikerapi.com/docs.
+- Added tests for request body, multi-game normalization, invalid date and conflicting lookup modes. No real provider request was made and no credits were consumed.
+- CI `44191675525` passed TypeScript, tests and production build; all 94 tests across 17 files passed. Cloudflare deployment `44191675193` completed successfully.
+- Current pilot remains disabled until `ODDS_PILOT_TOKEN` is configured; provider keys remain configured. No Tracker, coupon, settlement, bankroll or historical records changed.
