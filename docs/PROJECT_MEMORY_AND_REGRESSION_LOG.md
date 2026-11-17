@@ -1289,3 +1289,6 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 **Commits:** `b7d32c841195a9d6fddd756fac1ba22186f4420e`, `1d0479af049cc27f0184c8044e7ae3f7964e2f47`, `7edd8668d6f4a1f269c64b21d302708a62e499b0`, `63a5edaa6cf99a2894aa90e67ff1f04e8c153e0d`.
 
 **Not yet done:** The Supabase Edge Functions and SQL migration have not been deployed to the live Supabase project. The Cloudflare workflow is not a Supabase deploy. Live importer/database verification remains open; do not repeat the earlier overclaim that frontend filtering means source ingestion is fully geographic. Existing historical rows remain untouched.
+
+
+**CI/deployment result:** GitHub Actions CI #1230 SUCCESS and Cloudflare deploy #816 SUCCESS for `63a5edaa6cf99a2894aa90e67ff1f04e8c153e0d`. New Deno country-scope tests, Edge Function type-check, application tests, TypeScript, build and Cloudflare deployment all passed. Supabase runtime deployment remains outstanding.

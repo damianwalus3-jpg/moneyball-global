@@ -35,3 +35,6 @@ UN Statistics Division, Standard Country or Area Codes for Statistical Use (M49)
 A source-level correction now centralizes the geographic country boundary in `supabase/functions/_shared/geographic-europe.ts` and applies it to the five ingestion/prediction/result functions: `footynomad-sync`, `moneyball-free-feed`, `moneyball-results-sync`, `moneyball-public-sources`, and `moneyball-predict`. OpenMatchday's league index now uses the same country helper. A SQL migration wraps the existing top-two-tier predicate with the geographic check, without deleting historical rows.
 
 Regression tests were added and wired into GitHub CI and the Cloudflare workflow. However, these workflows do not deploy Supabase functions or SQL migrations. The backend source changes are committed but **not live in Supabase**. Full end-to-end exclusion remains unverified until an authorized Supabase deployment path is available and live importer/database checks pass.
+
+
+Cloudflare deployment run #816 completed SUCCESS for commit `63a5edaa6cf99a2894aa90e67ff1f04e8c153e0d`. This confirms the Cloudflare Worker deployment pipeline only; it does not activate the committed Supabase Edge Function or SQL migration changes.
