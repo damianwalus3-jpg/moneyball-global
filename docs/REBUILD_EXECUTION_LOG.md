@@ -486,3 +486,13 @@
 - Performed a source-level review of the full rebuild branch, product/domain specifications, CI/deploy workflows, PWA service worker and live production page content.
 - Added `docs/REBUILD_SPECIALIST_AUDIT_2026-11-17.md` with prioritized P0/P1/P2 findings, product/UX recommendations, source-compliance concerns and acceptance gates.
 - The audit is analysis only: no application behavior was changed in this stage. Interactive physical-device smoke testing and a reproducible historical backtest remain unperformed and are explicitly called out.
+
+
+## Stage 47 — explain every rejection and surface one strongest daily candidate
+- Added explicit pre-kickoff protection: when a fixture's scheduled local kickoff has passed, the analysis is rejected and the reason is persisted instead of recording it as a pre-match forecast.
+- Prediction records now retain the fixture kickoff time, allowing later selection logic to exclude started matches.
+- Added a deterministic dashboard/Typ dnia selector: it chooses at most one saved candidate, ranking derived Double Chance markets by probability and requiring at least 80%; it displays the exact fixture, market, probability, kickoff and model limitations. If no candidate qualifies, it explicitly shows no pick.
+- Added per-fixture rejected-status explanation in the match list, using the stored rejection reason; missing reasons receive an explicit diagnostic fallback.
+- This is a model-ranked candidate, not a guaranteed bet. Double Chance probabilities remain mathematically derived from the 1X2 model and are not independently calibrated.
+- European fixture coverage audit: the scanner queries all non-empty European folders listed in open-matchday's public build index, all catalogue entries accepted by its OpenLigaDB Europe classifier, and the current OpenFootball Europe feed list. It merges duplicate team/date matches. It cannot prove that every European fixture exists in these feeds: source catalogues are incomplete, OpenLigaDB classification uses league-name/shortcut heuristics, and deduplication currently keys by date+normalized teams (not competition/kickoff). The UI must not claim 100% coverage; source counts and fetch failures are the verifiable coverage evidence.
+- CI and Cloudflare deployment required before marking this stage deployed. Country-by-country independent fixture reconciliation remains outstanding.
