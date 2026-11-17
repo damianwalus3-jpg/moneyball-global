@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { openFootballSeasonFolder, parseOpenFootballFixtures, type OpenFootballFeed } from "./openfootball";
+import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm, openFootballSeasonFolder, parseOpenFootballFixtures, parseOpenFootballMatches, type OpenFootballFeed } from "./openfootball";
+import { vi } from "vitest";
 
 const france: OpenFootballFeed = {
   id: "test-france",
@@ -24,6 +25,8 @@ describe("OpenFootball fixtures", () => {
     expect(fixtures[0].home).toBe("Paris FC");
     expect(fixtures[0].away).toBe("Lille OSC");
     expect(fixtures[0].time).toBe("20:00");
+    expect(fixtures[0].homeGoals).toBe(2);
+    expect(fixtures[0].awayGoals).toBe(1);
     expect(fixtures[0].date).toBe("2026-11-20");
   });
 
@@ -33,6 +36,8 @@ describe("OpenFootball fixtures", () => {
     expect(fixtures).toHaveLength(1);
     expect(fixtures[0].home).toBe("LASK Linz");
     expect(fixtures[0].away).toBe("Grazer AK");
+    expect(fixtures[0].homeGoals).toBe(3);
+    expect(fixtures[0].awayGoals).toBe(0);
   });
 
   it("converts UK summer kickoff to Brussels time and calculates season folder", () => {
@@ -42,5 +47,34 @@ describe("OpenFootball fixtures", () => {
     expect(fixtures[0].time).toBe("21:00");
     expect(openFootballSeasonFolder("2026-11-17")).toBe("2026-27");
     expect(openFootballSeasonFolder("2027-03-10")).toBe("2026-27");
+  });
+});
+
+describe("OpenFootball history and result adapters", () => {
+  it("loads recent form and settles a final score from the public feed", async () => {
+    const feedText = `= France Ligue 1\nFri Nov 20 2026\n  20:00 Paris FC v Lille OSC     2-1 (1-0)\nSat Nov 21\n  15:00 Paris FC v Nice     1-0 (0-0)\nSun Nov 22\n  17:00 Lyon v Paris FC\n`;
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, text: async () => feedText });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => undefined });
+    try {
+      const form = await loadOpenFootballRecentTeamForm("europe-france-1", "Paris FC", "2026-11-22");
+      expect(form.matches).toHaveLength(2);
+      expect(form.matches[0].goalsFor).toBe(1);
+      expect(form.matches[0].result).toBe("W");
+      const result = await findOpenFootballFixtureResult("europe-france-1", "Paris FC", "Lille OSC", "2026-11-20");
+      expect(result?.actual).toBe("1");
+      expect(result?.homeGoals).toBe(2);
+      expect(result?.awayGoals).toBe(1);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not treat unscored fixtures as finished results", () => {
+    const text = `Fri Nov 20 2026\n  20:00 Paris FC v Lille OSC\n`;
+    const matches = parseOpenFootballMatches(text, france);
+    expect(matches[0].homeGoals).toBeNull();
+    expect(matches[0].awayGoals).toBeNull();
   });
 });
