@@ -172,7 +172,7 @@ export default function App() {
                 {coupon.legs.map(leg => <div className="coupon-leg" key={leg.fixtureId}><b>{leg.title}</b><span>{leg.selection} · {Math.round(leg.probability * 100)}%</span><small>{leg.competition}</small></div>)}
                 <div className="coupon-candidate-bottom"><span>Iloczyn prawdopodobieństw: {(coupon.combinedProbability * 100).toFixed(1)}%</span><span>Kursy: brak potwierdzonych danych</span></div>
                 <button onClick={() => {
-                  addRecord({ kind: "coupon", title: `Kupon ${fixtureScan!.date} #${index + 1}`, status: "PAPER_NO_ODDS", details: { date: coupon.date, legs: coupon.legs.map(leg => ({ fixtureId: leg.fixtureId, selection: leg.selection, probability: leg.probability })), combinedProbability: coupon.combinedProbability, odds: null, stake: null } });
+                  addRecord({ kind: "coupon", title: `Kupon ${fixtureScan!.date} #${index + 1}`, status: "PAPER_NO_ODDS", details: { date: coupon.date, legsJson: JSON.stringify(coupon.legs.map(leg => ({ fixtureId: leg.fixtureId, selection: leg.selection, probability: leg.probability }))), combinedProbability: coupon.combinedProbability, odds: null, stake: null } });
                   setRecords(readRecords());
                 }}>Zapisz kupon testowy</button>
               </article>)}
