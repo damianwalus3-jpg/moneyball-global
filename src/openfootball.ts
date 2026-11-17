@@ -74,8 +74,8 @@ function dateFromLine(line: string, seasonStartYear: number): string | null {
   const year=match[3] ? Number(match[3]) : month>=7 ? seasonStartYear : seasonStartYear+1;
   return `${year}-${String(month).padStart(2,"0")}-${String(Number(match[2])).padStart(2,"0")}`;
 }
-export function parseOpenFootballMatches(text: string, feed: OpenFootballFeed, targetDate?: string): OpenFootballFixture[] {
-  const seasonYear=seasonStart(targetDate ?? brusselsParts(new Date()).date);
+export function parseOpenFootballMatches(text: string, feed: OpenFootballFeed, targetDate?: string, seasonReferenceDate?: string): OpenFootballFixture[] {
+  const seasonYear=seasonStart(seasonReferenceDate ?? targetDate ?? brusselsParts(new Date()).date);
   let currentDate="";
   const output: OpenFootballFixture[]=[];
   for (const raw of text.replace(/^\uFEFF/,"").split(/\r?\n/)) {
@@ -167,7 +167,7 @@ export async function loadOpenFootballRecentTeamForm(feedId: string, team: strin
   } catch { /* ignore malformed cache */ }
   const text=await loadFeedText(feed,season);
   const target=normalizeTeamName(team);
-  const matches=parseOpenFootballMatches(text,feed).flatMap(match=>{
+  const matches=parseOpenFootballMatches(text,feed,undefined,beforeDate).flatMap(match=>{
     if (match.date>=beforeDate || match.homeGoals===null || match.awayGoals===null) return [];
     const isHome=normalizeTeamName(match.home)===target;
     const isAway=normalizeTeamName(match.away)===target;
