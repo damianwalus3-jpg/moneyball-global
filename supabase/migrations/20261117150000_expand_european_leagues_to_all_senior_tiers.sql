@@ -69,7 +69,7 @@ $function$;
 COMMENT ON FUNCTION public.moneyball_is_european_top_two_league(text,text)
 IS 'Legacy compatibility predicate, broadened to all geographic-European domestic competition tiers; excludes cups and international competitions.';
 COMMENT ON FUNCTION public.moneyball_is_eligible_european_match(text,text,text,text,text)
-IS 'Canonical eligibility predicate for all geographic-European senior men's domestic league tiers; excludes cups, international, youth, women's and reserve fixtures.';
+IS $comment$Canonical eligibility predicate for all geographic-European senior men's domestic league tiers; excludes cups, international, youth, women's and reserve fixtures.$comment$;
 COMMENT ON FUNCTION public.moneyball_guard_european_top_two_insert_scope()
 IS 'Legacy trigger name; enforces canonical all-tier geographic-European senior men's domestic league scope for new matches and predictions.';
 
