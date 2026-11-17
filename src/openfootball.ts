@@ -39,6 +39,95 @@ const FEEDS: OpenFootballFeed[] = [
   { id:"italy-1", countryCode:"ITA", competition:"Italy · Serie A", urlForSeason:s=>`https://raw.githubusercontent.com/openfootball/italy/master/${s}/1-seriea.txt`, timeZone:"Europe/Rome" },
   { id:"belgium-1", countryCode:"BEL", competition:"Belgium · Pro League", urlForSeason:s=>`https://raw.githubusercontent.com/openfootball/belgium/master/${s}/be1.txt`, timeZone:"Europe/Brussels" },
 ];
+const EUROPEAN_COUNTRIES: Record<string, { code: string; label: string; timeZone: string }> = {
+albania:{code:"ALB",label:"Albania",timeZone:"Europe/Tirane"},
+andorra:{code:"AND",label:"Andorra",timeZone:"Europe/Andorra"},
+armenia:{code:"ARM",label:"Armenia",timeZone:"Asia/Yerevan"},
+azerbaijan:{code:"AZE",label:"Azerbaijan",timeZone:"Asia/Baku"},
+belarus:{code:"BLR",label:"Belarus",timeZone:"Europe/Minsk"},
+"bosnia-herzegovina":{code:"BIH",label:"Bosnia and Herzegovina",timeZone:"Europe/Sarajevo"},
+bulgaria:{code:"BUL",label:"Bulgaria",timeZone:"Europe/Sofia"},
+croatia:{code:"CRO",label:"Croatia",timeZone:"Europe/Zagreb"},
+cyprus:{code:"CYP",label:"Cyprus",timeZone:"Asia/Nicosia"},
+"czech-republic":{code:"CZE",label:"Czech Republic",timeZone:"Europe/Prague"},
+denmark:{code:"DEN",label:"Denmark",timeZone:"Europe/Copenhagen"},
+estonia:{code:"EST",label:"Estonia",timeZone:"Europe/Tallinn"},
+"faroe-islands":{code:"FRO",label:"Faroe Islands",timeZone:"Atlantic/Faroe"},
+finland:{code:"FIN",label:"Finland",timeZone:"Europe/Helsinki"},
+france:{code:"FRA",label:"France",timeZone:"Europe/Paris"},
+georgia:{code:"GEO",label:"Georgia",timeZone:"Asia/Tbilisi"},
+greece:{code:"GRE",label:"Greece",timeZone:"Europe/Athens"},
+hungary:{code:"HUN",label:"Hungary",timeZone:"Europe/Budapest"},
+iceland:{code:"ISL",label:"Iceland",timeZone:"Atlantic/Reykjavik"},
+ireland:{code:"IRE",label:"Ireland",timeZone:"Europe/Dublin"},
+kosovo:{code:"KOS",label:"Kosovo",timeZone:"Europe/Belgrade"},
+latvia:{code:"LVA",label:"Latvia",timeZone:"Europe/Riga"},
+liechtenstein:{code:"LIE",label:"Liechtenstein",timeZone:"Europe/Vaduz"},
+lithuania:{code:"LTU",label:"Lithuania",timeZone:"Europe/Vilnius"},
+luxembourg:{code:"LUX",label:"Luxembourg",timeZone:"Europe/Luxembourg"},
+malta:{code:"MLT",label:"Malta",timeZone:"Europe/Malta"},
+moldova:{code:"MDA",label:"Moldova",timeZone:"Europe/Chisinau"},
+montenegro:{code:"MNE",label:"Montenegro",timeZone:"Europe/Podgorica"},
+netherlands:{code:"NED",label:"Netherlands",timeZone:"Europe/Amsterdam"},
+"north-macedonia":{code:"MKD",label:"North Macedonia",timeZone:"Europe/Skopje"},
+"northern-ireland":{code:"NIR",label:"Northern Ireland",timeZone:"Europe/London"},
+norway:{code:"NOR",label:"Norway",timeZone:"Europe/Oslo"},
+poland:{code:"POL",label:"Poland",timeZone:"Europe/Warsaw"},
+portugal:{code:"POR",label:"Portugal",timeZone:"Europe/Lisbon"},
+romania:{code:"ROU",label:"Romania",timeZone:"Europe/Bucharest"},
+russia:{code:"RUS",label:"Russia",timeZone:"Europe/Moscow"},
+"san-marino":{code:"SMR",label:"San Marino",timeZone:"Europe/Rome"},
+scotland:{code:"SCO",label:"Scotland",timeZone:"Europe/London"},
+serbia:{code:"SRB",label:"Serbia",timeZone:"Europe/Belgrade"},
+slovakia:{code:"SVK",label:"Slovakia",timeZone:"Europe/Bratislava"},
+slovenia:{code:"SVN",label:"Slovenia",timeZone:"Europe/Ljubljana"},
+sweden:{code:"SWE",label:"Sweden",timeZone:"Europe/Stockholm"},
+switzerland:{code:"SUI",label:"Switzerland",timeZone:"Europe/Zurich"},
+turkey:{code:"TUR",label:"Turkey",timeZone:"Europe/Istanbul"},
+ukraine:{code:"UKR",label:"Ukraine",timeZone:"Europe/Kyiv"},
+wales:{code:"WAL",label:"Wales",timeZone:"Europe/London"},
+};
+interface OpenFootballTreeEntry { path: string; type: string }
+interface OpenFootballTree { tree?: OpenFootballTreeEntry[]; truncated?: boolean }
+const discoveredFeedRegistry = new Map<string, OpenFootballFeed>();
+let discoveredCatalogueCache: { season: string; cachedAt: number; feeds: OpenFootballFeed[] } | null = null;
+
+export function buildEuropeanOpenFootballFeeds(paths: string[], date: string): OpenFootballFeed[] {
+  const season = openFootballSeasonFolder(date);
+  const calendarYear = date.slice(0,4);
+  const output: OpenFootballFeed[] = [];
+  for (const path of paths) {
+    const parts = path.split("/");
+    if (parts.length !== 2 || !path.endsWith(".txt")) continue;
+    const country = EUROPEAN_COUNTRIES[parts[0]];
+    if (!country) continue;
+    const filename = parts[1];
+    const prefix = filename.startsWith(season + "_") ? season + "_" : filename.startsWith(calendarYear + "_") ? calendarYear + "_" : "";
+    if (!prefix) continue;
+    const competitionCode = filename.slice(prefix.length, -4);
+    if (!/^[a-z0-9-]+$/i.test(competitionCode)) continue;
+    const id = "openfootball-europe-" + parts[0] + "-" + filename.replace(/[^a-z0-9]+/gi,"-").toLowerCase();
+    output.push({
+      id, countryCode: country.code, competition: country.label + " · " + competitionCode.toUpperCase(),
+      urlForSeason: () => "https://raw.githubusercontent.com/openfootball/europe/master/" + path,
+      timeZone: country.timeZone,
+    });
+  }
+  return output;
+}
+
+async function discoverEuropeanOpenFootballFeeds(date: string): Promise<OpenFootballFeed[]> {
+  const season = openFootballSeasonFolder(date);
+  if (discoveredCatalogueCache?.season === season && Date.now() - discoveredCatalogueCache.cachedAt < CACHE_MS) return discoveredCatalogueCache.feeds;
+  const response = await fetch("https://api.github.com/repos/openfootball/europe/git/trees/master?recursive=1", { headers: { Accept: "application/vnd.github+json" } });
+  if (!response.ok) throw new Error("katalog OpenFootball HTTP " + response.status);
+  const tree = await response.json() as OpenFootballTree;
+  if (!Array.isArray(tree.tree) || tree.truncated) throw new Error("niepełny katalog OpenFootball");
+  const feeds = buildEuropeanOpenFootballFeeds(tree.tree.filter(entry => entry.type === "blob").map(entry => entry.path), date);
+  for (const feed of feeds) discoveredFeedRegistry.set(feed.id, feed);
+  discoveredCatalogueCache = { season, cachedAt: Date.now(), feeds };
+  return feeds;
+}
 const MONTHS: Record<string, number> = { Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12 };
 const CACHE_KEY = "moneyball.openfootball.v1:";
 const CACHE_MS = 15 * 60 * 1000;
@@ -150,7 +239,7 @@ function normalizeTeamName(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
 }
 function findFeed(feedId: string): OpenFootballFeed {
-  const feed=FEEDS.find(item=>item.id===feedId);
+  const feed=discoveredFeedRegistry.get(feedId) ?? FEEDS.find(item=>item.id===feedId);
   if (!feed) throw new Error("Nieznany kanał OpenFootball");
   return feed;
 }
@@ -220,18 +309,25 @@ export async function scanOpenFootball(date: string, force = false): Promise<Ope
     } catch { /* ignore malformed cache */ }
   }
   const season=openFootballSeasonFolder(date);
-  const responses=await Promise.all(FEEDS.map(async feed=>{
+  let discovered: OpenFootballFeed[] = [];
+  let catalogueError = "";
+  try { discovered = await discoverEuropeanOpenFootballFeeds(date); }
+  catch(error) { catalogueError = "OpenFootball Europe catalogue: " + (error instanceof Error ? error.message : "catalogue unavailable"); }
+  const feedMap = new Map<string, OpenFootballFeed>();
+  for (const feed of [...FEEDS, ...discovered]) feedMap.set(feed.id, feed);
+  const feeds = [...feedMap.values()];
+  const responses=await Promise.all(feeds.map(async feed=>{
     try {
       const content=await loadFeedText(feed,season,force);
       return {fixtures:parseOpenFootballFixtures(content,feed,date),error:""};
     } catch(error) {
-      return {fixtures:[] as OpenFootballFixture[],error:`${feed.competition}: ${error instanceof Error?error.message:"source error"}`};
+      return {fixtures:[] as OpenFootballFixture[],error:feed.competition + ": " + (error instanceof Error?error.message:"source error")};
     }
   }));
   const result:OpenFootballScan={
     fixtures:responses.flatMap(response=>response.fixtures),
-    checked:FEEDS.length,
-    failed:responses.map(response=>response.error).filter(Boolean),
+    checked:feeds.length + (catalogueError ? 1 : 0),
+    failed:[catalogueError, ...responses.map(response=>response.error)].filter(Boolean),
   };
   try { localStorage.setItem(cacheKey,JSON.stringify({...result,cachedAt:Date.now()})); } catch { /* cache optional */ }
   return result;
