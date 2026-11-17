@@ -313,8 +313,8 @@ export default function App() {
         potentialReturn: decision === "SELECTED" ? stake * odds : 0,
         potentialProfit: decision === "SELECTED" ? stake * (odds - 1) : 0,
         selection: input.market,
-        modelProbability: typeof prediction.details.topProbability === "number" ? prediction.details.topProbability : null,
-        rejectionReason: decision === "REJECTED" ? String(prediction.details.reason ?? "Typ odrzucony przez użytkownika.") : null,
+        modelProbability: (() => { const key = input.market === "1" ? "p1" : input.market === "X" ? "px" : input.market === "2" ? "p2" : input.market === "1X" ? "dc1x" : input.market === "X2" ? "dcx2" : "dc12"; const value = prediction.details[key]; return typeof value === "number" ? value : null; })(),
+        rejectionReason: decision === "REJECTED" ? (prediction.status === "ODRZUCONY" ? String(prediction.details.reason ?? "Odrzucony przez model.") : "Odrzucony ręcznie przez użytkownika.") : null,
         competition: prediction.details.competition ?? null,
       },
     });
@@ -377,6 +377,7 @@ export default function App() {
             const wins = settled.filter(row => row.status === "WON").length;
             const losses = settled.filter(row => row.status === "LOST").length;
             const profit = settled.reduce((sum,row) => sum + (typeof row.details.profitLoss === "number" ? row.details.profitLoss : 0),0);
+            const openStake = selected.filter(row => !betSettlements.has(row.id)).reduce((sum,row) => sum + (Number(row.details.stake)||0),0);
             const stake = settled.reduce((sum,row) => sum + (typeof row.details.stake === "number" ? row.details.stake : 0),0);
             const rejectedSettled = rejected.map(row => betSettlements.get(row.id)).filter((row): row is TrackerRecord => !!row && ["ODRZUCONY_TRAFIŁ","ODRZUCONY_NIE_TRAFIŁ"].includes(row.status));
             const rejectedHits = rejectedSettled.filter(row => row.status === "ODRZUCONY_TRAFIŁ").length;
@@ -391,6 +392,8 @@ export default function App() {
                 <article><small>Odrzucone typy</small><b>{rejected.length}</b></article>
                 <article><small>Odrzucone, które weszły</small><b>{rejectedSettled.length ? `${rejectedHits}/${rejectedSettled.length}` : "—"}</b></article>
                 <article><small>Średni kurs wybranych</small><b>{selected.length ? (selected.reduce((s,r)=>s+(Number(r.details.odds)||0),0)/selected.length).toFixed(2) : "—"}</b></article>
+                <article><small>Średni kurs odrzuconych</small><b>{rejected.length ? (rejected.reduce((s,r)=>s+(Number(r.details.odds)||0),0)/rejected.length).toFixed(2) : "—"}</b></article>
+                <article><small>Stawki w otwartych typach</small><b>{currency(openStake)}</b></article>
               </div>
               <h3>Rejestr wybranych i odrzuconych</h3>
               <p>Przy każdym zapisanym typie można odnotować kurs. Dla odrzuconego stawka wynosi 0; jego trafność liczymy wyłącznie hipotetycznie.</p>
