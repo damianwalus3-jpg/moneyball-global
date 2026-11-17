@@ -1245,3 +1245,16 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - Restored footynomad-sync from the pre-change MAIN source and applied the scope changes without deleting configuration. SUPABASE_URL, KEY, CORS and runtime imports are present again.
 - Tightened cup exclusion aliases to include Supercopa/Supercoppa/Supercup. Removed unnecessary SECURITY DEFINER from the shared eligibility predicate; existing legacy wrapper permissions remain unchanged.
 - Re-run full CI and Cloudflare MAIN deployment before any Edge Function or database activation.
+
+
+### Follow-up audit — live runtime mismatch and all-tier regression hardening (2026-11-17, 12:xx Europe/Brussels)
+
+- Re-read MAIN at HEAD `08fca6c9e4aa8d53c7bc4e2de05b158d3f6692f8`. The all-tier code and migration were already committed; this follow-up does not recreate them.
+- Confirmed GitHub CI run `44070206292` SUCCESS and Cloudflare MAIN deploy `44070206451` SUCCESS for that HEAD. Cloudflare deployment is frontend-only; it does not deploy Supabase Edge Functions or SQL migrations.
+- Read-only production metadata: `footynomad-sync` ACTIVE v99, `moneyball-free-feed` v50, `moneyball-predict` v246, `moneyball-public-sources` v63. Production migration history ends at `20261117094948`; migration `20261117150000_expand_european_leagues_to_all_senior_tiers` is not applied.
+- Read-only production SQL test of the currently active shared predicate returned: France National 2=false, Czech 3. liga=false, England National League North=false, Scotland Lowland League=false, Northern Ireland Championship=true. This proves the production database still enforces the previous first/second-tier scope.
+- Public FootyNomad pages for 2026-11-17 independently list lower-tier European domestic fixtures, including France National 2, Czech 3. liga, England National League North/South and Non-League Premier, and Scotland Lowland League. The same pages also include cups, U21/U23/youth, reserve sides and non-European fixtures, which must remain excluded.
+- Confirmed current MAIN source already contains all-tier eligibility in `domestic-league-scope.ts`, `moneyball-free-feed`, `moneyball-predict`, `moneyball-public-sources`, frontend `isEuropeanDomesticLeague`, and migration `20261117150000`. The direct FootyNomad importer also uses the shared all-tier predicate; removed its unused legacy top-two helper and renamed the stale OpenMatchday helper for clarity.
+- Added end-to-end frontend eligibility regressions for National 2, Czech 3. liga, English National League North and Scottish Lowland League; retained explicit cup rejection. Updated the frontend eligibility comment to describe all senior tiers.
+- **Deployment blocker:** under the user's existing GitHub/Cloudflare-only restriction, do not directly deploy Supabase Edge Functions or apply the SQL migration. No Supabase deployment workflow exists in `.github/workflows`; current workflow only builds/deploys Cloudflare. Therefore this commit can validate/deploy Cloudflare, but cannot activate the backend changes. Do not report all-tier discovery as live until the authorized backend activation path is provided.
+- No historical matches, predictions, coupons, results or bankroll transactions were deleted or rewritten. Issue #77 remains open.

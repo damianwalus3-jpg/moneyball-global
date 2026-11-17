@@ -249,7 +249,7 @@ function isOpenMatchdayLeagueMatch(match: Pick<Match, "country" | "competition">
   return !/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series|cup|copa|trophy|youth|academy|reserves?)\b/.test(folder + " " + competition);
 }
 
-/** True only for senior men's first/second-tier fixtures, excluding reserve/B teams. */
+/** True for all senior men's domestic league tiers in geographic Europe, excluding reserve/B teams. */
 export function isEligibleEuropeanMatch(match: Pick<Match, "country" | "competition" | "league" | "gender" | "home_team" | "away_team"> & Partial<Pick<Match, "source" | "external_id">>): boolean {
   if (!isOpenMatchdayLeagueMatch(match) && !isEuropeanDomesticLeague(match.country, match.competition ?? match.league)) return false;
   if (match.gender && match.gender !== "men") return false;

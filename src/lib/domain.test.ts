@@ -190,6 +190,11 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("World", "UEFA U21 Championship - Qualification")).toBe(false);
     const eligibleBase = { country: "Ukraine", competition: "Persha Liga", league: null, gender: "men" as const, home_team: "UCSA", away_team: "Polissya" };
     expect(isEligibleEuropeanMatch(eligibleBase)).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "France", competition: "National 2 - Group C", home_team: "Andrezieux", away_team: "Chateauroux" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Czech Republic", competition: "3. liga - CFL B", home_team: "Pardubice", away_team: "Horni Redice" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "National League - North", home_team: "Oxford City", away_team: "Macclesfield" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Scotland", competition: "Football League - Lowland League", home_team: "Brechin", away_team: "Stirling University" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "EFL Trophy" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bulgaria", competition: "efbet League" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Lithuania", competition: "TOPLYGA" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Moldova", competition: "Liga 7777" })).toBe(true);
