@@ -9,7 +9,7 @@ import { evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
 import { shouldAppendPrediction } from "./prediction-record";
-import { getSafestPick, hasKickoffPassed } from "./safest-pick";
+import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import { buildBetSettlementRows } from "./bet-settlement";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
@@ -105,6 +105,12 @@ export default function App() {
   const [scanError, setScanError] = useState("");
   const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
   const loadFixtureForms = async (match: NonNullable<typeof fixtureScan>["fixtures"][number]) => {
+    if (!hasKnownKickoff(match.date, match.time)) {
+      const reason = "ODRZUCONY: brak zweryfikowanej godziny rozpoczęcia. Nie tworzymy prognozy przedmeczowej bez potwierdzonego czasu.";
+      setTeamForms(current => ({ ...current, [match.id]: { loading: false, error: reason } }));
+      setRecords(savePredictionRecord(match, undefined, reason));
+      return;
+    }
     if (hasKickoffPassed(match.date, match.time)) {
       const reason = "ODRZUCONY: mecz już się rozpoczął lub zakończył. Nie zapisujemy prognoz jako przedmeczowych.";
       setTeamForms(current => ({ ...current, [match.id]: { loading: false, error: reason } }));
