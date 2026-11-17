@@ -38,6 +38,15 @@ describe("local tracker", () => {
     expect(readRecords()).toHaveLength(2);
     expect(readRecords().find(row => row.id === "fixed-id")?.title).toBe("Original");
   });
+  it("prevents duplicate saved paper coupons with the same coupon key", () => {
+    const coupon = {
+      kind: "coupon" as const, title: "Three-leg paper coupon", status: "PAPER_WITH_ODDS",
+      details: { couponKey: "2026-11-17|fx1:1|fx2:X|fx3:2|Book A", legsJson: "[]" },
+    };
+    expect(addRecordsIfMissing([coupon], "couponKey")).toBe(1);
+    expect(addRecordsIfMissing([coupon], "couponKey")).toBe(0);
+    expect(readRecords().filter(row => row.kind === "coupon")).toHaveLength(1);
+  });
   it("keeps result and coupon settlement inserts idempotent by their parent keys", () => {
     const result = { kind: "result" as const, title: "Fixture result", status: "SETTLED", details: { fixtureId: "fx-1", actual: "1" } };
     const child = { kind: "coupon" as const, title: "Coupon settled", status: "PAPER_HIT", details: { parentCouponId: "coupon-1" } };
