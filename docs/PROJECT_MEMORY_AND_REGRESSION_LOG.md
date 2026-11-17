@@ -1308,3 +1308,13 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 
 
 **Validation update:** CI #1233 SUCCESS and Cloudflare deploy #819 SUCCESS for `5ff5fc72050dc3265d5203c6226d86061ffa960a`. The bearer-token helper tests, geographic scope tests, Edge Function type-check, app tests, TypeScript and build passed. Cloudflare deployment updates the client error detail display; it does not activate the corrected `footynomad-sync` on Supabase. Production Edge Function version was confirmed as 97 during diagnosis; live recovery is not yet verified.
+
+
+## Supabase production activation — footynomad-sync v99 — 2026-11-17
+
+- User explicitly authorized a one-time production deployment of the corrected `footynomad-sync` to Supabase project `gzgeklcukrclgwbsmbsp`.
+- Before deployment, verified the live function was version 97, ACTIVE, with `verify_jwt=true`. Its active source still had the malformed Bearer regex and only the old `footynomad-section` dependency. Read-only logs showed two POST 400 responses on 2026-11-17 10:31:33Z and 10:31:37Z, both against deployment v97; public-source requests returned 200. Prior log query did not retain the inner function exception body, so the bad token normalization is the strongest source-level cause, not a directly observed PostgREST error body.
+- A first deployment attempt failed bundle resolution due to relative helper path layout; no successful runtime activation was assumed from that attempt. A second deploy attempt produced v98 with a duplicated entrypoint path, which was immediately superseded. The final successful deployment is v99, using a self-contained one-file bundle generated from the committed MAIN source plus its exact shared helper contents. This avoids runtime relative-import resolution failures.
+- Verified live metadata after deployment: function `footynomad-sync` status ACTIVE, version 99, `verify_jwt=true`, entrypoint `source/index.ts`, single deployed file `index.ts`. The bundle includes the corrected Bearer extraction and M49 country filter. No auth setting was weakened and no database rows were deleted/rewritten.
+- Cloudflare MAIN remains deployed at commit `5ff5fc72050dc3265d5203c6226d86061ffa960a`; CI #1233 and Cloudflare deploy #819 succeeded. Documentation was updated on MAIN after the live activation.
+- **Still required for end-to-end proof:** a real authenticated POST scan from the app after v99 and inspection of its function logs plus `scan_runs`/matches results. The most recent database scan rows inspected pre-deployment were not a post-v99 test. Do not claim the user's button is fully verified until a post-deploy scan returns 2xx and stores the expected eligible European fixtures.
