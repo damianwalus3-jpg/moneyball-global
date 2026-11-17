@@ -304,3 +304,10 @@
 - Expanded manifest scope and descriptions and declared dedicated 192×192 and 512×512 vector app icons for install surfaces; added favicon and Apple touch icon metadata.
 - This stage improves PWA installation metadata and offline shell behavior. Browser-specific installability and offline acceptance still require real device/browser testing.
 - Validation/deployment status: pending CI and Cloudflare deployment.
+
+
+## 2026-11-17 — Stage 24: isolated GitHub Actions verification pipeline
+- Added a dedicated workflow triggered only by pushes and pull requests targeting `moneyball-rebuild`, plus manual dispatch.
+- The pipeline installs Node 22 dependencies and runs TypeScript typecheck, the full Vitest suite and the production Vite build.
+- The workflow does not deploy or modify the production `main` branch. Cloudflare deployment remains a separate gated release step.
+- Validation status: workflow committed; waiting for the first Actions run and its actual job result.
