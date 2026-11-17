@@ -1423,3 +1423,16 @@ Final verification trigger: all-tier helper and database migration exclusions ha
 - Post-deploy public-sources smoke test: ok=true, 22 raw fixtures, 11 eligible European senior domestic fixtures; all returned rows pass country/gender scope.
 - Latest code commit `07b2111e0aadd8c4d86edb3b3c23c56febd37c5d`; CI #44076707101 SUCCESS; Cloudflare MAIN deploy #44076707261 SUCCESS.
 - Older issue #76 (tier 1/2 only) is closed as superseded by broader all-tier issue #77. Issue #77 remains open only for authenticated UI screen verification.
+
+
+## Prediction screen coupon-reference query optimization — 2026-11-17 11:58 UTC
+
+- A fresh source audit found `PredictionsView` still loaded the complete `coupon_legs` table solely to protect edit/delete actions for visible predictions. This defeated part of the server-side prediction pagination and could grow with coupon history.
+- Added `fetchCouponLegsByPredictionIds()` in `src/lib/db.ts`: owner-scoped, deduplicated, chunked requests limited to the prediction IDs displayed in the currently loaded prediction pages. Empty ID lists return without a database request.
+- Added `predictionCouponLegsQuery()` in `src/lib/queries.ts`, keyed by sorted visible prediction IDs. Updated `PredictionsView` to use this query rather than `tableQuery("coupon_legs")`; edit/delete remains blocked until relevant coupon references are loaded and still prevents deleting any prediction used by a coupon.
+- Added query invalidation for `prediction-coupon-legs` to both success and error paths in `useAction`, so coupon creation/cancellation and partial multi-step failures cannot leave the safety guard stale.
+- Source re-read from `main` confirms the old full-table `tableQuery("coupon_legs")` call is absent from `PredictionsView`, helper/query wiring exists, and both mutation invalidation paths include the scoped key.
+- Code commits: `1b14f0e3ada4efd348fdce67b4e917804ac20e95`, `34e68c535a572d4af03f4b8eb8f2e3d71f6d4151`, `724f79a390f9ec0845eb02b7af65105c1e0552d6`, `86855aacb4dc350f8285b02ce04ea979635a43b2`.
+- Validation status: source-level checks only. No CI/Vitest/TypeScript/build result has yet been retrieved for these commits; the combined GitHub commit-status endpoint currently exposes only the unrelated Vercel build-rate-limit failure, which is not the production host. No Cloudflare deployment is claimed. Run the repository CI and Cloudflare MAIN deployment, then verify the exact deployed SHA and authenticated prediction screen.
+- Browser automation for authenticated production UI is currently blocked: the available browser profile has no recorded sign-in for the Worker domain and the browser automation wallet returned a zero balance. Do not attempt to bypass login or change user data; obtain a user-provided authenticated screenshot or explicit sign-in setup before that visual acceptance test.
+- Preserve all prediction/coupon/history/settlement/bankroll records. This change only narrows reads and invalidates cached references.
