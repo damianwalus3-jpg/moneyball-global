@@ -60,6 +60,13 @@ describe("local tracker", () => {
     expect(rows.map(row => row.id)).toEqual(["new", "fixed-id", "old"]);
     expect(rows.find(row => row.id === "fixed-id")?.title).toBe("Existing");
   });
+  it("allows a verified result after a malformed legacy result for the same fixture", () => {
+    addRecord({ kind: "result", title: "Bad legacy result", status: "SETTLED", details: { fixtureId: "fx-1", actual: "?" } });
+    const valid = { kind: "result" as const, title: "Verified result", status: "SETTLED", details: { fixtureId: "fx-1", actual: "1" } };
+    expect(addRecordsIfMissing([valid], "fixtureId")).toBe(1);
+    expect(addRecordsIfMissing([valid], "fixtureId")).toBe(0);
+    expect(readRecords().filter(row => row.kind === "result" && row.details.actual === "1")).toHaveLength(1);
+  });
   it("rejects malformed backup", () => {
     expect(() => validateBackup({ version: 99 })).toThrow();
     expect(() => validateBackup({ format: "moneyball-local-backup", version: 1, records: [{ id: "x", kind: "match", title: "bad", status: "x", details: [], createdAt: "now" }] })).toThrow();
