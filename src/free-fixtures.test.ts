@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixtureKey, isEuropeanOpenLiga } from "./free-fixtures";
+import { fixtureKey, isEuropeanOpenLiga, openLigaSeasonYears } from "./free-fixtures";
 
 describe("European fixture source classification", () => {
   it("accepts known European country names and competition prefixes", () => {
@@ -22,5 +22,14 @@ describe("European fixture source classification", () => {
       .toBe(fixtureKey("2026-11-17", "fc zurich", "bayern munchen"));
     expect(fixtureKey("2026-11-17", "Home FC", "Away FC"))
       .not.toBe(fixtureKey("2026-11-18", "Home FC", "Away FC"));
+  });
+});
+
+describe("OpenLigaDB season discovery", () => {
+  it("checks the active season and previous season during the European spring", () => {
+    expect(openLigaSeasonYears("2027-03-12")).toEqual([2027, 2026]);
+  });
+  it("checks the current season from July onward", () => {
+    expect(openLigaSeasonYears("2026-11-17")).toEqual([2026]);
   });
 });
