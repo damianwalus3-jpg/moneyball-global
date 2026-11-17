@@ -132,7 +132,8 @@ The first production Tracker release is implemented on the existing MAIN applica
 - Legacy category mapping is persisted in `moneyball_tracker_category_aliases` (14 aliases, including missing `group_name` values). Historical `MAIN` remains a separate legacy category and is never silently rewritten as `MAIN A` or `MAIN B`.
 - Jackpot register is persisted in `moneyball_jackpot_entries`, linked to an existing coupon with an owner-scoped foreign key. Sequence numbers are owner-scoped, allocated under a transaction advisory lock, immutable after insert and not deletable through the authenticated API.
 - Jackpot sequence allocation also preserves explicit sequence numbers during JSON backup restore; the next new entry continues at max(sequence)+1.
-- Owner-created categories can be archived and restored without deletion; system categories remain immutable. Archive state is included in backup/restore and the aggregate RPC.
+- Owner-created categories can be renamed and have their description edited without changing the stable category key; they can also be archived and restored without deletion. System categories remain immutable. Archive state is included in backup/restore and the aggregate RPC.
+- Tracker UI displays PAPER prediction and coupon counts separately from official coupon finance and bankroll.
 - Added nullable `predictions.decision_status`, `predictions.source_class` and `coupons.source_class`. Existing rows remain NULL/unclassified; no bulk historical relabeling occurred.
 - The model prediction Edge Function writes `source_class=MODEL` and decision states `FINAL/REJECTED` for new/upserted model rows. Active production function: `moneyball-predict` version 249.
 - New generated TEST coupons are `PAPER`; MAIN/MEGA/EXTRA are `MODEL`. PAPER coupons are excluded from the official coupon-finance summary and do not create bankroll stake/return transactions during settlement or cancellation.
@@ -148,15 +149,16 @@ The first production Tracker release is implemented on the existing MAIN applica
 - `20261117122648_moneyball_tracker_category_summary`
 - `20261117123139_add_tracker_category_archiving`
 - `20261117123206_tracker_category_summary_archive_state`
+- `20261117125207_moneyball_tracker_rls_and_fk_index_hardening`
 
 All seven are additive. They do not rewrite historical matches, predictions, coupons, coupon legs, results or bankroll transactions.
 
 ### Verification snapshot
 
-- 15 system categories; 14 legacy aliases.
+- 15 system categories; 14 legacy aliases; 8 additive Tracker migrations.
 - 0 Jackpot entries at deployment time — no synthetic entries were created.
 - 19,201 predictions; 9 coupons; 9 bankroll transactions remained unchanged by the migrations.
-- New tables have RLS enabled with owner/system-specific policies. No new Supabase health lints or security-advisor findings were introduced by the Tracker tables.
+- New tables have RLS enabled with owner/system-specific policies. Tracker-specific RLS initialization-plan warnings and the category-alias foreign-key index warning were remediated. Remaining advisor findings concern pre-existing unrelated objects; the new alias index is naturally reported unused until alias joins exercise it.
 - The aggregate RPC was checked against the authenticated owner scope and its totals matched the 19,201 prediction and 9 coupon records.
 - CI passed: 86 tests, Supabase Edge Function type-check, application type-check and production build.
 - Cloudflare MAIN deployment workflow completed successfully for the current Tracker release.
@@ -165,8 +167,9 @@ All seven are additive. They do not rewrite historical matches, predictions, cou
 ### Remaining work
 
 - Validate the rendered page and create the first real Jackpot entry through an authenticated user session.
-- Add category rename/description controls and explicit legacy source classification.
-- Add separate PAPER reporting and verify finance/settlement behavior with controlled non-production fixtures; do not fabricate production rows.
+- Category rename/description controls and separate PAPER count reporting are implemented.
+- Add an explicit, audited workflow for classifying selected legacy rows as USER / MODEL / PAPER; do not bulk infer source from legacy labels.
+- Verify PAPER finance/settlement behavior with controlled non-production fixtures; do not fabricate production rows.
 - Continue full authenticated UI, backup/restore and settlement regression testing before declaring the whole Tracker complete.
 
 The Tracker is therefore deployed as a working first release, not declared fully complete.
