@@ -260,8 +260,8 @@ function Mecze() {
     }
   }, {
     success: (r) => "Znaleziono " + (r.combined_count ?? r.total_found ?? 0) +
-      " europejskich meczów. Zapisano: " + (r.inserted ?? 0) + ", zaktualizowano: " + (r.updated ?? 0) +
-      ". Teraz uruchom osobno analizę meczów.",
+      " meczów: europejskie ligi krajowe mężczyzn, wszystkie szczeble. Zapisano: " + (r.inserted ?? 0) + ", zaktualizowano: " + (r.updated ?? 0) +
+      ". Wykluczone: puchary, reprezentacje, młodzież, kobiety i rezerwy. Teraz uruchom analizę meczów.",
     onDone: () => setPredictionProgress(""),
   });
 
@@ -438,7 +438,7 @@ function Mecze() {
       <PageHeader
         eyebrow="Europe/Brussels"
         title="Terminarz / Mecze"
-        description="Dzisiejsze europejskie ligi krajowe — wyłącznie pierwsza i druga liga; typy ODRZUCONY też pozostają widoczne."
+        description="Dzisiejsze europejskie ligi krajowe mężczyzn — wszystkie szczeble; bez pucharów, reprezentacji, młodzieży, kobiet i rezerw. Typy ODRZUCONY też pozostają widoczne."
         actions={
           <>
             <div className="num flex h-9 items-center rounded-md border border-border px-3 text-sm text-muted-foreground">
