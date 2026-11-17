@@ -51,7 +51,7 @@ function isOpenMatchdayTopTwoMatch(m:any):boolean {
  const competition=String(m?.competition||m?.league||"");
  if(String(m?.source||"").toLowerCase()!=="openmatchday"||!tier)return false;
  if(!isEuropeanFixture(m?.country,competition,m?.home_team,m?.away_team))return false;
- if(/\\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\\b/i.test(folder+" "+competition))return false;
+ if(/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\b/i.test(folder+" "+competition))return false;
  return true;
 }
 async function db(p:string,t:string,m="GET",b?:any,prefer="return=representation"){const isService=t===SERVICE_KEY;const r=await fetch(S+"/rest/v1/"+p,{method:m,headers:{apikey:isService?SERVICE_KEY:K,Authorization:"Bearer "+(isService?SERVICE_KEY:t),...(isService?{"x-cron-token":CRON_FALLBACK_TOKEN}:{}),"Content-Type":"application/json",Prefer:prefer},body:b===undefined?undefined:JSON.stringify(b)});const s=await r.text();let j:any;try{j=s?JSON.parse(s):null}catch{j=s}if(!r.ok)throw Error(j?.message||j?.details||"DB HTTP "+r.status);return j;}
