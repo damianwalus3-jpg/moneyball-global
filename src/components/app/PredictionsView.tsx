@@ -8,7 +8,7 @@ import { PredictionForm } from "@/components/forms/PredictionForm";
 import { deleteRow, fetchPredictionsPage, updateRow, type PredictionPageCursor } from "@/lib/db";
 import { impliedProbability, isEligibleEuropeanMatch, MARKET_LABELS, PICK_LABELS } from "@/lib/domain";
 import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
-import { predictionMatchesQuery, tableQuery, useAction } from "@/lib/queries";
+import { predictionCouponLegsQuery, predictionMatchesQuery, tableQuery, useAction } from "@/lib/queries";
 import { fmtDateTime } from "@/lib/time";
 import type { Market, Prediction } from "@/lib/types";
 
@@ -67,9 +67,6 @@ function oddsFreshnessLabel(coverage?: Record<string, unknown> | null) {
 }
 
 export function PredictionsView({ market }: { market: Market }) {
-  const couponLegsQuery = useQuery(tableQuery("coupon_legs"));
-  const couponLegs = couponLegsQuery.data ?? [];
-  const couponLegsReady = !couponLegsQuery.isPending && !couponLegsQuery.isError;
   const [verdictFilter, setVerdictFilter] = useState<"all" | "WYBRANY" | "ODRZUCONY">("all");
   const [modelScope, setModelScope] = useState<"current" | "all">("current");
   const [query, setQuery] = useState("");
@@ -96,6 +93,10 @@ export function PredictionsView({ market }: { market: Market }) {
     [pageQuery.data],
   );
   const visibleMatchIds = useMemo(() => [...new Set(rawList.map((prediction) => prediction.match_id))], [rawList]);
+  const visiblePredictionIds = useMemo(() => [...new Set(rawList.map((prediction) => prediction.id))], [rawList]);
+  const couponLegsQuery = useQuery(predictionCouponLegsQuery(visiblePredictionIds));
+  const couponLegs = couponLegsQuery.data ?? [];
+  const couponLegsReady = visiblePredictionIds.length === 0 || (!couponLegsQuery.isPending && !couponLegsQuery.isError);
   const pageMatchesQuery = useQuery(predictionMatchesQuery(visibleMatchIds));
   const byId = useMemo(() => new Map((pageMatchesQuery.data ?? []).map((match) => [match.id, match])), [pageMatchesQuery.data]);
   const list = useMemo(
