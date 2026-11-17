@@ -1381,3 +1381,15 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - The predictor v249 max latency of 30.776 s is a performance watch item despite all requests returning HTTP 200; inspect long-running batches before changing concurrency or schedules.
 - A previous 1X2 forecast record was superseded and retained with NULL probability; it is historical and must not be counted as the current model output.
 - Production data was only read. No migrations, data writes, cron changes, or Edge Function redeploys were made in this runtime audit.
+
+
+## Predictor cold-start latency repair — 2026-11-17 14:47 UTC
+
+- Confirmed current main HEAD before the change: `0f93ef0855e80d15119ec6ec3d8d48506fb375b3`; current production `moneyball-predict` was ACTIVE v249 with `verify_jwt=false`.
+- Source inspection identified three independent public historical xG archives (OpenPlay, StatsBomb Open Data, American Soccer Analysis) being fetched sequentially, each with an 18-second timeout. This made cold-start latency pay the sum of network waits even though the datasets are independent.
+- Changed `supabase/functions/moneyball-predict/index.ts` to fetch the three archives concurrently with `Promise.allSettled`, retaining each dataset's schema/team-count validation and independent fallback behavior. A failed archive is logged and omitted; successful archives continue to be merged exactly as before. No model equations, thresholds, source priority, prediction rows, coupons, bankroll, or historical data were changed.
+- Source commit on MAIN: `7a0d58f737946bc11eb4826692fd6a77d5a26eb0` — `perf: fetch historical xG archives concurrently`.
+- Deployed the exact committed function source to production Supabase project `gzgeklcukrclgwbsmbsp` as `moneyball-predict v250`. Deployment returned ACTIVE; follow-up `get_edge_function` and `list_edge_functions` confirmed v250 ACTIVE, `verify_jwt=false` unchanged, and the deployed bundle contains `loadXgDataset` and `Promise.allSettled` with no old sequential loader.
+- Shared helper sources were bundled into the one-file deployment from current MAIN: `geographic-europe.ts` blob `af468e2cbc7b909c034827b9651eb4684bdd46da`; `domestic-league-scope.ts` blob `6fea2f6eb9aa1e138f4cd554e15efe48aa2cb27b`.
+- Validation boundary: successful Supabase deployment and deployed-source inspection are confirmed. A live authenticated/scheduled POST scan and before/after latency comparison have NOT yet been run; do not claim measured performance improvement yet. GitHub combined status exposed only the unrelated Vercel build-rate-limit failure; this project does not use Vercel. No Cloudflare deployment is claimed for this backend-only code step.
+- No database migration or data mutation was performed. Next: inspect v250 execution logs after the next scheduled scan, compare p50/p95/max latency to v249, and verify all three xG sources remain independently represented where available.
