@@ -157,6 +157,14 @@ Deno.serve(async(req)=>{
   const result=await readFixtures(date);
   if(req.method==="GET")return new Response(JSON.stringify(result),{headers:{...cors,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});
   if(req.method!=="POST")return new Response(JSON.stringify({error:"Method not allowed"}),{status:405,headers:{...cors,"Content-Type":"application/json"}});
+  const token=req.headers.get("Authorization")?.replace(/^Bearer\\s+/i,"");
+  if(!token)throw new Error("Brak sesji logowania. Zaloguj się ponownie.");
+  const jwtParts=token.split(".");
+  const jwtPayload=jwtParts.length>1?JSON.parse(atob(jwtParts[1].replace(/-/g,"+").replace(/_/g,"/"))):{};
+  const ownerId=String(jwtPayload.sub||"");
+  if(!ownerId)throw new Error("Nie można odczytać właściciela sesji.");
+  // Free Football Charts access is personal/private-use only; never fetch it for other accounts.
+  const footballChartsOwner=ownerId==="668d578c-40dd-4767-8b9d-6b17c7eeebb5";
   // Enrich the primary FootyNomad fixture list with independent public no-key sources.
   // A public-source outage must never block the primary scan.
   let publicSourceStatus:any={ok:false,error:"not_called"};
@@ -168,13 +176,15 @@ Deno.serve(async(req)=>{
    const pj=JSON.parse(pt);publicFixtures=Array.isArray(pj.fixtures)?pj.fixtures.filter(isEligiblePublicFixture):[];
    publicSourceStatus={ok:true,source_count:pj.source_count,raw_fixtures:pj.raw_fixtures,unique_fixtures:pj.unique_fixtures,sources:pj.sources};
   }catch(e){publicSourceStatus={ok:false,error:String(e)};}
-  let footballChartsStatus:any={ok:false,error:"not_called"};
-  try{
-   const footballCharts=await readFootballChartsFixtures(date);
-   const eligible=footballCharts.fixtures.filter(isEligiblePublicFixture);
-   publicFixtures.push(...eligible);
-   footballChartsStatus={ok:footballCharts.ok,requests:footballCharts.requests,leagues_checked:footballCharts.leagues_checked,fixtures_count:footballCharts.fixtures_count,eligible_for_date:eligible.length,errors:footballCharts.errors,league_status:footballCharts.league_status,cache:footballCharts.cache,attribution:footballCharts.attribution,model_predictions_imported:false,stats_imported:false,odds_available:false};
-  }catch(e){footballChartsStatus={ok:false,error:String(e)};}
+  let footballChartsStatus:any={ok:false,skipped:"personal-use-only"};
+  if(footballChartsOwner){
+   try{
+    const footballCharts=await readFootballChartsFixtures(date);
+    const eligible=footballCharts.fixtures.filter(isEligiblePublicFixture);
+    publicFixtures.push(...eligible);
+    footballChartsStatus={ok:footballCharts.ok,requests:footballCharts.requests,leagues_checked:footballCharts.leagues_checked,fixtures_count:footballCharts.fixtures_count,eligible_for_date:eligible.length,errors:footballCharts.errors,league_status:footballCharts.league_status,cache:footballCharts.cache,attribution:footballCharts.attribution,model_predictions_imported:false,stats_imported:false,odds_available:false};
+   }catch(e){footballChartsStatus={ok:false,error:String(e)};}
+  }
   const normTeam=(v:any)=>{const key=String(v||"").normalize("NFKD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();return ({"turkiye":"turkey"} as Record<string,string>)[key]||key;};
   const localDay=(v:any)=>{const raw=String(v||"");if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;const d=new Date(raw);return Number.isNaN(d.getTime())?raw.slice(0,10):new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);};
   const fixtureDate=(f:any)=>{const explicit=String(f.date||"").slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(explicit))return explicit;const fromTime=localDay(f.kickoff_at);if(fromTime)return fromTime;return /:([0-9]{4}-[0-9]{2}-[0-9]{2}):/.exec(String(f.external_id||""))?.[1]||"";};
@@ -199,12 +209,6 @@ Deno.serve(async(req)=>{
     combined.push(pf);publicOnly++;
    }
   }
-  const token=req.headers.get("Authorization")?.replace(/^Bearer\s+/i,"");
-  if(!token)throw new Error("Brak sesji logowania. Zaloguj się ponownie.");
-  const jwtParts=token.split(".");
-  const jwtPayload=jwtParts.length>1?JSON.parse(atob(jwtParts[1].replace(/-/g,"+").replace(/_/g,"/"))):{};
-  const ownerId=String(jwtPayload.sub||"");
-  if(!ownerId)throw new Error("Nie można odczytać właściciela sesji.");
   const runRows=await db("scan_runs",token,"POST",{owner_id:ownerId,scan_date:date,source:"FootyNomad + public sources",status:"started",matches_found:combined.length,notes:"FootyNomad primary; public source enrichment: "+JSON.stringify(publicSourceStatus).slice(0,1500)});
   const run=runRows?.[0];if(!run?.id)throw new Error("Nie udało się utworzyć wpisu skanu.");
   let inserted=0,updated=0,settled=0,matchedByFixture=0,promotedToPrimary=0;
