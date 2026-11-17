@@ -11,10 +11,10 @@ BEGIN
   IF public.moneyball_is_eligible_european_match('Scotland','Football League - Lowland League','men','Brechin','Stirling University') IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'Senior Lowland League fixture must remain eligible';
   END IF;
-  IF public.moneyball_is_eligible_european_match('England','Non League Premier - Southern Central','men','Club A','Club B') IS DISTINCT FROM true THEN
+  IF public.moneyball_is_eligible_european_match('England','Non League Premier - Southern Central','men','Alpha United','Gamma City') IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'Southern Central senior league must remain eligible';
   END IF;
-  IF public.moneyball_is_eligible_european_match('England','Non League Premier - Southern South','men','Club A','Club B') IS DISTINCT FROM true THEN
+  IF public.moneyball_is_eligible_european_match('England','Non League Premier - Southern South','men','Alpha United','Gamma City') IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'Southern South senior league must remain eligible';
   END IF;
 END;
