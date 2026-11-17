@@ -796,3 +796,12 @@
 - Added regression tests for invalid odds, negative stake and out-of-order result records.
 - Commits: implementation aeb700e3bff9b4efcc4d4107b706aecb5975911a; tests 45221e63ebd330a14122d05f68587a886e1cf812.
 - Validation/deployment pending latest CI and Cloudflare workflow results. No historical Tracker records or bankroll values were modified.
+
+
+## Stage 66 — expand European fixture discovery and remove static OpenFootball feed ceiling (2026-11-18)
+- User reported that the daily scan returned only 10 fixtures and asked for a full audit and deployed correction.
+- Audited the actual scan path in src/free-fixtures.ts, src/openfootball.ts and the match-list UI. The UI does not cap the full list at 10 (the dashboard only previews six); the actual OpenFootball adapter was limited to a hard-coded list of 18 feeds and never discovered newly published European country/competition files. The OpenLigaDB classifier also omitted several common two-letter European feed prefixes (for example fr1, nl1, pt1, gr1, ch1 and Nordic/Central European codes).
+- Inspected the live OpenFootball Europe Git tree: 271 entries, 212 text files, with current-season files across additional countries/competitions beyond the 18 hard-coded feeds. The source tree is not exhaustive or always current; this change expands discovery but does not claim complete European coverage.
+- Implemented dynamic discovery from the single recursive OpenFootball Europe Git tree endpoint, selecting only current-season/calendar-year files for known European country directories; retains existing standalone country feeds; records catalogue failures in source errors; registers discovered feed IDs so team-form and result adapters can resolve them after scan.
+- Expanded OpenLigaDB country shortcut classification and added regression tests for the missing country prefixes. Added dynamic OpenFootball discovery tests to exclude stale seasons, RSSSF history files and non-European folders.
+- No paid provider requests, credits, Tracker records, coupon history or bankroll values were touched. Stage validation and separate Cloudflare REBUILD deployment are pending CI.
