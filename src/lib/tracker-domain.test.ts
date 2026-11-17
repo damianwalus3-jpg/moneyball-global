@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatJackpotSequence,
+  makeTrackerCategoryKey,
   normalizeTrackerDecision,
   normalizeTrackerSettlement,
   normalizeTrackerSourceClass,
@@ -47,5 +48,10 @@ describe("Tracker legacy normalization", () => {
     expect(formatJackpotSequence(12)).toBe("#012");
     expect(formatJackpotSequence(1000)).toBe("#1000");
     expect(() => formatJackpotSequence(0)).toThrow();
+  });
+
+  it("creates stable owner-local keys for custom categories", () => {
+    expect(makeTrackerCategoryKey("Liga żółta")).toBe("CUSTOM_LIGA_ZOLTA");
+    expect(() => makeTrackerCategoryKey("!!!")).toThrow();
   });
 });
