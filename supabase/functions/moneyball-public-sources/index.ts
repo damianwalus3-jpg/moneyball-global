@@ -168,7 +168,7 @@ async function openMatchday(date: string) {
   const leagueNameByFolder = new Map(indexRows.map(m => [m[1], m[2].trim()]));
   const countryNameByFolder = new Map(indexRows.map(m => [m[1], m[3].trim()]));
   const eligibleIndexRows = indexRows.filter(m => {
-    const folder = m[1], tier = folder.match(/^([A-Z]{3})_([12])_[A-Za-z0-9-]+$/i);
+    const folder = m[1], tier = folder.match(/^([A-Z]{3})_([1-9][0-9]*)_[A-Za-z0-9-]+$/i);
     const country = m[3].trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const league = m[2].trim();
     return !!tier && isGeographicEuropeCountry(country)
@@ -187,7 +187,7 @@ async function openMatchday(date: string) {
     const countryCode=folder.split("_")[0];
     const leagueName=leagueNameByFolder.get(folder)||folder;
     const countryName=countryNameByFolder.get(folder)||countryCode;
-    const tier=Number((folder.match(/^[A-Z]{3}_([12])_/)||[])[1]||0);
+    const tier=Number((folder.match(/^[A-Z]{3}_([1-9][0-9]*)_/)||[])[1]||0);
     return rows.slice(1).filter(r => norm(r[ix("date")]) === date).map(r => ({
       external_id: "om:" + folder + ":" + date + ":" + norm(r[ix("home")]) + ":" + norm(r[ix("away")]),
       source: "OpenMatchday",

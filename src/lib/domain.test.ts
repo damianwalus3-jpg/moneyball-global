@@ -22,6 +22,7 @@ import {
   probabilityQualityBySelection,
   isKickoffToday,
   isEuropeanTopTwoLeague,
+  isEuropeanDomesticLeague,
   isEligibleEuropeanMatch,
   dedupeEuropeanMatches,
   stakeBalances,
@@ -72,6 +73,7 @@ const match = (id: string, kickoff_at = "2026-11-11T20:00:00.000Z") =>
     updated_at: "2026-11-10T10:00:00.000Z",
   }) as Match;
 
+describe("European domestic league all-tier scope",()=>{it("includes lower senior league tiers",()=>{for(const [country,competition] of [["France","National 2 - Group C"],["Czech Republic","3. liga - CFL B"],["England","National League - North"],["Scotland","Football League - Lowland League"]])expect(isEuropeanDomesticLeague(country,competition)).toBe(true);});it("excludes cups, internationals, youth and non-European countries",()=>{for(const [country,competition] of [["England","EFL Trophy"],["World","UEFA Nations League"],["Portugal","Liga Revelacao U23"],["Israel","Premier League"]])expect(isEuropeanDomesticLeague(country,competition)).toBe(false);});});
 describe("European domestic league scope", () => {
   it("keeps first and second tiers while excluding cups, youth and lower divisions", () => {
     expect(isEuropeanTopTwoLeague("England", "Premier League")).toBe(true);
@@ -212,8 +214,8 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Betis Deportivo" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Sevilla Atletico" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: "women" })).toBe(false);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, competition: "Serie C" })).toBe(false);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie D - Championship Round" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie C" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie D - Championship Round" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Sweden", competition: "Damallsvenskan", gender: null })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "Premier League - Summer Series" })).toBe(false);
     // OpenMatchday's source folder is authoritative tier metadata; display names
@@ -253,7 +255,7 @@ describe("European domestic league scope", () => {
       competition: "National League - North",
       source: "FootyNomad",
       external_id: "fn:eng-national-league-north-2026-11-17",
-    })).toBe(false);
+    })).toBe(true);
     expect(isEligibleEuropeanMatch({
       ...openMatchdayBase,
       external_id: "om:BEL_2_challenger-pro-league:2026-11-17:club-a:club-b",
@@ -264,7 +266,7 @@ describe("European domestic league scope", () => {
       external_id: "om:ENG_3_league-one:2026-11-17:club-a:club-b",
       competition: "League One",
       country: "England",
-    })).toBe(false);
+    })).toBe(true);
     expect(isEligibleEuropeanMatch({
       ...openMatchdayBase,
       external_id: "om:UEFA_1_champions-league:2026-11-17:club-a:club-b",
