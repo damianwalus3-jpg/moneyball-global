@@ -166,6 +166,8 @@ export function isEuropeanTopTwoLeague(country: string | null | undefined, compe
   const c = normalize(String(country ?? ""));
   const league = normalize(String(competition ?? ""));
   if (!league) return false;
+  // OpenMatchday uses ENG_1/ENG_2 for the two English professional tiers; ENG_3+ are out of scope even if the slug contains 'Premier League'.
+  if ((c === "england" || c === "eng") && /^eng (?:[3-9]|[1-9][0-9]+)\b/.test(league)) return false;
   // Exact provider labels for country-specific top-tier competitions.
   if ((c === "croatia" && league === "hnl") || (c === "san marino" && league === "campionato")) return true;
   // Country-specific third-tier labels that otherwise match generic aliases.
