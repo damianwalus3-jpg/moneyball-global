@@ -147,17 +147,21 @@ export function impliedProbability(odds: number | null | undefined): number | nu
   return Math.round((100 / Number(odds)) * 100) / 100;
 }
 
+// Geographic Europe follows the UN Statistics Division M49 regional classification,
+// not UEFA membership. This intentionally excludes Western/Central Asian countries
+// (including Israel, Cyprus, Armenia, Azerbaijan, Georgia, Kazakhstan and Türkiye).
+// Albania is in Southern Europe and must remain eligible.
 const EUROPEAN_COUNTRIES = new Set([
-  "albania","andorra","armenia","austria","azerbaijan","belarus","belgium","bosnia","bosnia and herzegovina",
-  "bulgaria","croatia","cyprus","czechia","czech republic","denmark","england","estonia","faroe islands",
-  "finland","france","georgia","germany","gibraltar","greece","hungary","iceland","ireland","israel","isle of man",
-  "italy","kazakhstan","kosovo","latvia","liechtenstein","lithuania","luxembourg","malta","moldova","monaco",
+  "albania","andorra","austria","belarus","belgium","bosnia","bosnia and herzegovina",
+  "bulgaria","croatia","czechia","czech republic","denmark","england","estonia","faroe islands",
+  "finland","france","germany","gibraltar","greece","hungary","iceland","ireland","isle of man",
+  "italy","kosovo","latvia","liechtenstein","lithuania","luxembourg","malta","moldova","monaco",
   "montenegro","netherlands","macedonia","north macedonia","northern ireland","norway","poland","portugal","romania",
-  "russia","san marino","scotland","serbia","slovakia","slovenia","spain","sweden","switzerland","turkey",
-  "türkiye","turkiye","ukraine","wales","united kingdom","uk","alb","and","arm","aut","aze","blr","bel","bih","bul",
-  "cro","cyp","cze","dnk","eng","est","fro","fin","fra","geo","deu","ger","gib","grc","gre","hun","isl",
-  "irl","isr","ita","kaz","kos","lva","lie","ltu","lux","mlt","mda","mne","nld","mkd","nir","nor","pol","prt",
-  "por","rou","rus","smr","sco","srb","svk","svn","esp","swe","che","sui","tur","ukr","wal","gbr"
+  "russia","san marino","scotland","serbia","slovakia","slovenia","spain","sweden","switzerland",
+  "ukraine","wales","united kingdom","uk","alb","and","aut","blr","bel","bih","bul",
+  "cro","cze","dnk","eng","est","fro","fin","fra","deu","ger","gib","grc","gre","hun","isl",
+  "irl","ita","kos","lva","lie","ltu","lux","mlt","mda","mne","nld","mkd","nir","nor","pol","prt",
+  "por","rou","rus","smr","sco","srb","svk","svn","esp","swe","che","sui","ukr","wal","gbr"
 ]);
 
 /** True only for European domestic first- or second-tier leagues (no cups, youth or lower divisions). */

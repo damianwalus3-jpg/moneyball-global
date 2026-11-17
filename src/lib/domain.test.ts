@@ -100,10 +100,22 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Slovakia", "2. liga")).toBe(true);
     expect(isEuropeanTopTwoLeague("ESP", "ESP_2_segunda-division")).toBe(true);
     expect(isEuropeanTopTwoLeague("Kosovo", "Liga E Pare")).toBe(true);
+    // Geographic country gate: UN M49 Europe, not UEFA membership.
+    expect(isEuropeanTopTwoLeague("Albania", "Abissnet Superiore")).toBe(true);
+    expect(isEuropeanTopTwoLeague("ALB", "Abissnet Superiore")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Israel", "Ligat Winner")).toBe(false);
+    expect(isEuropeanTopTwoLeague("ISR", "Ligat Winner")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Armenia", "Armenian Premier League")).toBe(false);
+    expect(isEuropeanTopTwoLeague("ARM", "Armenian Premier League")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Azerbaijan", "Premyer Liqa")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Cyprus", "Cyprus First Division")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Kazakhstan", "Premier League")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Türkiye", "Süper Lig")).toBe(false);
     // Exact current FootyNomad competition labels from its country/league catalogue.
     expect(isEuropeanTopTwoLeague("Andorra", "1a Divisió")).toBe(true);
     expect(isEuropeanTopTwoLeague("Andorra", "2a Divisió")).toBe(true);
-    expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Dasta")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Dasta")).toBe(false);
     expect(isEuropeanTopTwoLeague("Belarus", "1. Division")).toBe(true);
     // Country-specific third-tier labels must not pass broad generic aliases.
     expect(isEuropeanTopTwoLeague("Scotland", "Football League - Lowland League")).toBe(false);
@@ -141,8 +153,8 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Belgium", "Unknown Regional Competition")).toBe(false);
     expect(isEuropeanTopTwoLeague("Macedonia", "First League")).toBe(true);
     expect(isEuropeanTopTwoLeague("Macedonia", "Second League")).toBe(true);
-    expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga")).toBe(true);
-    expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga 2")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga 2")).toBe(false);
     // Domestic tier-one/two only: reject international competitions and French National divisions.
     expect(isEuropeanTopTwoLeague("World", "UEFA Nations League")).toBe(false);
     expect(isEuropeanTopTwoLeague("World", "UEFA Champions League")).toBe(false);
@@ -154,7 +166,7 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("SWE", "Division 1")).toBe(false);
     // The actual tier-two names in those countries remain eligible.
     expect(isEuropeanTopTwoLeague("Scotland", "Championship")).toBe(true);
-    expect(isEuropeanTopTwoLeague("Turkey", "1. Lig")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Turkey", "1. Lig")).toBe(false);
     expect(isEuropeanTopTwoLeague("Denmark", "1. Division")).toBe(true);
     expect(isEuropeanTopTwoLeague("Norway", "1. Division")).toBe(true);
     expect(isEuropeanTopTwoLeague("Sweden", "Superettan")).toBe(true);
@@ -179,7 +191,7 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bulgaria", competition: "efbet League" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Lithuania", competition: "TOPLYGA" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Moldova", competition: "Liga 7777" })).toBe(true);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Israel", competition: "Ligat Winner" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Israel", competition: "Ligat Winner" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Faroe Islands", competition: "Meistaradeildin menn" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Iceland", competition: "Lengjudeild karla" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Montenegro", competition: "Meridianbet 1. CFL" })).toBe(true);
