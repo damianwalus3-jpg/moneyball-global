@@ -2,7 +2,7 @@ import { isGeographicEuropeCountry } from "./geographic-europe.ts";
 
 Deno.test("geographic Europe includes M49 European countries and football aliases", () => {
   for (const country of [
-    "Albania", "ALB", "Andorra", "Austria", "Belgium", "Bosnia and Herzegovina",
+    "Albania", "ALB", "Andorra", "Bosnia & Herzegovina", "Bosnia-Herzegovina", "Åland Islands", "Austria", "Belgium", "Bosnia and Herzegovina",
     "Bulgaria", "BGR", "Croatia", "Czechia", "Denmark", "England", "Estonia",
     "Faroe Islands", "Finland", "France", "Germany", "Gibraltar", "Greece",
     "Hungary", "Iceland", "Ireland", "Isle of Man", "Italy", "Jersey", "JEY", "Guernsey", "GGY", "Latvia",

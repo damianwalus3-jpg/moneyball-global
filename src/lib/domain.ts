@@ -152,7 +152,7 @@ export function impliedProbability(odds: number | null | undefined): number | nu
 // (including Israel, Cyprus, Armenia, Azerbaijan, Georgia, Kazakhstan and Türkiye).
 // Albania is in Southern Europe and must remain eligible.
 const EUROPEAN_COUNTRIES = new Set([
-  "albania","andorra","austria","belarus","belgium","bosnia","bosnia and herzegovina",
+  "albania","andorra","austria","belarus","belgium","bosnia","bosnia and herzegovina","bosnia herzegovina",
   "bulgaria","croatia","czechia","czech republic","denmark","england","estonia","faroe islands",
   "finland","france","germany","gibraltar","greece","hungary","iceland","ireland","isle of man",
   "italy","kosovo","latvia","liechtenstein","lithuania","luxembourg","malta","moldova","monaco",

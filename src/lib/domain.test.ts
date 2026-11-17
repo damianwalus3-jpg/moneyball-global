@@ -207,6 +207,7 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "North Macedonia", competition: "Prva MFL" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bosnia and Herzegovina", competition: "WWIN Liga Bosne i Hercegovine" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Albania", competition: "Abissnet Superiore" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bosnia & Herzegovina", competition: "WWIN Liga Bosne i Hercegovine" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Luxembourg", competition: "BGL Ligue" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Malta", competition: "VBet Malta Premier League" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Kosovo", competition: "Albi Mall Superliga" })).toBe(true);

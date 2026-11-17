@@ -8,7 +8,7 @@
  */
 const EUROPEAN_COUNTRY_NAMES = new Set([
   "albania", "andorra", "austria", "belarus", "belgium",
-  "bosnia", "bosnia and herzegovina", "bulgaria", "croatia",
+  "bosnia", "bosnia and herzegovina", "bosnia herzegovina", "bulgaria", "croatia",
   "czechia", "czech republic", "denmark", "england", "estonia",
   "faroe islands", "finland", "france", "germany", "gibraltar",
   "greece", "guernsey", "hungary", "iceland", "ireland", "republic of ireland",
