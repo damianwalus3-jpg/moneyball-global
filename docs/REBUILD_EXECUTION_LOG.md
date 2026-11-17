@@ -669,3 +669,6 @@
 - No real OddsPapi or StrikerAPI request was made and no provider credits were consumed.
 - Code commits: `a1d97fdf18c09d10977f0e1980bdbd99e06dac1d` and `26576025587354f4d5a67f0581ea02f2b1c8ee9d`.
 - CI and Cloudflare deployment verification: pending; do not mark this stage deployed until both pass.
+
+- Follow-up test-fixture correction: `c89db32c15af9630c151862acc7b1c9d18ca05be` updates the status endpoint test to use a strong-length pilot secret.
+- GitHub combined status for the latest code commit currently exposes only a failing `Vercel` context with a build-rate-limit URL. This is not the required Cloudflare rebuild deployment check and is not treated as a successful CI/deploy result. Stage 19 remains PENDING verification; no Vercel deployment was requested or attempted.
