@@ -223,6 +223,15 @@ export default function App() {
     const refreshId = window.setInterval(() => void runFixtureScan(true), 15 * 60 * 1000);
     return () => window.clearInterval(refreshId);
   }, []);
+  useEffect(() => {
+    const syncTracker = () => setRecords(readRecords());
+    window.addEventListener("storage", syncTracker);
+    window.addEventListener("moneyball:tracker-updated", syncTracker);
+    return () => {
+      window.removeEventListener("storage", syncTracker);
+      window.removeEventListener("moneyball:tracker-updated", syncTracker);
+    };
+  }, []);
   const fileRef = useRef<HTMLInputElement>(null);
   const modelAudit = useMemo(() => auditTrackerPredictions(records), [records]);
   const visibleRecords = useMemo(() => records.filter(row => (active === "tracker" ? true : row.kind === (active === "matches" ? "match" : active === "coupons" ? "coupon" : active === "pick" ? "prediction" : "scan")) && (row.title.toLowerCase().includes(query.toLowerCase()) || row.status.toLowerCase().includes(query.toLowerCase()))), [records, active, query]);
