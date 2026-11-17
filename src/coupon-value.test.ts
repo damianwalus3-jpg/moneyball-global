@@ -45,9 +45,10 @@ describe("three-leg coupon odds valuation", () => {
   });
 
   it("refuses pricing when a newer prediction has been rejected", () => {
-    const records = [...fullRecords(), row("prediction", "f1", {
+    const rejected = row("prediction", "f1", {
       p1: 0.8, px: 0.1, p2: 0.1, selection: "1", strongCandidate: false,
-    }, "ODRZUCONY")];
+    }, "ODRZUCONY");
+    const records = [...fullRecords(), { ...rejected, createdAt: "2026-11-17T20:00:01.000Z" }];
     expect(valueThreeLegCoupon(candidate, records, "Book A", now)).toBeNull();
   });
 
