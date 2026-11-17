@@ -4,6 +4,7 @@ import { addRecord, exportBackup, importBackup, readRecords, removeRecord, type 
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadOpenLigaRecentTeamForm, loadRecentTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
 import { buildThreeLegCandidates } from "./coupon-engine";
+import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from "./openfootball";
 import { evaluatePaperCoupon } from "./coupon-settlement";
 import { auditTrackerPredictions } from "./model-audit";
 import {
