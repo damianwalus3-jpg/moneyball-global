@@ -1282,7 +1282,7 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 
 **Bug:** Frontend geographic Europe filter and Supabase ingestion/database rules diverged. Five backend functions retained the old UEFA-based allowlist, including Asian countries and a competition-name fallback that could bypass country geography.
 
-**Fix in source:** Shared helper `supabase/functions/_shared/geographic-europe.ts`; updated `footynomad-sync`, `moneyball-free-feed`, `moneyball-results-sync`, `moneyball-public-sources`, and `moneyball-predict`; OpenMatchday league-index filter now uses the same helper. Added `geographic-europe.test.ts` and wired `deno test --no-check supabase/functions/_shared/geographic-europe.test.ts` into CI and Cloudflare deployment validation. Added SQL migration `20261117130000_enforce_geographic_europe_m49_scope.sql` with database regression assertions.
+**Fix in source:** Shared helper `supabase/functions/_shared/geographic-europe.ts`; updated `footynomad-sync`, `moneyball-free-feed`, `moneyball-results-sync`, `moneyball-public-sources`, `moneyball-predict`, and `moneyball-movi-odds-sync`; OpenMatchday league-index filter now uses the same helper. Added `geographic-europe.test.ts` and wired `deno test --no-check supabase/functions/_shared/geographic-europe.test.ts` into CI and Cloudflare deployment validation. Added SQL migration `20261117130000_enforce_geographic_europe_m49_scope.sql` with database regression assertions.
 
 **Country policy:** UN M49 is the geographic reference. Albania remains included. Israel, Armenia, Azerbaijan, Cyprus, Georgia, Kazakhstan and Türkiye are excluded. UK football associations and Kosovo are explicit provider aliases; Kosovo is not a separate M49 country code. Generic `Europe` and `UEFA` labels are not accepted as country evidence.
 
@@ -1292,3 +1292,6 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 
 
 **CI/deployment result:** GitHub Actions CI #1230 SUCCESS and Cloudflare deploy #816 SUCCESS for `63a5edaa6cf99a2894aa90e67ff1f04e8c153e0d`. New Deno country-scope tests, Edge Function type-check, application tests, TypeScript, build and Cloudflare deployment all passed. Supabase runtime deployment remains outstanding.
+
+
+**Final source/Cloudflare validation:** Deno scope tests, Edge Function type-check, application tests, TypeScript and build passed in CI #1231 and #1232. Cloudflare deploy #818 SUCCESS for `effa5063e006a40f30da26f3981987e9153865c5`. The odds-sync function now also rejects matches outside the shared geographic country gate. Supabase functions and SQL migration remain source-only and are not live.
