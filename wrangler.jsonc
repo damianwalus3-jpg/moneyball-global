@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "moneyball-global-rebuild",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-11-17",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "observability": { "enabled": true }
+}
