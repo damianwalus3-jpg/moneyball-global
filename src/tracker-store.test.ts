@@ -34,6 +34,17 @@ describe("local tracker", () => {
   it("rejects malformed backup", () => {
     expect(() => validateBackup({ version: 99 })).toThrow();
     expect(() => validateBackup({ format: "moneyball-local-backup", version: 1, records: [{ id: "x", kind: "match", title: "bad", status: "x", details: [], createdAt: "now" }] })).toThrow();
+    expect(() => validateBackup({ format: "moneyball-local-backup", version: 1, records: [{ id: "x", kind: "match", title: "bad", status: "x", details: { nested: { unsafe: true } }, createdAt: new Date().toISOString() }] })).toThrow();
+  });
+  it("deduplicates repeated IDs inside an imported backup", () => {
+    const createdAt = new Date().toISOString();
+    const backup = { format: "moneyball-local-backup", version: 1, exportedAt: createdAt, records: [
+      { id: "same-id", kind: "match", title: "First", status: "scheduled", details: {}, createdAt },
+      { id: "same-id", kind: "match", title: "Duplicate", status: "finished", details: {}, createdAt },
+    ]};
+    expect(importBackup(backup)).toBe(1);
+    expect(readRecords()).toHaveLength(1);
+    expect(readRecords()[0].title).toBe("First");
   });
   it("stores scanned fixtures once and never overwrites an existing fixture row", () => {
     const fixture = { kind: "match" as const, title: "Team A — Team B", status: "SCHEDULED", details: { fixtureId: "provider|fixture-1", date: "2026-11-17" } };
