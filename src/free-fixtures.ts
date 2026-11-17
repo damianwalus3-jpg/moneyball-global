@@ -143,6 +143,11 @@ spain:"ESP", sweden:"SWE", switzerland:"SUI", turkey:"TUR", ukraine:"UKR", wales
 };
 interface ESPNCompetitor { homeAway?: string; team?: { displayName?: string; name?: string } }
 interface ESPNEvent { id?: string | number; date?: string; competitions?: Array<{ altGameNote?: string; venue?: { address?: { country?: string } }; notes?: Array<{ headline?: string }>; competitors?: ESPNCompetitor[] }> }
+export function espnScoreboardDatesForBrusselsDay(date: string): string[] {
+  const [year, month, day] = date.split("-").map(Number);
+  const previousUtcDate = new Date(Date.UTC(year, month - 1, day) - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return [previousUtcDate.replace(/-/g, ""), date.replace(/-/g, "")];
+}
 export function parseEspnEuropeanFixtures(payload: unknown, targetDate: string): FreeFixture[] {
   if (!payload || typeof payload !== "object" || !Array.isArray((payload as { events?: unknown }).events)) throw new Error("ESPN scoreboard: nieprawidłowa odpowiedź lub brak tablicy events");
   const events = (payload as { events: ESPNEvent[] }).events;
@@ -331,9 +336,22 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
 
   // Source 4: ESPN public all-soccer daily scoreboard. Geographic venue filtering keeps Europe only.
   try {
-    const response = await fetchJson<unknown>(`/api/espn/scoreboard/${date.replace(/-/g, "")}`);
-    espnChecked = 1;
-    const espnFixtures = parseEspnEuropeanFixtures(response, date);
+    const scoreboardDates = espnScoreboardDatesForBrusselsDay(date);
+    const scoreboardResults = await Promise.all(scoreboardDates.map(async sourceDate => {
+      try {
+        const payload = await fetchJson<unknown>(`/api/espn/scoreboard/${sourceDate}`);
+        if (!payload || typeof payload !== "object" || !Array.isArray((payload as { events?: unknown }).events)) throw new Error("nieprawidłowa odpowiedź ESPN");
+        return { payload: payload as { events: ESPNEvent[] }, error: "" };
+      } catch (error) {
+        return { payload: null, error: `ESPN ${sourceDate}: ${error instanceof Error ? error.message : "błąd źródła"}` };
+      }
+    }));
+    espnChecked = scoreboardResults.filter(result => result.payload).length;
+    errors.push(...scoreboardResults.map(result => result.error).filter(Boolean));
+    const availableScoreboards = scoreboardResults.flatMap(result => result.payload ? [result.payload] : []);
+    if (!availableScoreboards.length) throw new Error("żaden z dwóch dziennych scoreboardów nie odpowiedział poprawnie");
+    const combinedEvents = availableScoreboards.flatMap(payload => payload.events);
+    const espnFixtures = parseEspnEuropeanFixtures({ events: combinedEvents }, date);
     espnFixturesFound = espnFixtures.length;
     for (const fixture of espnFixtures) {
       const key = fixtureKey(fixture.date, fixture.home, fixture.away);
