@@ -104,11 +104,19 @@ export function PredictionsView({ market }: { market: Market }) {
   const rate = stats && stats.settled > 0
     ? { rate: (stats.won / stats.settled) * 100, won: stats.won, settled: stats.settled }
     : { rate: null, won: 0, settled: 0 };
-  const toggle = useAction((prediction: Prediction) =>
-    updateRow("predictions", prediction.id, {
-      verdict: prediction.verdict === "ODRZUCONY" ? "WYBRANY" : "ODRZUCONY",
-    }),
-  );
+  const toggle = useAction((prediction: Prediction) => {
+    const promoting = prediction.verdict === "ODRZUCONY";
+    const odds = prediction.odds == null ? null : Number(prediction.odds);
+    return updateRow("predictions", prediction.id, {
+      verdict: promoting ? "WYBRANY" : "ODRZUCONY",
+      ...(promoting ? {
+        stake: 4,
+        potential_return: odds != null && Number.isFinite(odds) && odds > 1
+          ? Math.round(4 * odds * 100) / 100
+          : null,
+      } : {}),
+    });
+  });
   const remove = useAction(async (id: string) => {
     if (!couponLegsReady) throw new Error("Nie udało się sprawdzić powiązań z kuponami. Odśwież stronę i spróbuj ponownie.");
     if (couponLegs.some((leg) => leg.prediction_id === id))
