@@ -29,7 +29,7 @@ begin
     'feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series)'
   );
   if v_def = v_before then
-    raise exception 'Could not locate women's/special-competition exclusion in moneyball_is_european_top_two_league';
+    raise exception 'Could not locate women-specific/special-competition exclusion in moneyball_is_european_top_two_league';
   end if;
   execute v_def;
 
