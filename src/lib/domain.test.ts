@@ -12,6 +12,7 @@ import {
   isEligibleCouponPrediction,
   hasFreshConfirmedOdds,
   canPromoteManualOdds,
+  isMissingOddsRejectionReason,
   modelHitRate,
   probabilityQuality,
   multiclass1X2Quality,
@@ -390,6 +391,12 @@ describe("manual odds promotion", () => {
       home_history_matches: 4,
       away_history_matches: 5,
     },
+  });
+
+  it("recognizes both current and legacy missing-odds reason text", () => {
+    expect(isMissingOddsRejectionReason("Brak aktualnego, potwierdzonego kursu dla tego rynku i typu.")).toBe(true);
+    expect(isMissingOddsRejectionReason("Brak potwierdzonego kursu.")).toBe(true);
+    expect(isMissingOddsRejectionReason("Prawdopodobieństwo poniżej progu.")).toBe(false);
   });
 
   it("promotes only a qualified, upcoming model pick rejected solely for missing odds", () => {
