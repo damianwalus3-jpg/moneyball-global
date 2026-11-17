@@ -13,6 +13,7 @@ export interface MoneyballBackup {
   exportedAt: string;
   records: TrackerRecord[];
 }
+type NewTrackerRecord = Omit<TrackerRecord, "id" | "createdAt">;
 const STORAGE_KEY = "moneyball.local.tracker.v1";
 const VALID_KINDS: TrackerKind[] = ["scan","match","prediction","coupon","result","odds","ledger","category","jackpot"];
 
@@ -21,7 +22,8 @@ function isRecord(value: unknown): value is TrackerRecord {
   const row = value as Partial<TrackerRecord>;
   return typeof row.id === "string" && VALID_KINDS.includes(row.kind as TrackerKind)
     && typeof row.title === "string" && typeof row.status === "string"
-    && !!row.details && typeof row.details === "object" && typeof row.createdAt === "string";
+    && !!row.details && typeof row.details === "object" && !Array.isArray(row.details)
+    && typeof row.createdAt === "string";
 }
 
 export function readRecords(): TrackerRecord[] {
@@ -35,10 +37,34 @@ export function readRecords(): TrackerRecord[] {
 export function writeRecords(records: TrackerRecord[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
 }
-export function addRecord(input: Omit<TrackerRecord, "id" | "createdAt">): TrackerRecord {
+export function addRecord(input: NewTrackerRecord): TrackerRecord {
   const row: TrackerRecord = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
   writeRecords([row, ...readRecords()]);
   return row;
+}
+
+/**
+ * Adds records only when no existing record of the same kind has the same
+ * string value in uniqueDetailField. Existing rows are never overwritten.
+ * This is used by repeatable fixture scans to preserve history idempotently.
+ */
+export function addRecordsIfMissing(inputs: NewTrackerRecord[], uniqueDetailField: string): number {
+  const existing = readRecords();
+  const keys = new Set(existing.flatMap(row => {
+    const value = row.details[uniqueDetailField];
+    return typeof value === "string" ? [`${row.kind}|${value}`] : [];
+  }));
+  const added: TrackerRecord[] = [];
+  for (const input of inputs) {
+    const value = input.details[uniqueDetailField];
+    if (typeof value !== "string") continue;
+    const key = `${input.kind}|${value}`;
+    if (keys.has(key)) continue;
+    keys.add(key);
+    added.push({ ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() });
+  }
+  if (added.length) writeRecords([...added, ...existing]);
+  return added.length;
 }
 export function removeRecord(id: string): void {
   writeRecords(readRecords().filter(row => row.id !== id));
