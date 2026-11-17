@@ -1329,3 +1329,6 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 - Source changes on MAIN: shared domestic-league-scope helper and Deno tests; all-tier filters in footynomad-sync, moneyball-free-feed, moneyball-predict and OpenMatchday catalogue discovery; frontend eligibility and match-screen text updated; SQL migration 20261117150000_expand_european_leagues_to_all_senior_tiers.sql.
 - Geographic M49 country boundary is unchanged: Albania included; Israel, Armenia, Azerbaijan, Cyprus, Georgia, Kazakhstan and Türkiye excluded.
 - End-to-end verification is still required: CI and Cloudflare MAIN deploy, SQL migration, four Edge Function deployments, then authenticated manual scan checking lower-tier inclusion and cup/international/youth/women/reserve/non-European exclusions. Do not call the task complete until those checks pass.
+
+
+Final verification trigger: all-tier helper and database migration exclusions hardened on 2026-11-17; final CI/Cloudflare verification must include these last changes before production activation.
