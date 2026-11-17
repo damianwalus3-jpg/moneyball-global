@@ -140,3 +140,17 @@
 - CI run `44112642412`: SUCCESS — TypeScript, all tests and production build passed.
 - Cloudflare deployment run `44112642302`: deploy step SUCCESS — separate rebuild Worker deployed.
 - Stage 08 is COMPLETE/DEPLOYED as an evaluation framework. Automatic result retrieval, settlement and bankroll reconciliation remain the next implementation stage.
+
+## 2026-11-17 — Stage 09: verified final-result settlement
+- Added a finished-match result adapter for open-matchday results CSV and OpenLigaDB season match feeds.
+- OpenLigaDB settlement requires `matchIsFinished === true` and reads the final result row (resultTypeID 2 / final result), not half-time scores.
+- Both adapters match fixture date in Europe/Brussels and normalized home/away names; missing, unfinished or invalid scores remain unsettled.
+- Added shared in-flight OpenLigaDB season-feed requests so multiple predictions from one league can share the same response during a settlement batch.
+- Added a “Pobierz wyniki i rozlicz” action in Intelligence. It checks predictions without a result record, processes in batches of four, records verified 1/X/2 outcome and final score, and refreshes model audit metrics.
+- Result records are linked by the exact fixture ID. Predictions without result metadata or with provider errors remain pending; no guessed final scores are created.
+- Stage 09 does not yet update a real-money bankroll: no real bookmaker odds or real stakes are connected. Paper coupon records remain separate.
+- A TypeScript failure caused by optional league metadata was fixed by explicitly storing null for absent values.
+- Final code commit: `2af49e22bc8c0659e41a85b15a1460a87f95d618` (`fix(rebuild): normalize optional fixture metadata for result settlement`).
+- CI run `44113070380`: SUCCESS — typecheck, all tests and production build passed.
+- Cloudflare deploy run `44113070381`: SUCCESS — separate rebuild Worker deployment passed.
+- Stage 09 is COMPLETE/DEPLOYED as a verified-result settlement workflow. End-to-end visual testing and live source coverage validation remain outstanding.
