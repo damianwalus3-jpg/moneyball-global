@@ -215,7 +215,7 @@ async function openMatchday(date: string) {
   // Cup fixtures often have no recent cup-only results. Build a country-wide
   // club history from every available non-cup competition in the same country.
   // This improves form coverage without inventing scores or using another club's data.
-  const activeCountries = [...new Set(fixtures.map(x => String(x.country || "").toUpperCase()))];
+  const activeCountries = [...new Set(fixtures.map(x => String(x.source_competition_id || "").split("_")[0].toUpperCase()).filter(Boolean))];
   const historyFolders = unique.filter(folder => {
     const country = folder.split("_")[0].toUpperCase();
     return activeCountries.includes(country) && !/_CUP_/i.test(folder);
@@ -272,8 +272,9 @@ async function openMatchday(date: string) {
       f.away_form = { matches: 0, last10: [], points: null, goals_for: null, goals_against: null, source: "WOMENS_HISTORY_PENDING" };
       continue;
     }
-    const localHome = teamForm(f.competition, f.home_team);
-    const localAway = teamForm(f.competition, f.away_team);
+    const historyFolder = f.source_competition_id || f.competition;
+    const localHome = teamForm(historyFolder, f.home_team);
+    const localAway = teamForm(historyFolder, f.away_team);
     const githubHome = githubTeamForm(f.home_team, date, githubHistory);
     const githubAway = githubTeamForm(f.away_team, date, githubHistory);
     f.home_form = localHome.matches >= 3 ? localHome : (githubHome || localHome);
