@@ -105,6 +105,7 @@ function TrackerPage() {
   const p = picks.data ?? [];
   const scanRow = scan.data;
   const categoryRows = categories.data ?? [];
+  const newCategoryKey = (() => { try { return makeTrackerCategoryKey(newCategoryName); } catch { return ""; } })();
   const jackpotRows = jackpot.data ?? [];
   const couponRows = coupons.data ?? [];
   const couponById = new Map(couponRows.map((coupon) => [coupon.id, coupon]));
@@ -197,20 +198,15 @@ function TrackerPage() {
                 </select>
                 <Button
                   variant="outline"
-                  disabled={!newCategoryName.trim() || addCategory.isPending}
+                  disabled={!newCategoryName.trim() || !newCategoryKey || addCategory.isPending}
                   onClick={() => {
-                    try {
-                      const key = makeTrackerCategoryKey(newCategoryName);
-                      if (categoryRows.some((category) => category.category_key === key)) return;
-                      addCategory.mutate({
-                        name: newCategoryName.trim(),
-                        key,
-                        group: newCategoryGroup,
-                        sortOrder: Math.max(0, ...categoryRows.map((category) => category.sort_order)) + 10,
-                      });
-                    } catch {
-                      return;
-                    }
+                    if (categoryRows.some((category) => category.category_key === newCategoryKey)) return;
+                    addCategory.mutate({
+                      name: newCategoryName.trim(),
+                      key: newCategoryKey,
+                      group: newCategoryGroup,
+                      sortOrder: Math.max(0, ...categoryRows.map((category) => category.sort_order)) + 10,
+                    });
                   }}
                 >
                   {addCategory.isPending ? "Zapisywanie…" : "Dodaj kategorię"}
