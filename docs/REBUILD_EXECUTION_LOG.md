@@ -548,3 +548,16 @@
 - Klucze muszą być utworzone przez użytkownika w darmowych kontach i zapisane bezpośrednio w Cloudflare Worker Secrets jako `ODDSPAPI_API_KEY` i `STRIKERAPI_API_KEY`. Nie wolno przesyłać ich przez czat, commitować do repo ani umieszczać w frontendzie.
 - Na tym etapie nie wykonano live requestów, ponieważ klucze nie zostały jeszcze wygenerowane/ustawione. Nie stworzono kont, nie włączono billing i nie dodano sekretów. Nie ma jeszcze wyniku coverage.
 - Następna bramka: po ustawieniu obu Worker Secrets uruchomić ograniczony live pilot na 5–8 rzeczywistych fixture'ach, bez zapisywania danych testowych do P/L. Dopiero raport wyników zdecyduje, czy którykolwiek provider nadaje się do integracji.
+
+
+## Stage 52 — izolowany proxy pilota kursów OddsPapi + StrikerAPI (2026-11-17)
+- Dodano w Cloudflare Worker dwa endpointy: `GET /api/odds/status` (wyłącznie informacja true/false, czy sekret jest skonfigurowany) oraz `GET /api/odds/pilot?fixtureId=...&strikerGameId=...`.
+- Sekrety `ODDSPAPI_API_KEY` i `STRIKERAPI_API_KEY` są odczytywane wyłącznie po stronie Worker; endpoint status nie ujawnia wartości, odpowiedzi mają `Cache-Control: no-store`, a klucze nie są zwracane klientowi.
+- OddsPapi: Worker wywołuje `GET /v4/odds` dla jawnie podanego fixtureId. StrikerAPI: Worker wywołuje `POST /v1/get_odds` dla jawnie podanego game_id i normalizuje trzy kursy moneyline do decimal odds, gdy wszystkie wartości są poprawne.
+- Pilot zwraca surowe dane OddsPapi oraz znormalizowane kursy StrikerAPI. Nie wykonuje automatycznego cross-provider matching, nie zapisuje kursów do Tracker/P&L i nie uruchamia masowego skanu.
+- Identyfikatory providerów są odrębne od fixture ID aplikacji; należy je dopasować i zweryfikować przed interpretacją wyników. Nie zakładać, że oba providery zwracają dane dla tego samego meczu.
+- Dodano testy: status sekretów bez wycieku, walidacja identyfikatorów, wywołanie OddsPapi, moneyline-to-decimal StrikerAPI, brak wywołania bez sekretu oraz zachowanie proxy OpenLigaDB.
+- Commity: Worker `a6cd74c18d20a63b1c9ed6b2f81edd096fd20270`; testy `acc8dd051946c6d23967dea6aa388905034740bf`.
+- GitHub Actions Rebuild Checks dla commita Worker `a6cd74c18d20a63b1c9ed6b2f81edd096fd20270` uruchomił się jako run `44187285622`; w chwili zapisu był IN_PROGRESS. Końcowy status CI i deploy należy potwierdzić po zakończeniu workflow.
+- Nie potwierdzono obecności sekretów w Cloudflare przez API; endpoint `/api/odds/status` po deployu będzie właściwą metodą sprawdzenia. Nie wykonano jeszcze rzeczywistych zapytań do providerów ani nie potwierdzono coverage.
+- Ograniczenie: StrikerAPI wymaga jego własnego game_id. Nie wolno przekazywać do niego lokalnego fixture ID, jeśli nie jest to zgodny identyfikator dostawcy.
