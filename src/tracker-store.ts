@@ -20,10 +20,11 @@ const VALID_KINDS: TrackerKind[] = ["scan","match","prediction","coupon","result
 function isRecord(value: unknown): value is TrackerRecord {
   if (!value || typeof value !== "object") return false;
   const row = value as Partial<TrackerRecord>;
-  return typeof row.id === "string" && VALID_KINDS.includes(row.kind as TrackerKind)
+  const detailsValid = !!row.details && typeof row.details === "object" && !Array.isArray(row.details)
+    && Object.values(row.details).every(item => item === null || typeof item === "string" || typeof item === "boolean" || (typeof item === "number" && Number.isFinite(item)));
+  return typeof row.id === "string" && row.id.length > 0 && VALID_KINDS.includes(row.kind as TrackerKind)
     && typeof row.title === "string" && typeof row.status === "string"
-    && !!row.details && typeof row.details === "object" && !Array.isArray(row.details)
-    && typeof row.createdAt === "string";
+    && detailsValid && typeof row.createdAt === "string" && Number.isFinite(Date.parse(row.createdAt));
 }
 
 export function readRecords(): TrackerRecord[] {
@@ -36,6 +37,7 @@ export function readRecords(): TrackerRecord[] {
 }
 export function writeRecords(records: TrackerRecord[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("moneyball:tracker-updated"));
 }
 export function addRecord(input: NewTrackerRecord): TrackerRecord {
   const row: TrackerRecord = { ...input, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
@@ -84,7 +86,11 @@ export function importBackup(value: unknown): number {
   const backup = validateBackup(value);
   const existing = readRecords();
   const ids = new Set(existing.map(row => row.id));
-  const missing = backup.records.filter(row => !ids.has(row.id));
-  writeRecords([...missing, ...existing]);
+  const missing = backup.records.filter(row => {
+    if (ids.has(row.id)) return false;
+    ids.add(row.id);
+    return true;
+  });
+  if (missing.length) writeRecords([...missing, ...existing]);
   return missing.length;
 }
