@@ -232,13 +232,13 @@ describe("European domestic league scope", () => {
       competition: "Damallsvenskan",
       external_id: "om:SWE_1_damallsvenskan:2026-11-17:club-a:club-b",
     })).toBe(false);
-    // ISO-3 country codes must be treated consistently with the backend source filters.
+    // An explicit OpenMatchday tier folder must not override the geographic country boundary.
     expect(isEligibleEuropeanMatch({
       ...openMatchdayBase,
       country: "ISR",
       competition: "Liga Leumit",
       external_id: "om:ISR_2_liga-leumit:2026-11-17:club-a:club-b",
-    })).toBe(true);
+    })).toBe(false);
     // FootyNomad's Northern Ireland Championship is a valid domestic second tier.
     expect(isEligibleEuropeanMatch({
       ...eligibleBase,

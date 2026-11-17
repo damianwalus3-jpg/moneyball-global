@@ -1236,3 +1236,9 @@ Important: 53/55 is verified source-discovery coverage, NOT automated importer c
 ## 17.11.2026 — follow-up regression pass 2
 - CI #1220 / Cloudflare #806 passed the broad provider catalogue after removing the Asia/UEFA-only fixtures, but one remaining direct `isEligibleEuropeanMatch(Georgia, Erovnuli Liga 2)` assertion still expected true. This was the last stale positive test found by the suite (73/74 tests passed).
 - Changed that assertion to false, aligning both the top-two helper and the full match eligibility helper with the same M49 country gate. No tests were disabled. A new CI/Cloudflare run is required; the failed run did not deploy.
+
+
+## 17.11.2026 — follow-up regression pass 3
+- CI #1221 found one final stale test at the OpenMatchday source-folder path: an explicit `om:ISR_2_...` tier folder was expected to override the country filter. This exposed an important edge case: provider tier metadata must never override geography.
+- Updated the regression to require rejection even when the source folder explicitly labels Israel as tier 2. This is not a code relaxation; it strengthens the geographic gate test. The source-country allowlist remains the single deciding condition.
+- Three successive test runs exposed three distinct stale UEFA-era assumptions (110-entry catalogue, Georgia eligibility, explicit ISR OpenMatchday slug). Keep this history; do not repeat those diagnostics. CI #1221 did not deploy.
