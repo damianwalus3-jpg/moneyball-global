@@ -38,6 +38,16 @@ describe("local tracker", () => {
     expect(readRecords()).toHaveLength(2);
     expect(readRecords().find(row => row.id === "fixed-id")?.title).toBe("Original");
   });
+  it("keeps result and coupon settlement inserts idempotent by their parent keys", () => {
+    const result = { kind: "result" as const, title: "Fixture result", status: "SETTLED", details: { fixtureId: "fx-1", actual: "1" } };
+    const child = { kind: "coupon" as const, title: "Coupon settled", status: "PAPER_HIT", details: { parentCouponId: "coupon-1" } };
+    expect(addRecordsIfMissing([result], "fixtureId")).toBe(1);
+    expect(addRecordsIfMissing([result], "fixtureId")).toBe(0);
+    expect(addRecordsIfMissing([child], "parentCouponId")).toBe(1);
+    expect(addRecordsIfMissing([child], "parentCouponId")).toBe(0);
+    expect(readRecords().filter(row => row.kind === "result")).toHaveLength(1);
+    expect(readRecords().filter(row => row.kind === "coupon")).toHaveLength(1);
+  });
   it("rejects malformed backup", () => {
     expect(() => validateBackup({ version: 99 })).toThrow();
     expect(() => validateBackup({ format: "moneyball-local-backup", version: 1, records: [{ id: "x", kind: "match", title: "bad", status: "x", details: [], createdAt: "now" }] })).toThrow();
