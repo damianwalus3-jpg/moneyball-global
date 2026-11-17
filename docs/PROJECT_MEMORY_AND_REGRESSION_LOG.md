@@ -957,3 +957,27 @@ Ten plik jest trwałym punktem kontrolnym projektu. Przed każdą zmianą należ
 - Source coverage limitation: FootyNomad currently lists Luxembourg's National Division but not its second-tier Division of Honour; its Gibraltar directory currently lists Premier Division only; San Marino lists Campionato only; Liechtenstein lists a cup but no national league. Do not claim full 1-2 tier coverage in those cases without an alternate verified source. Keep these gaps visible in issue #77.
 - No Supabase SQL, Edge Function, secret or deployment change in this patch. This fix is frontend-only and will be delivered through Cloudflare Workers MAIN. Vercel and TEST remain excluded.
 - UI patch 9160382f was verified on Cloudflare MAIN. Current patch adds ISO3 Israel and provider alias regression cases; CI and Cloudflare deployment verification are pending.
+
+
+## Kontynuacja produkcyjnego audytu i napraw — 2026-11-17 (08:xx UTC)
+
+### Potwierdzone błędy i poprawki
+1. **Błąd autoryzacji źródeł publicznych** — moneyball-predict wysyłał do moneyball-public-sources niespójne nagłówki apikey i Authorization, co powodowało HTTP 401 i brak dodatkowych danych. W supabase/functions/moneyball-predict/index.ts oba nagłówki są teraz jawnie ustawiane na ten sam klucz po stronie serwera. Edge Function moneyball-predict version 245 wdrożona. Test sieciowy przez pg_net z tymi samymi nagłówkami: HTTP 200, source_count=4, raw_fixtures=11, european_fixtures=8, formę obu drużyn ma 8/8 fixture. W odpowiedzi funkcji public_source_error=null.
+2. **Nieefektywna paginacja ręcznego skanu** — dotychczasowy manual path pobierał LIMIT 10 surowych rekordów z matches, a dopiero później filtrował europejskie ligi top-two. W bazie 99 rekordów dnia tylko 2 były kwalifikowane, na pozycjach 80 i 94, co powodowało puste pierwsze strony i niepotrzebne wywołania. Dodano migrację 20261117090000_add_authenticated_manual_prediction_scan_page.sql, funkcję moneyball_manual_prediction_scan_page(date, integer, integer) z auth.uid() i filtrowaniem/deduplikacją przed paginacją. Migracja zastosowana w produkcyjnym projekcie Supabase gzgeklcukrclgwbsmbsp. Test SQL z kontekstem właściciela zwrócił 2 kwalifikowane mecze, count=2, has_more=false. Funkcja nie przyjmuje owner_id od klienta; zakres ogranicza auth.uid().
+3. Manual path w moneyball-predict version 246 korzysta teraz z nowego RPC; cron nadal używa istniejącego cursor/lease RPC. Wdrożenie Supabase Edge Function version 246 aktywne.
+
+### Testy i wdrożenie
+- Commit auth fix: bb9bf0d4d569319f262501c71df925558ce35a75.
+- Commit manual pagination: bf4a797f91649ee34f51aa6cf274add939969b66.
+- Migracja SQL zastosowana; test owner-scope: 2/2 kwalifikowane, brak kolejnej strony.
+- CI run #1166 / ID 44045844923: SUCCESS (Deno check, testy, TypeScript, build).
+- Cloudflare deploy run #752 / ID 44045845062: SUCCESS.
+- Produkcyjny Cloudflare Worker root i /login odpowiadają poprawnie; prywatny /panel wymaga logowania. Zewnętrzny browser test nie posiada sesji użytkownika, więc nie deklarować pełnego testu zalogowanego UI.
+- Ponowny produkcyjny skan uruchomiony po poprawce (Edge Function version 246): HTTP 200; matches=2, predictions=24, updated=24, covered=2, missing=0, selected=0, couponCreated=false; import: feed 2, public source 8, eligible 2, inserted 0, skipped existing 2; public_source_error=null; skan zakończony, następny termin 2026-11-17 15:00 Europe/Brussels.
+- Nie zmieniano historycznych rekordów, kuponów ani salda. Nie wykonywano prawdziwych zakładów.
+
+### Aktualny stan i blokery
+- FootyNomad podał 173 fixtures na 2026-11-17; baza zawiera 99 rekordów dla dnia, ale tylko 2 spełniają aktualny zakres: europejskie krajowe ligi mężczyzn, poziomy 1–2. Pozostałe wpisy obejmują m.in. rozgrywki UEFA, młodzież, puchary, rezerwy i niższe ligi. Nie rozszerzać zakresu przez dopuszczanie niekwalifikowanych spotkań. Issue #77 pozostaje OTWARTE do pełnego porównania katalogu lig i UI.
+- W provider_odds: 219022 historycznych rekordów MoviOdds/bet365, ale 0 aktywnych kursów z ostatnich 6 godzin; najnowszy zapis 2026-11-16 02:11:13 UTC. MoviOdds wymaga klucza API, którego użytkownik nie chce. Bwin Sports API wymaga oficjalnego partnerstwa i indywidualnych kluczy. Nie używać kursów starych, syntetycznych ani niepotwierdzonych; MAIN/MEGA/EXTRA pozostają zablokowane bez świeżego źródła.
+- Publiczny katalog odss-api udostępnia bez klucza wyłącznie coverage; rzeczywiste kursy wymagają klucza, a endpoint mock zwraca ceny syntetyczne — nie używać go do prognoz/kuponów. Football-Data.co.uk publikuje pliki historyczne/okresowo aktualizowane, nie jest to feed live; warunki źródła ograniczają automatyczne użycie AI/botów, więc nie wdrażać scraperów bez zgody.
+- Nie wdrażać Vercel, TEST, płatnych API ani nowych sekretów. Nie zamykać #77 ani nie ogłaszać całego projektu jako ukończonego.
