@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { formatJackpotSequence, makeTrackerCategoryKey } from "@/lib/tracker-domain";
-import { classifyTrackerSource, fetchTrackerUnclassifiedPage, insertRow, updateRow } from "@/lib/db";
+import { classifyTrackerSource, fetchTrackerSourceAudit, fetchTrackerUnclassifiedPage, insertRow, updateRow } from "@/lib/db";
 import {
   couponFinanceQuery, dashboardSelectedPicksQuery, dashboardSummaryQuery, latestScanRunQuery,
   trackerCategoriesQuery, jackpotEntriesQuery, trackerCategorySummaryQuery, tableQuery, useAction
@@ -73,6 +73,12 @@ function TrackerPage() {
   const [legacyEntityType, setLegacyEntityType] = useState<"prediction" | "coupon">("prediction");
   const [legacySourceClass, setLegacySourceClass] = useState<"USER" | "MODEL" | "PAPER">("MODEL");
   const [legacyNote, setLegacyNote] = useState("");
+  const legacyAudit = useQuery({
+    queryKey: ["tracker-source-audit"],
+    queryFn: fetchTrackerSourceAudit,
+    staleTime: 30_000,
+    refetchInterval: false,
+  });
   const legacyRows = useQuery({
     queryKey: ["tracker-unclassified", legacyEntityType, legacyOffset],
     queryFn: () => fetchTrackerUnclassifiedPage(legacyEntityType, legacyOffset, 51),
@@ -440,6 +446,21 @@ function TrackerPage() {
             </div>
           </>
         )}
+        <div className="mt-5 border-t border-border pt-4">
+          <h3 className="mb-2 text-sm font-semibold uppercase">Ostatnie zmiany · audyt źródeł</h3>
+          {legacyAudit.isPending ? <p className="text-xs text-muted-foreground">Ładowanie audytu…</p> : legacyAudit.error ? (
+            <p className="text-xs text-destructive">{legacyAudit.error.message}</p>
+          ) : legacyAudit.data?.length ? (
+            <div className="space-y-2">
+              {legacyAudit.data.map((entry) => (
+                <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-background/40 p-2 text-xs">
+                  <span><b>{entry.entity_type === "prediction" ? "PROGNOZA" : "KUPON"}</b> · {entry.previous_source_class ?? "NIEPRZYPISANE"} → <b>{entry.new_source_class}</b>{entry.note ? ` · ${entry.note}` : ""}</span>
+                  <span className="text-muted-foreground">{dateLabel(entry.changed_at)}</span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="text-xs text-muted-foreground">Brak ręcznych zmian klasyfikacji.</p>}
+        </div>
       </section>
 
       <section>
