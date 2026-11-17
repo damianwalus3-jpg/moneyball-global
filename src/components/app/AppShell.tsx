@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 type NavTo =
   | "/panel"
+  | "/tracker"
   | "/mecze"
   | "/prognozy-1x2"
   | "/double-chance"
@@ -35,6 +36,7 @@ type NavTo =
 
 const NAV: { to: NavTo; label: string; short: string; icon: LucideIcon }[] = [
   { to: "/panel", label: "Panel", short: "Panel", icon: LayoutDashboard },
+  { to: "/tracker", label: "Tracker", short: "Tracker", icon: ListOrdered },
   { to: "/mecze", label: "Terminarz / Mecze", short: "Mecze", icon: CalendarDays },
   { to: "/prognozy-1x2", label: "Prognozy 1X2", short: "1X2", icon: Target },
   { to: "/double-chance", label: "Double Chance", short: "DC", icon: ShieldHalf },
@@ -45,7 +47,7 @@ const NAV: { to: NavTo; label: string; short: string; icon: LucideIcon }[] = [
   { to: "/statystyki", label: "Statystyki", short: "Statystyki", icon: BarChart3 },
   { to: "/ustawienia", label: "Ustawienia", short: "Ustawienia", icon: Settings },
 ];
-const MOBILE_MAIN: NavTo[] = ["/panel", "/mecze", "/wyniki", "/kupony", "/historia"];
+const MOBILE_MAIN: NavTo[] = ["/panel", "/tracker", "/mecze", "/kupony", "/historia"];
 
 export function Brand({ compact = false }: { compact?: boolean }) {
   return (
