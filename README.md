@@ -28,3 +28,6 @@ bun run build
 ```
 
 See `docs/PRODUCT_SPEC.md`, `docs/DOMAIN_MODEL.md` and `docs/REBUILD_EXECUTION_LOG.md`.
+
+
+This project is designed to stay within free service quotas; no paid services are required or configured.
