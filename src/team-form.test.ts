@@ -26,7 +26,7 @@ describe("historical team form", () => {
     expect(form.matches.every(match => match.date < "2026-09-10")).toBe(true);
   });
   it("separates home and away form and calculates points", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => ({
+    vi.stubGlobal("fetch", vi.fn(async () => ({
       ok: true,
       json: async () => ({ generated_utc: "2026-11-17T00:00:00Z" }),
       text: async () => csv,
