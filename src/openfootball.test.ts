@@ -41,6 +41,6 @@ describe("OpenFootball fixtures", () => {
     const fixtures = parseOpenFootballFixtures(text, england, "2026-08-21");
     expect(fixtures[0].time).toBe("21:00");
     expect(openFootballSeasonFolder("2026-11-17")).toBe("2026-27");
-    expect(openFootballSeasonFolder("2027-03-10")).toBe("2026-2027");
+    expect(openFootballSeasonFolder("2027-03-10")).toBe("2026-27");
   });
 });
