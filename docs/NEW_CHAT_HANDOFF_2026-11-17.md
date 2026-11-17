@@ -76,3 +76,12 @@ Nowe najlepsze opcje do testu:
 Fora Reddit r/algobetting zgłaszają blokady Cloudflare, zmiany HTML/XHR, regionalne różnice kursów i bookmakerów oraz utrzymaniowy koszt scraperów. Nie obchodzić blokad przez rotację proxy/VPN.
 Szczegóły, linki i tabela są w `docs/ODDS_PROVIDER_RESEARCH_2026-11-17.md`.
 **Kolejny krok:** test pilotażowy OddsPapi i StrikerAPI, ale tylko po zgodzie użytkownika na darmowy klucz API. Bez klucza nie ma obecnie potwierdzonego legalnego, stabilnego feedu sportsbook odds o szerokim europejskim pokryciu.
+
+
+## Zmiana decyzji użytkownika — darmowy pilot OddsPapi + StrikerAPI (2026-11-17)
+Użytkownik zaakceptował oba darmowe klucze. Przygotowano plan: `docs/ODDS_PROVIDER_PILOT_TEST_2026-11-17.md`; Stage 51 zapisany w `docs/REBUILD_EXECUTION_LOG.md`.
+- OddsPapi: `ODDSPAPI_API_KEY`, Worker Secret; Free 250 requests/month; plan pilota używa maks. 5–8 fixture odds calls plus minimalne discovery.
+- StrikerAPI: `STRIKERAPI_API_KEY`, Worker Secret; Free 500 credits/month; get_odds 10 credits/day lub 5/match.
+- Live testing is BLOCKED until the user creates free accounts/keys and sets both secrets directly in Cloudflare dashboard for Worker `moneyball-global-rebuild`. Never ask for keys in chat and never commit them.
+- No provider code integration or production odds storage has been deployed yet. Do not count pilot samples as real bets/P&L.
+- After secrets exist, run small sample across available European leagues, report fixture match coverage, complete 1X2 coverage, bookmaker names (especially Belgian-relevant books), timestamps/freshness, API errors and quota cost. Never infer complete Europe coverage.
