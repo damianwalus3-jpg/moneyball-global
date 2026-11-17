@@ -1502,3 +1502,14 @@ No new provider was enabled, no API key was added, and no provider credits were 
 - Rechecked the production function registry: v103 ACTIVE. Rechecked cache table: RLS enabled, three owner-only policies, no production cache rows yet (expected until authenticated owner scan).
 - The earlier v102 deployment is superseded; v103 is the current target for the first authenticated scan.
 - Still pending: owner-authenticated POST scan and real cache write/read proof, then authenticated UI click-through. No user match, prediction, coupon, settlement or bankroll data changed.
+
+
+## FootballCharts 429 recovery and source audit — 2026-11-17
+
+- Live scan evidence: the 13:42 UTC 17 Nov owner scan saw HTTP 429 from 4 of 8 concurrently requested FootballCharts leagues. Durable cache table currently has zero rows because there has been no authenticated owner POST since function v104 was deployed; do not mistake this for a confirmed RLS insert failure.
+- MAIN commit `471e755f0f110664558839417736ee8b3cda155b` limits FootballCharts fetch concurrency to 2 and changes partial/error cache expiry from 24h to 12h. Successful cache remains 24h. Partial payloads are explicitly marked `partial`, served stale while fresh, then eligible for a later retry.
+- Follow-up MAIN commit `13e72a479299da3ce2324786912e556728514901` replaces out-of-scope Azerbaijan with Austria 2. Liga. Its CI/deploy were pending at time of logging.
+- Research: FootballCharts 98 leagues/44 countries but only 25 keyless requests/day/IP; no-key eight-league allowlist is supplemental, not complete. OpenMatchday 75 competitions, daily CSV, uneven coverage. FootyCheck 149 countries/776 leagues in 7-day index; no stable API/automated permission verified, so discovery only. No API key or paid plan added.
+- Cron `moneyball-global-free-footynomad` active every 15 minutes; last ten job records succeeded.
+- CI `44152983223` and Cloudflare deploy `44152983292` for `471e755...` succeeded.
+- Next: verify CI/deploy for `13e72a...`, deploy exact MAIN `footynomad-sync` source to Supabase as v105 preserving JWT verification, then require a real owner-authenticated scan to prove durable cache write and second-call cache hit. Authenticated Matches/Predictions UI click-through still pending; keep issue #77 open.
