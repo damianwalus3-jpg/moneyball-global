@@ -48,6 +48,18 @@ describe("local tracker", () => {
     expect(readRecords().filter(row => row.kind === "result")).toHaveLength(1);
     expect(readRecords().filter(row => row.kind === "coupon")).toHaveLength(1);
   });
+  it("sorts merged backup history newest-first without overwriting existing IDs", () => {
+    const now = "2026-11-17T20:00:00.000Z";
+    addRecord({ kind: "match", title: "Existing", status: "scheduled", details: {} });
+    const backup = { format: "moneyball-local-backup", version: 1, exportedAt: now, records: [
+      { id: "old", kind: "result", title: "Older", status: "SETTLED", details: {}, createdAt: "2026-11-16T10:00:00.000Z" },
+      { id: "new", kind: "result", title: "Newer", status: "SETTLED", details: {}, createdAt: now },
+    ]};
+    importBackup(backup);
+    const rows = readRecords();
+    expect(rows.map(row => row.id)).toEqual(["new", "fixed-id", "old"]);
+    expect(rows.find(row => row.id === "fixed-id")?.title).toBe("Existing");
+  });
   it("rejects malformed backup", () => {
     expect(() => validateBackup({ version: 99 })).toThrow();
     expect(() => validateBackup({ format: "moneyball-local-backup", version: 1, records: [{ id: "x", kind: "match", title: "bad", status: "x", details: [], createdAt: "now" }] })).toThrow();
