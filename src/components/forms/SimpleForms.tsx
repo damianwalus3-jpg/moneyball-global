@@ -146,7 +146,7 @@ export function OddsForm({
     const prediction = predictions.find((item) => item.id === row.prediction_id);
     if (!prediction) throw new Error("Nie znaleziono prognozy, do której zapisujesz kurs.");
     const nowMs = Date.now();
-    const capturedMs = Date.parse(row.captured_at);
+    const capturedMs = Date.parse(row.captured_at ?? "");
     const quoteAgeMs = nowMs - capturedMs;
     const quoteFresh = Number.isFinite(capturedMs) && quoteAgeMs >= 0 && quoteAgeMs <= 6 * 60 * 60 * 1000;
     let sourceUrlValid = false;
