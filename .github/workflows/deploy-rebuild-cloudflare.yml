@@ -1,0 +1,27 @@
+name: Deploy MONEYBALL rebuild to Cloudflare Free Worker
+on:
+  push:
+    branches: [moneyball-rebuild]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: moneyball-global-rebuild
+  cancel-in-progress: true
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bun run build
+      - name: Deploy static app to separate Cloudflare Worker
+        run: bunx wrangler@4 deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
