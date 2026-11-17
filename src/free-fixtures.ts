@@ -94,6 +94,12 @@ async function pooled<T, R>(items: T[], limit: number, fn: (item: T) => Promise<
   }));
   return results;
 }
+export function openLigaSeasonYears(date: string): number[] {
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  return month < 7 ? [year, year - 1] : [year];
+}
+
 export function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
   const shortcut = (league.leagueShortcut ?? "").toLowerCase();
   const name = (league.leagueName ?? "").toLowerCase();
@@ -173,9 +179,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
 
   // Source 2: OpenLigaDB's season catalogue and match feeds. Respect its 60 req/min fair-use limit.
   try {
-    const year = Number(date.slice(0, 4));
-    const month = Number(date.slice(5, 7));
-    const seasonYears = month < 7 ? [year, year - 1] : [year];
+    const seasonYears = openLigaSeasonYears(date);
     const catalogues = await Promise.all(seasonYears.map(async seasonYear => {
       try { return await fetchJson<OpenLigaLeague[]>(`${OPENLIGA}/leagues/${seasonYear}`); }
       catch (error) {
