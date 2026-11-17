@@ -977,3 +977,23 @@ No new odds provider was activated in this audit; no key was supplied and no rea
 - Today's Brussels scope: FootyNomad reports 173 total fixtures; DB contains 99 rows for today, only 2 meet the actual Europe domestic senior men's tier 1/2 rule. The other source entries include international competitions, cups, youth, reserves and lower tiers. Do not treat 173 as 173 eligible fixtures.
 - Fresh odds remain unavailable: 0 active provider_odds records in the last 6 hours; latest stored MoviOdds capture 2026-11-16 02:11:13 UTC. MoviOdds requires an API key and Bwin partner API access is restricted. Do not use stale, synthetic or non-Belgian prices as current bookmaker odds. MAIN/MEGA/EXTRA remain blocked until a verified current odds source is available.
 - Do not close issue #77, claim full league coverage, or declare the complete project finished. No Vercel/TEST deployment, no historical data deletion, no real-money betting.
+
+## Statistics performance and financial-field repair — 2026-11-17 08:32–08:38 UTC
+
+- Statistics page previously fetched all 2,596 historical match rows, all coupons/legs, then active-model predictions in multiple per-match-ID chunks. The page needed only eligible European senior tier 1/2 matches and active-model predictions.
+- Added owner-scoped SECURITY DEFINER RPC moneyball_statistics_page_data() in migration 20261117103000_add_owner_scoped_statistics_page_rpc.sql; then compacted its JSON payload in 20261117104500_compact_statistics_page_payload.sql and included the rationale required by the detail drawer in 20261117110000_include_rationale_in_statistics_payload.sql.
+- The RPC returns only eligible matches, active MONEYBALL GLOBAL 3.8/MANUAL predictions, coupons whose every leg belongs to an eligible match, and those legs. It also joins verified match_results for home_score/away_score. It includes stored prediction stake, potential_return, profit_loss and rationale, but omits bulky note/data_coverage metadata.
+- Owner-context SQL test: 374 eligible matches, 1,321 active predictions, 1 scoped coupon, 3 legs; JSON payload 798,520 bytes. The initial compact payload without rationale was 598,586 bytes. Earlier broad payload was 5,185,440 bytes. Final payload is about 84.6% smaller than the broad version and returned in about 1.7 seconds in the SQL test.
+- Security tests: anon/public do not have EXECUTE; authenticated does. A different owner UUID receives 0 matches, 0 predictions, 0 coupons and 0 legs.
+- Frontend db.ts now uses the single RPC. Statistics types are narrowed to the exact fields used by the page. schema.ts adds predictions.stake/potential_return/profit_loss and coupon_legs.match_id to canonical read columns; coupon-leg adapter preserves the database match_id. Stats page now receives verified scores and actual stored stake/P&L rather than defaulting to 4 EUR when historical stake differs.
+- Regression tests added in src/lib/schema.test.ts. The pre-existing schema contract test was updated because coupon_legs.match_id became canonical in migration 20261117072931. Type-check initially caught that the stats detail drawer also renders prediction.rationale; the RPC and StatisticsPrediction type were corrected to include it.
+- Final code commit 99b90fa73580bff38750fa46358d896680abe705: CI run 44048281991 SUCCESS; Cloudflare deploy run 44048281920 SUCCESS. Earlier intermediate CI failures were corrected; do not treat them as current failures.
+- Production root and /login smoke test succeeded after deployment; /panel remains login-protected. No authenticated UI session was available, so the statistics page itself has not been clicked through in a logged-in browser.
+- Remaining full-history operations: bankroll page reads its small ledger/coupon tables; saveCouponBatch, cancelCoupon and client settlement reconciliation still read the full bankroll ledger. Current ledger has 9 transactions and 9 coupons. Do not refactor financial settlement/cancellation without a rollback-only regression test; the existing server-side moneyball_reconcile_coupon_finance RPC is service_role-only and must not be called directly from the browser.
+
+### Current unresolved blockers remain
+- The 15:00 Europe/Brussels scan still needs its post-run audit.
+- Issue #77 remains open pending a complete country-by-country FootyNomad catalogue comparison and authenticated MAIN UI verification.
+- Fresh odds are still unavailable without an approved no-key source or user approval for a free provider key. MAIN/MEGA/EXTRA remain blocked; no stale or synthetic prices.
+- One historical 5 EUR TEST coupon marked won still has no recorded odds/payout; keep it financially incomplete rather than inventing a return.
+- Project is not complete. Do not deploy Vercel or TEST.

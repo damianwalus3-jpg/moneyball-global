@@ -108,14 +108,17 @@ OpenFootball's current 2026/27 mirror has limited league coverage and no 17 Nov 
 ## Results-sync v72 monitoring — 2026-11-17
 Fourth production sample: HTTP 200 in 3.249s, no errors, 7 coupon reconciliations with 0 failures. 3 alternate result observations persisted, no current due result settled. Continue 24h p50/p95 monitoring.
 
-## Bieżące priorytety — 2026-11-17 (aktualizacja 08:30 UTC)
+## Bieżące priorytety — 2026-11-17 (aktualizacja 08:38 UTC)
 1. Zweryfikować skan zaplanowany na 15:00 Europe/Brussels na moneyball-predict v246; potwierdzić public_source_error=null, liczbę kwalifikowanych meczów, predykcje i brak duplikatów.
 2. Dokończyć issue #77: porównać pełny katalog lig FootyNomad według krajów z listą krajowych lig seniorów tier 1/2 i potwierdzić coverage source → DB → RPC → zalogowany MAIN UI.
 3. Znaleźć zgodne z ograniczeniami użytkownika źródło świeżych kursów bez klucza API; do tego czasu nie tworzyć MAIN/MEGA/EXTRA bez aktualnych cen.
-4. Dokończyć przegląd pozostałych ekranów i operacji pod kątem full-table reads, zwłaszcza Bankroll, Coupons, cancelCoupon i reconcileCouponLedger; każdą zmianę finansową poprzedzić testem transakcyjnym.
-5. Dokończyć zalogowane E2E w istniejącej sesji użytkownika: ręczny skan → 4 EUR single/3-leg → wynik → ledger → statystyki. Nie prosić o hasło ani nie symulować tożsamości użytkownika.
+4. Dokończyć zalogowane E2E w istniejącej sesji użytkownika: ręczny skan → 4 EUR single/3-leg → wynik → ledger → statystyki. Nie prosić o hasło ani nie symulować tożsamości użytkownika.
+5. Przejrzeć pozostałe full-table reads w Bankroll, saveCouponBatch, cancelCoupon i client settlement reconciliation; obecnie to 9 transakcji i 9 kuponów. Nie refaktorować finansów bez rollback-only testów.
 6. Pozostawić jeden historyczny 5 EUR TEST kupon z wynikiem won, ale bez zapisanych kursów jako incomplete; nie wymyślać wypłaty.
 7. Nie zamykać #77 i nie deklarować całego projektu jako ukończonego.
 
 ## Naprawy po audycie 08:15 — 2026-11-17
 Auth 401 źródeł publicznych naprawiony (moneyball-predict v245); ręczna paginacja po eligibility naprawiona (v246 + owner-scoped RPC); shared eligibility odrzuca nazwane hiszpańskie rezerwy i NB III+; finanse nie liczą kuponów ze stawką 0 jako niekompletnych. Szczegóły, migracje, commit SHAs, testy i metryki są w PROJECT_STATE oraz PROJECT_MEMORY_AND_REGRESSION_LOG. Najnowszy CI/deploy commit e82719ed — oba SUCCESS. Panel zalogowany nadal wymaga testu w sesji użytkownika.
+
+## Statistics RPC deployed — 2026-11-17 08:38 UTC
+Statystyki korzystają z jednego owner-scoped RPC moneyball_statistics_page_data(). Finalny payload testowy: 374 mecze kwalifikowane, 1,321 aktywnych prognoz, 1 kupon/3 nogi, 798,520 B. Zwraca stored stake/P&L, rationale i zweryfikowane wyniki; pomija duże notes/data_coverage. CI 44048281991 i Cloudflare 44048281920 SUCCESS. Pozostałe ryzyka: brak świeżych kursów, otwarty #77, brak zalogowanego E2E, jedna historyczna wygrana 5 EUR bez kursów.
