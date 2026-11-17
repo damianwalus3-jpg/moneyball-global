@@ -142,6 +142,12 @@ export function PredictionsView({ market }: { market: Market }) {
         description="Prawdopodobieństwo modelu jest oddzielone od kursu bukmachera. Skuteczność obejmuje wyłącznie zweryfikowane rozliczenia."
         actions={<Button onClick={() => { setEditing(null); setOpen(true); }}><Plus /> Dodaj prognozę</Button>}
       />
+      {couponLegsQuery.isError && (
+        <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+          <span className="text-destructive">Nie udało się sprawdzić, czy prognozy są użyte w kuponach. Edycja i usuwanie pozostają zablokowane do czasu poprawnego sprawdzenia.</span>
+          <Button size="sm" variant="outline" onClick={() => { void couponLegsQuery.refetch(); }}>Ponów sprawdzanie</Button>
+        </div>
+      )}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Skuteczność WYBRANE" value={fmtPct(rate.rate)} hint={`${rate.won}/${rate.settled} zweryfikowanych`} tone="primary" />
         <StatCard label="Rozliczone" value={rate.settled} />
