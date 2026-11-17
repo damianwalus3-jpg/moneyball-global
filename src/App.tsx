@@ -401,7 +401,7 @@ export default function App() {
                   <b>{row.title} · {String(row.details.market ?? "")}</b>
                   <span>{Number(row.details.odds).toFixed(2)}</span>
                   <span>{currency(Number(row.details.stake)||0)}</span>
-                  <span>{row.status}{typeof row.details.profitLoss === "number" ? ` · ${currency(row.details.profitLoss)}` : ""}</span>
+                  <span>{settlement?.status ?? row.status}{typeof settlement?.details.profitLoss === "number" ? ` · ${currency(settlement.details.profitLoss)}` : ""}</span>
                 </div>)}
                 {!bets.length && <div className="tracker-empty">Nie ma jeszcze zapisanych decyzji. Wygeneruj prognozy, a następnie oznacz typ jako wybrany lub odrzucony w tym panelu.</div>}
               </div>
