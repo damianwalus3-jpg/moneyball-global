@@ -48,6 +48,7 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
         scan_run_id: options.scanRunId ?? null,
         name: `${options.namePrefix} #${index + 1}`.trim(),
         coupon_type: options.couponType ?? "TEST",
+        source_class: options.couponType === "TEST" ? "PAPER" : "MODEL",
         status: "pending",
         target_legs: targetLegs,
         combined_odds: odds,
