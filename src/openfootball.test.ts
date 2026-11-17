@@ -78,3 +78,9 @@ describe("OpenFootball history and result adapters", () => {
     expect(matches[0].awayGoals).toBeNull();
   });
 });
+
+it("uses the historical fixture season when parsing yearless date headings", () => {
+  const text = `Fri Feb 27\n  20:00 Paris FC v Lille OSC 1-0\n`;
+  const matches = parseOpenFootballMatches(text, france, undefined, "2026-03-01");
+  expect(matches[0].date).toBe("2026-02-27");
+});
