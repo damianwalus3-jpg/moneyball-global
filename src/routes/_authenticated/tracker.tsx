@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { formatJackpotSequence, makeTrackerCategoryKey } from "@/lib/tracker-domain";
-import { insertRow } from "@/lib/db";
+import { insertRow, updateRow } from "@/lib/db";
 import {
   couponFinanceQuery, dashboardSelectedPicksQuery, dashboardSummaryQuery, latestScanRunQuery,
   trackerCategoriesQuery, jackpotEntriesQuery, trackerCategorySummaryQuery, tableQuery, useAction
@@ -89,6 +89,10 @@ function TrackerPage() {
       success: "Dodano własną kategorię Trackera",
       onDone: () => setNewCategoryName(""),
     },
+  );
+  const toggleCategory = useAction(
+    async (args: { id: string; is_active: boolean }) => updateRow("moneyball_tracker_categories", args.id, { is_active: args.is_active }),
+    { success: "Zmieniono status kategorii Trackera" },
   );
 
   if (summary.isPending && picks.isPending && finance.isPending && scan.isPending && categories.isPending && categorySummary.isPending && jackpot.isPending && coupons.isPending) {
@@ -190,10 +194,22 @@ function TrackerPage() {
                 {categoryRows.map((category) => (
                   <div key={category.id} className="rounded-lg border border-border bg-background/40 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-1">
-                      <span className="text-sm font-semibold">{category.display_name}</span>
-                      <span className={category.is_system ? "text-[10px] font-semibold text-muted-foreground" : "text-[10px] font-semibold text-success"}>
-                        {category.is_system ? "SYSTEM" : "WŁASNA"}
-                      </span>
+                      <span className={category.is_active ? "text-sm font-semibold" : "text-sm font-semibold text-muted-foreground"}>{category.display_name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={category.is_system ? "text-[10px] font-semibold text-muted-foreground" : category.is_active ? "text-[10px] font-semibold text-success" : "text-[10px] font-semibold text-muted-foreground"}>
+                          {category.is_system ? "SYSTEM" : category.is_active ? "WŁASNA" : "ARCHIWALNA"}
+                        </span>
+                        {!category.is_system && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={toggleCategory.isPending}
+                            onClick={() => toggleCategory.mutate({ id: category.id, is_active: !category.is_active })}
+                          >
+                            {category.is_active ? "Archiwizuj" : "Przywróć"}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">{category.description ?? category.category_key}</p>
                     <p className="mt-2 text-xs font-medium">{categoryCounts.get(category.category_key)?.prediction_count ?? 0} prognoz · {categoryCounts.get(category.category_key)?.coupon_count ?? 0} kuponów</p>
