@@ -44,6 +44,7 @@ function parseResults(csv: string): CsvRow[] {
   });
 }
 const leagueRequests = new Map<string, Promise<{ rows: CsvRow[]; generatedAt: string }>>();
+const leagueRequests = new Map<string, Promise<{ rows: CsvRow[]; generatedAt: string }>>();
 async function loadLeagueResults(folder: string, beforeDate: string): Promise<{ rows: CsvRow[]; generatedAt: string }> {
   const season = seasonCode(beforeDate);
   const key = `${CACHE_PREFIX}${folder}:${season}`;
