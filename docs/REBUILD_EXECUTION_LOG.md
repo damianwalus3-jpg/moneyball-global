@@ -473,3 +473,10 @@
 - These tests exercise the Worker handler contract in CI without requiring paid services or live API credentials.
 - This is automated integration coverage, not a substitute for visual testing on a physical Android device.
 - CI and Cloudflare deployment required before marking deployed.
+
+
+## Stage 45 — final release acceptance and capability boundaries
+- Added a consolidated acceptance record for the implemented local-first analytical/paper-tracking scope and its verified CI/Cloudflare release.
+- Recorded the exact production branch, Worker, release commit and workflow evidence.
+- Explicitly documented remaining platform/data boundaries: non-exhaustive public fixture coverage, no xG-trained model, DC derived from 1X2, no bookmaker odds/EV, browser-local Tracker, no Web Push, and no physical-device or authenticated end-to-end smoke test.
+- The release is complete for the implemented scope; the documented boundaries remain future work rather than being falsely marked as delivered.
