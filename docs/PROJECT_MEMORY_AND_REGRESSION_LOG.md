@@ -1180,3 +1180,23 @@ The previous 18-country gap was overstated because it relied too heavily on the 
 - The remaining five are not all true gaps: Liechtenstein has no domestic league; Faroe Islands and Iceland are out of season in November; Israel and Moldova need further official source/fixture verification.
 - The FootyNomad /browse page is not an authoritative complete league directory. Use actual dated /fixtures/YYYY-MM-DD pages for source discovery and compare their competition sections against importer output. Do not count every global match as an eligible European match.
 - The 17 Nov reconciliation remains unchanged: 41 European domestic-category rows in the page/DB; only two Northern Ireland Championship fixtures meet tier-1/2 senior-men scope.
+## Shared FootyNomad parser + UI scope regression — 2026-11-17
+
+### Second parser path corrected
+- Discovery: the 15-minute automatic `moneyball-free-feed` had a separate FootyNomad HTML parser from authenticated `footynomad-sync`. The earlier country-heading/league-group fix had only been applied to the authenticated importer, leaving the automatic feed vulnerable to inheriting the previous country's league group when the current country had no competition heading.
+- Commit `269e85f78b0d7a608fd6d1a1c4c339d646c663a7` adds shared `supabase/functions/_shared/footynomad-section.ts` and uses it in BOTH Edge Functions. A league group is accepted only if it follows the current country heading; missing competition remains null and is rejected by scope filters.
+- Added two regression tests in `src/lib/domain.test.ts`: missing league heading cannot inherit the previous country's league; a league group after the current country heading is accepted.
+- Supabase `moneyball-free-feed` deployed v45 and `footynomad-sync` deployed v90, both `verify_jwt=true`. CI run `44056482857` SUCCESS; Cloudflare MAIN Worker deploy `44056483454` SUCCESS.
+- Triggered the real automatic feed through the existing cron-authenticated endpoint (HTTP request id 3964). Response HTTP 200: date 2026-11-17, reported fixtures 2, inserted 0, updated 2. The production feed table contains exactly two fixtures: Warrenpoint Town–Glenavon FC and Rathfriland–Moyola Park, both Northern Ireland Championship, scheduled 19:45 UTC. This is a real production feed refresh, not a mock.
+
+### Prediction and results views aligned with canonical scope
+- Found `moneyball_predictions_page` and `moneyball_results_page` did not apply the same European senior-men tier-1/tier-2 predicate already used by dashboard summary, selected picks and the match screen. This could expose legacy out-of-scope predictions/results in those two views.
+- Migration `20261117110000_filter_prediction_and_results_views_to_european_top_two.sql` applied. It joins predictions to their match and applies `moneyball_is_eligible_european_match` plus senior-men scope in the prediction base CTE; results page applies the same filter to its match window. No historical rows, coupons, settlements or bankroll transactions were deleted or modified.
+- Production RPC regression under the owner's auth context: first prediction page had 0 ineligible rows; first results page had 0 ineligible rows.
+- GitHub CI `44056784876` SUCCESS; Cloudflare MAIN Worker deploy `44056784923` SUCCESS for commit `6ec923fc`. The app's `/` and `/login` routes load; `/panel` correctly remains protected and reports `login_required` without an authenticated session.
+
+### Production day scope and outstanding proof
+- 17 Nov database snapshot: 99 FootyNomad-sourced match rows for the day; exactly 2 pass the canonical eligibility predicate. Those two are the Northern Ireland Championship fixtures listed above. The remaining 97 are out-of-scope competitions/tiers (cups, youth, reserves, lower divisions, international matches etc.) and are not valid candidates. Existing legacy rows are preserved; current match, prediction and results views now filter them.
+- Existing authenticated `mecze` page has separate '1. Szukaj meczów' (`footynomad-sync`) and '2. Analizuj' (`moneyball-predict`) actions, both using `brusselsDayKey(new Date())`. The automatic public feed refreshes independently every 15 minutes.
+- The 17 Nov 09:33 UTC automatic feed refresh verified v45 in production. `footynomad-sync` v90 has been deployed, but no post-v90 authenticated user-triggered sync was performed from this audit; the database import through that authenticated path still needs end-to-end verification.
+- Issue #77 remains OPEN. Continue source-vs-import comparison on dated FootyNomad pages and run the authenticated MAIN search/analysis from the user's session. Do not declare the app/project complete yet.
