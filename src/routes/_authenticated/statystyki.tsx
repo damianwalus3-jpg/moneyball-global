@@ -4,7 +4,7 @@ import { BarChart3 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DataError, EmptyState, NoGuarantee, PageHeader, PageLoader, StatCard } from "@/components/app/ui-bits";
-import { ACTIVE_MODEL_VERSION, couponPayout, groupHitRates, hitRate, isActivePredictionVersion, isEuropeanTopTwoLeague, modelHitRate, probabilityQuality, probabilityQualityBySelection, multiclass1X2Quality, PICK_LABELS, type HitRate } from "@/lib/domain";
+import { ACTIVE_MODEL_VERSION, couponPayout, groupHitRates, hitRate, isActivePredictionVersion, isEligibleEuropeanMatch, modelHitRate, probabilityQuality, probabilityQualityBySelection, multiclass1X2Quality, PICK_LABELS, type HitRate } from "@/lib/domain";
 import { fmtMoney, fmtPct } from "@/lib/format";
 import { statisticsPageDataQuery } from "@/lib/queries";
 import type { Market, Prediction } from "@/lib/types";
@@ -57,7 +57,7 @@ function Statystyki() {
   }
   const { matches, predictions: preds, coupons, legs } = statsQuery.data;
   const scopedMatchIds = new Set(matches
-    .filter((match) => isEuropeanTopTwoLeague(match.country, match.competition ?? match.league))
+    .filter((match) => isEligibleEuropeanMatch(match))
     .map((match) => match.id));
   const activePreds = preds.filter((prediction) =>
     isActivePredictionVersion(prediction.model_version) && scopedMatchIds.has(prediction.match_id),
