@@ -60,3 +60,9 @@ All eight endpoints returned valid JSON without an API key.
 - Next authenticated MAIN scan must confirm source status, inserts, deduplication, eligibility and prediction generation. No user token is available to run this authenticated end-to-end test from this audit.
 - Do not treat the catalogue as full coverage; 18 UEFA associations remain without a verified current tier-1/tier-2 source.
 - No bookmaker odds are provided; MAIN/MEGA/EXTRA remain blocked when verified fresh Belgian odds are absent.
+## OpenLigaDB / FixtureDownload checks and remaining provider deploy — 2026-11-17 10:27 Europe/Brussels
+
+- OpenLigaDB directory returned 849 historical/current-season rows. Filtering 2025+ showed the current 2026 season is concentrated in Germany plus selected already-covered countries (Austria, England, Netherlands, Spain) and international tournaments. It adds no new association among the remaining 18. The Spanish LaLiga 2026 endpoint returned 380 records with valid matchDateTime; Eredivisie returned 306 but matchDateTime was null and matchDateTimeUTC was the invalid 1970-01-01 sentinel; Austria shortcuts tested returned zero. Do not import the broken ERE time values.
+- FixtureDownload's current football catalogue exposes UEFA tournaments and some major domestic leagues, but no verified domestic tier-1/tier-2 feed for the remaining 18 associations. No new integration added.
+- Important deployment follow-through: moneyball-free-feed was updated in code with efbet League and TOPLYGA aliases but was still deployed at v43. It is now deployed as v44, verify_jwt=true, preserving JWT protection. footynomad-sync remains v88, verify_jwt=true. This closes the code-vs-edge version mismatch for the new aliases.
+- No authenticated user scan was run from this audit; the next 15:00 MAIN scan remains the end-to-end check.
