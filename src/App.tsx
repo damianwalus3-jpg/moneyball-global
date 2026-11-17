@@ -3,7 +3,7 @@ import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from ".
 import { addRecord, exportBackup, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { loadOpenLigaRecentTeamForm, loadRecentTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
-import { buildThreeLegCandidates, type ThreeLegCandidate } from "./coupon-engine";
+import { buildThreeLegCandidates } from "./coupon-engine";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
