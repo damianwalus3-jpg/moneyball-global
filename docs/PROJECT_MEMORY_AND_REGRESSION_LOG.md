@@ -1513,3 +1513,14 @@ No new provider was enabled, no API key was added, and no provider credits were 
 - Cron `moneyball-global-free-footynomad` active every 15 minutes; last ten job records succeeded.
 - CI `44152983223` and Cloudflare deploy `44152983292` for `471e755...` succeeded.
 - Next: verify CI/deploy for `13e72a...`, deploy exact MAIN `footynomad-sync` source to Supabase as v105 preserving JWT verification, then require a real owner-authenticated scan to prove durable cache write and second-call cache hit. Authenticated Matches/Predictions UI click-through still pending; keep issue #77 open.
+
+
+## FootballCharts v105 deployed; 17 Nov feed reconciled — 2026-11-17
+
+- Commit `13e72a479299da3ce2324786912e556728514901` passed CI `44153149957` and Cloudflare MAIN deploy `44153150085`.
+- Deployed exact current MAIN `footynomad-sync` as Supabase Edge Function v105 ACTIVE, JWT verification still true. Confirmed deployed source includes concurrency limit 2, partial-cache expiry 12h, and valid Austria 2. Liga instead of excluded Azerbaijan.
+- Live shared fixture feed for 2026-11-17: 31 eligible matches in 4 countries / 9 senior men's domestic leagues: England 21, France National 2 1, Northern Ireland Championship 2, Scotland Lowland League 7. All 31 currently scheduled; Celtic II reserve match excluded. Independent FootyCheck public page was used only as a manual reconciliation check, not scraped into production.
+- Free FootyNomad cron active every 15 minutes; latest 10 cron executions succeeded.
+- Cache table remains empty until user-authenticated POST after v105; no authenticated POST was attempted without the user's session. No cache-hit proof yet.
+- No saved browser profile is authenticated to the MONEYBALL Cloudflare domain. Matches/Predictions visual acceptance remains pending; issue #77 OPEN.
+- No match, prediction, coupon, settlement, bankroll or historical row changed.
