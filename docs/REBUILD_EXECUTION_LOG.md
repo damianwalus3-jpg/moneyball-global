@@ -115,3 +115,15 @@
 - Final CI run `44111904914`: SUCCESS — typecheck, all 33 unit tests and production build passed.
 - Cloudflare deployment run `44111904679`: deploy step SUCCESS — separate rebuild Worker deployment completed. Workflow post-job cleanup was still finalizing at time of log update.
 - Stage 06 is code-complete and deployed; live browser/UI verification remains outstanding.
+
+## 2026-11-17 — Stage 07: bulk analysis of the discovered daily fixture list
+- Added a dedicated “Analizuj wszystkie” action in the Mecze view. It processes every fixture returned by the current Europe/Brussels daily scan in batches of four.
+- Each fixture uses its source-compatible history adapter, derives a 1X2 Poisson baseline and separate Double Chance probabilities where at least three prior results per side are available, then writes a prediction record.
+- Insufficient history or source failures are recorded as ODRZUCONY with a reason instead of fabricating probabilities. Duplicate records for the same fixture/model are suppressed.
+- Progress is displayed while the batch is running; scan and bulk analysis controls cannot be run concurrently.
+- Added an in-flight promise cache for open-matchday historical CSVs so multiple matches from the same competition share a single download; existing six-hour local history cache remains.
+- Final code commit: `6310c135220aa908524f1c490a5f397d016c0391` (`style(rebuild): add bulk fixture analysis controls`).
+- CI run `44112255562`: SUCCESS — TypeScript, tests and production build all passed.
+- Cloudflare rebuild deployment run `44112255634`: SUCCESS — deploy step and workflow completed.
+- Stage 07 is COMPLETE/DEPLOYED. It now allows the user to generate audit records for the whole discovered daily fixture list without opening each match one by one.
+- Coverage limitation remains: bulk analysis can only process fixtures discovered by the current public feeds; it does not establish complete coverage of every European amateur/youth/women's competition.
