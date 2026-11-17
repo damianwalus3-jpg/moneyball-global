@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 const ODDS_PILOT_TOKEN_KEY = "moneyball.oddsPilotToken";
+const STRIKER_DAILY_FETCH_KEY = "moneyball.strikerDailyFetchDate";
 
 type Tab = "dashboard" | "matches" | "pick" | "coupons" | "intelligence" | "bets" | "tracker";
 
@@ -99,6 +100,7 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [oddsPilotToken, setOddsPilotToken] = useState(() => { try { return localStorage.getItem(ODDS_PILOT_TOKEN_KEY) ?? ""; } catch { return ""; } });
   const [oddsTokenSaved, setOddsTokenSaved] = useState(() => { try { return Boolean(localStorage.getItem(ODDS_PILOT_TOKEN_KEY)); } catch { return false; } });
+  const [lastOddsFetchDate, setLastOddsFetchDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_FETCH_KEY) ?? ""; } catch { return ""; } });
   const [oddsLoading, setOddsLoading] = useState(false);
   const [oddsNotice, setOddsNotice] = useState("");
   const [oddsAudit, setOddsAudit] = useState<{ matched: number; unmatched: number; ambiguous: number; snapshots: number; utcDate: string } | null>(null);
@@ -285,6 +287,11 @@ export default function App() {
       setOddsNotice("Przeglądarka nie pozwoliła zapisać tokenu lokalnie.");
     }
   };
+  const unlockDailyOddsRefresh = () => {
+    try { localStorage.removeItem(STRIKER_DAILY_FETCH_KEY); } catch { /* storage may be unavailable */ }
+    setLastOddsFetchDate("");
+    setOddsNotice("Ponowne pobranie odblokowane. Następne kliknięcie wykona kolejne zapytanie za 10 kredytów.");
+  };
   const clearOddsPilotToken = () => {
     try { localStorage.removeItem(ODDS_PILOT_TOKEN_KEY); } catch { /* storage may be unavailable */ }
     setOddsPilotToken("");
@@ -297,6 +304,10 @@ export default function App() {
       return;
     }
     const token = oddsPilotToken.trim();
+    if (lastOddsFetchDate === fixtureScan.date) {
+      setOddsNotice(`Kursy UTC ${fixtureScan.date} zostały już pobrane. Kolejne zapytanie kosztuje ponownie 10 kredytów. Odblokuj je świadomie poniżej.`);
+      return;
+    }
     if (!oddsTokenSaved || token.length < 32) {
       setOddsNotice("Najpierw zapisz token dostępu. Musi być identyczny z sekretem ODDS_PILOT_TOKEN w Cloudflare.");
       return;
@@ -377,6 +388,8 @@ export default function App() {
         });
       });
       const added = addRecordsIfMissing(snapshots, "snapshotKey");
+      try { localStorage.setItem(STRIKER_DAILY_FETCH_KEY, utcDate); } catch { /* quota guard is best-effort */ }
+      setLastOddsFetchDate(utcDate);
       setRecords(readRecords());
       setOddsAudit({
         matched: audit.matched.length,
@@ -512,7 +525,8 @@ export default function App() {
               <input type="password" autoComplete="off" value={oddsPilotToken} onChange={event => { setOddsPilotToken(event.target.value); setOddsTokenSaved(false); }} placeholder="ODDS_PILOT_TOKEN · min. 32 znaki" aria-label="Token dostępu do pilota kursów"/>
               <button onClick={saveOddsPilotToken}>Zapisz token</button>
               <button onClick={clearOddsPilotToken} disabled={!oddsTokenSaved && !oddsPilotToken}>Usuń</button>
-              <button className="primary-button" onClick={() => void fetchDailyOdds()} disabled={!fixtureScan || oddsLoading || !oddsTokenSaved}>{oddsLoading ? "Pobieranie kursów…" : "Pobierz kursy dnia"}</button>
+              <button className="primary-button" onClick={() => void fetchDailyOdds()} disabled={!fixtureScan || oddsLoading || !oddsTokenSaved || lastOddsFetchDate === fixtureScan?.date}>{oddsLoading ? "Pobieranie kursów…" : lastOddsFetchDate === fixtureScan?.date ? "Pobrano dzisiaj" : "Pobierz kursy dnia"}</button>
+              {lastOddsFetchDate === fixtureScan?.date && <button onClick={unlockDailyOddsRefresh} disabled={oddsLoading}>Odblokuj ponowne pobranie · 10 kredytów</button>}
             </div>
             <p className="source-note">Najpierw ustaw identyczny sekret <b>ODDS_PILOT_TOKEN</b> w Cloudflare Workerze <b>moneyball-global-rebuild</b>. Token pozostaje w lokalnej pamięci tej przeglądarki; nie wklejaj go do czatu. Data StrikerAPI jest w UTC, a dopasowanie odbywa się po dacie i godzinie Europe/Brussels. Zapytanie uruchamia się wyłącznie po kliknięciu.</p>
             {oddsNotice && <div className="tracker-notice">{oddsNotice}</div>}
