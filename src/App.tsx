@@ -76,6 +76,7 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
       && (pitchApiLineups.home.starters?.length ?? 0) === 11 && (pitchApiLineups.away.starters?.length ?? 0) === 11;
     evidenceAudit.areas.confirmed_lineups = { status: confirmed ? "VERIFIED" : "PARTIAL", source: "PitchAPI", observedAt: new Date().toISOString(), note: confirmed ? "Obie jedenastki oznaczone przez dostawcę jako confirmed=true." : "Dostępny skład przewidywany lub niekompletny; nie jest traktowany jako potwierdzony." };
   }
+  evidenceAudit.assessedAt = new Date().toISOString();
   evidenceAudit.complete = isEvidenceAuditComplete(evidenceAudit);
   const evidenceComplete = evidenceAudit.complete;
   const probabilities = prediction?.prediction.probabilities;
