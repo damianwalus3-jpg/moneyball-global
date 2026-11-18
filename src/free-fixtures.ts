@@ -406,7 +406,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     date,
     generatedAt,
     fixtures,
-    leaguesChecked: openMatchdayChecked + openLigaChecked + openFootballChecked + espnChecked + footyNomadPagesChecked,
+    leaguesChecked: openMatchdayChecked + openLigaChecked + openFootballChecked + espnChecked,
     leaguesFailed: errors,
     source: SOURCE,
     cache: false,
