@@ -25,6 +25,23 @@ import {
 const ODDS_PILOT_TOKEN_KEY = "moneyball.oddsPilotToken";
 const STRIKER_DAILY_FETCH_KEY = "moneyball.strikerDailyFetchDate";
 const STRIKER_DAILY_ATTEMPT_KEY = "moneyball.strikerDailyOddsAttemptDate";
+const FALLBACK_RETRY_KEY = "moneyball.neutralFallbackRetryAt";
+const FALLBACK_RETRY_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+function shouldRetryNeutralFallback(fixtureId: string, prior?: TrackerRecord): boolean {
+  if (prior?.details.predictionMethod !== "neutral-prior-poisson") return false;
+  try {
+    const raw = localStorage.getItem(FALLBACK_RETRY_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    const attempts = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown> : {};
+    const lastAttempt = attempts[fixtureId];
+    if (typeof lastAttempt === "number" && Number.isFinite(lastAttempt)
+      && Date.now() - lastAttempt < FALLBACK_RETRY_INTERVAL_MS) return false;
+    localStorage.setItem(FALLBACK_RETRY_KEY, JSON.stringify({ ...attempts, [fixtureId]: Date.now() }));
+    return true;
+  } catch { return false; }
+}
 
 type Tab = "dashboard" | "matches" | "pick" | "coupons" | "intelligence" | "bets" | "tracker";
 
@@ -83,7 +100,7 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
   const probabilities = prediction?.prediction.probabilities;
   const hasProbabilities = !!probabilities;
   const currentRecords = readRecords();
-  if (!shouldAppendPrediction(currentRecords, match.id, model, hasProbabilities)) return currentRecords;
+  if (!shouldAppendPrediction(currentRecords, match.id, model, hasProbabilities, prediction?.method)) return currentRecords;
   const dc = prediction?.prediction.doubleChance;
   addRecord({
     kind: "prediction",
@@ -267,7 +284,10 @@ export default function App() {
     const matches = [...new Map(sourceMatches.map(match => [match.id, match])).values()].filter(match => {
       if (hasKickoffPassed(match.date, match.time)) return false;
       const prior = latestByFixture.get(match.id);
-      return !prior || typeof prior.details.p1 !== "number" || typeof prior.details.px !== "number" || typeof prior.details.p2 !== "number";
+      const missingProbabilities = !prior || typeof prior.details.p1 !== "number" || typeof prior.details.px !== "number" || typeof prior.details.p2 !== "number";
+      // Neutral-prior rows are explicit placeholders, not finished forecasts. Retry them at most every six hours
+      // so newly published history/xG can replace them without hammering free providers on each 15-minute scan.
+      return missingProbabilities || shouldRetryNeutralFallback(match.id, prior);
     });
     if (!matches.length) { setRecords(readRecords()); return; }
     bulkAnalysisLock.current = true;
