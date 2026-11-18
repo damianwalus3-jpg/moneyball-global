@@ -7,9 +7,9 @@ const now = "2026-11-17T20:00:00.000Z";
 const candidate: ThreeLegCandidate = {
   date: "2026-11-17", combinedProbability: 0.512, averageProbability: 0.8, oddsAvailable: false,
   legs: [
-    { fixtureId: "f1", title: "A vs B", competition: "League", selection: "1", probability: 0.8, source: "model", model: "v1" },
-    { fixtureId: "f2", title: "C vs D", competition: "League", selection: "X", probability: 0.8, source: "model", model: "v1" },
-    { fixtureId: "f3", title: "E vs F", competition: "League", selection: "2", probability: 0.8, source: "model", model: "v1" },
+    { fixtureId: "f1", title: "A vs B", competition: "League", selection: "1", market: "1X2", probability: 0.8, source: "model", model: "v1" },
+    { fixtureId: "f2", title: "C vs D", competition: "League", selection: "X", market: "1X2", probability: 0.8, source: "model", model: "v1" },
+    { fixtureId: "f3", title: "E vs F", competition: "League", selection: "2", market: "1X2", probability: 0.8, source: "model", model: "v1" },
   ],
 };
 function row(kind: "prediction" | "odds", fixtureId: string, details: Record<string, string | number | boolean | null>, status: string): TrackerRecord {
