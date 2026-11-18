@@ -319,11 +319,15 @@ export function parseApiFootballEuropeanFixtures(payload: unknown, targetDate: s
     throw new Error("API-Football: nieprawidłowa odpowiedź lub brak tablicy fixtures");
   }
   const providerErrors = (payload as { errors?: unknown }).errors;
-  if (providerErrors && typeof providerErrors === "object" && Object.keys(providerErrors).length > 0) {
-    throw new Error("API-Football: provider zwrócił błędy zamiast wiarygodnych danych");
-  }
-  if (Array.isArray(providerErrors) && providerErrors.length > 0) {
-    throw new Error("API-Football: provider zwrócił błędy zamiast wiarygodnych danych");
+  const hasProviderErrors = Array.isArray(providerErrors)
+    ? providerErrors.length > 0
+    : !!providerErrors && typeof providerErrors === "object" && Object.keys(providerErrors).length > 0;
+  if (hasProviderErrors) {
+    // Keep the diagnostic useful without ever echoing credentials or unbounded provider payloads.
+    const diagnostic = JSON.stringify(providerErrors)
+      .replace(/(token|api[_-]?key|authorization|password)(\\s*[:=]\\s*)("[^"]*"|[^,}\\s]+)/gi, "$1$2[REDACTED]")
+      .slice(0, 300);
+    throw new Error("API-Football: provider error: " + diagnostic);
   }
   return ((payload as { fixtures: ApiFootballFixturePayload[] }).fixtures).flatMap(item => {
     const country = (item.league?.country ?? "").trim().toLowerCase();
