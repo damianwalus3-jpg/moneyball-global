@@ -43,6 +43,23 @@ describe("historical team form", () => {
 });
 
 
+describe("country history coverage diagnostics", () => {
+  it("reports scanned league count and index freshness when a country feed has no team rows", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/build_summary.json")) return new Response(JSON.stringify({
+        generated_utc: "2026-11-18T06:43:48Z",
+        leagues: [{ league: "Serie A", folder: "data/ITA_1_serie-a", fixtures: 270 }, { league: "Serie B", folder: "data/ITA_2_serie-b", fixtures: 270 }],
+      }), { status: 200 });
+      return new Response("date,home,away,ft_home,ft_away\n2026-11-01,Other FC,Another FC,1,0\n", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { loadRecentTeamFormAcrossCountry } = await import("./team-form");
+    await expect(loadRecentTeamFormAcrossCountry("ITA", "Piacenza", "2026-11-18"))
+      .rejects.toThrow(/Przeskanowano 2 plików ligowych kraju ITA; indeks danych: 2026-11-18T06:43:48Z.*nie obejmuje wszystkich poziomów rozgrywek/);
+  });
+});
+
 describe("OpenLigaDB historical team form", () => {
   it("retains up to fifteen rows for cross-source merging", () => {
     const matches = Array.from({ length: 9 }, (_, index) => ({
