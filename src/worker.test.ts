@@ -370,8 +370,8 @@ describe("PitchAPI secure Worker proxy", () => {
   it("validates date and status before making upstream requests", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const invalidDate = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/date/2026-02-31"), env("pk_live_12345678901234567890"), { waitUntil: vi.fn() });
-    const invalidStatus = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/date/2026-11-18?status=maybe"), env("pk_live_12345678901234567890"), { waitUntil: vi.fn() });
+    const invalidDate = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/date/2026-02-31"), env("pk_test_12345678901234567890"), { waitUntil: vi.fn() });
+    const invalidStatus = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/date/2026-11-18?status=maybe"), env("pk_test_12345678901234567890"), { waitUntil: vi.fn() });
     expect(invalidDate.status).toBe(400);
     expect(invalidStatus.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -382,11 +382,11 @@ describe("PitchAPI secure Worker proxy", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { match_id: "m_Ab12Cd" } }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
     const waitUntil = vi.fn();
-    const response = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/matches/m_Ab12Cd/lineups", { headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), env("pk_live_12345678901234567890"), { waitUntil });
+    const response = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/matches/m_Ab12Cd/lineups", { headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), env("pk_test_12345678901234567890"), { waitUntil });
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe("https://api.pitchapi.dev/v1/matches/m_Ab12Cd/lineups");
-    expect(fetchMock.mock.calls[0][1].headers["X-API-KEY"]).toBe("pk_live_12345678901234567890");
+    expect(fetchMock.mock.calls[0][1].headers["X-API-KEY"]).toBe("pk_test_12345678901234567890");
     expect(response.headers.get("X-MONEYBALL-SOURCE")).toBe("PitchAPI");
     expect(waitUntil).toHaveBeenCalledTimes(1);
   });
@@ -394,12 +394,12 @@ describe("PitchAPI secure Worker proxy", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const assetsFetch = vi.fn().mockResolvedValue(new Response("app asset", { status: 200 }));
-    const invalid = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/matches/m_Ab12Cd/admin"), { ASSETS: { fetch: assetsFetch }, PITCHAPI_API_KEY: "pk_live_12345678901234567890" }, { waitUntil: vi.fn() });
-    const forbidden = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/date/2026-11-18", { headers: { Origin: "https://attacker.example" } }), env("pk_live_12345678901234567890"), { waitUntil: vi.fn() });
+    const invalid = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/matches/m_Ab12Cd/admin"), { ASSETS: { fetch: assetsFetch }, PITCHAPI_API_KEY: "pk_test_12345678901234567890" }, { waitUntil: vi.fn() });
+    const forbidden = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/date/2026-11-18", { headers: { Origin: "https://attacker.example" } }), env("pk_test_12345678901234567890"), { waitUntil: vi.fn() });
     expect(invalid.status).toBe(200);
     expect(assetsFetch).toHaveBeenCalledTimes(1);
     expect(forbidden.status).toBe(403);
-    expect(JSON.stringify(await forbidden.json())).not.toContain("pk_live_");
+    expect(JSON.stringify(await forbidden.json())).not.toContain("pk_test_");
     expect(fetchMock).not.toHaveBeenCalled();
   });
   it("does not cache live snapshots", async () => {
@@ -407,7 +407,7 @@ describe("PitchAPI secure Worker proxy", () => {
     vi.stubGlobal("caches", { default: cache });
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { live: true } }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
-    const response = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/matches/m_Ab12Cd/live"), env("pk_live_12345678901234567890"), { waitUntil: vi.fn() });
+    const response = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/matches/m_Ab12Cd/live"), env("pk_test_12345678901234567890"), { waitUntil: vi.fn() });
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(cache.put).not.toHaveBeenCalled();

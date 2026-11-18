@@ -1312,3 +1312,10 @@
 - The API key has NOT been provisioned yet. The user must create a free key and enter it directly into Cloudflare Worker settings as `PITCHAPI_API_KEY`; never paste the secret into chat or commit it.
 - Important source gap: no dedicated injuries/suspensions endpoints were found in the official PitchAPI reference; those two areas remain unverified and must not be filled from absence of a player in a predicted lineup.
 - Key registration: https://pitchapi.dev/get-api-key ; official docs: https://pitchapi.dev/
+
+
+## Stage 109 — accept provider-issued PitchAPI test keys (2026-11-18)
+- User shared the PitchAPI key-generation screen. It visibly issues a `pk_test_` key; the previous Worker validator accepted only `pk_live_`, so it incorrectly returned `pitchapi_not_configured` before attempting the upstream request.
+- Official PitchAPI documentation explicitly distinguishes production `pk_live_` and test `pk_test_` keys and uses the same `X-API-KEY` authentication header. Both prefixes are now accepted server-side; the secret remains in Cloudflare Worker settings and is never exposed to browser code.
+- Updated regression tests to exercise the provider-issued `pk_test_` key path, including upstream header forwarding and existing security checks. No key value was committed; no existing Tracker, predictions, coupons, settlement or bankroll records were modified.
+- Validation/deployment status is recorded after CI and live endpoint verification complete.

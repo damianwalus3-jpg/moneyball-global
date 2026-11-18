@@ -89,3 +89,7 @@ The engine tracks eight separate areas. Every item must have a provider, an obse
 - The user approved using a free key. They must create the key at the official registration page and enter it directly in Cloudflare Worker settings. Never ask the user to paste the key into ChatGPT or commit it.
 - The proxy exposes `/api/pitchapi/date/{YYYY-MM-DD}?status=upcoming|played|all` and `/api/pitchapi/matches/{m_XXXXXX}[/{lineups|shots|events|momentum|stats|players|advanced|advanced/network|advanced/players|live}]`.
 - Key provisioning is pending. Until configured, the proxy returns `pitchapi_not_configured` without calling the upstream provider. No claim of live PitchAPI data ingestion is made until an authenticated smoke test passes.
+
+
+### PitchAPI key formats
+PitchAPI's official reference supports both production keys (`pk_live_`) and test keys (`pk_test_`), both sent in the `X-API-KEY` header. The Worker accepts both formats. A test key may be subject to provider sandbox semantics; successful authentication and usable match coverage must be verified against the live endpoint before it is treated as a production data source.

@@ -512,7 +512,7 @@ export default {
     if (pitchDate || pitchMatch) {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
       if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
-      if (!env.PITCHAPI_API_KEY || !/^pk_live_[A-Za-z0-9_-]{16,}$/.test(env.PITCHAPI_API_KEY)) {
+      if (!env.PITCHAPI_API_KEY || !/^pk_(?:live|test)_[A-Za-z0-9_-]{16,}$/.test(env.PITCHAPI_API_KEY)) {
         return json({ error: "pitchapi_not_configured", message: "PitchAPI key is not configured as a Cloudflare Worker secret." }, 503, origin);
       }
       let upstreamPath = "";
