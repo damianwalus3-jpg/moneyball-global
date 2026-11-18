@@ -34,7 +34,7 @@ describe("FootyNomad fixture parser", () => {
   });
 
   it("skips live fixture cards with no exact kickoff timestamp instead of inventing a time", () => {
-    const html = '<h2>Japan 1</h2><details class="league-group"><summary><a href="/league/4">WE League</a></summary><a href="/fixture/104-live-vs-team" class="ticket ticket-live"><small class="ticket-sub">11\\' live</small><span class="ticket-home">Home W</span><span class="ticket-away">Away W</span></a></details>';
+    const html = '<h2>Japan 1</h2><details class="league-group"><summary><a href="/league/4">WE League</a></summary><a href="/fixture/104-live-vs-team" class="ticket ticket-live"><small class="ticket-sub">11&#39; live</small><span class="ticket-home">Home W</span><span class="ticket-away">Away W</span></a></details>';
     const result = parseFootyNomadFixtures(html, "2026-11-18");
     expect(result.fixtures).toHaveLength(0);
     expect(result.skippedNoTimestamp).toBe(1);
