@@ -20,7 +20,7 @@ describe("historical team form", () => {
       status: 200,
     })));
     const form = await loadRecentTeamForm("BEL_1_pro-league", "Club A", "2026-09-10");
-    expect(form.matches).toHaveLength(5);
+    expect(form.matches).toHaveLength(6);
     expect(form.matches[0].date).toBe("2026-09-05");
     expect(form.matches[0].result).toBe("L");
     expect(form.matches.every(match => match.date < "2026-09-10")).toBe(true);
