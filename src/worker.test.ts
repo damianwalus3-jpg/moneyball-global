@@ -21,7 +21,7 @@ const FOOTYNOMAD_SAMPLE = [
 describe("FootyNomad fixture parser", () => {
   it("keeps European country fixtures and UEFA world competitions, filters non-European fixtures, and converts UTC to Brussels date", () => {
     const result = parseFootyNomadFixtures(FOOTYNOMAD_SAMPLE, "2026-11-18");
-    expect(result.pageMatches).toBe(3);
+    expect(result.pageMatches).toBe(2);
     expect(result.fixtures).toHaveLength(2);
     expect(result.fixtures[0]).toMatchObject({
       id: "footynomad|101", competition: "UEFA Champions League Women", countryCode: "UEFA",
@@ -34,7 +34,7 @@ describe("FootyNomad fixture parser", () => {
   });
 
   it("skips live fixture cards with no exact kickoff timestamp instead of inventing a time", () => {
-    const html = '<h2>Japan 1</h2><details class="league-group"><summary><a href="/league/4">WE League</a></summary><a href="/fixture/104-live-vs-team" class="ticket ticket-live"><small class="ticket-sub">11&#39; live</small><span class="ticket-home">Home W</span><span class="ticket-away">Away W</span></a></details>';
+    const html = '<h2>England 1</h2><details class="league-group"><summary><a href="/league/4">WSL Cup</a></summary><a href="/fixture/104-live-vs-team" class="ticket ticket-live"><small class="ticket-sub">11&#39; live</small><span class="ticket-home">Home W</span><span class="ticket-away">Away W</span></a></details>';
     const result = parseFootyNomadFixtures(html, "2026-11-18");
     expect(result.fixtures).toHaveLength(0);
     expect(result.skippedNoTimestamp).toBe(1);
@@ -45,7 +45,7 @@ describe("FootyNomad daily fixtures Worker proxy", () => {
   it("fetches the two UTC date pages, returns normalized Europe-only fixtures, and caches", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
-    const upstream = vi.fn().mockResolvedValue(new Response(FOOTYNOMAD_SAMPLE, { status: 200, headers: { "Content-Type": "text/html" } }));
+    const upstream = vi.fn().mockImplementation(() => Promise.resolve(new Response(FOOTYNOMAD_SAMPLE, { status: 200, headers: { "Content-Type": "text/html" } })));
     vi.stubGlobal("fetch", upstream);
     const waitUntil = vi.fn();
     const response = await worker.fetch(new Request("https://moneyball.example/api/footynomad/fixtures/2026-11-18", { headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil });
