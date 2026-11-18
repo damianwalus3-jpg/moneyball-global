@@ -11,6 +11,7 @@ import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
 import { describeHistoryProvenance, hasValidPredictionMarket, shouldAppendPrediction, shouldRetryPredictionAttempt } from "./prediction-record";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
+import { isEvidenceQualifiedCandidate } from "./prediction-eligibility";
 import { auditOddsFixtureMatches } from "./odds-matching";
 import { brusselsDateToday, getSelectedFixturePredictions } from "./selected-matches";
 import { auditMarketCoverage } from "./market-coverage";
@@ -709,8 +710,8 @@ export default function App() {
     const oneXTwo = latestRows.filter(row => row.details.market !== "DOUBLE_CHANCE");
     const doubleChance = latestRows.filter(row => row.details.market === "DOUBLE_CHANCE");
     const coverage = auditMarketCoverage(records, coverageDate);
-    const candidates = new Set(oneXTwo.filter(row => row.details.strongCandidate === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
-    const dcCandidates = new Set(doubleChance.filter(row => row.details.strongDoubleChance === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
+    const candidates = new Set(oneXTwo.filter(row => isEvidenceQualifiedCandidate(row, "1X2")).map(row => String(row.details.fixtureId)));
+    const dcCandidates = new Set(doubleChance.filter(row => isEvidenceQualifiedCandidate(row, "DOUBLE_CHANCE")).map(row => String(row.details.fixtureId)));
     const withProbabilities = new Set(oneXTwo.filter(row => hasValidPredictionMarket(records, String(row.details.fixtureId), "1X2"))
       .map(row => String(row.details.fixtureId)));
     const withDcProbabilities = new Set(doubleChance.filter(row => hasValidPredictionMarket(records, String(row.details.fixtureId), "DOUBLE_CHANCE"))
@@ -1039,7 +1040,7 @@ export default function App() {
             const card = (row: TrackerRecord | undefined, market: "1X2" | "DOUBLE_CHANCE") => {
               if (!row) return <div className="selected-market-missing">Brak zapisanego typu dla tego rynku.</div>;
               const probability = chosenProbability(row,market);
-              const eligible = row.details.evidenceComplete === true && (market === "1X2" ? row.details.strongCandidate === true : row.details.strongDoubleChance === true);
+              const eligible = isEvidenceQualifiedCandidate(row, market);
               const pick = typeof row.details.selection === "string" ? row.details.selection : "Brak typu";
               return <div className="selected-market">
                 <div className="selected-market-head"><b>{market === "1X2" ? "1X2" : "DOUBLE CHANCE"}</b><span className={eligible ? "selected-status eligible" : "selected-status rejected"}>{eligible ? "KANDYDAT ≥75%" : row.details.evidenceComplete !== true ? "ODRZUCONY · BRAK DANYCH" : probability === null ? "BRAK POPRAWNEGO TYPU" : "PONIŻEJ PROGU 75%"}</span></div>
@@ -1049,7 +1050,7 @@ export default function App() {
               </div>;
             };
             return <div className="selected-fixture-list">
-              <div className="module-status"><span className="status-dot"/> Mecze z dnia {activeFixtureDate}: {ordered.length} · kandydaci 1X2 ≥75%: {ordered.filter(item => item.one?.details.evidenceComplete === true && item.one?.details.strongCandidate === true).length} · kandydaci DC ≥75%: {ordered.filter(item => item.dc?.details.evidenceComplete === true && item.dc?.details.strongDoubleChance === true).length}</div>
+              <div className="module-status"><span className="status-dot"/> Mecze z dnia {activeFixtureDate}: {ordered.length} · kandydaci 1X2 ≥75%: {ordered.filter(item => isEvidenceQualifiedCandidate(item.one, "1X2")).length} · kandydaci DC ≥75%: {ordered.filter(item => isEvidenceQualifiedCandidate(item.dc, "DOUBLE_CHANCE")).length}</div>
               {ordered.map(item => {
                 const id = item.fixtureId;
                 const row = item.one ?? item.dc!;
