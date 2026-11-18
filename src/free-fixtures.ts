@@ -18,6 +18,8 @@ export interface FreeFixture {
   sourceUpdatedAt: string;
   sourceUrl?: string;
   pitchApiMatchId?: string;
+  pitchApiHomeTeamId?: string;
+  pitchApiAwayTeamId?: string;
   pitchApiLeagueId?: string;
   pitchApiSeason?: string;
 }
@@ -243,6 +245,8 @@ export function mergeFixtureSource(existing: FreeFixture, incoming: FreeFixture)
   if (!existing.leagueSeason && incoming.leagueSeason) existing.leagueSeason = incoming.leagueSeason;
   if (!existing.openFootballFeedId && incoming.openFootballFeedId) existing.openFootballFeedId = incoming.openFootballFeedId;
   if (!existing.pitchApiMatchId && incoming.pitchApiMatchId) existing.pitchApiMatchId = incoming.pitchApiMatchId;
+  if (!existing.pitchApiHomeTeamId && incoming.pitchApiHomeTeamId) existing.pitchApiHomeTeamId = incoming.pitchApiHomeTeamId;
+  if (!existing.pitchApiAwayTeamId && incoming.pitchApiAwayTeamId) existing.pitchApiAwayTeamId = incoming.pitchApiAwayTeamId;
   if (!existing.pitchApiLeagueId && incoming.pitchApiLeagueId) existing.pitchApiLeagueId = incoming.pitchApiLeagueId;
   if (!existing.pitchApiSeason && incoming.pitchApiSeason) existing.pitchApiSeason = incoming.pitchApiSeason;
   if (!existing.sourceUrl && incoming.sourceUrl) existing.sourceUrl = incoming.sourceUrl;
@@ -586,6 +590,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
         leagueFolder: "", date: localDate, time: get("hour") + ":" + get("minute"),
         home: item.home_team.name, away: item.away_team.name, source: "PitchAPI",
         sourceUpdatedAt: new Date().toISOString(), pitchApiMatchId: item.id,
+        pitchApiHomeTeamId: item.home_team.id, pitchApiAwayTeamId: item.away_team.id,
         pitchApiLeagueId: item.league.id, pitchApiSeason: league.season ?? undefined,
       };
       pitchApiEuropeanFixturesFound++;
