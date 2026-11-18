@@ -56,12 +56,13 @@ describe("verified odds valuation", () => {
 });
 
 describe("automatic daily odds fetch guard", () => {
-  const base = { fixtureDate: "2026-11-18", tokenSaved: true, lastSuccessfulDate: "", lastAttemptedDate: "" };
+  const base = { fixtureDate: "2026-11-18", tokenSaved: true, providerReady: true, lastSuccessfulDate: "", lastAttemptedDate: "" };
   it("allows one automatic fetch when the owner token is saved", () => {
     expect(shouldAutoFetchDailyOdds(base)).toBe(true);
   });
   it("does not fetch without the owner token or after a successful fetch", () => {
     expect(shouldAutoFetchDailyOdds({ ...base, tokenSaved: false })).toBe(false);
+    expect(shouldAutoFetchDailyOdds({ ...base, providerReady: false })).toBe(false);
     expect(shouldAutoFetchDailyOdds({ ...base, lastSuccessfulDate: "2026-11-18" })).toBe(false);
   });
   it("does not repeat an attempted fetch after reloads or 15-minute scans", () => {
