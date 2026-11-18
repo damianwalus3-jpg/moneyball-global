@@ -37,4 +37,4 @@ jobs:
           BASE="https://moneyball-global-rebuild.damianwalus3.workers.dev"
           HEALTH="$(curl --fail --silent --show-error "$BASE/api/health")"
           echo "$HEALTH" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);if(p.ok!==true||p.service!=="moneyball-global-rebuild"||p.pitchapiConfigured!==true){console.error("Production health check failed:",p);process.exit(1)}})'
-          curl --fail --silent --show-error "$BASE/api/pitchapi/leagues" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);if(!Array.isArray(p.data?.leagues)||p.data.leagues.length===0){console.error("PitchAPI returned no league catalogue");process.exit(1)}console.log("PitchAPI catalogue OK:",p.data.leagues.length,"leagues")})'
+          curl --fail --location --silent --show-error "$BASE/api/pitchapi/leagues" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);if(!Array.isArray(p.data?.leagues)||p.data.leagues.length===0){console.error("PitchAPI returned no league catalogue");process.exit(1)}console.log("PitchAPI catalogue OK:",p.data.leagues.length,"leagues")})'
