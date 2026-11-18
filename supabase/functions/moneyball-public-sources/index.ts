@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 import { isEligibleDomesticTopTwoLeague } from "../_shared/domestic-league-scope.ts";
+import { openMatchdayCET1ToIso } from "../_shared/openmatchday-time.ts";
 import { isExcludedSeniorTeam, normalizeTeamName, teamHistoryKey } from "../_shared/team-normalization.ts";
 
 const cors = {
@@ -34,38 +35,8 @@ function csvRows(text: string): string[][] {
 }
 
 
-const TIME_ZONE_BY_COUNTRY: Record<string,string> = {
-  ENG:"Europe/London", SCO:"Europe/London", WAL:"Europe/London", NIR:"Europe/London",
-  IRE:"Europe/Dublin", IRL:"Europe/Dublin", POR:"Europe/Lisbon", PRT:"Europe/Lisbon",
-  TUR:"Europe/Istanbul", RUS:"Europe/Moscow", UKR:"Europe/Kyiv", CYP:"Asia/Nicosia",
-  FIN:"Europe/Helsinki", EST:"Europe/Tallinn", LVA:"Europe/Riga", LTU:"Europe/Vilnius",
-  GRE:"Europe/Athens", BUL:"Europe/Sofia", ROU:"Europe/Bucharest", MDA:"Europe/Chisinau",
-  GEO:"Asia/Tbilisi", ARM:"Asia/Yerevan", AZE:"Asia/Baku", KAZ:"Asia/Almaty",
-  ISL:"Atlantic/Reykjavik", FRO:"Atlantic/Faroe", BLR:"Europe/Minsk",
-  ESP:"Europe/Madrid", FRA:"Europe/Paris", GER:"Europe/Berlin", DEU:"Europe/Berlin",
-  BEL:"Europe/Brussels", NED:"Europe/Amsterdam", NLD:"Europe/Amsterdam", POL:"Europe/Warsaw",
-  AUT:"Europe/Vienna", SUI:"Europe/Zurich", CHE:"Europe/Zurich", CZE:"Europe/Prague",
-  SVK:"Europe/Bratislava", SVN:"Europe/Ljubljana", CRO:"Europe/Zagreb", SRB:"Europe/Belgrade",
-  HUN:"Europe/Budapest", NOR:"Europe/Oslo", SWE:"Europe/Stockholm", DEN:"Europe/Copenhagen",
-  DNK:"Europe/Copenhagen",
-  GRC:"Europe/Athens", ALB:"Europe/Tirane", BIH:"Europe/Sarajevo", MNE:"Europe/Podgorica",
-  MKD:"Europe/Skopje", KOS:"Europe/Belgrade", MLT:"Europe/Malta", LUX:"Europe/Luxembourg",
-};
-function localKickoffToIso(date:string,time:string,countryCode:string):string|null {
-  const m=/^([01][0-9]|2[0-3]):([0-5][0-9])$/.exec(time);
-  if(!m)return null;
-  const [year,month,day]=date.split("-").map(Number),hour=Number(m[1]),minute=Number(m[2]);
-  if(!year||!month||!day)return null;
-  const desired=Date.UTC(year,month-1,day,hour,minute,0);
-  const zone=TIME_ZONE_BY_COUNTRY[countryCode]||"Europe/Brussels";
-  const fmt=new Intl.DateTimeFormat("en-GB",{timeZone:zone,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
-  let instant=desired;
-  for(let i=0;i<3;i++){
-    const p=Object.fromEntries(fmt.formatToParts(new Date(instant)).map(x=>[x.type,x.value]));
-    const represented=Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day),Number(p.hour),Number(p.minute),Number(p.second));
-    instant+=desired-represented;
-  }
-  return new Date(instant).toISOString();
+function localKickoffToIso(date:string,time:string,_countryCode:string):string|null {
+  return openMatchdayCET1ToIso(date,time);
 }
 
 function isEuropeanFixture(country: unknown, _competition?: unknown, _home?: unknown, _away?: unknown): boolean {
