@@ -1545,3 +1545,14 @@
 - StrikerAPI: aktualna dokumentacja rozróżnia koszt pobrania pojedynczego meczu i całego dnia (5/10 kredytów) oraz wymaga daty UTC. Nie wykonano żadnego płatnego żądania i nie zużyto kredytów. Błąd upstream 400 pozostaje nierozstrzygnięty do czasu uzyskania surowej odpowiedzi lub świadomej zgody na koszt.
 - Walidacja CI, testów, buildu, wdrożenia Cloudflare i live reconciliation po tych zmianach: **OCZEKUJE**. Nie ogłaszać etapu jako wdrożonego, dopóki workflow na gałęzi `moneyball-rebuild` nie zakończy się powodzeniem. Nie używać Vercel jako celu wdrożenia.
 - Zakres zmian pozostaje wyłącznie w repozytorium `damianwalus3-jpg/moneyball-global`, gałęzi `moneyball-rebuild` i Workerze REBUILT. MAIN, TEST, historyczny Tracker, kupony, rozliczenia i bankroll nie były modyfikowane przez tę poprawkę.
+
+
+## Stage 131 — ograniczenie ponawiania brakujących prognoz (2026-11-18)
+
+- Dalszy przegląd Stage 130 wykrył wtórny problem: brak rekordu 1X2/DC (a nie tylko istniejący rekord z błędnymi prawdopodobieństwami) omijał sześciogodzinny cooldown, ponieważ funkcja retry natychmiast zwracała `true` dla brakującego rekordu. Dodatkowy warunek obecności rynku w kolejce również wymuszał ponowną analizę przy każdym odświeżeniu co 15 minut.
+- Zmieniono retry tak, aby pierwszy brakujący/niepoprawny rynek był analizowany natychmiast, a kolejne nieudane próby tego samego fixture+market były blokowane przez sześć godzin. 1X2 i DC zachowują niezależne znaczniki czasu.
+- Usunięto redundantne wymuszanie analizy wyłącznie z powodu braku wiersza rynku; tę sytuację w pełni obsługuje teraz kontrola cooldown dla konkretnego rynku. Retry modelu xG i neutral fallback pozostają niezależne.
+- Dodano testy dla pierwszej próby, blokady w oknie cooldown, granicy wygaśnięcia i nieprawidłowego znacznika czasu.
+- Przegląd OpenFootAPI: darmowy Starter obejmuje katalog 120 rozgrywek, terminarze, wyniki, tabele i wyszukiwanie przy 5 000 żądań/miesiąc; xG, shot maps i składy są opisane w planie Developer za 14 USD/miesiąc, więc nie spełniają wymogu bezpłatnego xG. Publiczny klucz demonstracyjny jest ograniczony i nie powinien być używany jako produkcyjne źródło. OpenFootAPI nie został podłączony ani nie wygenerowano kosztów. OpenPlay zawiera 26 536 historycznych meczów z xG dla pięciu głównych lig i wybranych rozgrywek UEFA, ale jest statycznym archiwum do sezonu 2025/26, nie feedem na dziś.
+- Źródła: https://openfootapi.com/docs ; https://openfootapi.com/pricing ; https://github.com/nlbair/openplay ; https://www.football-charts.com/developers
+- Zmiany kodu/testów: oczekują na walidację CI i wdrożenie. Zakres: wyłącznie `moneyball-rebuild` / REBUILT. Nie zmieniano historycznego Trackera, kuponów, rozliczeń ani bankrolla. Nie użyto płatnych API.
