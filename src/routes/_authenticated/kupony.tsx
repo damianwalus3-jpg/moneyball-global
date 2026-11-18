@@ -398,10 +398,23 @@ function Kupony() {
                 const coverage = (prediction?.data_coverage ?? {}) as Record<string, unknown>;
                 const result = match ? resultByMatch.get(match.id) : undefined;
                 const sourceUrl = coverage["odds_source_url"];
+                const formSummary = (value: unknown) => {
+                  if (!value || typeof value !== "object") return "—";
+                  const form = value as Record<string, unknown>;
+                  const w = displayDetail(form["w"]), d = displayDetail(form["d"]), l = displayDetail(form["l"]);
+                  const count = displayDetail(form["matches"] ?? form["last10"]);
+                  const goals = form["goals_for"] != null && form["goals_against"] != null
+                    ? ` · gole ${displayDetail(form["goals_for"])}:${displayDetail(form["goals_against"])}`
+                    : "";
+                  return `${w}W · ${d}R · ${l}P · ${count}${goals}`;
+                };
                 return (
                   <section key={leg.id} className="rounded-lg border border-border p-3">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="font-semibold">{index + 1}. {matchLabel(match)}</h3>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold">{index + 1}. {matchLabel(match)}</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">{match?.competition ?? match?.league ?? "Rozgrywki niepodane"} · {match?.kickoff_at ? fmtDateTime(match.kickoff_at) : "Termin nieznany"}</p>
+                      </div>
                       <SettlementBadge status={leg.status} />
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
@@ -416,7 +429,11 @@ function Kupony() {
                         <dl className="mt-2 grid gap-2 text-sm">
                           <div><dt className="text-muted-foreground">Źródło danych</dt><dd className="break-words font-medium">{prediction?.data_source || "—"}</dd></div>
                           <div><dt className="text-muted-foreground">Typ źródła modelu / pokrycie</dt><dd className="break-words font-medium">{displayDetail(coverage["model_source_type"])} · {displayDetail(coverage["model_coverage"])}</dd></div>
+                          <div><dt className="text-muted-foreground">Pokrycie / confidence</dt><dd className="font-medium">{displayDetail(coverage["model_coverage"])} · {displayDetail(prediction?.confidence)}</dd></div>
                           <div><dt className="text-muted-foreground">Historia gospodarzy / gości</dt><dd className="font-medium">{displayDetail(coverage["home_history_matches"])} / {displayDetail(coverage["away_history_matches"])} meczów</dd></div>
+                          <div><dt className="text-muted-foreground">Forma gospodarzy</dt><dd className="break-words font-medium">{formSummary(coverage["home_form"])}</dd></div>
+                          <div><dt className="text-muted-foreground">Forma gości</dt><dd className="break-words font-medium">{formSummary(coverage["away_form"])}</dd></div>
+                          <div><dt className="text-muted-foreground">Decyzja / status wyboru</dt><dd className="break-words font-medium">{displayDetail(prediction?.verdict)} · {displayDetail(prediction?.selection_status)} · {displayDetail(prediction?.decision_status)}</dd></div>
                           <div><dt className="text-muted-foreground">xG rzeczywiście użyte</dt><dd className="font-medium">{displayDetail(coverage["historical_xg_used"] ?? coverage["xg_used"])}</dd></div>
                           <div><dt className="text-muted-foreground">Źródła / próbka xG</dt><dd className="break-words font-medium">{displayDetail(coverage["historical_xg_sources"] ?? coverage["xg_sources"])} · {displayDetail(coverage["historical_xg_home_matches"])} / {displayDetail(coverage["historical_xg_away_matches"])}</dd></div>
                           <div><dt className="text-muted-foreground">Decyzja / powód odrzucenia</dt><dd className="break-words font-medium">{displayDetail(prediction?.verdict)} · {displayDetail(prediction?.rejection_reason)}</dd></div>
