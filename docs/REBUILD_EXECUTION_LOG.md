@@ -1485,3 +1485,4 @@
 - Existing evidence gating remains unchanged: fallback predictions remain `ODRZUCONY` while evidence is incomplete and cannot enter candidate/coupon pools. This is a prediction placeholder, not an empirical or calibrated forecast.
 - Integrated the fallback into the shared fixture analysis path used by bulk analysis and individual fixture analysis. Added a regression test for normalized probabilities, method label, zero sample counts and non-candidate status.
 - CI/typecheck/test/build validation pending for this stage. No historical predictions, coupons, settlement, bankroll or Tracker rows were edited.
+- Follow-up hardening: fixtures without a verified kickoff time also receive the same explicit neutral-prior 1X2/DC record, while retaining the warning that kickoff is unverified. Fixtures whose kickoff has already passed remain excluded from pre-match forecasting.
