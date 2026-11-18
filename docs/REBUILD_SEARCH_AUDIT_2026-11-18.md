@@ -39,6 +39,20 @@ Scope: repository `damianwalus3-jpg/moneyball-global`, branch `moneyball-rebuild
 - ESPN scoreboard: 28 raw events for 2026-11-18, with 19 Europe candidates in the source snapshot. The prior UTC day is also queried to catch Brussels after-midnight fixtures.
 - These are per-source catalogue/response counts, not the final merged unique-fixture total. No full UI scan was run because the separate browser-automation wallet was empty; live Worker endpoints and GitHub CI/deploy were verified instead.
 
+## Additional independent source — timezone.football (2026-11-18)
+- Added the public `/api/v1/watch.json` feed as a sixth, supplementary source. The provider documents a 14-day fixture window, refreshes the fixture data three times daily, and explicitly permits personal/commercial use with attribution and match/country links. The integration caches the JSON locally for 15 minutes (provider asks for at least a few minutes).
+- Strict competition allowlist currently covers the feed's nine observed competition IDs: Premier League, La Liga, Bundesliga, Serie A, Ligue 1, Champions League, Europa League, DFB-Pokal and Coppa Italia. Unknown competition IDs are ignored rather than guessed.
+- Each imported fixture preserves its official timezone.football match URL; the app exposes a per-match attribution link, including when the fixture is merged with another source.
+- Live feed generated at 2026-11-18 02:43 UTC and contained 138 upcoming fixtures across 9 competitions, from 2026-11-20 through 2026-12-01. It contained **0 fixtures on 2026-11-18**, so it adds independent coverage/validation but no same-day match to today's scan.
+- Rechecked all 62 non-empty European open-matchday catalogues using the correct `fixtures_2627.csv` season filename. None contained a row dated 2026-11-18. This is a source-level zero, not proof that no European domestic fixtures exist; other sources still returned today's events.
+- The feed does not claim complete coverage of lower divisions and is not treated as a replacement for FootyNomad, OpenLigaDB, open-matchday, OpenFootball or ESPN.
+
+## Additional code changes
+- `src/free-fixtures.ts`: timezone.football parser, strict competition mapping, 15-minute feed cache, source URL preservation and coverage metrics.
+- `src/free-fixtures.test.ts`: date/timezone, allowlist, attribution URL and malformed payload regression tests.
+- `src/App.tsx`: per-match attribution links, feed diagnostics and corrected wording for the mixed source-unit counter.
+- Fixture scan cache bumped to v11.
+
 ## Validation gate
 - The branch has automatic `rebuild-ci.yml`, `rebuild-check.yml` and `deploy-rebuild-cloudflare.yml` workflows on pushes to `moneyball-rebuild`.
 - A change is not considered deployed until TypeScript checks, unit tests, production build and the isolated Cloudflare REBUILD deployment succeed, followed by a live Worker smoke test.
