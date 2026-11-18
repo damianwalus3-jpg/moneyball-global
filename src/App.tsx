@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
-import { addRecord, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
+import { addRecord, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, loadRecentTeamFormAcrossCountry, mergeVerifiedTeamForms, loadCalcioItSerieDTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, predictFromPitchApiXgForm, predictFromNeutralPrior, type FormPrediction } from "./form-prediction";
 import { fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, type PitchApiLineups, type PitchApiXgForm } from "./pitchapi";
@@ -27,6 +27,7 @@ const STRIKER_DAILY_FETCH_KEY = "moneyball.strikerDailyFetchDate";
 const STRIKER_DAILY_ATTEMPT_KEY = "moneyball.strikerDailyOddsAttemptDate";
 const FALLBACK_RETRY_KEY = "moneyball.neutralFallbackRetryAt";
 const FALLBACK_RETRY_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const XG_RETRY_KEY = "moneyball.xgModelRetryAt";
 
 function shouldRetryNeutralFallback(fixtureId: string, prior?: TrackerRecord): boolean {
   if (prior?.details.predictionMethod !== "neutral-prior-poisson") return false;
@@ -39,6 +40,19 @@ function shouldRetryNeutralFallback(fixtureId: string, prior?: TrackerRecord): b
     if (typeof lastAttempt === "number" && Number.isFinite(lastAttempt)
       && Date.now() - lastAttempt < FALLBACK_RETRY_INTERVAL_MS) return false;
     localStorage.setItem(FALLBACK_RETRY_KEY, JSON.stringify({ ...attempts, [fixtureId]: Date.now() }));
+    return true;
+  } catch { return false; }
+}
+
+
+function shouldRetryMissingXg(fixtureId: string): boolean {
+  try {
+    const raw = localStorage.getItem(XG_RETRY_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    const attempts = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+    const lastAttempt = attempts[fixtureId];
+    if (typeof lastAttempt === "number" && Number.isFinite(lastAttempt) && Date.now() - lastAttempt < FALLBACK_RETRY_INTERVAL_MS) return false;
+    localStorage.setItem(XG_RETRY_KEY, JSON.stringify({ ...attempts, [fixtureId]: Date.now() }));
     return true;
   } catch { return false; }
 }
@@ -291,13 +305,18 @@ export default function App() {
     for (const row of readRecords()) {
       if (row.kind === "prediction" && row.details.market !== "DOUBLE_CHANCE" && typeof row.details.fixtureId === "string" && !latestByFixture.has(row.details.fixtureId)) latestByFixture.set(row.details.fixtureId, row);
     }
+    const xgModelFixtures = new Set(readRecords().filter(row => row.kind === "prediction" && row.details.market !== "DOUBLE_CHANCE"
+      && row.details.model === "moneyball:pitchapi-recent-xg-poisson" && typeof row.details.fixtureId === "string")
+      .map(row => String(row.details.fixtureId)));
     const matches = [...new Map(sourceMatches.map(match => [match.id, match])).values()].filter(match => {
       if (hasKickoffPassed(match.date, match.time)) return false;
       const prior = latestByFixture.get(match.id);
       const missingProbabilities = !prior || typeof prior.details.p1 !== "number" || typeof prior.details.px !== "number" || typeof prior.details.p2 !== "number";
-      // Neutral-prior rows are explicit placeholders, not finished forecasts. Retry them at most every six hours
-      // so newly published history/xG can replace them without hammering free providers on each 15-minute scan.
-      return missingProbabilities || shouldRetryNeutralFallback(match.id, prior);
+      const missingXgModel = !!(match.pitchApiLeagueId && match.pitchApiHomeTeamId && match.pitchApiAwayTeamId)
+        && !xgModelFixtures.has(match.id) && shouldRetryMissingXg(match.id);
+      // Retry neutral and not-yet-available xG models at most every six hours. The 15-minute fixture refresh
+      // remains cheap and never repeatedly hammers free public sources.
+      return missingProbabilities || shouldRetryNeutralFallback(match.id, prior) || missingXgModel;
     });
     if (!matches.length) { setRecords(readRecords()); return; }
     bulkAnalysisLock.current = true;
