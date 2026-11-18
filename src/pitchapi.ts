@@ -104,6 +104,9 @@ async function getData<T>(path: string): Promise<T> {
   }
   return payload.data;
 }
+export function isPitchApiFreeEuropeanLeague(league: PitchApiLeague): boolean {
+  return league.is_free === true && isPitchApiCountryEligible(league.country_code);
+}
 export function isPitchApiCountryEligible(countryCode: string | null | undefined): boolean {
   if (!countryCode) return false;
   // Reuse the exact country-code allowlist used by every other European fixture source.
