@@ -268,6 +268,13 @@ const ESPN_COUNTRY: Record<string,string> = {
   aut:"Austria", sui:"Switzerland", gre:"Greece"
 };
 
+function espnRecentForm(competitor:any){
+  const sequence=String(competitor?.form||"").toUpperCase().replace(/[^WDL]/g,"").slice(-5);
+  if(sequence.length<3)return null;
+  const w=[...sequence].filter(x=>x==="W").length,d=[...sequence].filter(x=>x==="D").length,l=[...sequence].filter(x=>x==="L").length;
+  return {matches:sequence.length,w,d,l,points:w*3+d,source:"ESPN_FORM_LAST5"};
+}
+
 async function espn(date: string) {
   const ymd = date.replaceAll("-", "");
   const results = await mapLimit(ESPN_LEAGUES, 8, async (leagueCode) => {
