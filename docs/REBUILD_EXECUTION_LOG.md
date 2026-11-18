@@ -1130,3 +1130,13 @@
 - Implementation commit: 1ffb8b797f2c73750bdc9031e18c25aa93ed065f; regression test commit: eafccdef13468caba799423bfca474a755ed6273.
 - Validation and Cloudflare REBUILD deployment are pending the resulting GitHub Actions runs. Do not mark Stage 90 deployed until CI and Worker deployment both pass.
 - No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
+
+
+## Stage 91 — discover complete current-season national OpenFootball catalogues (2026-11-18)
+- Corrected the initial Stage 90 diagnosis after inspecting the actual public GitHub repository trees: the openfootball/europe catalogue does not contain separate England, Germany, Italy, Spain or Belgium folders. Those countries are maintained in distinct repositories (england, deutschland, italy, espana, belgium); Austria also has a separate repository.
+- Implemented dynamic current-season feed discovery across the Europe catalogue plus all six separate national repositories. The national parser includes nested season paths, so Belgium's provincial/regional competitions and Germany's Regionalliga files are discoverable, not just top divisions.
+- Excludes RSSSF archive paths from the live-fixture feed discovery; historical archive ingestion remains a separate provenance/licensing task. Existing static feeds remain as fallback and are deduplicated by feed ID.
+- Added regression coverage for current-season feeds in all six national repositories, multiple tiers, nested Belgian provincial paths, correct country codes, and exclusion of prior-season/RSSSF paths.
+- Implementation commit: 75ae831eae3ff3d574f4fe87db8afb6511c505e8; tests commit: 99cb24e35984838303863c638593c550c2bd5818.
+- Stage 90's initial country-map-only change is superseded by this more accurate repository-aware implementation. CI and deployment for Stage 91 are pending; do not claim it is deployed until all checks pass.
+- No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
