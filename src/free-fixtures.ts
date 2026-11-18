@@ -201,7 +201,7 @@ gibraltar:"GIB", greece:"GRE", hungary:"HUN", iceland:"ISL", ireland:"IRE", ital
 liechtenstein:"LIE", lithuania:"LTU", luxembourg:"LUX", malta:"MLT", moldova:"MDA", monaco:"MCO", montenegro:"MNE",
 netherlands:"NED", "north macedonia":"MKD", "northern ireland":"NIR", norway:"NOR", poland:"POL", portugal:"POR",
 romania:"ROU", russia:"RUS", "san marino":"SMR", scotland:"SCO", serbia:"SRB", slovakia:"SVK", slovenia:"SVN",
-spain:"ESP", sweden:"SWE", switzerland:"SUI", turkey:"TUR", ukraine:"UKR", wales:"WAL",
+spain:"ESP", sweden:"SWE", switzerland:"SUI", turkey:"TUR", turkiye:"TUR", israel:"ISR", kazakhstan:"KAZ", "republic of ireland":"IRE", ukraine:"UKR", wales:"WAL",
 };
 interface ESPNCompetitor { homeAway?: string; team?: { displayName?: string; name?: string } }
 interface ESPNEvent { id?: string | number; date?: string; competitions?: Array<{ altGameNote?: string; venue?: { address?: { country?: string } }; notes?: Array<{ headline?: string }>; competitors?: ESPNCompetitor[] }> }
@@ -216,7 +216,7 @@ export function parseEspnEuropeanFixtures(payload: unknown, targetDate: string):
   const output: FreeFixture[] = [];
   for (const event of events) {
     const competition = event.competitions?.[0];
-    const country = (competition?.venue?.address?.country ?? "").trim().toLowerCase();
+    const country = (competition?.venue?.address?.country ?? "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const countryCode = ESPN_COUNTRIES[country];
     const note = competition?.altGameNote?.trim() || competition?.notes?.find(item => item.headline?.trim())?.headline?.trim() || "";
     const europeanTournament = /\bUEFA\b|European Championship/i.test(note);
