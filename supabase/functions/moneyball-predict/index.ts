@@ -12,18 +12,7 @@ function isEuropeanFixture(country: unknown, _competition?: unknown, _home?: unk
   return isGeographicEuropeCountry(country);
 }
 
-function fixtureGender(m:any):"men"|"women"|"excluded" {
- const competition=String(m?.competition||m?.league||"");
- const home=String(m?.home_team||m?.home||"");
- const away=String(m?.away_team||m?.away||"");
- if(isWomensTeam(home)||isWomensTeam(away)||/\b(women|womens|woman|female|frauen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f)\b/i.test(competition))return "women";
- if(isExcludedSeniorTeam(home)||isExcludedSeniorTeam(away)||/\b(u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend|reserves?)\b/i.test(competition))return "excluded";
- const explicit=String(m?.gender||"").toLowerCase();
- if(explicit && explicit!=="men")return "excluded";
- return "men";
-}
-
-function isEligibleOpenMatchdayMatch(m:any):boolean {
+function isEligibleOpenMatchdayMatchfunction isEligibleOpenMatchdayMatch(m:any):boolean {
  const folder=(String(m?.external_id||"").match(/^om:([^:]+):/)||[])[1]||String(m?.source_competition_id||"");
  const competition=String(m?.competition||m?.league||"");
  const country=String(m?.country||"");
@@ -49,21 +38,17 @@ function brusselsFixtureDay(value:any):string {
 async function db(p:string,t:string,m="GET",b?:any,prefer="return=representation"){const isService=t===SERVICE_KEY;const r=await fetch(S+"/rest/v1/"+p,{method:m,headers:{apikey:isService?SERVICE_KEY:K,Authorization:"Bearer "+(isService?SERVICE_KEY:t),...(isService?{"x-cron-token":CRON_FALLBACK_TOKEN}:{}),"Content-Type":"application/json",Prefer:prefer},body:b===undefined?undefined:JSON.stringify(b)});const s=await r.text();let j:any;try{j=s?JSON.parse(s):null}catch{j=s}if(!r.ok)throw Error(j?.message||j?.details||"DB HTTP "+r.status);return j;}
 const clamp=(n:number,a:number,b:number)=>Math.max(a,Math.min(b,n));
 function normTeam(v:any){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\b(fc|cf|sc|ac|afc|club)\b/g," ").replace(/\b(wfc|women|w)\b/g," women ").replace(/[^a-z0-9]+/g," ").trim().replace(/\s+/g," ");}
-function fixtureGender(m:any){
- const normalize=(v:any)=>String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
- const competition=normalize(m?.competition||m?.league),home=normalize(m?.home_team),away=normalize(m?.away_team);
- const label=[competition,home,away].join(" ");
- if(/\b(women|womens|woman|frauen|femenina|femenino|feminin|female|damallsvenskan|wsl|liga f)\b/.test(label))return "women";
- if(/\b(u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend)\b/.test(label))return "unknown";
- // Reserve sides are excluded even when the feed incorrectly labels the fixture as men's.
- const reserveTeam=(team:string)=>/\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico)\b/.test(team)||/(^| )(ii|iii|b)$/.test(team);
- if(reserveTeam(home)||reserveTeam(away))return "unknown";
+function fixtureGender(m:any):"men"|"women"|"excluded" {
+ const competition=String(m?.competition||m?.league||"");
+ const home=String(m?.home_team||m?.home||"");
+ const away=String(m?.away_team||m?.away||"");
+ if(isWomensTeam(home)||isWomensTeam(away)||/\b(women|womens|woman|female|frauen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f)\b/i.test(competition))return "women";
+ if(isExcludedSeniorTeam(home)||isExcludedSeniorTeam(away)||/\b(u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend|reserves?)\b/i.test(competition))return "excluded";
  const explicit=String(m?.gender||"").toLowerCase();
- if(explicit==="women")return "women";
- if(explicit==="men")return "men";
+ if(explicit && explicit!=="men")return "excluded";
  return "men";
 }
-function fixtureTeamKey(v:any){const key=normTeam(v);const aliases:Record<string,string>={"turkiye":"turkey","republic of ireland":"ireland","czech republic":"czechia","north macedonia":"north macedonia","korea republic":"south korea","united states of america":"united states","usa":"united states","ivory coast":"cote d ivoire","cote d ivoire":"cote d ivoire"};return aliases[key]||key;}
+function fixtureTeamKeyfunction fixtureTeamKey(v:any){const key=normTeam(v);const aliases:Record<string,string>={"turkiye":"turkey","republic of ireland":"ireland","czech republic":"czechia","north macedonia":"north macedonia","korea republic":"south korea","united states of america":"united states","usa":"united states","ivory coast":"cote d ivoire","cote d ivoire":"cote d ivoire"};return aliases[key]||key;}
 function dedupeFixturesByDate(fixtures:any[],getDate:(m:any)=>string|null){
  const kept:any[]=[];
  const identity=(m:any)=>{const d=getDate(m),h=fixtureTeamKey(m.home_team),a=fixtureTeamKey(m.away_team);return d&&h&&a?d+"|"+h+">"+a:null;};
