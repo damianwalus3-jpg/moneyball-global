@@ -97,6 +97,22 @@ interface OpenFootballTreeEntry { path: string; type: string }
 interface OpenFootballTree { tree?: OpenFootballTreeEntry[]; truncated?: boolean }
 const discoveredFeedRegistry = new Map<string, OpenFootballFeed>();
 let discoveredCatalogueCache: { season: string; cachedAt: number; feeds: OpenFootballFeed[] } | null = null;
+let discoveredCatalogueFailures: string[] = [];
+
+export function mergeOpenFootballCatalogueResults(
+  results: Array<{ repository: string; feeds: OpenFootballFeed[] } | { repository: string; error: string }>,
+): { feeds: OpenFootballFeed[]; failed: string[] } {
+  const feeds = new Map<string, OpenFootballFeed>();
+  const failed: string[] = [];
+  for (const result of results) {
+    if ("error" in result) {
+      failed.push(result.repository + " catalogue: " + result.error);
+      continue;
+    }
+    for (const feed of result.feeds) feeds.set(feed.id, feed);
+  }
+  return { feeds: [...feeds.values()], failed };
+}
 
 export function buildEuropeanOpenFootballFeeds(paths: string[], date: string): OpenFootballFeed[] {
   const season = openFootballSeasonFolder(date);
@@ -157,15 +173,21 @@ async function discoverEuropeanOpenFootballFeeds(date: string): Promise<OpenFoot
   const season = openFootballSeasonFolder(date);
   if (discoveredCatalogueCache?.season === season && Date.now() - discoveredCatalogueCache.cachedAt < CACHE_MS) return discoveredCatalogueCache.feeds;
   const repositories = ["europe", ...Object.keys(NATIONAL_OPENFOOTBALL_REPOSITORIES)];
-  const catalogues = await Promise.all(repositories.map(async repository => {
+  const settled = await Promise.allSettled(repositories.map(async repository => {
     const response = await fetch("https://api.github.com/repos/openfootball/" + repository + "/git/trees/master?recursive=1", { headers: { Accept: "application/vnd.github+json" } });
-    if (!response.ok) throw new Error(repository + " catalogue HTTP " + response.status);
+    if (!response.ok) throw new Error("HTTP " + response.status);
     const tree = await response.json() as OpenFootballTree;
-    if (!Array.isArray(tree.tree) || tree.truncated) throw new Error(repository + " catalogue is incomplete");
+    if (!Array.isArray(tree.tree) || tree.truncated) throw new Error("catalogue is incomplete");
     const paths = tree.tree.filter(entry => entry.type === "blob").map(entry => entry.path);
-    return repository === "europe" ? buildEuropeanOpenFootballFeeds(paths, date) : buildNationalOpenFootballFeeds(repository, paths, date);
+    return { repository, feeds: repository === "europe" ? buildEuropeanOpenFootballFeeds(paths, date) : buildNationalOpenFootballFeeds(repository, paths, date) };
   }));
-  const feeds = catalogues.flat();
+  const results = settled.map((result, index) => result.status === "fulfilled"
+    ? result.value
+    : { repository: repositories[index], error: result.reason instanceof Error ? result.reason.message : "request failed" });
+  const merged = mergeOpenFootballCatalogueResults(results);
+  if (merged.failed.length && merged.feeds.length === 0) throw new Error(merged.failed.join("; "));
+  discoveredCatalogueFailures = merged.failed;
+  const feeds = merged.feeds;
   for (const feed of feeds) discoveredFeedRegistry.set(feed.id, feed);
   discoveredCatalogueCache = { season, cachedAt: Date.now(), feeds };
   return feeds;
@@ -344,8 +366,12 @@ export async function scanOpenFootball(date: string, force = false): Promise<Ope
   const season=openFootballSeasonFolder(date);
   let discovered: OpenFootballFeed[] = [];
   let catalogueError = "";
-  try { discovered = await discoverEuropeanOpenFootballFeeds(date); }
-  catch(error) { catalogueError = "OpenFootball Europe catalogue: " + (error instanceof Error ? error.message : "catalogue unavailable"); }
+  try {
+    discovered = await discoverEuropeanOpenFootballFeeds(date);
+    if (discoveredCatalogueFailures.length) catalogueError = "OpenFootball partial catalogue: " + discoveredCatalogueFailures.join("; ");
+  } catch(error) {
+    catalogueError = "OpenFootball Europe catalogue: " + (error instanceof Error ? error.message : "catalogue unavailable");
+  }
   if (!force) {
     try {
       const cached=localStorage.getItem(cacheKey);
