@@ -134,17 +134,27 @@ export default function App() {
     try {
       const load = async (team: string): Promise<TeamForm> => {
         const failures: string[] = [];
+        const minimumHistory = 3;
         if (match.leagueFolder) {
-          try { return await loadRecentTeamForm(match.leagueFolder, team, match.date); }
-          catch (error) { failures.push(error instanceof Error ? error.message : "open-matchday history failed"); }
+          try {
+            const form = await loadRecentTeamForm(match.leagueFolder, team, match.date);
+            if (form.matches.length >= minimumHistory) return form;
+            failures.push("open-matchday: tylko " + form.matches.length + "/" + minimumHistory + " zakończonych meczów");
+          } catch (error) { failures.push(error instanceof Error ? error.message : "open-matchday history failed"); }
         }
         if (match.leagueShortcut && match.leagueSeason) {
-          try { return await loadOpenLigaRecentTeamForm(match.leagueShortcut, match.leagueSeason, team, match.date); }
-          catch (error) { failures.push(error instanceof Error ? error.message : "OpenLigaDB history failed"); }
+          try {
+            const form = await loadOpenLigaRecentTeamForm(match.leagueShortcut, match.leagueSeason, team, match.date);
+            if (form.matches.length >= minimumHistory) return form;
+            failures.push("OpenLigaDB: tylko " + form.matches.length + "/" + minimumHistory + " zakończonych meczów");
+          } catch (error) { failures.push(error instanceof Error ? error.message : "OpenLigaDB history failed"); }
         }
         if (match.openFootballFeedId) {
-          try { return await loadOpenFootballRecentTeamForm(match.openFootballFeedId, team, match.date); }
-          catch (error) { failures.push(error instanceof Error ? error.message : "OpenFootball history failed"); }
+          try {
+            const form = await loadOpenFootballRecentTeamForm(match.openFootballFeedId, team, match.date);
+            if (form.matches.length >= minimumHistory) return form;
+            failures.push("OpenFootball: tylko " + form.matches.length + "/" + minimumHistory + " zakończonych meczów");
+          } catch (error) { failures.push(error instanceof Error ? error.message : "OpenFootball history failed"); }
         }
         throw new Error(failures.join(" · ") || "Brak źródła historii dla tej ligi.");
       };
