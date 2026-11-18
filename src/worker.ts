@@ -208,7 +208,10 @@ export default {
         headers.set("Content-Type", "application/json; charset=utf-8");
         headers.set("Cache-Control", "public, max-age=900");
         headers.set("X-MONEYBALL-SOURCE", "FootyNomad");
-        const response = new Response(JSON.stringify({ date, html }), { status: 200, headers });
+        const bytes = new TextEncoder().encode(html);
+        let binary = "";
+        for (const byte of bytes) binary += String.fromCharCode(byte);
+        const response = new Response(JSON.stringify({ date, htmlBase64: btoa(binary) }), { status: 200, headers });
         ctx.waitUntil(cache.put(cacheKey, response.clone()));
         return response;
       } catch (error) {
