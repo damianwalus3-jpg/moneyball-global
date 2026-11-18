@@ -182,14 +182,57 @@ export default {
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         });
         const body = await feed.text();
+        const records = body.split("~").filter(Boolean).map(record => Object.fromEntries(
+          record.split("¬").map(pair => {
+            const separator = pair.indexOf("÷");
+            return separator < 0 ? [pair, ""] : [pair.slice(0, separator), pair.slice(separator + 1)];
+          }),
+        ));
+        let competition: { name: string; country: string; url: string } | null = null;
+        const competitions: Array<{ name: string; country: string; url: string }> = [];
+        const countryCounts: Record<string, number> = {};
+        const matchSamples: Array<{ id: string; kickoff: string; home: string; away: string; status: string; competition: string; country: string }> = [];
+        let matchCount = 0;
+        let timestampMissing = 0;
+        for (const record of records) {
+          if (record.ZA) {
+            const display = record.ZA;
+            const split = display.indexOf(":");
+            competition = {
+              name: split >= 0 ? display.slice(split + 1).trim() : display,
+              country: record.ZY || record.ZAF || (split >= 0 ? display.slice(0, split).trim() : ""),
+              url: record.ZL || "",
+            };
+            competitions.push(competition);
+          } else if (record.AA) {
+            matchCount++;
+            if (!record.AD || !Number.isFinite(Number(record.AD))) { timestampMissing++; continue; }
+            const country = competition?.country || "Unknown";
+            countryCounts[country] = (countryCounts[country] || 0) + 1;
+            if (matchSamples.length < 25) matchSamples.push({
+              id: record.AA,
+              kickoff: new Date(Number(record.AD) * 1000).toISOString(),
+              home: record.AE || "",
+              away: record.AF || "",
+              status: record.AB || "",
+              competition: competition?.name || "",
+              country,
+            });
+          }
+        }
         return json({
           homepageStatus: homepage.status,
           homepageUrl: homepage.url,
-          signatureFound: /feed_sign\s*[:=]/i.test(html),
+          signatureFound: /feed_sign\\s*[:=]/i.test(html),
           feedStatus: feed.status,
           feedLength: body.length,
-          feedLooksStructured: body.includes("~") && body.includes("÷"),
-          sample: body.slice(0, 800),
+          recordCount: records.length,
+          competitionCount: competitions.length,
+          matchCount,
+          timestampMissing,
+          countryCounts,
+          competitions: competitions.slice(0, 30),
+          matchSamples,
         }, 200, origin);
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "flashscore_probe_failed" }, 502, origin);
