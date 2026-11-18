@@ -50,6 +50,96 @@ async function readJson(response: Response): Promise<unknown> {
   try { return JSON.parse(text); } catch { throw new Error("upstream_invalid_json"); }
 }
 
+
+const FOOTYNOMAD_COUNTRIES: Record<string, string> = {
+  albania: "ALB", andorra: "AND", armenia: "ARM", austria: "AUT", azerbaijan: "AZE", belarus: "BLR",
+  belgium: "BEL", bosnia: "BIH", "bosnia and herzegovina": "BIH", bulgaria: "BUL", croatia: "CRO",
+  cyprus: "CYP", "czech republic": "CZE", czechia: "CZE", denmark: "DEN", england: "ENG",
+  estonia: "EST", "faroe islands": "FRO", finland: "FIN", france: "FRA", georgia: "GEO",
+  germany: "GER", gibraltar: "GIB", greece: "GRE", hungary: "HUN", iceland: "ISL", ireland: "IRE",
+  italy: "ITA", kosovo: "KOS", latvia: "LVA", liechtenstein: "LIE", lithuania: "LTU",
+  luxembourg: "LUX", malta: "MLT", moldova: "MDA", monaco: "MCO", montenegro: "MNE",
+  netherlands: "NED", "north macedonia": "MKD", "northern ireland": "NIR", norway: "NOR",
+  poland: "POL", portugal: "POR", romania: "ROU", russia: "RUS", "san marino": "SMR",
+  scotland: "SCO", serbia: "SRB", slovakia: "SVK", slovenia: "SVN", spain: "ESP",
+  sweden: "SWE", switzerland: "SUI", turkey: "TUR", ukraine: "UKR", wales: "WAL",
+};
+function footyHtmlText(value: string): string {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#(\d+);/g, (_match, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_match, code: string) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/\s+/g, " ").trim();
+}
+export function parseFootyNomadFixtures(html: string, pageDate: string, targetDate: string): { fixtures: Array<Record<string, unknown>>; pageMatches: number; skippedNoTimestamp: number } {
+  const headings = [...html.matchAll(/<h2\b[^>]*>([\s\S]*?)<\/h2>/gi)];
+  const fixtures: Array<Record<string, unknown>> = [];
+  let pageMatches = 0;
+  let skippedNoTimestamp = 0;
+  for (let index = 0; index < headings.length; index++) {
+    const heading = headings[index];
+    const country = footyHtmlText(heading[1]).replace(/\s+\d+$/, "").toLowerCase();
+    const countryCode = FOOTYNOMAD_COUNTRIES[country];
+    const sectionStart = (heading.index ?? 0) + heading[0].length;
+    const sectionEnd = index + 1 < headings.length ? (headings[index + 1].index ?? html.length) : html.length;
+    const section = html.slice(sectionStart, sectionEnd);
+    const leagueBlocks = [...section.matchAll(/<details\b[^>]*class="[^"]*league-group[^"]*"[^>]*>([\s\S]*?)<\/details>/gi)];
+    for (const leagueBlock of leagueBlocks) {
+      const block = leagueBlock[1];
+      const competition = footyHtmlText(block.match(/<a\b[^>]*href="\/league\/[^"]+"[^>]*>([\s\S]*?)<\/a>/i)?.[1] ?? "");
+      const isUefaWorldCompetition = /\bUEFA\b|European Championship|Nations League/i.test(competition);
+      if (!countryCode && !(country === "world" && isUefaWorldCompetition)) continue;
+      const resolvedCountryCode = countryCode ?? "UEFA";
+      const matches = [...block.matchAll(/<a\b[^>]*href="\/fixture\/([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
+      pageMatches += matches.length;
+      for (const match of matches) {
+        const card = match[2];
+        const kickoff = card.match(/<time\b[^>]*datetime="([^"]+)"/i)?.[1];
+        if (!kickoff || !Number.isFinite(Date.parse(kickoff))) {
+          skippedNoTimestamp++;
+          continue;
+        }
+        const local = new Date(kickoff);
+        const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(local);
+        const get = (key: string) => parts.find(part => part.type === key)?.value ?? "";
+        const localDate = get("year") + "-" + get("month") + "-" + get("day");
+        if (localDate !== targetDate) continue;
+        const home = footyHtmlText(card.match(/<span\b[^>]*class="ticket-home"[^>]*>([\s\S]*?)<\/span>/i)?.[1] ?? "");
+        const away = footyHtmlText(card.match(/<span\b[^>]*class="ticket-away(?:\s[^"]*)?"[^>]*>([\s\S]*?)<\/span>/i)?.[1] ?? "");
+        if (!home || !away) continue;
+        const statusText = footyHtmlText(card.match(/<small\b[^>]*class="ticket-sub"[^>]*>([\s\S]*?)<\/small>/i)?.[1] ?? "").toLowerCase();
+        const cardClass = match[0].match(/\bclass="([^"]+)"/i)?.[1] ?? "";
+        const status = /cancelled|abandoned/.test(statusText) ? "cancelled"
+          : /postponed/.test(statusText) ? "postponed"
+          : /live|^\d+['′]/.test(statusText) || /ticket-live/.test(cardClass) ? "live"
+          : /full time|finished|ft/.test(statusText) ? "finished" : "scheduled";
+        const id = match[1].split("-")[0];
+        fixtures.push({
+          id: "footynomad|" + id,
+          providerId: id,
+          competition: competition || "FootyNomad",
+          countryCode: resolvedCountryCode,
+          leagueFolder: "",
+          date: localDate,
+          time: get("hour") + ":" + get("minute"),
+          home,
+          away,
+          status,
+          source: "FootyNomad",
+          sourceUpdatedAt: new Date().toISOString(),
+        });
+      }
+    }
+  }
+  return { fixtures, pageMatches, skippedNoTimestamp };
+}
+function previousUtcDate(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day) - 86400000).toISOString().slice(0, 10);
+}
+
 export default {
   async fetch(request: Request, env: Env, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<Response> {
     const url = new URL(request.url);
@@ -185,10 +275,11 @@ export default {
       }
     }
 
-    const footyNomadInspect = url.pathname.match(/^\/api\/footynomad\/inspect\/(\d{4}-\d{2}-\d{2})$/);
-    if (footyNomadInspect) {
+
+    const footyNomadFixtures = url.pathname.match(/^\/api\/footynomad\/fixtures\/(\d{4}-\d{2}-\d{2})$/);
+    if (footyNomadFixtures) {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
-      const date = footyNomadInspect[1];
+      const date = footyNomadFixtures[1];
       const year = Number(date.slice(0,4)), month = Number(date.slice(5,7)), day = Number(date.slice(8,10));
       const parsed = new Date(Date.UTC(year, month - 1, day));
       if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return json({ error: "invalid_date" }, 400, origin);
@@ -197,27 +288,37 @@ export default {
       const cached = await cache.match(cacheKey);
       if (cached) return cached;
       try {
-        const upstream = await fetch("https://footynomad.com/fixtures/" + date, {
-          headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "Mozilla/5.0 (compatible; MONEYBALL-REBUILD/1.0; +https://moneyball-global-rebuild.damianwalus3.workers.dev)", Cookie: "tz=Europe%2FBrussels" },
-          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-        });
-        const html = await upstream.text();
-        if (!upstream.ok) return json({ error: "footynomad_upstream_http_" + upstream.status }, upstream.status, origin);
-        if (!html.includes("fixtures/") || !html.includes("<h1")) return json({ error: "footynomad_invalid_html" }, 502, origin);
+        const pageDates = [previousUtcDate(date), date];
+        const pages = await Promise.all(pageDates.map(async pageDate => {
+          const upstream = await fetch("https://footynomad.com/fixtures/" + pageDate, {
+            headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "Mozilla/5.0 (compatible; MONEYBALL-REBUILD/1.0; +https://moneyball-global-rebuild.damianwalus3.workers.dev)" },
+            signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+          });
+          const html = await upstream.text();
+          if (!upstream.ok) throw new Error("footynomad_upstream_http_" + upstream.status + " for " + pageDate);
+          if (!html.includes("/fixture/") || !html.includes("<h1")) throw new Error("footynomad_invalid_html for " + pageDate);
+          return parseFootyNomadFixtures(html, pageDate, date);
+        }));
+        const byId = new Map<string, Record<string, unknown>>();
+        for (const page of pages) for (const fixture of page.fixtures) byId.set(String(fixture.id), fixture);
         const headers = corsHeaders(origin);
         headers.set("Content-Type", "application/json; charset=utf-8");
         headers.set("Cache-Control", "public, max-age=900");
         headers.set("X-MONEYBALL-SOURCE", "FootyNomad");
-        const bytes = new TextEncoder().encode(html);
-        let binary = "";
-        for (const byte of bytes) binary += String.fromCharCode(byte);
-        const response = new Response(JSON.stringify({ date, htmlBase64: btoa(binary) }), { status: 200, headers });
+        const response = new Response(JSON.stringify({
+          date, fixtures: [...byId.values()].sort((a,b) => String(a.time).localeCompare(String(b.time))),
+          pagesRequested: pageDates.length, pagesChecked: pages.length,
+          pageMatches: pages.reduce((sum, page) => sum + page.pageMatches, 0),
+          skippedNoTimestamp: pages.reduce((sum, page) => sum + page.skippedNoTimestamp, 0),
+          errors: [],
+        }), { status: 200, headers });
         ctx.waitUntil(cache.put(cacheKey, response.clone()));
         return response;
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "footynomad_upstream_error" }, 502, origin);
       }
     }
+
     const leagues = url.pathname.match(/^\/api\/openligadb\/leagues\/(\d{4})$/);
     const matches = url.pathname.match(/^\/api\/openligadb\/matches\/((?:[a-z0-9._-]|%[0-9a-f]{2})+)\/(\d{4})$/i);
     const teamMatches = url.pathname.match(/^\/api\/openligadb\/team-matches\/((?:[a-z0-9._-]|%[0-9a-f]{2})+)\/(\d{4})\/([^/]+)$/i);
