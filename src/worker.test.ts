@@ -402,6 +402,30 @@ describe("PitchAPI secure Worker proxy", () => {
     expect(JSON.stringify(await forbidden.json())).not.toContain("pk_test_");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it("proxies PitchAPI league metadata and historical match lists with validated query parameters", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { id: "l_Ab12Cd", country_code: "BEL" } }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const waitUntil = vi.fn();
+    const metadata = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/leagues/l_Ab12Cd"), env("pk_test_12345678901234567890"), { waitUntil });
+    const history = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/leagues/l_Ab12Cd/matches?season=2026%2F2027&status=played"), env("pk_test_12345678901234567890"), { waitUntil });
+    expect(metadata.status).toBe(200);
+    expect(history.status).toBe(200);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.pitchapi.dev/v1/leagues/l_Ab12Cd");
+    expect(fetchMock.mock.calls[1][0]).toBe("https://api.pitchapi.dev/v1/leagues/l_Ab12Cd/matches?season=2026%2F2027&status=played");
+    expect(fetchMock.mock.calls[0][1].headers["X-API-KEY"]).toBe("pk_test_12345678901234567890");
+    expect(waitUntil).toHaveBeenCalledTimes(2);
+  });
+  it("rejects malformed PitchAPI league history parameters before provider calls", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const invalidSeason = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/leagues/l_Ab12Cd/matches?season=bad"), env("pk_test_12345678901234567890"), { waitUntil: vi.fn() });
+    const invalidStatus = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/leagues/l_Ab12Cd/matches?status=live"), env("pk_test_12345678901234567890"), { waitUntil: vi.fn() });
+    expect(invalidSeason.status).toBe(400);
+    expect(invalidStatus.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("does not cache live snapshots", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
