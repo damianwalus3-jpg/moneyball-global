@@ -32,7 +32,7 @@ BEGIN
   IF v_country IN ('scotland','sco') AND v_label ~* '\m(lowland league|highland league)\M' THEN RETURN false; END IF;
   IF v_country IN ('denmark','dnk','norway','nor','belarus','blr') AND v_label ~* '\m2 division\M' THEN RETURN false; END IF;
   IF v_country IN ('denmark','dnk') AND v_label ~* '\m2nd division\M' THEN RETURN false; END IF;
-  IF v_country IN ('russia','rus') AND v_label ~* '\msecond league\M' THEN RETURN false; END IF;
+  IF v_country IN ('russia','rus','belarus','blr') AND v_label ~* '\msecond league\M' THEN RETURN false; END IF;
   IF v_country IN ('spain','esp') AND v_label ~* '\m(primera division rfef|segunda division rfef)\M' THEN RETURN false; END IF;
   IF v_country IN ('switzerland','sui','che') AND v_label ~* '\m1 liga (promotion|classic)\M' THEN RETURN false; END IF;
   IF v_country IN ('sweden','swe') AND v_label ~* '\mdivision [12]\M' THEN RETURN false; END IF;
@@ -43,7 +43,7 @@ BEGIN
   IF v_country IN ('poland','pol') AND v_label ~* '\m(ii|2) liga\M' THEN RETURN false; END IF;
   IF v_label ~* '\m(serie c|serie d|lega pro|serie c1|serie c2|league one|league two|league three)\M' THEN RETURN false; END IF;
   IF v_label ~* '\m(uefa|nations league|champions league|europa league|conference league|world cup|international|national [2-5]|cup|copa|trophy|play ?offs?)\M' THEN RETURN false; END IF;
-  IF v_label ~* '\m(premier league 2|pl2|professional development league|u(17|18|19|20|21|23)|under ?(17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend|reserves?|b team|women|woman|female|frauen|damen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series)\M' THEN RETURN false; END IF;
+  IF v_label ~* '\m(premier league 2|pl2|professional development league|u(15|16|17|18|19|20|21|23)|under ?(15|16|17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend|reserves?|b team|women|woman|female|frauen|damen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series)\M' THEN RETURN false; END IF;
   IF v_label ~* '\m(druha liga|(3|4|5|6|7|8|9|iii|iv|v|vi)\s*\.?\s*(liga|league|division|div|bundesliga|serie|snl|hnl|federal|federation)|third|fourth|fifth|regional|regionalliga|oberliga|national league north|national league south|non league|non-league)\M' THEN RETURN false; END IF;
   RETURN v_label ~* '\m(premier league|premiership|championship|super league 2|super league|superliga|super lig|pro league|jupiler pro league|challenger pro league|bundesliga|austrian 2 liga|2 liga|ligue 1|ligue 2|serie a|serie b|la liga|laliga|primera division|segunda division|segunda liga|segunda divisao|liga portugal 2|liga portugal|eredivisie|eerste divisie|keuken kampioen divisie|primeira liga|ekstraklasa|i liga|1 lig|2 lig|1 liga|2 liga|liga i|liga ii|liga 1|liga 2|liga e pare|prva liga|first league|second league|fnl|first division|second division|division 1|division 2|div 1|div 2|1st division|2nd division|1st league|2nd league|a lyga|1 lyga|i lyga|1 snl|virsliga|meistriliiga|esiliiga|veikkausliiga|ykkosliiga|allsvenskan|superettan|eliteserien|obos ligaen|1 divisjon|premier division|league of ireland premier|league of ireland first|scottish championship|challenge league|tff first league|national football league|football league|nb i|nb ii|nemzeti bajnoksag i|nemzeti bajnoksag ii|kategoria superiore|kategoria e pare|premyer liqa|i liqa|1 deild|cymru premier|cymru north|cymru south|erovnuli liga|e rovnuli liga|erovnuli liga 2|first nl|prva nl|2 snl|persha liga|first professional football league|second professional football league|bulgarian second league|first division a|first division b|1 division|2 division|divizia nationala|divizia a|1a divisio|2a divisio|primera divisio|segunda divisio|albanian superliga|armenian premier league|belarusian premier league|belarusian first league|premijer liga|first professional league|meistaradeildin|besta deild|urvalsdeild|national division|super liga|super liga 2|super liga Srbije|superliga kosovo|campionato sammarinese|2 mfl|vtora mfl|prva makedonska|super league greece|super liga romania|liga 1 romania|liga 2 romania|montenegro first league|azerbaijan premier league|premyer liqasi|super league albania|lliga multisegur assegurances|lliga grup pirineu|abissnet superiore|bgl ligue|promotion d honneur|albi mall superliga|vbet malta premier league|malta premier league|czech liga|vysshaya liga|pervaya liga|birinci dasta|birinci liqa|azerbaijan first division|azerbaijan first league|liga leumit|ligat haal|ligat ha al|israeli national league|kazakhstan first division|kazakhstan first league|qazaqstan first league|division d honneur|luxembourg division of honour|division of honour|moldovan super liga|moldova liga 1|liga 1 moldova|liga 7777|ligat winner|winner league|meistaradeildin|meistara deildin|lengjudeild karla|1 deild menn|montenegrin second league|second league montenegro|meridianbet 1 cfl|prva mfl|first mfl|wwin liga bih|wwin liga bosne i hercegovine|first league federation of bih|first league of the federation of bih|first league of republika srpska|prva liga federacije bih|prva liga republike srpska|prva liga republike srpske|efbet liga|efbet league|toplyga|cyprus second division|cypriot second division|cyprus league b|league b cyprus|1 deild karla|league of ireland first division|league of ireland premier division|nifl championship|nifl premiership|gibraltar football league|gibraltar second division|malta challenge league|challenge league malta|premier league malta|superliga e shqiperise|armenian first league|bosnian premier league|premijer liga bih|croatian first football league|first football league croatia|prva nogometna liga|czech first league|chance liga|dansk superliga|superligaen|danish 1st division|danish first division|finnish first division|greek super league|premier division ireland|island premier league|israeli premier league|lithuanian a lyga|lithuanian i lyga|latvian higher league|latvian first league|maltese premier league|maltese challenge league|norwegian first division|serbian super liga|slovak first football league|nike liga|prva slovenska nogometna liga|druga slovenska nogometna liga|swiss super league|swiss challenge league|turkish first league|ukrainian premier league|welsh premier league)\M';
 END;
@@ -52,7 +52,7 @@ $function$;
 CREATE OR REPLACE FUNCTION public.moneyball_is_eligible_european_match(p_country text,p_competition text,p_gender text,p_home_team text,p_away_team text)
 RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path TO '' AS $function$
   SELECT public.moneyball_is_european_top_two_league(p_country,p_competition)
-    AND coalesce(nullif(lower(btrim(p_gender)),''),'men')='men'
+    AND lower(btrim(coalesce(p_gender,''))) IN ('men','male','m','mens','men senior')
     AND coalesce(p_home_team,'') !~* '(^|[^a-z0-9])(women|womens|woman|female|frauen|feminine|femminile|femenina|femenino|ladies|girls|wfc|fcw)([^a-z0-9]|$)'
     AND coalesce(p_away_team,'') !~* '(^|[^a-z0-9])(women|womens|woman|female|frauen|feminine|femminile|femenina|femenino|ladies|girls|wfc|fcw)([^a-z0-9]|$)'
     AND coalesce(p_home_team,'') !~* '(^|[^a-z0-9])(reserves?|academy|youth|u[0-9]{1,2}|under[ -]*[0-9]{1,2}|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico|ii|iii|b)$'
@@ -126,10 +126,10 @@ DECLARE fixture record; v_country text; v_competition text; v_gender text; v_hom
 BEGIN
   IF tg_table_name='matches' THEN
     v_country:=coalesce(new.country,''); v_competition:=coalesce(new.competition,new.league,'');
-    v_gender:=coalesce(nullif(lower(new.gender),''),'men'); v_home:=coalesce(new.home_team,''); v_away:=coalesce(new.away_team,'');
+    v_gender:=new.gender; v_home:=coalesce(new.home_team,''); v_away:=coalesce(new.away_team,'');
     v_source:=coalesce(new.source,''); v_external_id:=coalesce(new.external_id,'');
   ELSIF tg_table_name='predictions' THEN
-    SELECT m.country,coalesce(m.competition,m.league,'') competition,coalesce(nullif(lower(m.gender),''),'men') gender,
+    SELECT m.country,coalesce(m.competition,m.league,'') competition,m.gender gender,
            m.home_team,m.away_team,m.source,m.external_id
       INTO fixture FROM public.matches m WHERE m.id=new.match_id AND m.owner_id=coalesce(new.owner_id,new.user_id);
     IF NOT found THEN RETURN null; END IF;
@@ -491,7 +491,29 @@ BEGIN
   IF public.moneyball_is_eligible_european_match('Turkey','Super Lig','men','Galatasaray','Fenerbahce') THEN RAISE EXCEPTION 'Non-M49 Turkey scope incorrectly accepted.'; END IF;
   IF public.moneyball_is_openmatchday_tier('OpenMatchday','om:ENG_3_League-One:2026-11-18:fixture') THEN RAISE EXCEPTION 'OpenMatchday tier 3 incorrectly accepted.'; END IF;
   IF NOT public.moneyball_is_openmatchday_tier('OpenMatchday','om:ENG_2_Championship:2026-11-18:fixture') THEN RAISE EXCEPTION 'OpenMatchday tier 2 unexpectedly rejected.'; END IF;
-  IF public.moneyball_is_geographic_europe_country('Türkiye') THEN RAISE EXCEPTION 'UEFA membership incorrectly widened geographic Europe.'; END IF;
+  IF public.moneyball_is_geographic_europe_country('Türkiye') OR public.moneyball_is_geographic_europe_country('Israel')
+     OR public.moneyball_is_geographic_europe_country('Cyprus') OR public.moneyball_is_geographic_europe_country('Armenia')
+     OR public.moneyball_is_geographic_europe_country('Azerbaijan') OR public.moneyball_is_geographic_europe_country('Georgia')
+     OR public.moneyball_is_geographic_europe_country('Kazakhstan') THEN RAISE EXCEPTION 'A non-M49 country was accepted as geographic Europe.'; END IF;
+  IF public.moneyball_is_eligible_european_match('Spain','Tercera División RFEF - Group 13','men','Audit Home','Audit Away')
+     OR public.moneyball_is_eligible_european_match('Spain','Segunda División RFEF - Group 1','men','Audit Home','Audit Away')
+     OR public.moneyball_is_eligible_european_match('Scotland','Football League - Lowland League','men','Audit Home','Audit Away')
+     OR public.moneyball_is_eligible_european_match('Bulgaria','Third League - Southwest','men','Audit Home','Audit Away')
+     OR public.moneyball_is_eligible_european_match('Bulgaria','Third League - Northeast','men','Audit Home','Audit Away')
+     OR public.moneyball_is_eligible_european_match('England','Non League Premier - Southern South','men','Audit Home','Audit Away')
+     OR public.moneyball_is_eligible_european_match('Germany','Oberliga - Rheinland-Pfalz / Saar','men','Audit Home','Audit Away')
+     OR public.moneyball_is_eligible_european_match('Germany','Regionalliga - Nord','men','Audit Home','Audit Away')
+     OR public.moneyball_is_eligible_european_match('Poland','III Liga - Group 3','men','Audit Home','Audit Away') THEN
+    RAISE EXCEPTION 'A lower-tier competition observed in the 18 Nov raw feed was accepted.';
+  END IF;
+  IF NOT public.moneyball_is_eligible_european_match('Bosnia','1st League - RS','men','Audit Home','Audit Away') THEN
+    RAISE EXCEPTION 'Bosnia 1st League - RS (tier 2) unexpectedly rejected.';
+  END IF;
+  IF public.moneyball_is_eligible_european_match('England','Premier League',NULL,'Audit Home','Audit Away')
+     OR public.moneyball_is_eligible_european_match('England','Premier League','','Audit Home','Audit Away')
+     OR public.moneyball_is_eligible_european_match('England','Premier League','women','Audit Home','Audit Away') THEN
+    RAISE EXCEPTION 'Unknown or non-men gender was accepted.';
+  END IF;
 END;
 $scope_assertions$;
 
