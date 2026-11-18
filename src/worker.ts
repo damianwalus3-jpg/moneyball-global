@@ -198,7 +198,7 @@ export default {
       if (cached) return cached;
       try {
         const upstream = await fetch("https://footynomad.com/fixtures/" + date, {
-          headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "Mozilla/5.0 (compatible; MONEYBALL-REBUILD/1.0; +https://moneyball-global-rebuild.damianwalus3.workers.dev)" },
+          headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "Mozilla/5.0 (compatible; MONEYBALL-REBUILD/1.0; +https://moneyball-global-rebuild.damianwalus3.workers.dev)", Cookie: "tz=Europe%2FBrussels" },
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         });
         const html = await upstream.text();
