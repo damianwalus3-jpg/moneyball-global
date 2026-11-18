@@ -140,6 +140,21 @@ BEGIN
   END IF;
   IF NOT public.moneyball_is_eligible_european_match(v_country,v_competition,v_gender,v_home,v_away)
      OR NOT public.moneyball_is_openmatchday_tier(v_source,v_external_id) THEN RETURN null; END IF;
+  IF tg_table_name='matches' AND tg_op='INSERT' AND new.kickoff_at IS NOT NULL THEN
+    v_day:=(new.kickoff_at AT TIME ZONE 'Europe/Brussels')::date;
+    v_home_key:=regexp_replace(normalize(lower(btrim(v_home)),NFD),'[^a-z0-9]+','','g');
+    v_away_key:=regexp_replace(normalize(lower(btrim(v_away)),NFD),'[^a-z0-9]+','','g');
+    PERFORM pg_advisory_xact_lock(hashtextextended(coalesce(new.owner_id::text,'')||'|'||v_day::text||'|'||v_home_key||'|'||v_away_key,0));
+    IF EXISTS (
+      SELECT 1 FROM public.matches m
+      WHERE m.owner_id=new.owner_id AND m.kickoff_at IS NOT NULL
+        AND (m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date=v_day
+        AND regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g')=v_home_key
+        AND regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g')=v_away_key
+        AND public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
+        AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
+    ) THEN RETURN NULL; END IF;
+  END IF;
   RETURN new;
 END;
 $function$;
@@ -201,6 +216,18 @@ BEGIN
   IF NEW.odds IS NULL OR NEW.odds<=1 OR NEW.odds IS DISTINCT FROM v_prediction.odds THEN
     RAISE EXCEPTION 'Coupon leg payout odds must equal the confirmed prediction odds at placement.';
   END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM public.coupon_legs l
+    JOIN public.matches m ON m.id=l.match_id AND m.owner_id=l.owner_id
+    WHERE l.owner_id=NEW.owner_id AND l.coupon_id=NEW.coupon_id AND l.id<>NEW.id
+      AND m.kickoff_at IS NOT NULL AND v_match.kickoff_at IS NOT NULL
+      AND (m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date=(v_match.kickoff_at AT TIME ZONE 'Europe/Brussels')::date
+      AND regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g')=regexp_replace(normalize(lower(btrim(coalesce(v_match.home_team,''))),NFD),'[^a-z0-9]+','','g')
+      AND regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g')=regexp_replace(normalize(lower(btrim(coalesce(v_match.away_team,''))),NFD),'[^a-z0-9]+','','g')
+  ) THEN
+    RAISE EXCEPTION 'A coupon cannot contain the same Brussels-date team pair more than once.';
+  END IF;
   RETURN NEW;
 END;
 $function$;
@@ -252,7 +279,6 @@ active_predictions AS (
   FROM public.predictions p
   JOIN eligible_matches m ON m.id=p.match_id AND m.owner_id=p.owner_id
   WHERE (p.model_version='MONEYBALL GLOBAL 3.8' OR p.model_version LIKE 'MANUAL%')
-    AND public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
   ORDER BY m.brussels_day,m.home_key,m.away_key,p.market,p.selection,p.created_at DESC,p.id DESC
 ),
 market_stats AS (
@@ -407,17 +433,16 @@ BEGIN
     active_predictions_ranked AS (
       SELECT DISTINCT ON (m.brussels_day,m.home_key,m.away_key,p.market,p.selection)
         p.id,p.match_id,p.model_version,p.market,p.selection,p.probability,p.verdict,p.rationale,p.odds,
-        p.settlement_status,p.verified,p.stake,p.potential_return,p.profit_loss,p.created_at
+        p.settlement_status,p.verified,p.stake,p.potential_return,p.profit_loss,p.data_source,p.data_coverage,p.xg_used,p.created_at
       FROM public.predictions p
       JOIN eligible_matches m ON m.id=p.match_id
       WHERE p.owner_id=v_owner
         AND (p.model_version='MONEYBALL GLOBAL 3.8' OR p.model_version LIKE 'MANUAL%')
-        AND public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
       ORDER BY m.brussels_day,m.home_key,m.away_key,p.market,p.selection,p.created_at DESC,p.id DESC
     ),
     active_predictions AS (
       SELECT id,match_id,model_version,market,selection,probability,verdict,rationale,odds,
-        settlement_status,verified,stake,potential_return,profit_loss
+        settlement_status,verified,stake,potential_return,profit_loss,data_source,data_coverage,xg_used
       FROM active_predictions_ranked
     ),
     scoped_coupon_ids AS (
