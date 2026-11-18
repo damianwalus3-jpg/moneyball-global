@@ -4,7 +4,8 @@ export interface CouponLegCandidate {
   fixtureId: string;
   title: string;
   competition: string;
-  selection: "1" | "X" | "2";
+  selection: "1" | "X" | "2" | "1X" | "X2" | "12";
+  market: "1X2" | "DOUBLE_CHANCE";
   probability: number;
   source: string;
   model: string;
@@ -20,26 +21,39 @@ export interface ThreeLegCandidate {
 function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCandidate | null {
   const d = record.details;
   if (record.kind !== "prediction" || record.status !== "KANDYDAT") return null;
-  if (d.fixtureDate !== date || d.strongCandidate !== true) return null;
-  if (typeof d.fixtureId !== "string" || typeof d.selection !== "string" || !["1","X","2"].includes(d.selection)) return null;
-  const probabilities = [d.p1, d.px, d.p2];
-  if (probabilities.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) return null;
-  const [p1, px, p2] = probabilities as [number, number, number];
-  if (Math.abs(p1 + px + p2 - 1) > 0.0001) return null;
-  const ranked = [{ selection: "1", probability: p1 }, { selection: "X", probability: px }, { selection: "2", probability: p2 }]
-    .sort((a, b) => b.probability - a.probability);
-  if (d.selection !== ranked[0].selection) return null;
-  const probability = ranked[0].probability;
-  if (probability < 0.75) return null;
-  return {
+  if (d.fixtureDate !== date || typeof d.fixtureId !== "string" || !d.fixtureId) return null;
+
+  const base = {
     fixtureId: d.fixtureId,
     title: record.title,
     competition: typeof d.competition === "string" ? d.competition : "Rozgrywki nieznane",
-    selection: d.selection as "1" | "X" | "2",
-    probability,
     source: typeof d.source === "string" ? d.source : "unknown",
     model: typeof d.model === "string" ? d.model : "unknown",
   };
+
+  // 1X2 remains an independent model market and requires its own 75% gate.
+  if (d.strongCandidate === true && typeof d.selection === "string" && ["1", "X", "2"].includes(d.selection)) {
+    const probabilities = [d.p1, d.px, d.p2];
+    if (probabilities.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) return null;
+    const [p1, px, p2] = probabilities as [number, number, number];
+    if (Math.abs(p1 + px + p2 - 1) > 0.0001) return null;
+    const ranked = [{ selection: "1", probability: p1 }, { selection: "X", probability: px }, { selection: "2", probability: p2 }]
+      .sort((a, b) => b.probability - a.probability);
+    if (d.selection !== ranked[0].selection || ranked[0].probability < 0.75) return null;
+    return { ...base, selection: d.selection as "1" | "X" | "2", market: "1X2", probability: ranked[0].probability };
+  }
+
+  // Double Chance is separately eligible at 75%; it does not need a 1X2 pick.
+  if (d.strongDoubleChance !== true) return null;
+  const dcMarkets = [
+    { selection: "1X", probability: d.dc1x },
+    { selection: "X2", probability: d.dcx2 },
+    { selection: "12", probability: d.dc12 },
+  ].filter(item => typeof item.probability === "number" && Number.isFinite(item.probability) && item.probability >= 0.75 && item.probability <= 1)
+    .sort((a, b) => (b.probability as number) - (a.probability as number));
+  const bestDc = dcMarkets[0];
+  if (!bestDc) return null;
+  return { ...base, selection: bestDc.selection as "1X" | "X2" | "12", market: "DOUBLE_CHANCE", probability: bestDc.probability as number };
 }
 
 export function buildThreeLegCandidates(records: TrackerRecord[], date: string, limit = 30): ThreeLegCandidate[] {
