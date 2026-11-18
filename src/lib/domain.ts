@@ -280,12 +280,16 @@ export function hasSufficientPredictionEvidence(
   if (coverage["baseline_only"] === true || String(coverage["baseline_only"] ?? "").toLowerCase() === "true") return false;
   const modelSource = String(coverage["model_source_type"] ?? "").trim().toUpperCase();
   if (modelSource === "BASELINE_ONLY" || modelSource === "BEYONDELO_ONLY") return false;
-  if (String(prediction.model_version ?? "").toUpperCase().startsWith("MANUAL")) return true;
   const modelCoverage = Number(coverage["model_coverage"]);
   const homeMatches = Number(coverage["home_history_matches"]);
   const awayMatches = Number(coverage["away_history_matches"]);
   const historyCovered = Number.isFinite(homeMatches) && Number.isFinite(awayMatches) && homeMatches >= 3 && awayMatches >= 3;
-  const marketCovered = coverage["market_odds"] === true || String(coverage["market_odds"] ?? "").toLowerCase() === "true";
+  const marketCovered = (coverage["market_odds"] === true || String(coverage["market_odds"] ?? "").toLowerCase() === "true")
+    && String(coverage["odds_status"] ?? "").toUpperCase() === "CONFIRMED"
+    && String(coverage["odds_phase"] ?? "").toLowerCase() === "prematch"
+    && String(coverage["odds_suspended"] ?? "false").toLowerCase() !== "true"
+    && !!String(coverage["odds_bookmaker"] ?? "").trim()
+    && !/tipsaudit|fair.?market|fair.?odds/i.test(String(coverage["odds_source"] ?? ""));
   return !!modelSource && Number.isFinite(modelCoverage) && modelCoverage >= 55 && (historyCovered || marketCovered);
 }
 

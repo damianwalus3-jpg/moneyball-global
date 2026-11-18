@@ -8,7 +8,7 @@ export function isUefaNationsLeagueCompetition(competition: unknown): boolean {
   return /\buefa\b/.test(label) && /\bnations league\b/.test(label);
 }
 
-const OUT_OF_SCOPE_COMPETITION = /\b(?:uefa|fifa|nations league|champions league|europa league|conference league|world cup|international|friendly|qualif(?:ication|ier)|cup|copa|coppa|supercopa|supercoppa|supercup|coupe|pokal|trophy|shield|women|womens|woman|female|frauen|feminine|femminile|femenina|ladies|girls|youth|academy|reserve|reserves|development|u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23))\b/;
+const OUT_OF_SCOPE_COMPETITION = /\b(?:uefa|fifa|nations league|champions league|europa league|conference league|world cup|international|friendly|qualif(?:ication|ier)|cup|copa|coppa|supercopa|supercoppa|supercup|coupe|pokal|trophy|shield|women|womens|woman|female|frauen|feminine|femminile|femenina|ladies|girls|youth|academy|reserve|reserves|development|premier league 2|reserve league|u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23))\b/;
 const DOMESTIC_LEAGUE_MARKER = /\b(?:league|liga|ligue|division|divisao|divisie|bundesliga|premiership|premier|championship|superliga|super lig|serie|national|regionalliga|oberliga|esiliiga|meistriliiga|virsliga|eliteserien|allsvenskan|superettan|ekstraklasa|mfl|cfl|nl|lyga|liiga|deild|kup|mistrzostwa|1st|2nd|3rd|first|second|third)\b/;
 const TOP_TWO_COMPETITION = /\b(?:premier league|premiership|championship|super league|superliga|super lig|bundesliga|2 bundesliga|ligue 1|ligue 2|serie a|serie b|la liga|laliga|primera division|segunda division|primera divisio|segunda divisio|eredivisie|eerste divisie|keuken kampioen divisie|primeira liga|liga portugal|liga portugal 2|segunda liga|segunda divisao|ekstraklasa|i liga|1 liga|2 liga|a lyga|i lyga|1 lyga|2 lyga|veikkausliiga|ykkosliiga|allsvenskan|superettan|eliteserien|obos ligaen|1 divisjon|premier division|league of ireland premier|league of ireland first|scottish championship|challenge league|first division|second division|first league|second league|first professional league|second professional league|first professional football league|second professional football league|national football league|nb i|nb ii|nemzeti bajnoksag i|nemzeti bajnoksag ii|kategoria superiore|kategoria e pare|prva liga|prva nl|first nl|2 snl|1 snl|cymru premier|cymru north|cymru south|erovnuli liga|erovnuli liga 2|persha liga|divizia nationala|liga i|liga ii|liga 1|liga 2|super league 2|super liga|super liga 2|meistaradeildin|besta deild|urvalsdeild|lengjudeild|national division|abissnet superiore|bgl ligue|efbet league|toplyga|liga 7777|meridianbet 1 cfl|prva mfl|wwin liga)\b/i;
 
@@ -49,5 +49,5 @@ export function isEligibleOpenMatchdayTier(value: unknown): boolean {
   const match = folder.match(/^[A-Z]{3}_([1-9][0-9]*)_[A-Z0-9-]+$/i);
   if (!match) return false;
   const tier = Number(match[1]);
-  return tier >= 1 && tier <= 2 && !/\b(?:cup|women|youth|academy|reserve|reserves|u(?:15|16|17|18|19|20|21|23))\b/i.test(folder);
+  return tier >= 1 && tier <= 2 && !/(?:cup|women|womens|female|youth|academy|reserve|reserves|u(?:15|16|17|18|19|20|21|23))/i.test(folder);
 }

@@ -482,7 +482,7 @@ describe("prediction evidence and payout quote gates", () => {
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"BASELINE_ONLY", model_coverage:100, home_history_matches:10, away_history_matches:10 } }))).toBe(false);
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"PARTIAL_VERIFIED_HISTORY", model_coverage:54, home_history_matches:10, away_history_matches:10 } }))).toBe(false);
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"PARTIAL_VERIFIED_HISTORY", model_coverage:60, home_history_matches:2, away_history_matches:2 } }))).toBe(false);
-    expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"MARKET_ODDS_MODEL", model_coverage:60, market_odds:true } }))).toBe(true);
+    expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"MARKET_ODDS_MODEL", model_coverage:60, market_odds:true, odds_status:"CONFIRMED", odds_phase:"prematch", odds_suspended:false, odds_bookmaker:"Bwin", odds_source:"Bwin" } }))).toBe(true);
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_source:"", rationale:"" }))).toBe(false);
   });
 
