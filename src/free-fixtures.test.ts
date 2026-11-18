@@ -136,7 +136,7 @@ describe("timezone.football supplemental European fixtures", () => {
       home: "Arsenal", away: "Chelsea", source: "timezone.football",
       sourceUrl: "https://timezone.football/premier-league/match/arsenal-v-chelsea/",
     });
-    expect(fixtures[1]).toMatchObject({ countryCode: "GER", date: "2026-11-18", time: "01:30", home: "Bayern", away: "Köln" });
+    expect(fixtures[1]).toMatchObject({ countryCode: "GER", date: "2026-11-18", time: "00:30", home: "Bayern", away: "Köln" });
   });
 
   it("rejects malformed feed payloads rather than reporting a successful empty source", () => {
