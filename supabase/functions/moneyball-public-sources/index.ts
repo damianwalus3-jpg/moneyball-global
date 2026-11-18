@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 import { isEligibleDomesticSeniorLeague } from "../_shared/domestic-league-scope.ts";
+import { isExcludedSeniorTeam, normalizeTeamName, teamHistoryKey } from "../_shared/team-normalization.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -71,22 +72,11 @@ function isEuropeanFixture(country: unknown, _competition?: unknown, _home?: unk
   return isGeographicEuropeCountry(country);
 }
 
-function isExcludedSeniorTeam(value: unknown): boolean {
-  const team=String(value??"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
-  return /\\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico|u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23))\\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
-}
-
 function norm(s: unknown): string {
   return String(s ?? "").replace(/\s+/g, " ").trim();
 }
 
 const GITHUB_TEAM_HISTORY_URL = "https://raw.githubusercontent.com/damianwalus3-jpg/moneyball-global-web/main/public-data/team-form.json";
-function teamHistoryKey(value: unknown): string {
-  return String(value ?? "").normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase()
-    .replace(/\\b(fc|cf|sc|ac|afc|club)\\b/g," ")
-    .replace(/\\b(women|w)\\b/g," women ")
-    .replace(/[^a-z0-9]+/g," ").trim().replace(/\\s+/g," ");
-}
 async function readGithubTeamHistory(): Promise<any> {
   try {
     const payload = await safeJson(GITHUB_TEAM_HISTORY_URL);
@@ -232,7 +222,7 @@ async function openMatchday(date: string) {
   const teamForm = (folder: string, team: string) => {
     const country = folder.split("_")[0].toUpperCase();
     const rowsForTeam: {date:string; opponent:string; own:number; opp:number; competition:string}[] = [];
-    const canonical = (v:string) => v.normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+    const canonical = (v:string) => normalizeTeamName(v);
     for (const [historyFolder, rows] of historyMap.entries()) {
       if (historyFolder.split("_")[0].toUpperCase() !== country || !rows.length) continue;
       const headers = rows[0].map(x => x.trim().toLowerCase());
@@ -327,7 +317,7 @@ async function espnWomenHistory(targetDate:string) {
     return Array.isArray(data?.events)?data.events:[];
   });
   const byTeam=new Map<string,any[]>(),errors=results.filter(x=>x instanceof Error).length;
-  const key=(value:string)=>norm(value).normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const key=(value:string)=>normalizeTeamName(value);
   for(const group of results){
     if(!Array.isArray(group))continue;
     for(const event of group){
@@ -534,7 +524,7 @@ async function espn(date: string) {
   let womenHistory:any={forms:new Map(),teams:0,matches:0,errors:0,dates:0,leagues:0};
   if(womenFixtures.length){
     womenHistory=await espnWomenHistory(date);
-    const key=(value:string)=>norm(value).normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+    const key=(value:string)=>normalizeTeamName(value);
     for(const fixture of womenFixtures){
       fixture.home_form=womenHistory.forms.get(key(fixture.home_team))||fixture.home_form||null;
       fixture.away_form=womenHistory.forms.get(key(fixture.away_team))||fixture.away_form||null;
