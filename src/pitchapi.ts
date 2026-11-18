@@ -101,8 +101,8 @@ async function getData<T>(path: string): Promise<T> {
 }
 export function isPitchApiCountryEligible(countryCode: string | null | undefined): boolean {
   if (!countryCode) return false;
-  // Match the application's strict European scan policy; transcontinental/Asian
-  // associations are intentionally not inferred from a league display name.
+  // Reuse the exact country-code allowlist used by every other European fixture source.
+  // Never infer eligibility from a league display name.
   return EUROPEAN_COUNTRY_CODES.has(countryCode.toUpperCase());
 }
 export function parsePitchApiXgStats(data: PitchApiTeamMatchStats, teamId: string, match: PitchApiLeagueMatch, advanced?: PitchApiAdvancedStats): PitchApiXgObservation | null {
