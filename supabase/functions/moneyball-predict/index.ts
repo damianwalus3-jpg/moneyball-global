@@ -621,7 +621,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    if(rows.length)saved=await db("matches?on_conflict=owner_id,source,external_id",token,"POST",rows,"resolution=ignore-duplicates,return=representation");
    const sourceCounts:Record<string,number>={};
    for(const f of eligible){const key=String(f.source||"unknown");sourceCounts[key]=(sourceCounts[key]||0)+1;}
-   scheduledImport={ok:!feedError&&!publicForImport.error,attempted:true,scope:"EUROPE_MENS_DOMESTIC_TIER_1_2",feed_rows:feedRows.length,public_rows:publicRows.length,eligible_rows:eligible.length,inserted:Array.isArray(saved)?saved.length:0,skipped_existing:skippedExisting,deduplicated_candidates:deduplicatedCandidates,source_counts:sourceCounts,feed_error:feedError,public_source_error:publicForImport.error||null};
+   scheduledImport={ok:!feedError&&!publicForImport.error,attempted:true,scope:"EUROPE_MENS_ALL_SENIOR_DOMESTIC_TIERS",feed_rows:feedRows.length,public_rows:publicRows.length,eligible_rows:eligible.length,inserted:Array.isArray(saved)?saved.length:0,skipped_existing:skippedExisting,deduplicated_candidates:deduplicatedCandidates,source_counts:sourceCounts,feed_error:feedError,public_source_error:publicForImport.error||null};
   }catch(e){scheduledImport={ok:false,attempted:true,error:String(e)};}
  }
  if(scheduledImport.attempted)console.log("scheduled_import",JSON.stringify(scheduledImport));
