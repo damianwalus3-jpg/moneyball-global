@@ -228,6 +228,18 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
+    // Read-only production health check. Exposes configuration presence only,
+    // never credentials, so CI can verify the server-side free xG provider.
+    if (url.pathname === "/api/health") {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
+      return json({
+        ok: true,
+        service: "moneyball-global-rebuild",
+        pitchapiConfigured: !!env.PITCHAPI_API_KEY && /^pk_(?:live|test)_[A-Za-z0-9_-]{16,}$/.test(env.PITCHAPI_API_KEY),
+      }, 200, origin);
+    }
+
     const flashscoreFixtures = url.pathname.match(/^\/api\/flashscore\/fixtures\/(\d{4}-\d{2}-\d{2})$/);
     if (flashscoreFixtures) {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
