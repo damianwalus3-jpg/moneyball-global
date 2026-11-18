@@ -1235,3 +1235,13 @@
 - Current free app sources remain open-matchday, OpenLigaDB, openfootball, ESPN, FootyNomad and timezone.football. Their date coverage differs, so fixture totals must be deduplicated and source provenance retained.
 - No new paid API, subscription, API key, external hosting service or production MAIN change was introduced.
 - This stage is an evidence/feasibility audit, not a claim of complete European coverage. Next implementation target: investigate a direct, free Flashscore public-feed adapter that can run inside the existing Cloudflare Worker without curl_cffi or a paid intermediary; only keep it if production tests show reliable access and correct Europe-only/date filtering.
+
+
+## Stage 100 — Flashscore integrated into daily European scan (2026-11-18)
+- Verified the direct Flashscore public feed from Cloudflare Free Worker: HTTP 200, structured feed 291 KB, 89 competition headers and 215 raw match rows in the global feed sample. This feed includes many non-European competitions, so it is NOT accepted wholesale.
+- The existing Europe-only parser keeps verified European country competitions and UEFA competitions, rejects other confederations and generic world friendlies, and filters kickoffs to the exact Europe/Brussels current date. Statuses are mapped as scheduled/live/finished.
+- Fixed the Flashscore date route matcher (it previously escaped the digit token incorrectly, so requests fell through to the SPA); corrected the regression test expectation for the additional generic Europe/world exclusion.
+- Integrated `/api/flashscore/fixtures/{today}` into `scanTodayEuropeanFixtures`, including source merge/deduplication and explicit coverage counters (competitions, raw matches, accepted fixtures, non-European skips, wrong-date skips, missing timestamps, errors).
+- The temporary diagnostic endpoint was removed after the connectivity test. No debug feed/sample remains exposed.
+- Earlier baseline sources returned: FootyNomad 102 normalized date fixtures (2 pages checked; 197 page matches), OpenLigaDB 88 season catalogue entries, ESPN 28 raw events. These are separate provider counts and must not be summed as unique fixtures.
+- Final validation and deployment for the latest commits are running; production endpoint verification is pending. No MAIN Tracker records, predictions, coupons, settlements or bankroll were modified. No paid API or API key added.
