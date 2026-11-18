@@ -14,6 +14,7 @@ describe("FootyNomad public fixture page inspection", () => {
     const waitUntil = vi.fn();
     const response = await worker.fetch(new Request("https://moneyball.example/api/footynomad/inspect/2026-11-18", { headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil });
     expect(upstream.mock.calls[0][0]).toBe("https://footynomad.com/fixtures/2026-11-18");
+    expect(upstream.mock.calls[0][1].headers.Cookie).toBe("tz=Europe%2FBrussels");
     expect(response.status).toBe(200);
     expect(response.headers.get("X-MONEYBALL-SOURCE")).toBe("FootyNomad");
     expect(atob((await response.json()).htmlBase64)).toBe(html);
