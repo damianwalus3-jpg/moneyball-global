@@ -16,7 +16,7 @@ describe("FootyNomad public fixture page inspection", () => {
     expect(upstream.mock.calls[0][0]).toBe("https://footynomad.com/fixtures/2026-11-18");
     expect(response.status).toBe(200);
     expect(response.headers.get("X-MONEYBALL-SOURCE")).toBe("FootyNomad");
-    expect((await response.json()).html).toBe(html);
+    expect(atob((await response.json()).htmlBase64)).toBe(html);
     expect(cache.put).toHaveBeenCalledTimes(1);
   });
   it("rejects impossible dates before contacting FootyNomad", async () => {
