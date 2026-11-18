@@ -125,8 +125,8 @@ describe("three-leg coupon candidates", () => {
     const invalidDc = { ...prediction("bad-dc", 0.9), details: { ...prediction("bad-dc", 0.9).details, market: "DOUBLE_CHANCE", selection: "1X", probability: 0.9, p1x: 0.9, px2: 0.9, p12: 0.9, strongCandidate: false, strongDoubleChance: true, couponEligible: true } };
     expect(buildThreeLegCandidates([invalidDc, prediction("b", 0.85), prediction("c", 0.86)], "2026-11-17")).toHaveLength(0);
   });
-  it("blocks old probability-only records that lack verified factor evidence", () => {
-    const legacy = { ...prediction("legacy", 0.95), details: { ...prediction("legacy", 0.95).details, evidenceComplete: false } };
+  it("blocks records marked coupon-eligible when required evidence is incomplete", () => {
+    const legacy = { ...prediction("legacy", 0.95), details: { ...prediction("legacy", 0.95).details, couponEligible: true, evidenceComplete: false } };
     expect(buildThreeLegCandidates([legacy, prediction("b", 0.9), prediction("c", 0.9)], "2026-11-17")).toHaveLength(0);
   });
 });
