@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeHistoryProvenance, hasMissingPredictionMarket, hasValidPredictionMarket, parseHistoryProvenance, shouldAppendPrediction, shouldRetryPredictionAttempt } from "./prediction-record";
+import { describeHistoryProvenance, hasMissingPredictionMarket, hasValidPredictionMarket, parseHistoryProvenance, shouldAppendPrediction, shouldRetryPredictionAttempt, shouldRetryPredictionWithEvidence } from "./prediction-record";
 import type { TrackerRecord } from "./tracker-store";
 
 function row(id: string, probabilities: [number | null, number | null, number | null]): TrackerRecord {
@@ -20,6 +20,13 @@ describe("prediction record refresh policy", () => {
     const valid = { ...row("valid", [0.6, 0.2, 0.2]), details: { ...row("valid", [0.6, 0.2, 0.2]).details, predictionMethod: "recent-form-goals-poisson" } };
     expect(shouldAppendPrediction([valid], "fixture-1", "model-v1", true, "recent-form-goals-poisson")).toBe(false);
   });
+  it("appends a new immutable prediction when the evidence gaps change", () => {
+    const prior = { ...row("valid", [0.6, 0.2, 0.2]), details: { ...row("valid", [0.6, 0.2, 0.2]).details, evidenceComplete: false, evidenceGaps: "xG, składy" } };
+    expect(shouldAppendPrediction([prior], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "1X2", false, "składy")).toBe(true);
+    expect(shouldAppendPrediction([prior], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "1X2", false, "xG, składy")).toBe(false);
+    expect(shouldAppendPrediction([prior], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "1X2", true, "")).toBe(true);
+  });
+
   it("allows an evidence-backed forecast to supersede a neutral-prior placeholder", () => {
     const fallback = { ...row("fallback", [0.34, 0.32, 0.34]), details: { ...row("fallback", [0.34, 0.32, 0.34]).details, predictionMethod: "neutral-prior-poisson" } };
     expect(shouldAppendPrediction([fallback], "fixture-1", "model-v1", true, "recent-form-goals-poisson")).toBe(true);
@@ -48,6 +55,13 @@ describe("incomplete market retry cooldown", () => {
   it("blocks a repeated failed attempt inside the cooldown", () => {
     expect(shouldRetryPredictionAttempt(1000, 5999, 5000)).toBe(false);
   });
+  it("retries valid probability rows when evidence is incomplete, but respects cooldown", () => {
+    const prior = { ...row("valid", [0.6, 0.2, 0.2]), details: { ...row("valid", [0.6, 0.2, 0.2]).details, evidenceComplete: false } };
+    expect(shouldRetryPredictionWithEvidence(prior, "1X2", undefined, 10000, 5000)).toBe(true);
+    expect(shouldRetryPredictionWithEvidence(prior, "1X2", 9000, 10000, 5000)).toBe(false);
+    expect(shouldRetryPredictionWithEvidence({ ...prior, details: { ...prior.details, evidenceComplete: true } }, "1X2", undefined, 10000, 5000)).toBe(false);
+  });
+
   it("allows a retry exactly when the cooldown expires", () => {
     expect(shouldRetryPredictionAttempt(1000, 6000, 5000)).toBe(true);
   });
