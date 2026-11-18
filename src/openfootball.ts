@@ -40,6 +40,11 @@ const FEEDS: OpenFootballFeed[] = [
   { id:"belgium-1", countryCode:"BEL", competition:"Belgium · Pro League", urlForSeason:s=>`https://raw.githubusercontent.com/openfootball/belgium/master/${s}/be1.txt`, timeZone:"Europe/Brussels" },
 ];
 const EUROPEAN_COUNTRIES: Record<string, { code: string; label: string; timeZone: string }> = {
+belgium:{code:"BEL",label:"Belgium",timeZone:"Europe/Brussels"},
+england:{code:"ENG",label:"England",timeZone:"Europe/London"},
+germany:{code:"GER",label:"Germany",timeZone:"Europe/Berlin"},
+italy:{code:"ITA",label:"Italy",timeZone:"Europe/Rome"},
+spain:{code:"ESP",label:"Spain",timeZone:"Europe/Madrid"},
 albania:{code:"ALB",label:"Albania",timeZone:"Europe/Tirane"},
 andorra:{code:"AND",label:"Andorra",timeZone:"Europe/Andorra"},
 armenia:{code:"ARM",label:"Armenia",timeZone:"Asia/Yerevan"},
