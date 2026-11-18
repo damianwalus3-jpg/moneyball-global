@@ -62,6 +62,7 @@ The engine tracks eight separate areas. Every item must have a provider, an obse
 - Default odds freshness is tightened from six hours to 15 minutes for EV valuation. Complete 1X2 snapshot, bookmaker identity, timestamp and valid decimal prices remain mandatory.
 - EV remains unavailable until current timestamped odds are captured and the probability model is calibrated out of sample. The EV formula cannot prove the model probability is reliable.
 - The first PitchAPI xG backtest (66 eligible predictions in Denmark 1. Division 2026/2027) is exploratory only: xG modestly outperformed the goals-only baseline, but 50–70% confidence buckets were materially overconfident. This is not sufficient calibration evidence. Require multi-league, multi-season out-of-sample validation and reliability analysis before allowing the 75% threshold to qualify a coupon.
+- PitchAPI league catalogue discovery is restricted to records with `is_free === true` and an explicit European country code. Season selection must be date-aware and independent of provider array order; for standard European July–June competitions, a November 2026 scan selects 2026/2027, while a January 2026 scan selects 2025/2026. Calendar-year competitions are supported separately. Never assume `seasons[0]` is current.
 
 ## Hard limitations
 - No reviewed source provides complete, current, verified xG, confirmed lineups, injuries, suspensions, tactical data and odds for every European league and team while satisfying no-key/no-paid constraints.
