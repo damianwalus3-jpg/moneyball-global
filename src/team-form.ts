@@ -115,15 +115,16 @@ export async function loadRecentTeamForm(folder: string, team: string, beforeDat
  * of treating the cup's folder as the club's historical league.
  */
 export async function loadRecentTeamFormAcrossCountry(countryCode: string, team: string, beforeDate: string): Promise<TeamForm> {
-  if (!/^[A-Z]{3}$/.test(countryCode) || countryCode === "UEFA" || !team.trim() || !/^\\d{4}-\\d{2}-\\d{2}$/.test(beforeDate)) {
+  if (!/^[A-Z]{3}$/.test(countryCode) || countryCode === "UEFA" || !team.trim() || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(beforeDate)) {
     throw new Error("Nieprawidłowe parametry krajowej historii drużyny");
   }
   const indexResponse = await fetch(`${ROOT}/build_summary.json`);
   if (!indexResponse.ok) throw new Error(`Indeks historii niedostępny (HTTP ${indexResponse.status})`);
   const index = await indexResponse.json() as { generated_utc?: string; leagues?: Array<{ league?: string; folder?: string; fixtures?: number }> };
   const folders = (index.leagues ?? []).flatMap(league => {
-    const folder = (league.folder ?? "").replace(/^data\\//, "");
-    return new RegExp("^" + countryCode + "_\\d+_[a-z0-9-]+$").test(folder) && Number(league.fixtures) > 0
+    const rawFolder = league.folder ?? "";
+    const folder = rawFolder.startsWith("data/") ? rawFolder.slice(5) : rawFolder;
+    return new RegExp("^" + countryCode + "_[0-9]+_[a-z0-9-]+$").test(folder) && Number(league.fixtures) > 0
       ? [{ folder, league: league.league ?? folder }] : [];
   });
   if (!folders.length) throw new Error(`Brak opublikowanych lig ${countryCode} w indeksie historii`);
