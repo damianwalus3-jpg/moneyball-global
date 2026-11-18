@@ -1216,3 +1216,12 @@
 - Cloudflare Free Worker deployment completed successfully (run 44272490389). The live REBUILD homepage was read-only checked after deployment and returned successfully.
 - The failed intermediate Stage 96 test build was not deployed; the regression was corrected, the full suite passed, and only the corrected HEAD was deployed.
 - MAIN production and its historical data remain untouched.
+
+
+## Stage 98 — FootyNomad world-section confederation filter (2026-11-18)
+- Continued source-level audit after the ESPN correction. FootyNomad groups international competitions under a mixed `World` heading; its previous parser allowed any competition name containing the generic phrase "Nations League". That could import Concacaf Nations League fixtures as European when they appeared in that section.
+- Added a fail-closed exclusion for explicit CONCACAF, CONMEBOL, AFC, CAF and OFC competitions before accepting a World-section competition. World-section inclusion now requires explicit UEFA, European Championship, or UEFA Nations League wording.
+- Added a live-shape regression fixture for Concacaf Nations League under World; existing UEFA Champions League Women fixture remains included and Brazil domestic fixture remains excluded.
+- Source commit: 673c182030c409c872da61500c45d1f4dc847d15. Test commit: e22b05a1a6588c98cf5f1943a251ac9fc467e062. CI and Cloudflare deployment pending.
+- Production API read-only checks before this change: FootyNomad date endpoint returned 102 normalized fixtures, 2 pages checked, 197 page matches and no upstream errors; ESPN scoreboard endpoint returned 28 raw events for 2026-11-18; OpenLigaDB season catalogue returned 88 entries. These are provider payload counts, not unique final scan totals.
+- No scan records, predictions, coupons, bets, settlements, bankroll or production MAIN data were modified. No paid provider/API key added.
