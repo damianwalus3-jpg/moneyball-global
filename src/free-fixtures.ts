@@ -127,9 +127,23 @@ export function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
   if (startsWithCountryCode && !countryCodeFeed && !namedFeed) return false;
   return countryCodeFeed || namedFeed;
 }
-export function fixtureKey(date: string, home: string, away: string): string {
-  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  return `${date}|${normalize(home)}|${normalize(away)}`;
+export function fixtureKey(date: string, home: string, away: string, competition = ""): string {
+  const genderText = `${competition} ${home} ${away}`.toLowerCase();
+  const gender = /\\b(women|woman|womens|frauen|femmes|femenina|feminine|ladies|girls|wsl|wcl)\\b/.test(genderText) ? "women" : "open";
+  const aliases: Record<string, string> = {
+    "oud heverlee leuven": "oh leuven",
+    "inter milan": "inter",
+    "internazionale": "inter",
+  };
+  const normalize = (value: string) => {
+    const base = value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLowerCase()
+      .replace(/\\((?:women|woman|womens)\\)/g, " ")
+      .replace(/\\b(?:women|woman|womens|frauen|femmes|femenina|feminine|ladies|girls)\\b/g, " ")
+      .replace(/\\b(?:f\\.?c\\.?|a\\.?f\\.?c\\.?|c\\.?f\\.?|s\\.?c\\.?)$/g, " ")
+      .replace(/\\s+/g, " ").trim();
+    return aliases[base] ?? base;
+  };
+  return `${date}|${gender}|${normalize(home)}|${normalize(away)}`;
 }
 const ESPN_COUNTRIES: Record<string, string> = {
 albania:"ALB", andorra:"AND", armenia:"ARM", austria:"AUT", azerbaijan:"AZE", belarus:"BLR", belgium:"BEL",
@@ -241,7 +255,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     for (const response of responses) {
       if (response.error) errors.push(response.error);
       openMatchdayFixturesFound += response.fixtures.length;
-      for (const fixture of response.fixtures) byKey.set(fixtureKey(fixture.date, fixture.home, fixture.away), fixture);
+      for (const fixture of response.fixtures) byKey.set(fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition), fixture);
     }
   } catch (error) {
     errors.push(`open-matchday · ${error instanceof Error ? error.message : "indeks niedostępny"}`);
@@ -306,7 +320,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       if (response.error) errors.push(response.error);
       openLigaFixturesFound += response.fixtures.length;
       for (const fixture of response.fixtures) {
-        const key = fixtureKey(fixture.date, fixture.home, fixture.away);
+        const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
         const existing = byKey.get(key);
         if (existing) existing.source = `${existing.source} + OpenLigaDB`;
         else byKey.set(key, fixture);
@@ -323,7 +337,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     openFootballFixturesFound = openFootball.fixtures.length;
     errors.push(...openFootball.failed.map(error => `openfootball · ${error}`));
     for (const fixture of openFootball.fixtures) {
-      const key = fixtureKey(fixture.date, fixture.home, fixture.away);
+      const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
       const existing = byKey.get(key);
       if (existing) {
         existing.source = `${existing.source} + openfootball`;
@@ -354,7 +368,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     const espnFixtures = parseEspnEuropeanFixtures({ events: combinedEvents }, date);
     espnFixturesFound = espnFixtures.length;
     for (const fixture of espnFixtures) {
-      const key = fixtureKey(fixture.date, fixture.home, fixture.away);
+      const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
       const existing = byKey.get(key);
       if (existing) existing.source = `${existing.source} + ESPN`;
       else byKey.set(key, fixture);
