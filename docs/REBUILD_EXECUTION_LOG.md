@@ -1460,3 +1460,11 @@
 - Updated the app to reject an empty `games` response as an unsuccessful ingestion rather than marking the date as successfully fetched. The attempt lock remains in place after a provider request to prevent accidental repeat credit consumption.
 - Official StrikerAPI documentation confirms `POST /v1/get_odds`, the `date` parameter in UTC as `YYYY-MM-DD`, and documents 5 credits for a match / 10 for a day in its overview while the page's notes currently state 5 credits per call. Treat provider credit wording as inconsistent and do not make test calls to resolve it.
 - No live provider request was made during this fix. No historical predictions, coupons, settlements, bankroll or existing Tracker records were modified. CI and production deployment must pass before this change is considered active.
+
+## Stage 124 — Lower-tier history coverage diagnosis (2026-11-18)
+- Investigated the attached production screenshot: Piacenza–Lucchese had no PitchAPI fixture/team IDs, Open-Matchday returned no matching team results, and the ESPN fallback returned HTTP 404.
+- Read the live Open-Matchday build index (generated 2026-11-18 06:43:48 UTC). Its Italian folders are Serie A, Serie B and Coppa Italia only; it does not publish Serie C or Serie D. Therefore the Piacenza/Lucchese Serie D gap is a source-coverage limitation, not evidence that the app should relax team/score matching.
+- Improved `loadRecentTeamFormAcrossCountry` diagnostics: when no rows match, the app now reports the number of country league files scanned, the source index timestamp, and explicitly warns that the dataset does not cover every tier.
+- Added a regression test for this coverage-gap message.
+- Researched SportsEvents24 as a potential free, keyless supplement. Its documented beta allows 100 data requests/day, 5,000 returned rows/month and only event dates from the previous 7 days to next 30 days; that window cannot independently supply a reliable 3–5 match historical sample for weekly leagues. Not integrated as a replacement for historical form and no request was made.
+- No live odds fetches, paid calls, or secrets were used. No existing predictions, coupons, settlements, bankroll, or Tracker rows were modified.
