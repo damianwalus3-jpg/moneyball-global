@@ -1251,3 +1251,11 @@
 - CI caught a test-fixture placement issue: the "next-day" row inherited the preceding Concacaf competition header, so the parser correctly counted it as non-European rather than as a European wrong-date row.
 - Moved the synthetic next-day row under an explicit England competition header. This makes the test exercise the intended Brussels-date exclusion path rather than confounding it with confederation filtering.
 - No production data was involved; all changes are confined to source tests and fixture ingestion.
+
+
+## Stage 102 — Production verification of Flashscore integration (2026-11-18)
+- Cloudflare deployment completed successfully for the Europe-only Flashscore integration. Live read-only request to `/api/flashscore/fixtures/2026-11-18` returned HTTP 200 and JSON for the correct Brussels date: 89 competitions checked, 215 raw rows, 113 accepted Europe/UEFA fixtures, 102 non-European rows excluded, 0 missing timestamps. The public global feed contained no additional wrong-date European rows for this snapshot.
+- Live FootyNomad endpoint independently returned 102 date fixtures, two pages checked and no errors.
+- The app homepage returned the expected MONEYBALL rebuild title and content.
+- Updated the browser fixture scan source label to include Flashscore and bumped the local scan cache key from v12 to v13 so existing browser sessions do not keep displaying a pre-Flashscore cached result. This final cache refresh commit is pending its own CI/deploy run.
+- Counts above are per-source counts, not a combined deduplicated total. Full scan UI verification still needs an in-app scan; historical Tracker and bankroll data remain untouched.
