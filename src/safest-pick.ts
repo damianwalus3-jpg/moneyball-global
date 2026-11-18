@@ -31,7 +31,7 @@ export function hasKickoffPassed(date: string, time: string): boolean {
   return date < now.date || (date === now.date && time <= now.time);
 }
 
-export function getSafestPick(records: TrackerRecord[], minimum = 0.8): SafestPick | null {
+export function getSafestPick(records: TrackerRecord[], minimum = 0.75): SafestPick | null {
   const now = brusselsNowParts();
   const newest = new Map<string, TrackerRecord>();
   for (const row of records) {
@@ -59,7 +59,7 @@ export function getSafestPick(records: TrackerRecord[], minimum = 0.8): SafestPi
       market: best.market,
       probability: best.probability as number,
       kickoff: `${d.fixtureDate} ${d.fixtureTime}`,
-      reason: "Najwyższe dostępne prawdopodobieństwo Double Chance wśród zapisanych kandydatów; próg selekcji 80%. DC jest wyliczane z modelu 1X2, a nie trenowane niezależnie.",
+      reason: "Najwyższe dostępne prawdopodobieństwo Double Chance wśród zapisanych kandydatów; próg selekcji 75%. DC jest wyliczane z modelu 1X2, a nie trenowane niezależnie.",
     });
   }
   return candidates.sort((a, b) => b.probability - a.probability)[0] ?? null;
