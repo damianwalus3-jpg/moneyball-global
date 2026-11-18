@@ -15,10 +15,18 @@ export function shouldAppendPrediction(
   fixtureId: string,
   model: string,
   nextProbabilitiesAvailable: boolean,
+  nextMethod?: string,
 ): boolean {
   const existing = records.filter(row => row.kind === "prediction"
     && row.details.fixtureId === fixtureId && row.details.model === model);
-  if (existing.some(row => hasValidProbabilities(row.details))) return false;
+  const latestValid = existing.filter(row => hasValidProbabilities(row.details))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+  if (latestValid) {
+    // A neutral-prior forecast is only a placeholder. Preserve it in Tracker, but allow
+    // a later evidence-backed model to append a superseding record once real data arrives.
+    return latestValid.details.predictionMethod === "neutral-prior-poisson"
+      && nextProbabilitiesAvailable && nextMethod !== "neutral-prior-poisson";
+  }
   if (existing.length === 0) return true;
   return nextProbabilitiesAvailable;
 }
