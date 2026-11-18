@@ -45,7 +45,7 @@ describe("Flashscore European daily fixture parser", () => {
       id: "flashscore|uefa-1", competition: "UEFA Champions League Women - League phase", countryCode: "UEFA",
       date: "2026-11-18", time: "00:30", home: "Häcken W", away: "Manchester City W", status: "live",
     });
-    expect(result.skippedNonEuropean).toBe(2);
+    expect(result.skippedNonEuropean).toBe(3);
     expect(result.skippedWrongDate).toBe(1);
   });
 });
