@@ -292,18 +292,24 @@ describe("odds provider pilot proxy", () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { games: [{
       game_id: "game-1", starts_at: "2026-11-18T18:00:00Z",
       home: { name: "Home FC" }, away: { name: "Away FC" },
-      books: [{ provider: "ExampleBook", source: "live", captured_at: "2026-11-17T18:00:00Z", home_ml_close: 100, draw_ml_close: -110, away_ml_close: 250 }],
+      books: [{ provider: "ExampleBook", source: "live", captured_at: "2026-11-17T18:00:00Z", home_ml_close: 100, draw_ml_close: -110, away_ml_close: 250, home_handicap_open: -0.25, home_handicap_close: -0.5, handicap_home_odds: -105, handicap_away_odds: -115, total_open: 2.25, total_close: 2.5, over_odds: -108, under_odds: 100 }],
     }] } }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?strikerGameId=game-1", { headers: { Authorization: "Bearer test-pilot-token-0123456789-abcdef" } }), {
       ASSETS: { fetch: vi.fn() }, STRIKERAPI_API_KEY: "private-key-value", ODDS_PILOT_TOKEN: "test-pilot-token-0123456789-abcdef",
     }, { waitUntil: vi.fn() });
-    const body = await response.json() as { results: { strikerapi: { games: Array<{ bookmakers: Array<{ odds1: number; oddsX: number; odds2: number; complete1X2: boolean }> }> } } };
+    const body = await response.json() as { results: { strikerapi: { games: Array<{ bookmakers: Array<{ odds1: number; oddsX: number; odds2: number; homeHandicapClose: number | null; handicapHomeOdds: number | null; handicapAwayOdds: number | null; totalClose: number | null; overOdds: number | null; underOdds: number | null; complete1X2: boolean }> }> } } };
     const book = body.results.strikerapi.games[0].bookmakers[0];
     expect(book.odds1).toBe(2);
     expect(book.oddsX).toBe(1.9091);
     expect(book.odds2).toBe(3.5);
     expect(book.complete1X2).toBe(true);
+    expect(book.homeHandicapClose).toBe(-0.5);
+    expect(book.handicapHomeOdds).toBeCloseTo(1.9524, 4);
+    expect(book.handicapAwayOdds).toBeCloseTo(1.8696, 4);
+    expect(book.totalClose).toBe(2.5);
+    expect(book.overOdds).toBeCloseTo(1.9259, 4);
+    expect(book.underOdds).toBe(2);
     expect(fetchMock.mock.calls[0][1].headers["x-api-key"]).toBe("private-key-value");
   });
 
