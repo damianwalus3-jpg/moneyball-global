@@ -44,9 +44,9 @@ interface OpenLigaMatch {
 }
 const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const OPENLIGA = "/api/openligadb";
-const SOURCE = "FootyNomad + open-matchday + OpenLigaDB + openfootball + ESPN + timezone.football (publiczne terminarze)";
+const SOURCE = "Flashscore + FootyNomad + open-matchday + OpenLigaDB + openfootball + ESPN + timezone.football (publiczne terminarze)";
 const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","ISR","KOS","BLR","LIE","SMR","MCO","VAT","UEFA"]);
-const CACHE_KEY = "moneyball.free-fixtures.v12";
+const CACHE_KEY = "moneyball.free-fixtures.v13";
 const CACHE_MS = 15 * 60 * 1000;
 const TIMEZONE_FEED_CACHE_KEY = "moneyball.timezone-football.v1";
 const TIMEZONE_FEED_CACHE_MS = 15 * 60 * 1000;
