@@ -82,7 +82,7 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
       leagueSeason: match.leagueSeason ?? null,
       openFootballFeedId: match.openFootballFeedId ?? null,
       competition: match.competition,
-      model: prediction?.method ?? model,
+      model,
       market: "1X2",
       selection: prediction?.pick ?? null,
       p1: probabilities?.home ?? null,
@@ -143,7 +143,7 @@ export default function App() {
   const settlementLock = useRef(false);
   const [settleProgress, setSettleProgress] = useState(0);
   const [scanError, setScanError] = useState("");
-  const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
+  const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm }; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
   const loadFixtureForms = async (match: NonNullable<typeof fixtureScan>["fixtures"][number]) => {
     if (!hasKnownKickoff(match.date, match.time)) {
       const reason = "ODRZUCONY: brak zweryfikowanej godziny rozpoczęcia. Nie tworzymy prognozy przedmeczowej bez potwierdzonego czasu.";
