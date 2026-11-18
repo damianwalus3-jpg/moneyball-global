@@ -12,7 +12,7 @@ describe("FootyNomad public fixture page inspection", () => {
     const upstream = vi.fn().mockResolvedValue(new Response(html, { status: 200, headers: { "Content-Type": "text/html" } }));
     vi.stubGlobal("fetch", upstream);
     const waitUntil = vi.fn();
-    const response = await worker.fetch(new Request("https://moneyball.example/_internal/footynomad-inspect/2026-11-18", { headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil });
+    const response = await worker.fetch(new Request("https://moneyball.example/api/footynomad/inspect/2026-11-18", { headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil });
     expect(upstream.mock.calls[0][0]).toBe("https://footynomad.com/fixtures/2026-11-18");
     expect(response.status).toBe(200);
     expect(response.headers.get("X-MONEYBALL-SOURCE")).toBe("FootyNomad");
@@ -22,7 +22,7 @@ describe("FootyNomad public fixture page inspection", () => {
   it("rejects impossible dates before contacting FootyNomad", async () => {
     const upstream = vi.fn();
     vi.stubGlobal("fetch", upstream);
-    const response = await worker.fetch(new Request("https://moneyball.example/_internal/footynomad-inspect/2026-02-31"), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    const response = await worker.fetch(new Request("https://moneyball.example/api/footynomad/inspect/2026-02-31"), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
     expect(response.status).toBe(400);
     expect(upstream).not.toHaveBeenCalled();
   });
