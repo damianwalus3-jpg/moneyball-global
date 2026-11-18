@@ -1034,11 +1034,13 @@ export default function App() {
               if (!row) return <div className="selected-market-missing">Brak zapisanego typu dla tego rynku.</div>;
               const probability = chosenProbability(row,market);
               const eligible = isEvidenceQualifiedCandidate(row, market);
+              const displayStatus = getPredictionDisplayStatus(row, market, probability);
+              const preliminary = !eligible && row.details.evidenceComplete !== true && probability !== null;
               const pick = typeof row.details.selection === "string" ? row.details.selection : "Brak typu";
               return <div className="selected-market">
-                <div className="selected-market-head"><b>{market === "1X2" ? "1X2" : "DOUBLE CHANCE"}</b><span className={eligible ? "selected-status eligible" : "selected-status rejected"}>{getPredictionDisplayStatus(row, market, probability)}</span></div>
+                <div className="selected-market-head"><b>{market === "1X2" ? "1X2" : "DOUBLE CHANCE"}</b><span className={"selected-status " + (eligible ? "eligible" : preliminary ? "preliminary" : "rejected")}>{displayStatus}</span></div>
                 <div className="selected-pick">{pick}<strong>{probability === null ? "Brak %" : (probability * 100).toFixed(1) + "%"}</strong></div>
-                {!eligible && probability !== null && <small className="prediction-probability-note">To surowe prawdopodobieństwo modelu, a nie potwierdzona wiarygodność ani kwalifikacja do kuponu.</small>}
+                {!eligible && probability !== null && <small className="prediction-probability-note">{preliminary ? "Wysokie prawdopodobieństwo modelu — prognoza wstępna. Nie oznacza potwierdzonego typu ani dopuszczenia do kuponu." : "To surowe prawdopodobieństwo modelu, a nie potwierdzona wiarygodność ani kwalifikacja do kuponu."}</small>}
                 <p>{reasonFor(row)}</p>
                 <small>Model: {String(row.details.predictionMethod ?? row.details.modelName ?? "nieznany")} · próbka: {String(row.details.historySampleCounts ?? "brak danych")}</small>
               </div>;
