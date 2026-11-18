@@ -9,7 +9,7 @@ import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from ".
 import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
-import { describeHistoryProvenance, hasValidPredictionMarket, shouldAppendPrediction, shouldRetryPredictionAttempt } from "./prediction-record";
+import { describeHistoryProvenance, hasValidPredictionMarket, shouldAppendPrediction, shouldRetryPredictionWithEvidence } from "./prediction-record";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import { isEvidenceQualifiedCandidate } from "./prediction-eligibility";
 import { auditOddsFixtureMatches } from "./odds-matching";
@@ -62,23 +62,13 @@ function shouldRetryMissingXg(fixtureId: string): boolean {
 
 
 function shouldRetryIncompletePrediction(fixtureId: string, prior: TrackerRecord | undefined, market: "1X2" | "DOUBLE_CHANCE"): boolean {
-  if (prior) {
-    const probabilities = market === "DOUBLE_CHANCE"
-      ? [prior.details.p1x, prior.details.px2, prior.details.p12]
-      : [prior.details.p1, prior.details.px, prior.details.p2];
-    const expectedTotal = market === "DOUBLE_CHANCE" ? 2 : 1;
-    const valid = probabilities.every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
-      && Math.abs((probabilities as number[]).reduce((sum, value) => sum + value, 0) - expectedTotal) <= 0.0001;
-    if (valid) return false;
-  }
   try {
     const key = "moneyball.incompletePredictionRetryAt";
     const raw = localStorage.getItem(key);
     const parsed: unknown = raw ? JSON.parse(raw) : {};
     const attempts = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
     const attemptKey = fixtureId + "|" + market;
-    const lastAttempt = attempts[attemptKey];
-    return shouldRetryPredictionAttempt(lastAttempt, Date.now(), FALLBACK_RETRY_INTERVAL_MS);
+    return shouldRetryPredictionWithEvidence(prior, market, attempts[attemptKey], Date.now(), FALLBACK_RETRY_INTERVAL_MS);
   } catch { return false; }
 }
 
@@ -224,7 +214,7 @@ function savePredictionRecord(
     const hasOneXTwoProbabilities = !!probabilities
       && [probabilities.home, probabilities.draw, probabilities.away].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
       && Math.abs(probabilities.home + probabilities.draw + probabilities.away - 1) <= 0.0001;
-    if (shouldAppendPrediction(current, match.id, model, hasOneXTwoProbabilities, method, "1X2")) {
+    if (shouldAppendPrediction(current, match.id, model, hasOneXTwoProbabilities, method, "1X2", evidenceAudit.complete, shared.evidenceGaps)) {
       pendingPredictionRecords.push({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · 1X2 · " + method,
         status: strongCandidate ? "KANDYDAT" : "ODRZUCONY", details: oneXTwoDetails });
     }
@@ -235,7 +225,7 @@ function savePredictionRecord(
     const hasDcProbabilities = !!dc
       && [dc.oneX, dc.xTwo, dc.oneTwo].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
       && Math.abs(dc.oneX + dc.xTwo + dc.oneTwo - 2) <= 0.0001;
-    if (shouldAppendPrediction(current, match.id, model, hasDcProbabilities, method, "DOUBLE_CHANCE")) {
+    if (shouldAppendPrediction(current, match.id, model, hasDcProbabilities, method, "DOUBLE_CHANCE", evidenceAudit.complete, shared.evidenceGaps)) {
       pendingPredictionRecords.push({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · DOUBLE CHANCE · " + method,
         status: strongDoubleChance ? "KANDYDAT" : "ODRZUCONY", details: dcDetails });
     }
