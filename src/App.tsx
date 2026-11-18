@@ -184,8 +184,9 @@ export default function App() {
   const loadFixtureForms = async (match: NonNullable<typeof fixtureScan>["fixtures"][number]) => {
     if (!hasKnownKickoff(match.date, match.time)) {
       const reason = "ODRZUCONY: brak zweryfikowanej godziny rozpoczęcia. Nie tworzymy prognozy przedmeczowej bez potwierdzonego czasu.";
-      setTeamForms(current => ({ ...current, [match.id]: { loading: false, error: reason } }));
-      setRecords(savePredictionRecord(match, undefined, reason));
+      const fallback = predictFromNeutralPrior();
+      setTeamForms(current => ({ ...current, [match.id]: { prediction: fallback, loading: false, error: reason } }));
+      setRecords(savePredictionRecord(match, fallback, reason));
       return;
     }
     if (hasKickoffPassed(match.date, match.time)) {
