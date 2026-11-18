@@ -186,6 +186,7 @@ function Mecze() {
   const coupons = pageDataQuery.data?.coupons ?? [];
   const [view, setView] = useState<View>("all");
   const [q, setQ] = useState("");
+  const [sortMode, setSortMode] = useState<"kickoff" | "confidence" | "league" | "teams">("kickoff");
   const [editMatch, setEditMatch] = useState<Match | null>(null);
   const [matchOpen, setMatchOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -420,11 +421,30 @@ function Mecze() {
       return true;
     })
     .filter((match) => !q || `${match.home_team} ${match.away_team} ${match.competition ?? match.league ?? ""} ${match.country ?? ""}`.toLowerCase().includes(q.toLowerCase()))
-    .sort((a, b) =>
-      matchSortKey(a).localeCompare(matchSortKey(b)) ||
-      a.home_team.localeCompare(b.home_team) ||
-      a.away_team.localeCompare(b.away_team),
-    );
+    .sort((a, b) => {
+      if (sortMode === "league") {
+        return String(a.competition ?? a.league ?? "").localeCompare(String(b.competition ?? b.league ?? ""), "pl")
+          || matchSortKey(a).localeCompare(matchSortKey(b));
+      }
+      if (sortMode === "teams") {
+        return a.home_team.localeCompare(b.home_team, "pl")
+          || a.away_team.localeCompare(b.away_team, "pl")
+          || matchSortKey(a).localeCompare(matchSortKey(b));
+      }
+      if (sortMode === "confidence") {
+        const bestProbability = (matchId: string) => Math.max(-1, ...preds
+          .filter((prediction) => prediction.match_id === matchId
+            && isActivePredictionVersion(prediction.model_version)
+            && prediction.verdict === "WYBRANY"
+            && Number.isFinite(Number(prediction.probability)))
+          .map((prediction) => Number(prediction.probability)));
+        return bestProbability(b.id) - bestProbability(a.id)
+          || matchSortKey(a).localeCompare(matchSortKey(b));
+      }
+      return matchSortKey(a).localeCompare(matchSortKey(b))
+        || a.home_team.localeCompare(b.home_team, "pl")
+        || a.away_team.localeCompare(b.away_team, "pl");
+    });
 
   const groups = new Map<string, Match[]>();
   for (const match of filtered) {
@@ -482,7 +502,20 @@ function Mecze() {
           </Button>
         ))}
         {view !== "scans" && (
-          <Input placeholder="Szukaj drużyny lub ligi…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 max-w-xs" />
+          <>
+            <Input placeholder="Szukaj drużyny lub ligi…" value={q} onChange={(e) => setQ(e.target.value)} className="h-8 min-w-0 max-w-xs flex-1" />
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              Sortuj:
+              <select aria-label="Sortowanie meczów" value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as typeof sortMode)}
+                className="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground">
+                <option value="kickoff">Godzina rozpoczęcia</option>
+                <option value="confidence">Najwyższa pewność typu</option>
+                <option value="league">Liga A–Z</option>
+                <option value="teams">Drużyny A–Z</option>
+              </select>
+            </label>
+          </>
         )}
       </div>
 
