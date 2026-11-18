@@ -4,6 +4,29 @@ import worker from "./worker";
 afterEach(() => vi.unstubAllGlobals());
 
 
+describe("FootyNomad public fixture page inspection", () => {
+  it("fetches only the public date page and caches its HTML for parser verification", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const html = "<html><h1>Football matches</h1><h2>England 1</h2></html>";
+    const upstream = vi.fn().mockResolvedValue(new Response(html, { status: 200, headers: { "Content-Type": "text/html" } }));
+    vi.stubGlobal("fetch", upstream);
+    const waitUntil = vi.fn();
+    const response = await worker.fetch(new Request("https://moneyball.example/_internal/footynomad-inspect/2026-11-18", { headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil });
+    expect(upstream.mock.calls[0][0]).toBe("https://footynomad.com/fixtures/2026-11-18");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("X-MONEYBALL-SOURCE")).toBe("FootyNomad");
+    expect((await response.json()).html).toBe(html);
+    expect(cache.put).toHaveBeenCalledTimes(1);
+  });
+  it("rejects impossible dates before contacting FootyNomad", async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal("fetch", upstream);
+    const response = await worker.fetch(new Request("https://moneyball.example/_internal/footynomad-inspect/2026-02-31"), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(400);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+});
 describe("Cloudflare ESPN scoreboard proxy", () => {
   it("proxies the requested date, validates JSON and caches successful responses", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
