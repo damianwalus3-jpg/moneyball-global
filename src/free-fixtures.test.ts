@@ -126,7 +126,7 @@ describe("timezone.football supplemental European fixtures", () => {
       matches: [
         { competition: "premier-league", home: "Arsenal", away: "Chelsea", kickoff: "2026-11-18T17:00:00Z", status: "TIMED", url: "https://timezone.football/premier-league/match/arsenal-v-chelsea/" },
         { competition: "bundesliga", home: "Bayern", away: "Köln", kickoff: "2026-11-17T23:30:00Z", status: "TIMED", url: "https://timezone.football/bundesliga/match/bayern-v-koln/" },
-        { competition: "nations-league", home: "Denmark", away: "Norway", kickoff: "2026-11-17T19:45:00Z", status: "TIMED", url: "https://timezone.football/nations-league/match/denmark-v-norway/" },
+        { competition: "nations-league", home: "Denmark", away: "Norway", kickoff: "2026-11-18T19:45:00Z", status: "TIMED", url: "https://timezone.football/nations-league/match/denmark-v-norway/" },
         { competition: "unknown-competition", home: "Home", away: "Away", kickoff: "2026-11-18T17:00:00Z", url: "https://timezone.football/unknown/" },
         { competition: "premier-league", home: "Home", away: "Away", kickoff: "2026-11-18T17:00:00Z", url: "https://example.com/not-attributed/" },
       ],
