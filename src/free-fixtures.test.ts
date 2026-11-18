@@ -40,12 +40,18 @@ describe("European fixture source classification", () => {
     expect(isEuropeanOpenLiga({ leagueId: 23, leagueName: "BL12026", leagueShortcut: "bl12026" })).toBe(false);
   });
 
-  it("rejects a non-football sport even when the league name looks European", () => {
+  it("rejects non-football sport categories returned by the live OpenLigaDB catalogue", () => {
     expect(isEuropeanOpenLiga({
       leagueId: 4,
       leagueName: "English Premier League",
       leagueShortcut: "epl",
       sport: { sportName: "Basketball" },
+    })).toBe(false);
+    expect(isEuropeanOpenLiga({
+      leagueId: 4908,
+      leagueName: "Poland Darts Open 2026",
+      leagueShortcut: "EUPDO",
+      sport: { sportId: 44, sportName: "Test" },
     })).toBe(false);
   });
 
