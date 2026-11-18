@@ -615,6 +615,51 @@ export default {
 
 
 
+    // API-Football account status: exposes only plan/quota metadata, never account PII or credentials.
+    if (url.pathname === "/api/api-football/status") {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
+      if (!env.API_FOOTBALL_KEY) return json({ error: "api_football_not_configured" }, 503, origin);
+      const cacheKey = new Request(`${APP_ORIGIN}/api/api-football/status`, { method: "GET" });
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+      try {
+        const upstream = await fetch("https://v3.football.api-sports.io/status", {
+          headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        });
+        const raw = await upstream.text();
+        let payload: unknown;
+        try { payload = JSON.parse(raw); } catch { return json({ error: "api_football_status_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
+        if (!upstream.ok) return json({ error: "api_football_status_http_" + upstream.status }, upstream.status, origin);
+        const data = payload as { errors?: unknown; response?: { subscription?: { plan?: string; active?: boolean; end?: string }; requests?: { current?: number; limit_day?: number } } };
+        const result = {
+          provider: "API-Football Pro",
+          checkedAt: new Date().toISOString(),
+          errors: data.errors ?? null,
+          subscription: {
+            plan: data.response?.subscription?.plan ?? null,
+            active: data.response?.subscription?.active ?? null,
+            end: data.response?.subscription?.end ?? null,
+          },
+          requests: {
+            current: data.response?.requests?.current ?? null,
+            dailyLimit: data.response?.requests?.limit_day ?? null,
+            perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"),
+            perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"),
+            dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining"),
+          },
+        };
+        const response = json(result, 200, origin);
+        response.headers.set("Cache-Control", "public, max-age=300");
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "api_football_status_upstream_error" }, 502, origin);
+      }
+    }
+
     // API-Football Pro: server-side only; never expose the subscription key to the browser.
     const apiFootballDate = url.pathname.match(/^\/api\/api-football\/fixtures\/(\d{4}-\d{2}-\d{2})$/);
     if (apiFootballDate) {
@@ -639,7 +684,16 @@ export default {
         try { payload = JSON.parse(raw); } catch { return json({ error: "api_football_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
         if (!upstream.ok) return json({ error: "api_football_upstream_http_" + upstream.status, upstreamStatus: upstream.status }, upstream.status, origin);
         const data = payload as { response?: unknown[]; errors?: unknown; results?: number; paging?: unknown };
-        const response = json({ provider: "API-Football Pro", date, timezone: "Europe/Brussels", generatedAt: new Date().toISOString(), results: data.results ?? data.response?.length ?? 0, paging: data.paging ?? null, errors: data.errors ?? null, fixtures: Array.isArray(data.response) ? data.response : [] }, 200, origin);
+        const response = json({
+          provider: "API-Football Pro", date, timezone: "Europe/Brussels", generatedAt: new Date().toISOString(),
+          results: data.results ?? data.response?.length ?? 0, paging: data.paging ?? null, errors: data.errors ?? null,
+          rateLimit: {
+            perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"),
+            perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"),
+            dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining"),
+          },
+          fixtures: Array.isArray(data.response) ? data.response : [],
+        }, 200, origin);
         response.headers.set("X-MONEYBALL-SOURCE", "API-Football Pro");
         response.headers.set("Cache-Control", "public, max-age=300");
         ctx.waitUntil(cache.put(cacheKey, response.clone()));
