@@ -30,6 +30,15 @@ export interface PitchApiTeamMatchStats {
   away_team?: PitchApiTeamRef;
   periods?: Array<{ period?: string; groups?: Array<{ items?: Array<{ key?: string; home?: string | null; away?: string | null }> }> }>;
 }
+export interface PitchApiAdvancedTeam {
+  team?: PitchApiTeamRef;
+  possession_value?: { xt_total?: number | null };
+  creation?: { xag?: number | null };
+  defending?: { ppda?: number | null };
+  territory?: { field_tilt?: number | null; box_entries?: number | null };
+  tempo?: { direct_speed?: number | null };
+}
+export interface PitchApiAdvancedStats { match_id: string; teams?: PitchApiAdvancedTeam[] }
 export interface PitchApiXgObservation {
   matchId: string;
   date: string;
@@ -48,6 +57,12 @@ export interface PitchApiXgObservation {
   xgOnTargetAgainst: number | null;
   xgNonPenaltyFor: number | null;
   xgNonPenaltyAgainst: number | null;
+  ppdaFor: number | null;
+  fieldTiltFor: number | null;
+  boxEntriesFor: number | null;
+  xThreatFor: number | null;
+  xAssistedGoalsFor: number | null;
+  directSpeedFor: number | null;
 }
 export interface PitchApiXgForm {
   team: string;
@@ -63,6 +78,12 @@ export interface PitchApiXgForm {
   bigChancesAgainstPerMatch: number | null;
   xgOnTargetForPerMatch: number | null;
   xgOnTargetAgainstPerMatch: number | null;
+  ppdaPerMatch: number | null;
+  fieldTiltPerMatch: number | null;
+  boxEntriesPerMatch: number | null;
+  xThreatPerMatch: number | null;
+  xAssistedGoalsPerMatch: number | null;
+  directSpeedPerMatch: number | null;
   source: "PitchAPI";
 }
 async function getData<T>(path: string): Promise<T> {
@@ -80,7 +101,7 @@ export function isPitchApiCountryEligible(countryCode: string | null | undefined
   // associations are intentionally not inferred from a league display name.
   return new Set(["ALB","AND","AUT","BLR","BEL","BIH","BUL","CRO","CZE","DEN","ENG","EST","FRO","FIN","FRA","GER","GIB","GRE","HUN","ISL","IRE","ITA","KOS","LVA","LIE","LTU","LUX","MLT","MDA","MCO","MNE","NED","MKD","NIR","NOR","POL","POR","ROU","RUS","SMR","SCO","SRB","SVK","SVN","ESP","SWE","SUI","UKR","WAL","UEFA"]).has(countryCode.toUpperCase());
 }
-export function parsePitchApiXgStats(data: PitchApiTeamMatchStats, teamId: string, match: PitchApiLeagueMatch): PitchApiXgObservation | null {
+export function parsePitchApiXgStats(data: PitchApiTeamMatchStats, teamId: string, match: PitchApiLeagueMatch, advanced?: PitchApiAdvancedStats): PitchApiXgObservation | null {
   const period = data.periods?.find(item => item.period === "All") ?? data.periods?.[0];
   const items = period?.groups?.flatMap(group => group.items ?? []) ?? [];
   const find = (keys: string[], side: "home" | "away"): number | null => {
@@ -109,6 +130,8 @@ export function parsePitchApiXgStats(data: PitchApiTeamMatchStats, teamId: strin
   const homeNpxg = find(["expected_goals_non_penalty"], "home");
   const awayNpxg = find(["expected_goals_non_penalty"], "away");
   const date = match.time_utc.slice(0, 10);
+  const advancedTeams = advanced?.teams ?? [];
+  const advancedFor = advancedTeams.find(row => row.team?.id === teamId);
   return {
     matchId: match.id, date, isHome: homeSide,
     xgFor: homeSide ? homeXg : awayXg,
@@ -125,6 +148,12 @@ export function parsePitchApiXgStats(data: PitchApiTeamMatchStats, teamId: strin
     xgOnTargetAgainst: homeSide ? awayXgot : homeXgot,
     xgNonPenaltyFor: homeSide ? homeNpxg : awayNpxg,
     xgNonPenaltyAgainst: homeSide ? awayNpxg : homeNpxg,
+    ppdaFor: advancedFor?.defending?.ppda ?? null,
+    fieldTiltFor: advancedFor?.territory?.field_tilt ?? null,
+    boxEntriesFor: advancedFor?.territory?.box_entries ?? null,
+    xThreatFor: advancedFor?.possession_value?.xt_total ?? null,
+    xAssistedGoalsFor: advancedFor?.creation?.xag ?? null,
+    directSpeedFor: advancedFor?.tempo?.direct_speed ?? null,
   };
 }
 export function buildPitchApiXgForm(team: string, matches: PitchApiXgObservation[]): PitchApiXgForm {
@@ -145,6 +174,12 @@ export function buildPitchApiXgForm(team: string, matches: PitchApiXgObservation
     bigChancesAgainstPerMatch: average(ordered.map(row => row.bigChancesAgainst)),
     xgOnTargetForPerMatch: average(ordered.map(row => row.xgOnTargetFor)),
     xgOnTargetAgainstPerMatch: average(ordered.map(row => row.xgOnTargetAgainst)),
+    ppdaPerMatch: average(ordered.map(row => row.ppdaFor)),
+    fieldTiltPerMatch: average(ordered.map(row => row.fieldTiltFor)),
+    boxEntriesPerMatch: average(ordered.map(row => row.boxEntriesFor)),
+    xThreatPerMatch: average(ordered.map(row => row.xThreatFor)),
+    xAssistedGoalsPerMatch: average(ordered.map(row => row.xAssistedGoalsFor)),
+    directSpeedPerMatch: average(ordered.map(row => row.directSpeedFor)),
     source: "PitchAPI",
   };
 }
@@ -163,6 +198,9 @@ export async function fetchPitchApiLeagueMatches(leagueId: string, season?: stri
 }
 export async function fetchPitchApiMatchStats(matchId: string): Promise<PitchApiTeamMatchStats> {
   return getData<PitchApiTeamMatchStats>(`/api/pitchapi/matches/${encodeURIComponent(matchId)}/stats`);
+}
+export async function fetchPitchApiMatchAdvanced(matchId: string): Promise<PitchApiAdvancedStats> {
+  return getData<PitchApiAdvancedStats>(`/api/pitchapi/matches/${encodeURIComponent(matchId)}/advanced`);
 }
 
 function brusselsDate(utc: string): string {
@@ -185,21 +223,24 @@ export async function fetchPitchApiXgFormsForFixture(input: {
     .sort((a,b) => b.time_utc.localeCompare(a.time_utc)).slice(0,5);
   const selected = [...new Map([...homeMatches, ...awayMatches].map(match => [match.id, match])).values()];
   const statsByMatch = new Map<string, PitchApiTeamMatchStats>();
+  const advancedByMatch = new Map<string, PitchApiAdvancedStats>();
   let cursor = 0;
   await Promise.all(Array.from({ length: Math.min(4, selected.length) }, async () => {
     while (cursor < selected.length) {
       const match = selected[cursor++];
-      try { statsByMatch.set(match.id, await fetchPitchApiMatchStats(match.id)); } catch { /* missing match analytics stays missing */ }
+      const [statsResult, advancedResult] = await Promise.allSettled([fetchPitchApiMatchStats(match.id), fetchPitchApiMatchAdvanced(match.id)]);
+      if (statsResult.status === "fulfilled") statsByMatch.set(match.id, statsResult.value);
+      if (advancedResult.status === "fulfilled") advancedByMatch.set(match.id, advancedResult.value);
     }
   }));
   const homeRows = homeMatches.flatMap(match => {
     const stats = statsByMatch.get(match.id);
-    const row = stats ? parsePitchApiXgStats(stats, input.homeTeamId, match) : null;
+    const row = stats ? parsePitchApiXgStats(stats, input.homeTeamId, match, advancedByMatch.get(match.id)) : null;
     return row ? [row] : [];
   });
   const awayRows = awayMatches.flatMap(match => {
     const stats = statsByMatch.get(match.id);
-    const row = stats ? parsePitchApiXgStats(stats, input.awayTeamId, match) : null;
+    const row = stats ? parsePitchApiXgStats(stats, input.awayTeamId, match, advancedByMatch.get(match.id)) : null;
     return row ? [row] : [];
   });
   return {
