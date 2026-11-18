@@ -129,7 +129,7 @@ export function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
 }
 export function fixtureKey(date: string, home: string, away: string, competition = ""): string {
   const genderText = `${competition} ${home} ${away}`.toLowerCase();
-  const gender = /\b(women|woman|womens|frauen|femmes|femenina|feminine|ladies|girls|wsl|wcl)\b/.test(genderText) ? "women" : "open";
+  const gender = /\b(women|woman|womens|frauen|femmes|femenina|feminine|ladies|girls|wsl|wcl|w)\b/.test(genderText) ? "women" : "open";
   const aliases: Record<string, string> = {
     "oud heverlee leuven": "oh leuven",
     "inter milan": "inter",
@@ -138,7 +138,7 @@ export function fixtureKey(date: string, home: string, away: string, competition
   const normalize = (value: string) => {
     const base = value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
       .replace(/\((?:women|woman|womens)\)/g, " ")
-      .replace(/\b(?:women|woman|womens|frauen|femmes|femenina|feminine|ladies|girls)\b/g, " ")
+      .replace(/\b(?:women|woman|womens|frauen|femmes|femenina|feminine|ladies|girls|w)\b/g, " ")
       .replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim()
       .replace(/\b(?:fc|f c|afc|a f c|cf|c f|sc|s c)$/g, "").trim();
     return aliases[base] ?? base;
