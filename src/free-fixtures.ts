@@ -286,8 +286,9 @@ export function parseEspnEuropeanFixtures(payload: unknown, targetDate: string):
     const competition = event.competitions?.[0];
     const country = (competition?.venue?.address?.country ?? "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const note = competition?.altGameNote?.trim() || competition?.notes?.find(item => item.headline?.trim())?.headline?.trim() || "";
-    const isNationsLeague = /(?:UEFA\s+)?Nations\s+League/i.test(note);
-    const countryCode = isNationsLeague ? "UEFA" : ESPN_COUNTRIES[country];
+    // Do not mistake CONCACAF/AFC/CAF Nations League events for European fixtures.
+    const isNationsLeague = /\bUEFA\s+Nations\s+League\b/i.test(note);
+    const countryCode = ESPN_COUNTRIES[country];
     const europeanTournament = /\bUEFA\b|European Championship/i.test(note);
     if (!countryCode && !europeanTournament) continue;
     if (!event.date || !Number.isFinite(Date.parse(event.date))) continue;
