@@ -571,7 +571,7 @@ export default {
 
 
     const pitchDate = url.pathname.match(/^\/api\/pitchapi\/date\/(\d{4}-\d{2}-\d{2})$/);
-    const pitchLeagues = url.pathname === "/api/pitchapi/leagues";
+    const pitchLeagues = /^\\/api\\/pitchapi\\/leagues\\/?$/.test(url.pathname);
     const pitchLeague = url.pathname.match(/^\/api\/pitchapi\/leagues\/(l_[A-Za-z0-9]{6})$/);
     const pitchLeagueMatches = url.pathname.match(/^\/api\/pitchapi\/leagues\/(l_[A-Za-z0-9]{6})\/matches$/);
     const pitchMatch = url.pathname.match(/^\/api\/pitchapi\/matches\/(m_[A-Za-z0-9]{6})(?:\/(live|shots|lineups|events|momentum|stats|players|advanced(?:\/(?:network|players))?))?$/);
