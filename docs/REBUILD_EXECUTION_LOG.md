@@ -1225,3 +1225,13 @@
 - Source commit: 673c182030c409c872da61500c45d1f4dc847d15. Test commit: e22b05a1a6588c98cf5f1943a251ac9fc467e062. CI and Cloudflare deployment pending.
 - Production API read-only checks before this change: FootyNomad date endpoint returned 102 normalized fixtures, 2 pages checked, 197 page matches and no upstream errors; ESPN scoreboard endpoint returned 28 raw events for 2026-11-18; OpenLigaDB season catalogue returned 88 entries. These are provider payload counts, not unique final scan totals.
 - No scan records, predictions, coupons, bets, settlements, bankroll or production MAIN data were modified. No paid provider/API key added.
+
+
+## Stage 99 — Europe coverage inventory and free-source feasibility (2026-11-18)
+- Re-read the live open-matchday index (generated 2026-11-18 06:43:48 UTC): 75 total competition folders, 65 European-code folders, 62 European folders with nonzero fixture rows. Three European folders currently have zero published fixtures: Ireland First Division, Finland Veikkausliiga and Kazakhstan Premier League. Ten non-European folders are correctly excluded.
+- The 62 active European feeds cover 37 country/competition codes in the index; they are not a complete inventory of every UEFA member country or every division. Do not label this source "all Europe".
+- Evaluated Football Charts as a possible supplement: the public Dify connector describes 98 leagues in 44 countries, current/previous season fixtures, daily refresh and a no-key tier limited to 100 requests/day per IP. Its published terms say an app/bot used by other people requires a paid plan, so it is not integrated into this public Worker app under the free-only requirement.
+- Evaluated the MIT-licensed omkarcloud/flashscore-scraper: it is a local Python service using curl_cffi/BeautifulSoup and claims broad Flashscore coverage without an API key. It is not a drop-in Cloudflare Worker dependency; self-hosting or a verified serverless-compatible feed adapter is required before it can be considered. No paid Apify/RapidAPI hosted scraper is used.
+- Current free app sources remain open-matchday, OpenLigaDB, openfootball, ESPN, FootyNomad and timezone.football. Their date coverage differs, so fixture totals must be deduplicated and source provenance retained.
+- No new paid API, subscription, API key, external hosting service or production MAIN change was introduced.
+- This stage is an evidence/feasibility audit, not a claim of complete European coverage. Next implementation target: investigate a direct, free Flashscore public-feed adapter that can run inside the existing Cloudflare Worker without curl_cffi or a paid intermediary; only keep it if production tests show reliable access and correct Europe-only/date filtering.
