@@ -15,6 +15,14 @@ export function shouldAppendPrediction(records: TrackerRecord[], fixtureId: stri
   if (existing.length === 0) return true;
   return nextProbabilitiesAvailable;
 }
+
+/** True when a scanned fixture has no independent record for either market. */
+export function hasMissingPredictionMarket(records: TrackerRecord[], fixtureId: string): boolean {
+  const markets = new Set(records.filter(row => row.kind === "prediction" && row.details.fixtureId === fixtureId)
+    .map(row => row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2"));
+  return !markets.has("1X2") || !markets.has("DOUBLE_CHANCE");
+}
+
 export interface HistoryProvenanceSide { source?: string; matches?: number; homeMatches?: number; awayMatches?: number; sourceUpdatedAt?: string; }
 export interface HistoryProvenance { home?: HistoryProvenanceSide; away?: HistoryProvenanceSide; cutoffDateExclusive?: string; }
 export function parseHistoryProvenance(value: unknown): HistoryProvenance | null {
