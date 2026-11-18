@@ -1760,3 +1760,12 @@
 - Validation/deployment workflow runs are recorded after the final documentation commit. Do not claim full European coverage from this source; API-Football is one additional feed in the multi-source reconciliation.
 - Next: after production deployment, compare API-Football's mapped European same-day fixtures with FootyNomad/Flashscore and inspect source disagreements. Then validate separate API endpoints and plan entitlements for statistics, injuries, lineups and odds before integrating those datasets.
 - Scope preserved: only repository `damianwalus3-jpg/moneyball-global`, branch `moneyball-rebuild`, and Cloudflare REBUILT. No MAIN/TEST/Vercel/Lovable or legacy Supabase projects touched. No tracker history, predictions, coupons, settlements, results or bankroll were modified.
+
+
+## Stage 150 — API-Football widoczny w audycie źródeł (2026-11-18)
+- Po wdrożeniu Stage 149 pełny audyt produkcyjny zakończył się sukcesem dla daty Europe/Brussels 2026-11-18: 168 unikalnych meczów, 20 krajów, 63 rozgrywki; 0 duplikatów, 0 meczów z błędną datą, 0 spoza Europy, 0 błędów źródeł.
+- API-Football gateway odpowiedział HTTP 200, ale w tym przebiegu zwrócił 0 fixtures; zapisujemy to jako poprawną odpowiedź źródła, nie jako dowód pokrycia meczów. Wcześniejszy test endpointu zwrócił 183 fixtures dla tej daty. Różnica wymaga dalszej diagnostyki zmienności odpowiedzi/API planu/cache.
+- Dodano API-Football Pro do `sourceHealth` w audycie live. Źródło jest zdrowe, gdy wywołanie skanera nie zgłosiło błędu; liczba 0 meczów nie jest automatycznie traktowana jako awaria.
+- Nie zmieniono danych historycznych, kuponów, rozliczeń ani bankrolla.
+- Weryfikacja Stage 149: commit `bbcae7f`, CI + Rebuild Checks + Cloudflare deploy + live reconciliation — SUCCESS; 26 plików testowych, 247 testów.
+- Następny krok: sprawdzić dlaczego API-Football zwrócił 0 w pełnym skanie mimo wcześniejszego 183, a następnie porównać jego listę meczów z FootyNomad/Flashscore bez dopisywania duplikatów.
