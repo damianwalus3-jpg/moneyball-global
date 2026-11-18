@@ -1435,3 +1435,11 @@
 - The daily fetch guard remains one attempt per Brussels scan date, persisted before the request to avoid duplicate calls on refresh/reload. The StrikerAPI free allowance documented by the provider is 500 credits/month; one daily `get_odds` call costs 10 credits (about 300 credits in a 30-day month). The app deliberately does not expose a repeated-fetch unlock that could exhaust the allowance.
 - Current automated market mapping is 1X2 only. Other markets are not advertised as populated until their provider fields and settlement mapping are independently verified. StrikerAPI's published league list is limited; unsupported European fixtures remain visible with an explicit no-verified-odds message.
 - Latest code changes across odds guard, tests, App UI and fixture rows are awaiting the final CI and Cloudflare deployment confirmation. No historical prediction, coupon, settlement, bankroll or Tracker data was altered.
+
+
+## Stage 121 — additional bookmaker markets (2026-11-18)
+- Extended the existing daily StrikerAPI odds normalization to preserve the documented Asian/goal handicap line and prices, plus totals line and over/under prices, in addition to the 1X2 moneyline. American prices are converted to decimal odds; line values remain numeric line values and are not treated as prices.
+- Persisted the extra market fields on the same fixture/bookmaker/time-stamped Tracker snapshot. The European fixture list now displays 1X2, AH and O/U when the provider actually returns complete values. Missing market fields remain absent; no inferred lines or prices are generated.
+- Added a Worker regression test covering American-to-decimal conversion for home/away handicap and over/under prices, as well as preservation of the handicap and totals lines. Existing 1X2 completeness checks and EV calculations remain unchanged and continue to use only complete 1X2 prices.
+- Official field definitions and sample response: https://strikerapi.com/docs/get-odds . The endpoint describes per-bookmaker three-way moneyline, goal handicap and total, with date-wide batch cost 10 credits.
+- Stage 121 code/test/UI commits are awaiting CI and production deployment confirmation. No historical records or bankroll data were modified.
