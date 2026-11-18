@@ -619,7 +619,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
         home: item.home_team.name, away: item.away_team.name, source: "PitchAPI",
         sourceUpdatedAt: new Date().toISOString(), pitchApiMatchId: item.id,
         pitchApiHomeTeamId: item.home_team.id, pitchApiAwayTeamId: item.away_team.id,
-        pitchApiLeagueId: item.league.id, pitchApiSeason: league.season ?? undefined,
+        pitchApiLeagueId: item.league.id, pitchApiSeason: selectPitchApiSeason(league, date),
       };
       pitchApiEuropeanFixturesFound++;
       const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
