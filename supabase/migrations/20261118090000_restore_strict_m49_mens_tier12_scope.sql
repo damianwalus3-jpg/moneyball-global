@@ -122,7 +122,7 @@ $function$;
 
 CREATE OR REPLACE FUNCTION public.moneyball_guard_european_top_two_insert_scope()
 RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public','pg_temp' AS $function$
-DECLARE fixture record; v_country text; v_competition text; v_gender text; v_home text; v_away text; v_source text; v_external_id text;
+DECLARE fixture record; v_country text; v_competition text; v_gender text; v_home text; v_away text; v_source text; v_external_id text; v_day date; v_home_key text; v_away_key text;
 BEGIN
   IF tg_table_name='matches' THEN
     v_country:=coalesce(new.country,''); v_competition:=coalesce(new.competition,new.league,'');
