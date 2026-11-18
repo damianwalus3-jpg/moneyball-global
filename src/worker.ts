@@ -292,7 +292,7 @@ export default {
           const home = competitors.find(item => item.homeAway === "home");
           const away = competitors.find(item => item.homeAway === "away");
           if (!home || !away) return [];
-          const score = (item: typeof home) => {
+          const score = (item: EspnScheduleCompetitor): number => {
             const raw = typeof item.score === "object" && item.score ? item.score.value : typeof item.score === "string" ? Number(item.score) : NaN;
             return Number.isFinite(raw) ? raw : Number(typeof item.score === "object" && item.score ? item.score.displayValue : NaN);
           };
