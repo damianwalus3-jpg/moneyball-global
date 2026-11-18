@@ -53,6 +53,7 @@ const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const OPENLIGA = "/api/openligadb";
 const SOURCE = "Flashscore + FootyNomad + open-matchday + OpenLigaDB + openfootball + ESPN + timezone.football + PitchAPI catalogue (publiczne terminarze)";
 const EUROPE = EUROPEAN_COUNTRY_CODES;
+const FETCH_TIMEOUT_MS = 15_000;
 const CACHE_KEY = "moneyball.free-fixtures.v14";
 const CACHE_MS = 15 * 60 * 1000;
 const TIMEZONE_FEED_CACHE_KEY = "moneyball.timezone-football.v1";
@@ -143,12 +144,12 @@ async function fetchTimezoneFootballFeed(): Promise<TimezoneFootballFeed> {
   return payload;
 }
 async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, { headers: { Accept: "text/plain" } });
+  const response = await fetch(url, { headers: { Accept: "text/plain" }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${url.split("/").slice(-2).join("/")}`);
   return response.text();
 }
 async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { headers: { Accept: "application/json" } });
+  const response = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
   if (!response.ok) throw new Error(`HTTP ${response.status}: OpenLigaDB`);
   return response.json() as Promise<T>;
 }
