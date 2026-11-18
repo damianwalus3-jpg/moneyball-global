@@ -1809,3 +1809,12 @@
 - Parser zmieniono tak, aby raportował ograniczony do 300 znaków szczegół błędu dostawcy, z redakcją wartości token/apiKey/authorization/password. Dodano testy diagnostyki i redakcji sekretów.
 - To jest poprawa obserwowalności, nie naprawa przyczyny upstream. API-Football pozostaje zdegradowane do czasu ponownego sprawdzenia szczegółu błędu po wdrożeniu.
 - Stage 153 deployment jest aktywny; Stage 154 wymaga pełnego CI, testów, builda, wdrożenia i ponownego live audit. Nie zmieniono historii trackerów, kuponów ani bankrolla.
+
+
+### Stage 154 — poprawka redakcji sekretów i ponowna walidacja (2026-11-19)
+- Workflowy Stage 154 wykryły, że regex redakcji był nadmiernie escapowany i nie dopasowywał separatorów pól JSON; w efekcie test `apiKey` wykazał, że wartość sekretu pozostawała w komunikacie diagnostycznym.
+- Zastąpiono kruchą redakcję regexem JSON replacerem, który maskuje wartości pól o nazwach zawierających token, api_key/apiKey, authorization lub password, niezależnie od wielkości liter i zagnieżdżenia.
+- Rozszerzono test o `apiKey` oraz zagnieżdżone `Authorization`; sekret nie może pojawić się w komunikacie.
+- Poprawka kodu: `727b77603c0162e657b624fd839e60ac83443cee`; test: `c5ee9c4d3bb5eb24ca4aadde6ca1d2a92c80c234`.
+- Wdrożenie Stage 154 nadal oczekuje na zielone CI, Rebuild Checks, build i produkcyjny deploy. Nie uznajemy API-Football za naprawione upstream do czasu odczytania bezpiecznego komunikatu po wdrożeniu.
+- Bez zmian w danych historycznych, kuponach, rozliczeniach i bankrollu.
