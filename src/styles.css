@@ -84,7 +84,9 @@
 .selected-market-head>b{color:var(--text)}
 .selected-status{font-size:8px;font-weight:800;text-align:right}
 .selected-status.eligible{color:#8ce6bf}
+.selected-status.preliminary{color:#e8c77f}
 .selected-status.rejected{color:#e5a5a5}
+.prediction-probability-note{color:#e8c77f;font-size:9px;line-height:1.45;margin:0 0 8px}
 .selected-pick{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:12px 0;color:var(--text);font-size:19px;font-weight:800}
 .selected-pick strong{color:var(--accent);font-size:21px}
 .selected-market p{margin:0 0 9px;color:var(--muted);font-size:10px;line-height:1.5;overflow-wrap:anywhere}
