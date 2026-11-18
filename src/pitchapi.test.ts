@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildPitchApiXgForm, fetchPitchApiLeagueCatalog, fetchPitchApiLeagueMatches, selectPitchApiSeason, fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiAdvancedStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
+import { buildPitchApiXgForm, fetchPitchApiLeagueCatalog, fetchPitchApiLeagueMatches, selectPitchApiSeason, isPitchApiFreeEuropeanLeague, fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiAdvancedStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
 
 const match: PitchApiLeagueMatch = {
   id: "m_Ab12Cd", time_utc: "2026-11-17T19:00:00Z", status: "finished",
@@ -74,6 +74,14 @@ describe("PitchAPI xG history parsing", () => {
   });
 });
 
+describe("PitchAPI free league eligibility", () => {
+  it("admits only explicitly free leagues with an eligible European country code", () => {
+    expect(isPitchApiFreeEuropeanLeague({ id: "l_Bel123", name: "Belgian Pro League", country_code: "BEL", is_free: true })).toBe(true);
+    expect(isPitchApiFreeEuropeanLeague({ id: "l_Sau123", name: "Saudi First Division", country_code: "SAU", is_free: true })).toBe(false);
+    expect(isPitchApiFreeEuropeanLeague({ id: "l_Bel456", name: "Belgian Cup", country_code: "BEL", is_free: false })).toBe(false);
+    expect(isPitchApiFreeEuropeanLeague({ id: "l_Bel789", name: "Belgian League", country_code: "BEL" })).toBe(false);
+  });
+});
 describe("PitchAPI season selection", () => {
   it("selects the season covering a November date even when the provider lists oldest first", () => {
     expect(selectPitchApiSeason({ id: "l_Den123", name: "Denmark 1. Division", seasons: ["2024/2025", "2026/2027", "2025/2026"] }, "2026-11-19")).toBe("2026/2027");
