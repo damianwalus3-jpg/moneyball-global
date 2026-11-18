@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import worker, { parseFootyNomadFixtures } from "./worker";
+import worker, { parseFootyNomadFixtures, parseFlashscoreFixtures } from "./worker";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -20,6 +20,35 @@ const FOOTYNOMAD_SAMPLE = [
   '<a href="/fixture/103-home-vs-away" class="ticket ticket-ns"><time datetime="2026-11-18T19:00:00Z">19:00</time><span class="ticket-home">Home</span><span class="ticket-away">Away</span></a>',
   "</div></details></html>",
 ].join("");
+
+describe("Flashscore European daily fixture parser", () => {
+  it("keeps European domestic and UEFA matches, filters other confederations and world friendlies, and converts UTC to Brussels date", () => {
+    const feed = [
+      "ZA÷ENGLAND: Southern League Premier South¬ZY÷England¬ZL÷/football/england/southern-league-premier-south/¬~",
+      "AA÷eng-1¬AD÷1795021200¬AB÷1¬AE÷Home FC¬AF÷Away FC¬~",
+      "ZA÷EUROPE: UEFA Champions League Women - League phase¬ZY÷Europe¬ZL÷/football/europe/uefa-champions-league-women/¬~",
+      "AA÷uefa-1¬AD÷1794958200¬AB÷2¬AE÷Häcken W¬AF÷Manchester City W¬~",
+      "ZA÷WORLD: Friendly International¬ZY÷World¬ZL÷/football/world/friendly-international/¬~",
+      "AA÷world-1¬AD÷1795021200¬AB÷1¬AE÷Team A¬AF÷Team B¬~",
+      "ZA÷NORTH & CENTRAL AMERICA: CONCACAF Nations League¬ZY÷North & Central America¬ZL÷/football/north-central-america/concacaf-nations-league/¬~",
+      "AA÷concacaf-1¬AD÷1795021200¬AB÷1¬AE÷Team C¬AF÷Team D¬~",
+      "AA÷next-day¬AD÷1795044600¬AB÷1¬AE÷Home 2¬AF÷Away 2¬~",
+    ].join("");
+    const result = parseFlashscoreFixtures(feed, "2026-11-18");
+    expect(result.rawMatches).toBe(5);
+    expect(result.fixtures).toHaveLength(2);
+    expect(result.fixtures[0]).toMatchObject({
+      id: "flashscore|eng-1", competition: "Southern League Premier South", countryCode: "ENG",
+      date: "2026-11-18", time: "18:00", home: "Home FC", away: "Away FC", status: "scheduled",
+    });
+    expect(result.fixtures[1]).toMatchObject({
+      id: "flashscore|uefa-1", competition: "UEFA Champions League Women - League phase", countryCode: "UEFA",
+      date: "2026-11-18", time: "00:30", home: "Häcken W", away: "Manchester City W", status: "live",
+    });
+    expect(result.skippedNonEuropean).toBe(2);
+    expect(result.skippedWrongDate).toBe(1);
+  });
+});
 
 describe("FootyNomad fixture parser", () => {
   it("keeps European country fixtures and UEFA world competitions, filters non-European fixtures, and converts UTC to Brussels date", () => {
