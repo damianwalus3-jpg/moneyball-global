@@ -15,6 +15,10 @@ export interface PitchApiLeague {
   name: string;
   country_code?: string | null;
   season?: string | null;
+  seasons?: string[];
+}
+export interface PitchApiLeagueCatalog {
+  leagues: PitchApiLeague[];
 }
 export interface PitchApiLeagueMatch {
   id: string;
@@ -191,11 +195,15 @@ export async function fetchPitchApiDate(date: string): Promise<PitchApiFixture[]
   const data = await getData<{ matches?: PitchApiFixture[] }>(`/api/pitchapi/date/${date}?status=all`);
   return Array.isArray(data.matches) ? data.matches : [];
 }
+export async function fetchPitchApiLeagueCatalog(): Promise<PitchApiLeague[]> {
+  const data = await getData<PitchApiLeagueCatalog>("/api/pitchapi/leagues");
+  return Array.isArray(data.leagues) ? data.leagues : [];
+}
 export async function fetchPitchApiLeague(leagueId: string): Promise<PitchApiLeague> {
   return getData<PitchApiLeague>(`/api/pitchapi/leagues/${encodeURIComponent(leagueId)}`);
 }
-export async function fetchPitchApiLeagueMatches(leagueId: string, season?: string): Promise<PitchApiLeagueMatch[]> {
-  const params = new URLSearchParams({ status: "played" });
+export async function fetchPitchApiLeagueMatches(leagueId: string, season?: string, status: "played" | "upcoming" | "all" = "played"): Promise<PitchApiLeagueMatch[]> {
+  const params = new URLSearchParams({ status });
   if (season) params.set("season", season);
   const data = await getData<{ matches?: PitchApiLeagueMatch[] }>(`/api/pitchapi/leagues/${encodeURIComponent(leagueId)}/matches?${params.toString()}`);
   return Array.isArray(data.matches) ? data.matches : [];
