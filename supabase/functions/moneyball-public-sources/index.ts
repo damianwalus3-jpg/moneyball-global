@@ -771,7 +771,7 @@ Deno.serve(async (req: Request) => {
       };
     });
     const sourceCounts=Object.fromEntries(Object.entries(sources).map(([name,value]:[string,any])=>[name,Number(value?.fixtures?.length??value?.events_received??0)]));
-    const sourceErrors=Object.fromEntries(Object.entries(sources).filter(([,value]:[string,any])=>value?.ok===false).map(([name,value]:[string,any])=>[name,String(value?.error||"source_error")]));
+    const sourceErrors=Object.fromEntries(Object.entries(sources).filter(([,value]:[string,any])=>value instanceof Error || value?.ok===false || !!value?.error).map(([name,value]:[string,any])=>[name,String(value?.message||value?.error||"source_error")]));
     console.log("[moneyball-public-sources] daily scope summary",JSON.stringify({date,scope:"EUROPE_MENS_DOMESTIC_TIER_1_2",raw_fixture_count:all.length,eligible_fixture_count:enriched.length,source_counts:sourceCounts,source_errors:sourceErrors}));
     const responseBody=JSON.stringify({
       ok: true, date, api_key_required: false,
