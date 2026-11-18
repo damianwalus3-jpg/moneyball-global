@@ -46,9 +46,24 @@ const canonicalKeys = scan.fixtures.map(fixture => fixtureKey(fixture.date, fixt
 const duplicateKeys = canonicalKeys.filter((key, index) => canonicalKeys.indexOf(key) !== index);
 const wrongDate = scan.fixtures.filter(fixture => fixture.date !== scan.date);
 const nonEuropean = scan.fixtures.filter(fixture => !EUROPEAN_COUNTRY_CODES.has(fixture.countryCode) && !["EU", "UEFA"].includes(fixture.countryCode));
+const generatedAtMs = Date.parse(scan.generatedAt);
+const generatedAtAgeSeconds = Math.round((Date.now() - generatedAtMs) / 1000);
+const scanTimestampFresh = Number.isFinite(generatedAtMs) && generatedAtAgeSeconds >= 0 && generatedAtAgeSeconds <= 300;
+const catalogueGeneratedAtMs = Date.parse(scan.coverage.openMatchday.catalogueGeneratedAt);
+const catalogueAgeHours = Number.isFinite(catalogueGeneratedAtMs)
+  ? Math.round((Date.now() - catalogueGeneratedAtMs) / 3_600_000 * 10) / 10 : null;
+const timezoneGeneratedAtMs = Date.parse(scan.coverage.timezoneFootball.generatedAt);
+const timezoneAgeHours = Number.isFinite(timezoneGeneratedAtMs)
+  ? Math.round((Date.now() - timezoneGeneratedAtMs) / 3_600_000 * 10) / 10 : null;
 const report = {
   dateEuropeBrussels: scan.date,
   generatedAt: scan.generatedAt,
+  freshness: {
+    scanTimestampFresh,
+    scanAgeSeconds: generatedAtAgeSeconds,
+    openMatchdayCatalogueAgeHours: catalogueAgeHours,
+    timezoneFootballFeedAgeHours: timezoneAgeHours,
+  },
   totalUniqueFixtures: scan.fixtures.length,
   countries: countrySummary.length,
   competitions: new Set(scan.fixtures.map(fixture => fixture.countryCode + "|" + fixture.competition)).size,
@@ -62,7 +77,7 @@ const report = {
 };
 console.log("MONEYBALL REBUILT LIVE EUROPE FIXTURE AUDIT");
 console.log(JSON.stringify(report, null, 2));
-if (!scan.fixtures.length || Object.values(sourceHealth).filter(Boolean).length < 2
+if (!scanTimestampFresh || !scan.fixtures.length || Object.values(sourceHealth).filter(Boolean).length < 2
   || duplicateKeys.length || wrongDate.length || nonEuropean.length) {
   throw new Error("Live fixture audit failed validation; inspect the source and country diagnostics above.");
 }
