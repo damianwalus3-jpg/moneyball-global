@@ -1477,3 +1477,11 @@
 - Integrated this source as an additional fallback for Italian Serie D and Coppa Italia Serie D fixtures. It merges with other sources using existing conflict checks; conflicting results are not silently selected.
 - Added parser tests for team-to-group resolution and round result extraction.
 - No paid API calls, bookmaker calls, or secret values were used. No existing predictions, coupons, settlements, bankroll or Tracker rows were modified. Deployment and live source validation remain pending CI.
+
+## Stage 126 — Guarantee a recorded 1X2 prediction for analyzed fixtures (2026-11-18)
+- Added a neutral-prior Poisson fallback for a fixture when PitchAPI xG and all historical-results sources fail or return fewer than three valid matches.
+- The fallback produces a normalized 1/X/2 distribution and separately derived 1X/X2/12 probabilities, so the analyzed fixture is no longer left without a prediction record solely because historical sources are missing.
+- The fallback is explicitly identified as `neutral-prior-poisson`, records zero observed history samples, documents its generic λ assumptions, and always sets `strongCandidate=false`.
+- Existing evidence gating remains unchanged: fallback predictions remain `ODRZUCONY` while evidence is incomplete and cannot enter candidate/coupon pools. This is a prediction placeholder, not an empirical or calibrated forecast.
+- Integrated the fallback into the shared fixture analysis path used by bulk analysis and individual fixture analysis. Added a regression test for normalized probabilities, method label, zero sample counts and non-candidate status.
+- CI/typecheck/test/build validation pending for this stage. No historical predictions, coupons, settlement, bankroll or Tracker rows were edited.
