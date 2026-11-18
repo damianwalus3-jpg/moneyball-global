@@ -58,3 +58,7 @@
 .bet-row { grid-template-columns: .8fr 2fr .6fr .8fr 1.2fr; }
 .profit-positive { color:var(--mint); } .profit-negative { color:#ff8585; }
 @media(max-width:700px){.bet-entry-controls{grid-template-columns:1fr 1fr}.bet-entry-controls button{min-height:42px}.bet-row{grid-template-columns:1fr;gap:5px}}
+
+
+/* Stage 77 — readable per-record drill-down on narrow screens */
+.record-details{min-width:0;color:#9aabc1;font-size:11px}.record-details summary,.fixture-details summary{cursor:pointer;color:#8ce6bf;font-weight:700;list-style-position:inside;padding:5px 0}.record-details dl{display:grid;gap:6px;margin:8px 0;max-width:100%}.record-details dl>div{display:grid;grid-template-columns:minmax(90px,.7fr) minmax(0,2fr);gap:8px;border-top:1px solid #253249;padding:6px 0}.record-details dt{color:#8292a8;overflow-wrap:anywhere}.record-details dd{margin:0;color:#d5dfed;overflow-wrap:anywhere;white-space:pre-wrap}.tracker-row-detail{grid-template-columns:.65fr 1.8fr .7fr 1fr auto auto;align-items:start}.fixture-details{grid-column:1/-1;border-top:1px solid #253249;padding-top:6px;color:#9aabc1;font-size:11px}.fixture-details p{margin:5px 0;overflow-wrap:anywhere}.metric-card-button{position:relative}.metric-card-button:focus-visible,.record-details summary:focus-visible,.fixture-details summary:focus-visible{outline:2px solid #8ce6bf;outline-offset:3px}@media(max-width:700px){.tracker-row-detail{grid-template-columns:1fr auto}.tracker-row-detail>*{min-width:0}.record-details{grid-column:1/-1}.record-details dl>div{grid-template-columns:1fr;gap:3px}}
