@@ -34,12 +34,17 @@ This project is designed to stay within free service quotas; no paid services ar
 
 ## European fixture sources
 
-The daily scan combines two public, keyless feeds:
+The daily scan combines seven public fixture sources: **open-matchday**, **OpenLigaDB**, **OpenFootball**, **ESPN Soccer**, **FootyNomad**, **timezone.football** and the **Flashscore public daily feed**. The first six are read through their public feeds/pages; Flashscore is proxied by the same Cloudflare Worker and filtered server-side. No paid scraper or proxy is used.
 
-- **open-matchday** — daily CSV dataset with 75 competitions in its current catalogue. It is non-commercial and its coverage varies by competition. The app scans all recognised European folders, including cups and youth categories, instead of filtering them out.
-- **OpenLigaDB** — public football API with a dynamic season catalogue. It is community-maintained, has no API key, and is used as a complementary source. Requests are throttled and successful responses are cached by the separate Cloudflare Worker for eight hours.
+- **open-matchday** — daily CSV catalogue, including all currently indexed European folders with fixtures; non-commercial terms apply and coverage varies by competition.
+- **OpenLigaDB** — public season catalogue and match feeds; requests are throttled and Worker responses cached.
+- **OpenFootball** — public-domain Football.TXT repositories for selected European leagues and cups; repository coverage and update cadence vary.
+- **ESPN Soccer** — public daily scoreboards; fixtures are accepted only when the event metadata identifies a European country or UEFA event.
+- **FootyNomad** — public fixture date pages; previous/current UTC pages are normalized to Europe/Brussels date and filtered to UEFA countries/competitions.
+- **timezone.football** — attributed public 14-day feed, cached for 15 minutes as required by its feed guidance.
+- **Flashscore** — public daily feed proxied by the Worker; explicit non-European confederations are excluded and only today's Europe/Brussels fixtures are accepted.
 
-Matches are normalized to Europe/Brussels date and deduplicated across feeds. The app reports provider errors and source counts. No single free feed proves complete coverage of every European senior, women's, youth, regional and amateur match; missing data is never invented. OpenLigaDB data is subject to its ODbL 1.0 and fair-use guidance; open-matchday's non-commercial terms must be respected.
+All feeds are normalized to Europe/Brussels date, merged and deduplicated by date/team identity (with women's fixtures distinguished). Per-source counts and errors are retained. Provider counts must not be summed as unique matches. No single free feed or combination currently proves complete coverage of every European senior, women's, youth, regional and amateur match; missing data is never invented. OpenLigaDB data is subject to its ODbL 1.0 and fair-use guidance; open-matchday's non-commercial terms must be respected.
 
 ### Additional fixture source: OpenFootball
 
