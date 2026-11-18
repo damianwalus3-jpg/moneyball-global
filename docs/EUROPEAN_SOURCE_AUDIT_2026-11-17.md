@@ -137,3 +137,18 @@ No new provider was enabled, no API key was added, and no provider credits were 
 - No API keys were created, requested, or stored. No provider credits/requests were consumed. No Supabase function, database row, match, prediction, coupon, settlement or bankroll data was changed.
 - Existing project constraint against introducing API keys remains in force until the owner explicitly approves the free API-Football key.
 - Official references checked 2026-11-18: API-Football coverage/pricing/docs (https://www.api-football.com/coverage, https://www.api-football.com/pricing, https://www.api-football.com/documentation-v3); PitchAPI (https://pitchapi.dev/); Football API (https://footballapi.org/); FootyCheck robots and country index (https://footycheck.com/robots.txt, https://footycheck.com/football/countries/); Livesport Terms (https://www.livesport.eu/terms-of-use/en); SofaScore Terms/FAQ (https://www.sofascore.com/terms-and-conditions, https://sofascore.helpscoutdocs.com/article/129-does-sofascore-offer-sports-data-api).
+
+
+## Production source-parser correction — 2026-11-18
+
+A code review of the OpenMatchday/ESPN/TheSportsDB aggregator found regex literals with doubled backslashes. In regex literals, this caused several intended tokens to be treated as literal backslash sequences rather than word boundaries or digit classes. Affected paths included team-name accent normalization, club-name history keys, reserve/youth-team exclusions, WSL detection, ISO offset recognition and TheSportsDB date validation.
+
+Corrections committed on MAIN:
+- `f2155d6`: added shared `_shared/team-normalization.ts` so source adapters use one canonical team normalizer, one reserve/youth exclusion rule and one history-key normalizer.
+- `112703c`: added Deno regression tests for accents, whitespace, reserve/academy/youth teams, senior-team retention and women's identity.
+- `ffdbcdd` and `1a8425b`: repaired the escaped regexes in `moneyball-public-sources`, including WSL, ISO offsets and date parsing.
+- `7461cb1`: changed `footynomad-sync` to use the same shared senior-team exclusion helper.
+- `223fe2b`: corrected the women's history-key expected value in the regression test.
+- `2831819`: added the new test file to the MAIN GitHub Actions CI workflow.
+
+Validation status at the time of this entry: GitHub Actions was triggered for MAIN commit `2831819`; its run was queued when checked. Do not describe CI or the production Edge Function deployments as passed until the run completes and the two affected Edge Functions are deployed and smoke-tested. No database rows, match records, predictions, coupons, settlements or bankroll values were changed by these source edits.
