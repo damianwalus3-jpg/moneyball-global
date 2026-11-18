@@ -163,10 +163,10 @@ CREATE OR REPLACE FUNCTION public.moneyball_guard_coupon_leg_scope()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $function$
 DECLARE v_coupon record; v_match record; v_prediction record;
 BEGIN
-  SELECT c.owner_id,c.coupon_type,c.source_class,c.target_legs,c.stake INTO v_coupon FROM public.coupons c WHERE c.id=NEW.coupon_id;
+  SELECT c.owner_id,c.coupon_type,c.source_class,c.target_legs,c.stake,c.status INTO v_coupon FROM public.coupons c WHERE c.id=NEW.coupon_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Coupon not found for leg insertion.'; END IF;
   IF NEW.owner_id IS DISTINCT FROM v_coupon.owner_id THEN RAISE EXCEPTION 'Coupon leg owner does not match coupon owner.'; END IF;
-  IF upper(coalesce(v_coupon.coupon_type,'')) NOT IN ('MAIN','MEGA','EXTRA') OR coalesce(v_coupon.source_class,'MODEL')='PAPER' OR v_coupon.stake IS DISTINCT FROM 4.00 THEN
+  IF upper(coalesce(v_coupon.coupon_type,'')) NOT IN ('MAIN','MEGA','EXTRA') OR coalesce(v_coupon.source_class,'MODEL')='PAPER' OR v_coupon.stake IS DISTINCT FROM 4.00 OR coalesce(v_coupon.status,'') <> 'pending' THEN
     RAISE EXCEPTION 'Only official EUR 4 MAIN/AKO coupons can receive new legs.';
   END IF;
   IF (v_coupon.target_legs=1 AND v_coupon.coupon_type<>'MAIN') OR (v_coupon.target_legs=3 AND v_coupon.coupon_type NOT IN ('MEGA','EXTRA')) OR v_coupon.target_legs NOT IN (1,3) THEN
