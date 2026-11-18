@@ -1,4 +1,4 @@
-import { isEligibleDomesticTopTwoLeague, isEligibleOpenMatchdayTier } from "./domestic-league-scope.ts";
+import { isEligibleDomesticSeniorLeague, isEligibleDomesticTopTwoLeague, isEligibleOpenMatchdayTier } from "./domestic-league-scope.ts";
 import { isExcludedSeniorTeam, isWomensTeam, teamHistoryKey } from "./team-normalization.ts";
 
 export function isEligibleResultsSyncMatch(match: {
@@ -13,8 +13,12 @@ export function isEligibleResultsSyncMatch(match: {
 }): boolean {
   const gender = String(match.gender ?? "").trim().toLowerCase();
   if (gender && gender !== "men") return false;
-  return isEligibleDomesticTopTwoLeague(match.country, match.competition ?? match.league)
-    && (String(match.source ?? "").trim().toLowerCase() !== "openmatchday" || isEligibleOpenMatchdayTier(match.external_id))
+  const source = String(match.source ?? "").trim().toLowerCase();
+  const competition = match.competition ?? match.league;
+  const competitionEligible = source === "openmatchday"
+    ? isEligibleDomesticTopTwoLeague(match.country, competition) && isEligibleOpenMatchdayTier(match.external_id)
+    : isEligibleDomesticSeniorLeague(match.country, competition);
+  return competitionEligible
     && !isWomensTeam(match.home_team) && !isWomensTeam(match.away_team)
     && !isExcludedSeniorTeam(match.home_team) && !isExcludedSeniorTeam(match.away_team);
 }
