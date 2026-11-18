@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
+import { isEligibleResultsSyncMatch } from "../_shared/results-sync-scope.ts";
 import { isWomensTeam } from "../_shared/team-normalization.ts";
 import { selectEspnLeagues } from "./espn-leagues.ts";
 const SUPABASE_URL="https://gzgeklcukrclgwbsmbsp.supabase.co";
@@ -7,9 +7,6 @@ const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 const cors={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type, x-cron-token","Access-Control-Allow-Methods":"GET, POST, OPTIONS"};
 
 
-function isEuropeanFixture(country: unknown, _competition?: unknown, _home?: unknown, _away?: unknown): boolean {
-  return isGeographicEuropeCountry(country);
-}
 
 function clean(s:string){return s.replace(/<[^>]*>/g," ").replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;|&apos;/g,"'").replace(/&nbsp;/g," ").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#(\d+);/g,(_,n)=>String.fromCodePoint(Number(n))).replace(/\s+/g," ").trim();}
 function day(d:Date){return new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);}
@@ -59,7 +56,7 @@ async function limitedSettled<T,R>(items:T[],limit:number,fn:(item:T)=>Promise<R
 async function readAlternateResults(startDate:string,endDate:string):Promise<ScoreFeed[]>{
  const alternateStarted=Date.now();
  const out:ScoreFeed[]=[];
- const matchFields="select=id,external_id,home_team,away_team,owner_id,country,league,gender,kickoff_at,kickoff_date,status";
+ const matchFields="select=id,external_id,source,home_team,away_team,owner_id,country,competition,league,gender,kickoff_at,kickoff_date,status";
  const discoveryStarted=Date.now();
  const [timedMatches,dateOnlyMatches]=await Promise.all([
   db("matches?"+matchFields+"&kickoff_at=gte."+encodeURIComponent(startDate+"T00:00:00Z")+"&kickoff_at=lt."+encodeURIComponent(endDate+"T23:59:59Z")).catch(()=>[]),
@@ -67,7 +64,7 @@ async function readAlternateResults(startDate:string,endDate:string):Promise<Sco
  ]);
  console.log("[moneyball-results-sync] discovery",JSON.stringify({timedMatches:timedMatches.length,dateOnlyMatches:dateOnlyMatches.length,durationMs:Date.now()-discoveryStarted}));
  const unresolved=[...(timedMatches||[]),...(dateOnlyMatches||[])],todayKey=day(new Date());
- const due=unresolved.filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team)&&((m.kickoff_at&&new Date(m.kickoff_at).getTime()<Date.now())||(!m.kickoff_at&&m.kickoff_date&&String(m.kickoff_date)<=todayKey))&& !["finished","postponed","cancelled"].includes(String(m.status||"").toLowerCase()));
+ const due=unresolved.filter((m:any)=>isEligibleResultsSyncMatch(m)&&((m.kickoff_at&&new Date(m.kickoff_at).getTime()<Date.now())||(!m.kickoff_at&&m.kickoff_date&&String(m.kickoff_date)<=todayKey))&& !["finished","postponed","cancelled"].includes(String(m.status||"").toLowerCase()));
  if(!due.length){
   console.log("[moneyball-results-sync] alternate sources skipped",JSON.stringify({reason:"no_due_unresolved_matches",durationMs:Date.now()-alternateStarted}));
   return [];
@@ -303,8 +300,8 @@ async function reconcileRescheduledMatches(ownerId:string|null=null){
  }
  if(!futureById.size)return {updated:0,errors:readErrors};
  const cutoff=new Date(Date.now()-3*60*60*1000).toISOString();
- const stale=await db("matches?select=id,external_id,source,kickoff_at,status,home_team,away_team,country,league,notes&kickoff_at=lt."+encodeURIComponent(cutoff)+"&status=in.(scheduled,unknown,live)"+(ownerId?"&owner_id=eq."+encodeURIComponent(ownerId):""));
- const candidates=(stale||[]).filter((m:any)=>String(m.source||"").toLowerCase()==="footynomad"&&m.external_id&&isEuropeanFixture(m.country,m.league,m.home_team,m.away_team)&&futureById.has(String(m.external_id)));
+ const stale=await db("matches?select=id,external_id,source,kickoff_at,status,home_team,away_team,country,competition,league,gender,notes&kickoff_at=lt."+encodeURIComponent(cutoff)+"&status=in.(scheduled,unknown,live)"+(ownerId?"&owner_id=eq."+encodeURIComponent(ownerId):""));
+ const candidates=(stale||[]).filter((m:any)=>String(m.source||"").toLowerCase()==="footynomad"&&m.external_id&&isEligibleResultsSyncMatch(m)&&futureById.has(String(m.external_id)));
  if(!candidates.length)return {updated:0,errors:readErrors};
  const ids=candidates.map((m:any)=>m.id);
  const existing:any[]=[];
@@ -396,14 +393,14 @@ Deno.serve(async(req:Request)=>{
    try{
     // Query a wide UTC window, then filter by the actual Brussels calendar day.
     const start=new Date(Date.parse(date+"T00:00:00.000Z")-86400000),end=new Date(Date.parse(date+"T00:00:00.000Z")+2*86400000);
-     const matchFields="select=id,external_id,source,home_team,away_team,country,league,gender,kickoff_at,kickoff_date,status,owner_id";
+     const matchFields="select=id,external_id,source,home_team,away_team,country,competition,league,gender,kickoff_at,kickoff_date,status,owner_id";
      const ownerFilter=ownerId?"&owner_id=eq."+encodeURIComponent(ownerId):"";
      const matchLoadStarted=Date.now();
      const [rawMatches,rawDateOnly]=await Promise.all([
       db("matches?"+matchFields+"&kickoff_at=gte."+encodeURIComponent(start.toISOString())+"&kickoff_at=lt."+encodeURIComponent(end.toISOString())+ownerFilter),
       db("matches?"+matchFields+"&kickoff_at=is.null&kickoff_date=eq."+encodeURIComponent(date)+ownerFilter),
      ]);
-     const matches=[...(rawMatches||[]).filter((m:any)=>m.kickoff_at&&day(new Date(m.kickoff_at))===date),...(rawDateOnly||[]).filter((m:any)=>String(m.kickoff_date||"").slice(0,10)===date)].filter((m:any)=>isEuropeanFixture(m.country,m.league,m.home_team,m.away_team));
+     const matches=[...(rawMatches||[]).filter((m:any)=>m.kickoff_at&&day(new Date(m.kickoff_at))===date),...(rawDateOnly||[]).filter((m:any)=>String(m.kickoff_date||"").slice(0,10)===date)].filter((m:any)=>isEligibleResultsSyncMatch(m));
     const existingResults:any[]=[];
     // Bound every IN query to avoid PostgREST gateway URL limits on large match days.
     for(let offset=0;offset<matches.length;offset+=100){
