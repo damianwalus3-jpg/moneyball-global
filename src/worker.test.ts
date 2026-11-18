@@ -1,33 +1,76 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import worker from "./worker";
+import worker, { parseFootyNomadFixtures } from "./worker";
 
 afterEach(() => vi.unstubAllGlobals());
 
 
-describe("FootyNomad public fixture page inspection", () => {
-  it("fetches only the public date page and caches its HTML for parser verification", async () => {
+
+const FOOTYNOMAD_SAMPLE = [
+  "<html><h1>Football matches on 18 November 2026</h1>",
+  '<h2>World <span>1</span></h2><details class="league-group"><summary><a href="/league/1">UEFA Champions League Women</a></summary><div>',
+  '<a href="/fixture/101-hacken-w-vs-city-w" class="ticket ticket-ns"><span class="ticket-stub"><b><time datetime="2026-11-17T23:30:00Z">23:30</time></b></span><span class="ticket-body"><span class="ticket-home">Häcken W</span><span class="ticket-away">Manchester City W</span></span></a>',
+  "</div></details>",
+  '<h2>England <span>1</span></h2><details class="league-group"><summary><a href="/league/2">WSL Cup</a></summary><div>',
+  '<a href="/fixture/102-chelsea-w-vs-arsenal-w" class="ticket ticket-finished"><span class="ticket-stub"><b><time datetime="2026-11-18T18:00:00Z">18:00</time></b><small class="ticket-sub">full time</small></span><span class="ticket-body"><span class="ticket-home">Chelsea W</span><span class="ticket-away">Arsenal W</span></span></a>',
+  "</div></details>",
+  '<h2>Brazil <span>1</span></h2><details class="league-group"><summary><a href="/league/3">Serie A</a></summary><div>',
+  '<a href="/fixture/103-home-vs-away" class="ticket ticket-ns"><time datetime="2026-11-18T19:00:00Z">19:00</time><span class="ticket-home">Home</span><span class="ticket-away">Away</span></a>',
+  "</div></details></html>",
+].join("");
+
+describe("FootyNomad fixture parser", () => {
+  it("keeps European country fixtures and UEFA world competitions, filters non-European fixtures, and converts UTC to Brussels date", () => {
+    const result = parseFootyNomadFixtures(FOOTYNOMAD_SAMPLE, "2026-11-17", "2026-11-18");
+    expect(result.pageMatches).toBe(3);
+    expect(result.fixtures).toHaveLength(2);
+    expect(result.fixtures[0]).toMatchObject({
+      id: "footynomad|101", competition: "UEFA Champions League Women", countryCode: "UEFA",
+      date: "2026-11-18", time: "00:30", home: "Häcken W", away: "Manchester City W", source: "FootyNomad",
+    });
+    expect(result.fixtures[1]).toMatchObject({
+      id: "footynomad|102", competition: "WSL Cup", countryCode: "ENG",
+      date: "2026-11-18", time: "19:00", status: "finished",
+    });
+  });
+
+  it("skips live fixture cards with no exact kickoff timestamp instead of inventing a time", () => {
+    const html = '<h2>Japan 1</h2><details class="league-group"><summary><a href="/league/4">WE League</a></summary><a href="/fixture/104-live-vs-team" class="ticket ticket-live"><small class="ticket-sub">11\\' live</small><span class="ticket-home">Home W</span><span class="ticket-away">Away W</span></a></details>';
+    const result = parseFootyNomadFixtures(html, "2026-11-18", "2026-11-18");
+    expect(result.fixtures).toHaveLength(0);
+    expect(result.skippedNoTimestamp).toBe(1);
+  });
+});
+
+describe("FootyNomad daily fixtures Worker proxy", () => {
+  it("fetches the two UTC date pages, returns normalized Europe-only fixtures, and caches", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
-    const html = "<html><h1>Football matches</h1><a href=\"/fixtures/2026-11-18\">date</a><h2>England 1</h2></html>";
-    const upstream = vi.fn().mockResolvedValue(new Response(html, { status: 200, headers: { "Content-Type": "text/html" } }));
+    const upstream = vi.fn().mockResolvedValue(new Response(FOOTYNOMAD_SAMPLE, { status: 200, headers: { "Content-Type": "text/html" } }));
     vi.stubGlobal("fetch", upstream);
     const waitUntil = vi.fn();
-    const response = await worker.fetch(new Request("https://moneyball.example/api/footynomad/inspect/2026-11-18", { headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil });
-    expect(upstream.mock.calls[0][0]).toBe("https://footynomad.com/fixtures/2026-11-18");
-    expect(upstream.mock.calls[0][1].headers.Cookie).toBe("tz=Europe%2FBrussels");
+    const response = await worker.fetch(new Request("https://moneyball.example/api/footynomad/fixtures/2026-11-18", { headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" } }), { ASSETS: { fetch: vi.fn() } }, { waitUntil });
+    expect(upstream).toHaveBeenCalledTimes(2);
+    expect(upstream.mock.calls.map(call => call[0])).toEqual([
+      "https://footynomad.com/fixtures/2026-11-17",
+      "https://footynomad.com/fixtures/2026-11-18",
+    ]);
     expect(response.status).toBe(200);
     expect(response.headers.get("X-MONEYBALL-SOURCE")).toBe("FootyNomad");
-    expect(atob((await response.json()).htmlBase64)).toBe(html);
+    const body = await response.json();
+    expect(body.fixtures).toHaveLength(2);
+    expect(body.pagesChecked).toBe(2);
     expect(cache.put).toHaveBeenCalledTimes(1);
   });
+
   it("rejects impossible dates before contacting FootyNomad", async () => {
     const upstream = vi.fn();
     vi.stubGlobal("fetch", upstream);
-    const response = await worker.fetch(new Request("https://moneyball.example/api/footynomad/inspect/2026-02-31"), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    const response = await worker.fetch(new Request("https://moneyball.example/api/footynomad/fixtures/2026-02-31"), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
     expect(response.status).toBe(400);
     expect(upstream).not.toHaveBeenCalled();
   });
 });
+
 describe("Cloudflare ESPN scoreboard proxy", () => {
   it("proxies the requested date, validates JSON and caches successful responses", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
