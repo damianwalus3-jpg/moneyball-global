@@ -95,3 +95,23 @@ export function listOddsBookmakers(records: TrackerRecord[], fixtureIds: string[
     return Number.isFinite(captured) && captured <= current && current - captured <= maxAgeMinutes * 60_000 ? [d.bookmaker] : [];
   }))].sort((a, b) => a.localeCompare(b));
 }
+
+/**
+ * One automatic StrikerAPI daily snapshot is allowed per fixture-scan date.
+ * A failed/empty attempt is still recorded by the caller to protect the free
+ * monthly credit allowance from repeated refreshes or reloads.
+ */
+export function shouldAutoFetchDailyOdds(input: {
+  fixtureDate: string;
+  tokenSaved: boolean;
+  lastSuccessfulDate: string;
+  lastAttemptedDate: string;
+}): boolean {
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(input.fixtureDate)) return false;
+  const year = Number(input.fixtureDate.slice(0, 4));
+  const month = Number(input.fixtureDate.slice(5, 7));
+  const day = Number(input.fixtureDate.slice(8, 10));
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return false;
+  return input.tokenSaved && input.lastSuccessfulDate !== input.fixtureDate && input.lastAttemptedDate !== input.fixtureDate;
+}
