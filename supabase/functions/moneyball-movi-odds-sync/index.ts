@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { isEligibleDomesticTopTwoLeague } from "../_shared/domestic-league-scope.ts";
+import { isEligibleDomesticSeniorLeague } from "../_shared/domestic-league-scope.ts";
 import { isExcludedSeniorTeam, isWomensTeam } from "../_shared/team-normalization.ts";
 import { shouldSkipMoviOddsSync } from "../_shared/movi-odds-config.ts";
 
@@ -70,7 +70,7 @@ Deno.serve(async(req)=>{
   const rawMatches=await db("matches?select=id,owner_id,user_id,home_team,away_team,competition,league,country,gender,kickoff_at,kickoff_date,status&kickoff_date=eq."+encodeURIComponent(day)+"&order=kickoff_at.asc"+ownerFilter);
    const matches=(rawMatches||[]).filter((match:any)=>{
    const gender=String(match.gender??"").toLowerCase();
-   return isEligibleDomesticTopTwoLeague(match.country,match.competition||match.league)
+   return isEligibleDomesticSeniorLeague(match.country,match.competition||match.league)
     && (!gender||gender==="men")
     && !isWomensTeam(match.home_team)&&!isWomensTeam(match.away_team)
     && !isExcludedSeniorTeam(match.home_team)&&!isExcludedSeniorTeam(match.away_team);
