@@ -1169,3 +1169,13 @@
 - This is a test-only hardening change; fixture selection behavior is unchanged. No new provider was added.
 - Regression test commit: cdf7ba5259e0099df9a914ed2605260e69712d16. CI and deploy for the resulting latest HEAD must pass before recording validation.
 - No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
+
+
+## Stage 95 — fail-closed OpenLigaDB sport metadata validation (2026-11-18)
+- Live catalogue audit found 88 OpenLigaDB competition entries for season 2026, each with explicit `sport.sportName`; categories include football, women's football, ice hockey and test data.
+- Previous European competition filter rejected explicit non-football categories but allowed missing/blank sport metadata to continue to country/shortcut heuristics. Tightened it to require an explicit sport name containing football/Fußball before a competition can be imported.
+- Updated positive classification fixtures to include the verified football sport metadata; added regression tests that missing/blank metadata is rejected. Existing tests also reject Basketball, the live Darts `Test` category, and synthetic Bundesliga entries.
+- Source commit: 2d591a6beafbce2a5842080994f98124526b8f4b. Test commit: 18cd8c791a0ef0a4154d369b201e8888d62ff989. Documentation commit: pending.
+- Tradeoff: this deliberately prefers a false negative over importing a non-football event when OpenLigaDB omits the sport category. The current live catalogue confirms this field is populated for all 88 entries.
+- CI, rebuild checks and Cloudflare deployment for the new test commit must pass before marking Stage 95 deployed.
+- No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
