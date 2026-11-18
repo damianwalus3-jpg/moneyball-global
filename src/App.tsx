@@ -9,7 +9,7 @@ import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from ".
 import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
-import { describeHistoryProvenance, shouldAppendPrediction } from "./prediction-record";
+import { describeHistoryProvenance, hasMissingPredictionMarket, shouldAppendPrediction } from "./prediction-record";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import { auditOddsFixtureMatches } from "./odds-matching";
 import { auditMarketCoverage } from "./market-coverage";
@@ -54,6 +54,23 @@ function shouldRetryMissingXg(fixtureId: string): boolean {
     const lastAttempt = attempts[fixtureId];
     if (typeof lastAttempt === "number" && Number.isFinite(lastAttempt) && Date.now() - lastAttempt < FALLBACK_RETRY_INTERVAL_MS) return false;
     localStorage.setItem(XG_RETRY_KEY, JSON.stringify({ ...attempts, [fixtureId]: Date.now() }));
+    return true;
+  } catch { return false; }
+}
+
+
+function shouldRetryIncompletePrediction(fixtureId: string, prior?: TrackerRecord): boolean {
+  if (!prior) return true;
+  const probabilities = [prior.details.p1, prior.details.px, prior.details.p2];
+  if (probabilities.every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)) return false;
+  try {
+    const key = "moneyball.incompletePredictionRetryAt";
+    const raw = localStorage.getItem(key);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    const attempts = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+    const lastAttempt = attempts[fixtureId];
+    if (typeof lastAttempt === "number" && Number.isFinite(lastAttempt) && Date.now() - lastAttempt < FALLBACK_RETRY_INTERVAL_MS) return false;
+    localStorage.setItem(key, JSON.stringify({ ...attempts, [fixtureId]: Date.now() }));
     return true;
   } catch { return false; }
 }
@@ -309,22 +326,24 @@ export default function App() {
   const analyzeAllFixtures = async (fixtures?: FreeFixture[]) => {
     const sourceMatches = fixtures ?? fixtureScan?.fixtures;
     if (!sourceMatches || bulkAnalysisLock.current || (!fixtures && scanLoading)) return;
+    const currentRecords = readRecords();
     const latestByFixture = new Map<string, TrackerRecord>();
-    for (const row of readRecords()) {
+    for (const row of currentRecords) {
       if (row.kind === "prediction" && row.details.market !== "DOUBLE_CHANCE" && typeof row.details.fixtureId === "string" && !latestByFixture.has(row.details.fixtureId)) latestByFixture.set(row.details.fixtureId, row);
     }
-    const xgModelFixtures = new Set(readRecords().filter(row => row.kind === "prediction" && row.details.market !== "DOUBLE_CHANCE"
+    const xgModelFixtures = new Set(currentRecords.filter(row => row.kind === "prediction" && row.details.market !== "DOUBLE_CHANCE"
       && row.details.model === "moneyball:pitchapi-recent-xg-poisson" && typeof row.details.fixtureId === "string")
       .map(row => String(row.details.fixtureId)));
     const matches = [...new Map(sourceMatches.map(match => [match.id, match])).values()].filter(match => {
       if (hasKickoffPassed(match.date, match.time)) return false;
       const prior = latestByFixture.get(match.id);
-      const missingProbabilities = !prior || typeof prior.details.p1 !== "number" || typeof prior.details.px !== "number" || typeof prior.details.p2 !== "number";
+      const missingProbabilities = shouldRetryIncompletePrediction(match.id, prior);
+      const missingMarket = hasMissingPredictionMarket(currentRecords, match.id);
       const missingXgModel = !!(match.pitchApiLeagueId && match.pitchApiHomeTeamId && match.pitchApiAwayTeamId)
         && !xgModelFixtures.has(match.id) && shouldRetryMissingXg(match.id);
-      // Retry neutral and not-yet-available xG models at most every six hours. The 15-minute fixture refresh
-      // remains cheap and never repeatedly hammers free public sources.
-      return missingProbabilities || shouldRetryNeutralFallback(match.id, prior) || missingXgModel;
+      // Repair a missing 1X2/DC row immediately; retry failed probability lookups and neutral/xG
+      // fallbacks at most every six hours so the 15-minute scan cannot hammer free sources.
+      return missingProbabilities || missingMarket || shouldRetryNeutralFallback(match.id, prior) || missingXgModel;
     });
     if (!matches.length) { setRecords(readRecords()); return; }
     bulkAnalysisLock.current = true;
