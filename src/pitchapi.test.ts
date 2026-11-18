@@ -86,7 +86,7 @@ describe("PitchAPI historical xG fetch", () => {
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/leagues/")) return new Response(JSON.stringify({ data: { league: { id: "l_Ab12Cd", season: "2026/2027" }, matches: rows } }), { status: 200 });
-      const id = url.split("/").pop() ?? "";
+      const id = url.split("/").at(-2) ?? "";
       const isHome = id.startsWith("m_Home");
       const h = isHome ? homeId : "t_Opp";
       const a = isHome ? "t_Opp" : awayId;
