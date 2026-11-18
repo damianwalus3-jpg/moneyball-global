@@ -318,6 +318,13 @@ export function parseApiFootballEuropeanFixtures(payload: unknown, targetDate: s
   if (!payload || typeof payload !== "object" || !Array.isArray((payload as { fixtures?: unknown }).fixtures)) {
     throw new Error("API-Football: nieprawidłowa odpowiedź lub brak tablicy fixtures");
   }
+  const providerErrors = (payload as { errors?: unknown }).errors;
+  if (providerErrors && typeof providerErrors === "object" && Object.keys(providerErrors).length > 0) {
+    throw new Error("API-Football: provider zwrócił błędy zamiast wiarygodnych danych");
+  }
+  if (Array.isArray(providerErrors) && providerErrors.length > 0) {
+    throw new Error("API-Football: provider zwrócił błędy zamiast wiarygodnych danych");
+  }
   return ((payload as { fixtures: ApiFootballFixturePayload[] }).fixtures).flatMap(item => {
     const country = (item.league?.country ?? "").trim().toLowerCase();
     const countryCode = ESPN_COUNTRIES[country];
