@@ -1071,3 +1071,12 @@
   - FBref, Understat, ClubElo and other sources have coverage and access limitations; do not scrape restricted pages or infer xG where unavailable.
 - Research citations/URLs: https://github.com/openfootball/europe ; https://github.com/openfootball/leagues ; https://github.com/hudl/open-data ; https://github.com/xgabora/Club-Football-Match-Data ; https://github.com/withqwerty/open-football .
 - Latest code commits in this follow-up: `d13095e6645df68fbdaec0fe29d42a31a6017d4f`, `63e301d74f92dcdcfbc7111d964c3ebc05cd1cf6`, `df72c21a3d57e0486e4a23996dc26d265d58d1da`. CI, tests and deployment are still unverified; do not claim this code is live.
+
+
+## Stage 86 — OpenLigaDB history depth consistency (2026-11-18)
+- Re-audited the actual provider adapters after Stage 85. Open-matchday and OpenFootball exposed up to 15 recent rows to the merge layer, but OpenLigaDB still truncated its overall history to five rows before merging.
+- This could cause OpenLigaDB to contribute fewer distinct historical fixtures when its newest matches overlap with other feeds, reducing the benefit of multi-source history.
+- Changed OpenLigaDB's overall history output to retain up to 15 validated, finished, pre-fixture matches. Home/away split arrays remain capped at the latest five, matching the existing model's venue-split behavior.
+- Added a regression test with nine finished pre-fixture OpenLigaDB matches to ensure all nine reach the multi-source merge layer and future-dated records remain excluded by the mapper.
+- Commits: implementation da8a0520aed1abf3e4085231d55ef6cf0a99fc9b; regression test 69ad9cd0b8bd3f7c88ba8b2327ea8f55369fd345.
+- Validation and deployment are pending the latest GitHub Actions runs. No production MAIN resources, Tracker records, coupon history or bankroll values were changed.
