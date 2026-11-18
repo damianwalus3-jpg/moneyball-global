@@ -169,6 +169,93 @@ export async function loadRecentTeamFormAcrossCountry(countryCode: string, team:
   };
 }
 
+
+function calcioText(value: string): string {
+  return value.replace(/<[^>]*>/g, " ").replace(/&amp;/gi, "&").replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+}
+export function parseCalcioItSerieDTeams(html: string): Array<{ group: string; team: string }> {
+  const found: Array<{ group: string; team: string }> = [];
+  const pattern = /<a\b[^>]*href=["'](?:https?:\/\/calcio\.it)?\/serie-d-girone-([a-i])\/squadre\/[^"']+["'][^>]*>([\s\S]*?)<\/a>/gi;
+  for (const match of html.matchAll(pattern)) {
+    const team = calcioText(match[2]).replace(/^\d+\s+/, "");
+    if (team) found.push({ group: match[1].toLowerCase(), team });
+  }
+  return found;
+}
+export function parseCalcioItSerieDResults(html: string): { round: number | null; matches: Array<{ date: string; home: string; away: string; homeGoals: number; awayGoals: number }> } {
+  const roundMatch = html.match(/giornata\s+(\d{1,2})/i);
+  const round = roundMatch ? Number(roundMatch[1]) : null;
+  const matches: Array<{ date: string; home: string; away: string; homeGoals: number; awayGoals: number }> = [];
+  const anchors = /<a\b[^>]*href=["'][^"']*\/partite\/(\d{4}-\d{2}-\d{2})-[^"']+["'][^>]*>([\s\S]*?)<\/a>/gi;
+  for (const match of html.matchAll(anchors)) {
+    const text = calcioText(match[2]);
+    const score = text.match(/^(.+?)\s+(\d+)\s*[-–]\s*(\d+)\s+\d{2}\/\d{2}(?:\s+\d{2}:\d{2})?\s+(.+)$/);
+    if (!score) continue;
+    const cleanTeam = (name: string) => name.replace(/\s+[A-Z]{2,4}$/, "").trim();
+    const home = cleanTeam(score[1]), away = cleanTeam(score[4]);
+    const homeGoals = Number(score[2]), awayGoals = Number(score[3]);
+    if (!home || !away || !Number.isInteger(homeGoals) || !Number.isInteger(awayGoals)) continue;
+    matches.push({ date: match[1], home, away, homeGoals, awayGoals });
+  }
+  return { round, matches };
+}
+const calcioTeamGroupCache = new Map<string, Promise<string>>();
+async function resolveCalcioItSerieDGroup(team: string): Promise<string> {
+  const key = normalizeTeam(team);
+  const cached = calcioTeamGroupCache.get(key);
+  if (cached) return cached;
+  const request = (async () => {
+    let cursor = 0;
+    const groups = "abcdefghi".split("");
+    const results: Array<{ group: string; team: string }> = [];
+    await Promise.all(Array.from({ length: 3 }, async () => {
+      while (cursor < groups.length) {
+        const group = groups[cursor++];
+        const response = await fetch(`/api/calcio/serie-d/${group}/teams`);
+        if (!response.ok) continue;
+        results.push(...parseCalcioItSerieDTeams(await response.text()));
+      }
+    }));
+    const match = results.find(item => normalizeTeam(item.team) === key);
+    if (!match) throw new Error(`calcio.it: nie znaleziono drużyny „${team}” w grupach Serie D A–I`);
+    return match.group;
+  })();
+  calcioTeamGroupCache.set(key, request);
+  try { return await request; } catch (error) { calcioTeamGroupCache.delete(key); throw error; }
+}
+export async function loadCalcioItSerieDTeamForm(team: string, beforeDate: string): Promise<TeamForm> {
+  if (!team.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(beforeDate)) throw new Error("calcio.it: nieprawidłowe parametry historii");
+  const group = await resolveCalcioItSerieDGroup(team);
+  const first = await fetch(`/api/calcio/serie-d/${group}/results`);
+  if (!first.ok) throw new Error(`calcio.it Serie D HTTP ${first.status}`);
+  const initial = parseCalcioItSerieDResults(await first.text());
+  if (!initial.round) throw new Error("calcio.it: nie udało się odczytać numeru ostatniej kolejki");
+  const rounds = Array.from({ length: Math.min(8, initial.round) }, (_, index) => initial.round! - index);
+  const pages = await Promise.all(rounds.map(async round => {
+    if (round === initial.round) return initial.matches;
+    const response = await fetch(`/api/calcio/serie-d/${group}/results/${round}`);
+    if (!response.ok) return [];
+    return parseCalcioItSerieDResults(await response.text()).matches;
+  }));
+  const target = normalizeTeam(team);
+  const unique = new Map<string, FormMatch>();
+  for (const match of pages.flat()) {
+    if (match.date >= beforeDate) continue;
+    const home = normalizeTeam(match.home), away = normalizeTeam(match.away);
+    const isHome = home === target, isAway = away === target;
+    if (!isHome && !isAway) continue;
+    const goalsFor = isHome ? match.homeGoals : match.awayGoals;
+    const goalsAgainst = isHome ? match.awayGoals : match.homeGoals;
+    const result: FormMatch["result"] = goalsFor > goalsAgainst ? "W" : goalsFor === goalsAgainst ? "D" : "L";
+    const row: FormMatch = { date: match.date, opponent: isHome ? match.away : match.home, venue: isHome ? "H" : "A", goalsFor, goalsAgainst, result, points: result === "W" ? 3 : result === "D" ? 1 : 0 };
+    unique.set([row.date, normalizeTeam(row.opponent), row.venue].join("|"), row);
+  }
+  const matches = [...unique.values()].sort((a,b) => b.date.localeCompare(a.date)).slice(0,15);
+  if (matches.length < 3) throw new Error(`calcio.it Serie D Girone ${group.toUpperCase()}: tylko ${matches.length}/3 wcześniejszych zgodnych wyników dla ${team}`);
+  return { team, matches, home: matches.filter(row => row.venue === "H").slice(0,5), away: matches.filter(row => row.venue === "A").slice(0,5), source: `calcio.it Serie D Girone ${group.toUpperCase()}`, sourceUpdatedAt: new Date().toISOString() };
+}
+
 interface OpenLigaResultRow {
   resultTypeID?: number;
   resultName?: string | null;
