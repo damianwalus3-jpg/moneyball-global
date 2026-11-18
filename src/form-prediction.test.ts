@@ -44,10 +44,15 @@ describe("recent-form Poisson baseline", () => {
 describe("PitchAPI xG Poisson model", () => {
   const xgForm = (team: string, xgFor: number, xgAgainst: number, isHome: boolean): PitchApiXgForm => ({
     team, sampleSize: 5, xgForPerMatch: xgFor, xgAgainstPerMatch: xgAgainst,
-    shotsForPerMatch: 12, shotsAgainstPerMatch: 8, source: "PitchAPI",
+    shotsForPerMatch: 12, shotsAgainstPerMatch: 8,
+    shotsOnTargetForPerMatch: 5, shotsOnTargetAgainstPerMatch: 3,
+    bigChancesForPerMatch: 2, bigChancesAgainstPerMatch: 1,
+    xgOnTargetForPerMatch: 1.2, xgOnTargetAgainstPerMatch: 0.6, source: "PitchAPI",
     matches: Array.from({ length: 5 }, (_, index) => ({
       matchId: "m_" + team + index, date: `2026-11-${String(17-index).padStart(2,"0")}`,
       isHome, xgFor, xgAgainst, goalsFor: 1, goalsAgainst: 0, shotsFor: 12, shotsAgainst: 8,
+      shotsOnTargetFor: 5, shotsOnTargetAgainst: 3, bigChancesFor: 2, bigChancesAgainst: 1,
+      xgOnTargetFor: 1.2, xgOnTargetAgainst: 0.6, xgNonPenaltyFor: xgFor, xgNonPenaltyAgainst: xgAgainst,
     })),
   });
   it("uses observed xG rather than goals-derived lambda and labels the model separately", () => {
