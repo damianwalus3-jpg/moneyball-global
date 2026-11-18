@@ -3,6 +3,7 @@ import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 import { isEligibleDomesticTopTwoLeague, isEligibleOpenMatchdayTier } from "../_shared/domestic-league-scope.ts";
 import { isExcludedSeniorTeam, isWomensTeam } from "../_shared/team-normalization.ts";
 import { isRealXgObservation } from "../_shared/xg-validation.ts";
+import { selectPublicSourceApiKey } from "../_shared/public-source-auth.ts";
 const S="https://gzgeklcukrclgwbsmbsp.supabase.co",K=Deno.env.get("SUPABASE_ANON_KEY")||"",SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"",V="MONEYBALL GLOBAL 3.8";
 let CRON_FALLBACK_TOKEN="";
 const C={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-requested-with, prefer, cache-control, pragma","Access-Control-Allow-Methods":"POST, GET, OPTIONS","Access-Control-Max-Age":"86400","Vary":"Origin"};
@@ -232,7 +233,7 @@ async function readPublicSourceForms(date:string){
  if(publicSourceFormsCache&&publicSourceFormsCache.date===date&&Date.now()-publicSourceFormsCache.at<10*60*1000)return publicSourceFormsCache.value;
  const byPair=new Map<string,any>(),byTeam=new Map<string,any[]>(),eloByTeam=new Map<string,any>();
  try{
-  const sourceApiKey=K||SERVICE_KEY;
+  const sourceApiKey=selectPublicSourceApiKey(SERVICE_KEY,K);
    // Edge Runtime may attach its service-role Authorization context to same-project fetches.
    // Set both headers explicitly to the same key to prevent Supabase rejecting conflicting credentials.
    const r=await fetch(S+"/functions/v1/moneyball-public-sources?date="+encodeURIComponent(date),{headers:{apikey:sourceApiKey,Authorization:"Bearer "+sourceApiKey,Accept:"application/json"},signal:AbortSignal.timeout(25000)});
@@ -620,7 +621,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
    if(rows.length)saved=await db("matches?on_conflict=owner_id,source,external_id",token,"POST",rows,"resolution=ignore-duplicates,return=representation");
    const sourceCounts:Record<string,number>={};
    for(const f of eligible){const key=String(f.source||"unknown");sourceCounts[key]=(sourceCounts[key]||0)+1;}
-   scheduledImport={ok:!feedError||!publicForImport.error,attempted:true,feed_rows:feedRows.length,public_rows:publicRows.length,eligible_rows:eligible.length,inserted:Array.isArray(saved)?saved.length:0,skipped_existing:skippedExisting,deduplicated_candidates:deduplicatedCandidates,source_counts:sourceCounts,feed_error:feedError,public_source_error:publicForImport.error||null};
+   scheduledImport={ok:!feedError&&!publicForImport.error,attempted:true,scope:"EUROPE_MENS_DOMESTIC_TIER_1_2",feed_rows:feedRows.length,public_rows:publicRows.length,eligible_rows:eligible.length,inserted:Array.isArray(saved)?saved.length:0,skipped_existing:skippedExisting,deduplicated_candidates:deduplicatedCandidates,source_counts:sourceCounts,feed_error:feedError,public_source_error:publicForImport.error||null};
   }catch(e){scheduledImport={ok:false,attempted:true,error:String(e)};}
  }
  if(scheduledImport.attempted)console.log("scheduled_import",JSON.stringify(scheduledImport));
