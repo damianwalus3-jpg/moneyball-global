@@ -157,6 +157,45 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
+    // Temporary read-only probe for testing whether the free Flashscore public feed
+    // is reachable from Cloudflare Workers without a paid scraper or TLS impersonation.
+    if (url.pathname === "/api/flashscore/probe") {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      try {
+        const headers = {
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          "Accept-Language": "en-US,en;q=0.9",
+        };
+        const homepage = await fetch("https://www.flashscore.com/football/", { headers, redirect: "follow", signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+        const html = await homepage.text();
+        const signature = html.match(/feed_sign\\s*[:=]\\s*["']([^"']+)["']/i)?.[1] || "SW9D1eZo";
+        const feed = await fetch("https://global.flashscore.ninja/2/x/feed/f_1_0_1_en_1", {
+          headers: {
+            Accept: "*/*",
+            "User-Agent": headers["User-Agent"],
+            "Accept-Language": "en-US,en;q=0.9",
+            Referer: "https://www.flashscore.com/",
+            Origin: "https://www.flashscore.com",
+            "x-fsign": signature,
+          },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        });
+        const body = await feed.text();
+        return json({
+          homepageStatus: homepage.status,
+          homepageUrl: homepage.url,
+          signatureFound: /feed_sign\\s*[:=]/i.test(html),
+          feedStatus: feed.status,
+          feedLength: body.length,
+          feedLooksStructured: body.includes("~") && body.includes("÷"),
+          sample: body.slice(0, 800),
+        }, 200, origin);
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "flashscore_probe_failed" }, 502, origin);
+      }
+    }
+
     const oddsHealth = url.pathname === "/api/odds/status";
     const oddsPilot = url.pathname === "/api/odds/pilot";
     if (oddsHealth || oddsPilot) {
