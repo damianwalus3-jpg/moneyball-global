@@ -231,7 +231,7 @@ export default {
           matchCount,
           timestampMissing,
           countryCounts,
-          competitions: competitions.slice(0, 30),
+          competitions,
           matchSamples,
         }, 200, origin);
       } catch (error) {
