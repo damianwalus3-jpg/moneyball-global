@@ -1,6 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { fixtureKey, mergeFixtureSource, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaCountryCode, openLigaSeasonYears, parseEspnEuropeanFixtures, espnScoreboardDatesForBrusselsDay, parseTimezoneFootballFixtures } from "./free-fixtures";
+import { fixtureKey, mergeFixtureSource, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaCountryCode, openLigaSeasonYears, parseEspnEuropeanFixtures, espnScoreboardDatesForBrusselsDay, parseTimezoneFootballFixtures, parsePitchApiLeagueFixtures } from "./free-fixtures";
 
+describe("PitchAPI catalogue fixture discovery", () => {
+  const league = { id: "l_Den123", name: "Denmark 1. Division", country_code: "DEN", seasons: ["2026/2027"] };
+  it("maps only exact Brussels-day upcoming fixtures and preserves provider IDs", () => {
+    const fixtures = parsePitchApiLeagueFixtures(league, [
+      { id: "m_123456", time_utc: "2026-11-18T23:30:00Z", status: "not_started", home_team: { id: "t_Home01", name: "Home FC" }, away_team: { id: "t_Away01", name: "Away FC" }, score_home: null, score_away: null },
+      { id: "m_123457", time_utc: "2026-11-18T18:00:00Z", status: "not_started", home_team: { id: "t_Home02", name: "Other Home" }, away_team: { id: "t_Away02", name: "Other Away" }, score_home: null, score_away: null },
+      { id: "m_123458", time_utc: "2026-11-18T18:00:00Z", status: "finished", home_team: { id: "t_Home03", name: "Finished Home" }, away_team: { id: "t_Away03", name: "Finished Away" }, score_home: 1, score_away: 0 },
+    ], "2026-11-19", "2026-11-18T12:00:00.000Z");
+    expect(fixtures).toHaveLength(1);
+    expect(fixtures[0]).toMatchObject({
+      id: "pitchapi|m_123456", date: "2026-11-19", time: "00:30", countryCode: "DEN",
+      home: "Home FC", away: "Away FC", pitchApiHomeTeamId: "t_Home01", pitchApiAwayTeamId: "t_Away01",
+      pitchApiLeagueId: "l_Den123", pitchApiSeason: "2026/2027", sourceUpdatedAt: "2026-11-18T12:00:00.000Z",
+    });
+  });
+  it("rejects non-European leagues even when their match is on the requested date", () => {
+    const fixtures = parsePitchApiLeagueFixtures({ id: "l_Sau123", name: "Saudi First Division", country_code: "SAU" }, [
+      { id: "m_123459", time_utc: "2026-11-19T12:00:00Z", status: "not_started", home_team: { id: "t_Home04", name: "Home FC" }, away_team: { id: "t_Away04", name: "Away FC" }, score_home: null, score_away: null },
+    ], "2026-11-19", "2026-11-18T12:00:00.000Z");
+    expect(fixtures).toEqual([]);
+  });
+});
 describe("European fixture source classification", () => {
   it("accepts known European country names and competition prefixes", () => {
     expect(isEuropeanOpenLiga({ leagueId: 1, leagueName: "Cup of Scotland 2026", leagueShortcut: "cup_scot", sport: { sportName: "Fußball" } })).toBe(true);
