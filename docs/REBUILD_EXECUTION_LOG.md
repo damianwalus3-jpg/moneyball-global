@@ -1585,3 +1585,15 @@
 - Aktualny wynik 171 jest zweryfikowanym snapshotem wielu źródeł, nie gwarancją 100% pokrycia każdej ligi, szczebla, kobiet, młodzieży i rozgrywek amatorskich.
 - Brak potwierdzenia danych lokalnego Trackera na telefonie użytkownika: CI nie ma dostępu do localStorage w jego przeglądarce. Po odświeżeniu aplikacji należy sprawdzić osobne liczniki brakujących prawidłowych prawdopodobieństw 1X2 i DC. Empiryczna kalibracja modeli nadal wymaga co najmniej 30 odrębnych rozliczonych meczów na model/rynek.
 - Zakres: wyłącznie `moneyball-rebuild` / Worker REBUILT. MAIN, TEST, historyczny Tracker, kupony, rozliczenia i bankroll nie były modyfikowane.
+
+
+## Stage 134 — on-device Tracker integrity diagnostics and European source review (2026-11-18)
+- Added an integrity panel directly to the Tracker tab, using the current Europe/Brussels scan date and the same local Tracker records as the rest of the app.
+- The panel reports stored record count, fixture count, 1X2/DC record presence, and separately the number of fixtures without valid normalized 1X2/DC probabilities. It explicitly explains that the data is browser-local and cannot be remotely read by CI.
+- Added a one-click JSON backup export beside the integrity report so the user can provide the actual Android/WebView Tracker snapshot for inspection. Existing backup/import semantics remain additive; no local data is overwritten or deleted.
+- Rechecked model audit: qualification is 30 distinct settled fixtures per model and market; DC reports three binary events per fixture but uses unique fixture count for the threshold. No unqualified performance claim is made.
+- Researched additional open fixture sources. OpenMatchday is a useful daily 75-competition supplement but coverage is uneven and its compilation is non-commercial; OpenFootball Europe/Austria are public-domain selected-league supplements, with Austria already represented in the existing national catalogue discovery; FootballAPI.org free access covers only the Premier League while broader coverage is paid. No new broad, terms-compatible free provider was added based on insufficient evidence.
+- Last completed 2026-11-18 multi-source audit remains 171 unique fixtures / 20 countries or federations / 63 competitions; this is a snapshot, not a 100% completeness claim. One OpenLigaDB request timed out in that run.
+- Detailed evidence and limitations: `docs/STAGE_134_TRACKER_DEVICE_AND_SOURCE_RESEARCH_2026-11-18.md`.
+- Validation and deployment for the Stage 134 application commit are pending GitHub Actions; do not mark this stage deployed until CI, rebuild checks, and isolated Cloudflare REBUILT deployment pass.
+- Remaining user-device action: open Tracker on Android, inspect the integrity panel and share the JSON export. Server-side automation cannot access browser localStorage.
