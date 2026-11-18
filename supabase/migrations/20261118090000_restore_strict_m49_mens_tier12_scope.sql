@@ -221,215 +221,235 @@ CREATE TRIGGER trg_moneyball_lock_coupon_leg_odds BEFORE UPDATE OF odds ON publi
 DROP TRIGGER IF EXISTS trg_sync_coupon_leg_odds_from_prediction ON public.predictions;
 
 CREATE OR REPLACE FUNCTION public.moneyball_dashboard_summary()
- RETURNS jsonb
- LANGUAGE sql
- STABLE
- SET search_path TO 'public'
-AS $function$
-with owner_scope as (select auth.uid() as owner_id),
-active_predictions as (
-  select p.market, p.settlement_status, p.verified
-  from public.predictions p
-  join public.matches m on m.id = p.match_id and m.owner_id = p.owner_id
-  join owner_scope o on p.owner_id = o.owner_id
-  where (p.model_version = 'MONEYBALL GLOBAL 3.8' or p.model_version like 'MANUAL%')
-    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
-    and public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
+RETURNS jsonb LANGUAGE sql STABLE SET search_path TO 'public' AS $function$
+WITH owner_scope AS (SELECT auth.uid() AS owner_id),
+eligible_matches AS (
+  SELECT DISTINCT ON (
+    m.owner_id,(m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,
+    regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g'),
+    regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g')
+  )
+    m.id,m.owner_id,m.country,m.competition,m.league,m.gender,m.home_team,m.away_team,
+    m.kickoff_at,m.kickoff_date,m.status,m.source,m.external_id,
+    (m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date AS brussels_day,
+    regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g') AS home_key,
+    regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g') AS away_key
+  FROM public.matches m JOIN owner_scope o ON m.owner_id=o.owner_id
+  WHERE m.kickoff_at IS NOT NULL
+    AND public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
+    AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
+  ORDER BY m.owner_id,(m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,
+    regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g'),
+    regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g'),
+    (lower(coalesce(m.source,''))='footynomad') DESC,coalesce(m.updated_at,m.created_at) DESC,m.id
 ),
-market_stats as (
-  select market,
-    count(*) filter (where verified and settlement_status = 'won')::integer as won,
-    count(*) filter (where verified and settlement_status in ('won','lost'))::integer as settled
-  from active_predictions group by market
+eligible_matches_today AS (
+  SELECT * FROM eligible_matches WHERE brussels_day=(now() AT TIME ZONE 'Europe/Brussels')::date
 ),
-candidate_count as (
-  select count(distinct p.match_id)::integer as total
-  from public.predictions p
-  join public.matches m on m.id = p.match_id and m.owner_id = p.owner_id
-  join owner_scope o on p.owner_id = o.owner_id
-  where (p.model_version = 'MONEYBALL GLOBAL 3.8' or p.model_version like 'MANUAL%')
-    and p.verdict = 'WYBRANY' and p.settlement_status = 'pending'
-    and p.probability > 75 and p.selection <> '—'
-    and public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
-    and public.moneyball_prediction_has_fresh_confirmed_odds(p.odds,p.data_coverage,now())
-    and m.kickoff_at >= (((now() at time zone 'Europe/Brussels')::date)::timestamp at time zone 'Europe/Brussels')
-    and m.kickoff_at < ((((now() at time zone 'Europe/Brussels')::date + 1)::timestamp) at time zone 'Europe/Brussels')
-    and m.status not in ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
-    and m.kickoff_at > now()
-    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
+active_predictions AS (
+  SELECT DISTINCT ON (m.brussels_day,m.home_key,m.away_key,p.market,p.selection)
+    p.market,p.selection,p.settlement_status,p.verified,p.created_at,p.id
+  FROM public.predictions p
+  JOIN eligible_matches m ON m.id=p.match_id AND m.owner_id=p.owner_id
+  WHERE (p.model_version='MONEYBALL GLOBAL 3.8' OR p.model_version LIKE 'MANUAL%')
+    AND public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
+  ORDER BY m.brussels_day,m.home_key,m.away_key,p.market,p.selection,p.created_at DESC,p.id DESC
 ),
-bankroll as (
-  select case when count(*) = 0 then null
-    else coalesce(
-      (array_agg(balance_after order by occurred_at desc) filter (where balance_after is not null))[1],
-      sum(case
-        when transaction_type in ('deposit','return') then abs(amount)
-        when transaction_type in ('withdrawal','stake') then -abs(amount)
-        else amount end)
-    ) end as balance
-  from public.bankroll_transactions b
-  join owner_scope o on b.owner_id = o.owner_id
+market_stats AS (
+  SELECT market,
+    count(*) FILTER (WHERE verified AND settlement_status='won')::integer AS won,
+    count(*) FILTER (WHERE verified AND settlement_status IN ('won','lost'))::integer AS settled
+  FROM active_predictions GROUP BY market
+),
+candidate_count AS (
+  SELECT count(DISTINCT (m.brussels_day::text||'|'||m.home_key||'|'||m.away_key))::integer AS total
+  FROM public.predictions p
+  JOIN eligible_matches_today m ON m.id=p.match_id AND m.owner_id=p.owner_id
+  WHERE (p.model_version='MONEYBALL GLOBAL 3.8' OR p.model_version LIKE 'MANUAL%')
+    AND p.verdict='WYBRANY' AND p.settlement_status='pending'
+    AND p.probability>75 AND p.selection<>'—'
+    AND public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
+    AND public.moneyball_prediction_has_fresh_confirmed_odds(p.odds,p.data_coverage,now())
+    AND m.kickoff_at>now() AND lower(m.status) NOT IN ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
+),
+pending_coupons AS (
+  SELECT c.id
+  FROM public.coupons c JOIN owner_scope o ON c.owner_id=o.owner_id
+  WHERE coalesce(c.status,'pending')='pending'
+    AND c.coupon_type IN ('MAIN','MEGA','EXTRA')
+    AND coalesce(c.source_class,'MODEL')<>'PAPER'
+    AND c.target_legs IN (1,3)
+    AND (SELECT count(*) FROM public.coupon_legs l WHERE l.owner_id=c.owner_id AND l.coupon_id=c.id)=c.target_legs
+    AND NOT EXISTS (
+      SELECT 1 FROM public.coupon_legs l
+      WHERE l.owner_id=c.owner_id AND l.coupon_id=c.id
+        AND NOT EXISTS (
+          SELECT 1 FROM eligible_matches_today m
+          WHERE m.id=l.match_id AND m.kickoff_at>now()
+            AND lower(m.status) NOT IN ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
+        )
+    )
+),
+bankroll AS (
+  SELECT CASE WHEN count(*)=0 THEN NULL ELSE coalesce(
+    (array_agg(balance_after ORDER BY occurred_at DESC) FILTER (WHERE balance_after IS NOT NULL))[1],
+    sum(CASE WHEN transaction_type IN ('deposit','return') THEN abs(amount)
+      WHEN transaction_type IN ('withdrawal','stake') THEN -abs(amount) ELSE amount END)
+  ) END AS balance
+  FROM public.bankroll_transactions b JOIN owner_scope o ON b.owner_id=o.owner_id
 )
-select jsonb_build_object(
-  'matches_today', (
-    select count(*)::integer from public.matches m
-    join owner_scope o on m.owner_id = o.owner_id
-    where m.kickoff_at >= (((now() at time zone 'Europe/Brussels')::date)::timestamp at time zone 'Europe/Brussels')
-      and m.kickoff_at < ((((now() at time zone 'Europe/Brussels')::date + 1)::timestamp) at time zone 'Europe/Brussels')
-      and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
+SELECT jsonb_build_object(
+  'matches_today',(SELECT count(*)::integer FROM eligible_matches_today),
+  'bankroll',(SELECT balance FROM bankroll),
+  'coupons_in_play',(SELECT count(*)::integer FROM pending_coupons),
+  'candidates',coalesce((SELECT total FROM candidate_count),0),
+  'to_settle',(
+    SELECT count(*)::integer FROM eligible_matches m
+    WHERE m.kickoff_at<now() AND lower(m.status) NOT IN ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
+      AND NOT EXISTS (SELECT 1 FROM public.match_results r WHERE r.match_id=m.id AND r.owner_id=m.owner_id AND r.verified)
   ),
-  'bankroll', (select balance from bankroll),
-  'coupons_in_play', (
-    select count(*)::integer from public.coupons c
-    join owner_scope o on c.owner_id = o.owner_id
-    where coalesce(c.status, 'pending') = 'pending'
-      and c.coupon_type in ('MAIN','MEGA','EXTRA')
-      and coalesce(c.source_class,'MODEL') <> 'PAPER'
-      and c.target_legs in (1,3)
-      and (select count(*) from public.coupon_legs l where l.owner_id=c.owner_id and l.coupon_id=c.id)=c.target_legs
-      and not exists (
-        select 1 from public.coupon_legs l
-        join public.matches m on m.id=l.match_id and m.owner_id=l.owner_id
-        where l.owner_id=c.owner_id and l.coupon_id=c.id
-          and (
-            not public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
-            or m.kickoff_at is null or m.kickoff_at <= now()
-            or (m.kickoff_at at time zone 'Europe/Brussels')::date <> (now() at time zone 'Europe/Brussels')::date
-            or lower(m.status) in ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
-          )
-      )
-  ),
-  'candidates', coalesce((select total from candidate_count), 0),
-  'to_settle', (
-    select count(*)::integer from public.matches m
-    join owner_scope o on m.owner_id = o.owner_id
-    where m.kickoff_at < now() and m.status not in ('finished','postponed','cancelled')
-      and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
-      and not exists (
-        select 1 from public.match_results r
-        where r.match_id = m.id and r.owner_id = m.owner_id and r.verified
-      )
-  ),
-  'hit_rates', coalesce((
-    select jsonb_object_agg(market, jsonb_build_object(
-      'won', won, 'settled', settled,
-      'rate', case when settled > 0 then round((won::numeric / settled::numeric) * 1000) / 10 else null end
-    )) from market_stats
-  ), '{}'::jsonb)
+  'hit_rates',coalesce((SELECT jsonb_object_agg(market,jsonb_build_object(
+    'won',won,'settled',settled,
+    'rate',CASE WHEN settled>0 THEN round((won::numeric/settled::numeric)*1000)/10 ELSE NULL END
+  )) FROM market_stats),'{}'::jsonb)
 );
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.moneyball_dashboard_selected_picks()
- RETURNS TABLE(prediction_id uuid, market text, selection text, probability numeric, odds numeric, settlement_status text, match_id uuid, home_team text, away_team text, competition text, league text, kickoff_at timestamp with time zone, kickoff_date date, match_status text, home_score integer, away_score integer, rationale text, confidence text, data_coverage jsonb)
- LANGUAGE sql
- STABLE
- SET search_path TO 'public'
-AS $function$
-  select
-    p.id, p.market, p.selection, p.probability, p.odds, p.settlement_status,
-    m.id, m.home_team, m.away_team, m.competition, m.league, m.kickoff_at,
-    m.kickoff_date, m.status, r.home_score, r.away_score,
-    p.rationale, p.confidence, p.data_coverage
-  from public.predictions p
-  join public.matches m on m.id = p.match_id and m.owner_id = p.owner_id
-  left join public.match_results r on r.match_id = m.id and r.owner_id = m.owner_id
-  where p.owner_id = (select auth.uid())
-    and m.owner_id = (select auth.uid())
-    and (p.model_version = 'MONEYBALL GLOBAL 3.8' or p.model_version like 'MANUAL%')
-    and p.verdict = 'WYBRANY'
-    and p.settlement_status = 'pending'
-    and p.probability > 75 and p.selection <> '—'
-    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
-    and public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
-    and public.moneyball_prediction_has_fresh_confirmed_odds(p.odds,p.data_coverage,now())
-    and m.kickoff_at > now()
-    and lower(m.status) not in ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
-    and m.kickoff_at >= (((now() at time zone 'Europe/Brussels')::date)::timestamp at time zone 'Europe/Brussels')
-    and m.kickoff_at < ((((now() at time zone 'Europe/Brussels')::date + 1)::timestamp) at time zone 'Europe/Brussels')
-  order by m.kickoff_at asc nulls last, p.created_at desc
-  limit 100;
-$function$
+RETURNS TABLE(
+  prediction_id uuid,market text,selection text,probability numeric,odds numeric,settlement_status text,
+  match_id uuid,home_team text,away_team text,competition text,league text,kickoff_at timestamptz,
+  kickoff_date date,match_status text,home_score integer,away_score integer,rationale text,confidence text,data_coverage jsonb
+)
+LANGUAGE sql STABLE SET search_path TO 'public' AS $function$
+WITH eligible_matches AS (
+  SELECT DISTINCT ON (
+    (m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,
+    regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g'),
+    regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g')
+  )
+    m.id,m.owner_id,m.home_team,m.away_team,m.competition,m.league,m.kickoff_at,m.kickoff_date,m.status,
+    (m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date AS brussels_day,
+    regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g') AS home_key,
+    regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g') AS away_key
+  FROM public.matches m
+  WHERE m.owner_id=(SELECT auth.uid())
+    AND m.kickoff_at>=(((now() AT TIME ZONE 'Europe/Brussels')::date)::timestamp AT TIME ZONE 'Europe/Brussels')
+    AND m.kickoff_at<((((now() AT TIME ZONE 'Europe/Brussels')::date+1)::timestamp) AT TIME ZONE 'Europe/Brussels')
+    AND public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
+    AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
+  ORDER BY (m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,
+    regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g'),
+    regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g'),
+    (lower(coalesce(m.source,''))='footynomad') DESC,coalesce(m.updated_at,m.created_at) DESC,m.id
+),
+ranked_picks AS (
+  SELECT DISTINCT ON (m.brussels_day,m.home_key,m.away_key,p.market,p.selection)
+    p.id AS prediction_id,p.market,p.selection,p.probability,p.odds,p.settlement_status,
+    m.id AS match_id,m.home_team,m.away_team,m.competition,m.league,m.kickoff_at,m.kickoff_date,m.status AS match_status,
+    r.home_score,r.away_score,p.rationale,p.confidence,p.data_coverage,p.created_at,
+    m.brussels_day,m.home_key,m.away_key
+  FROM public.predictions p
+  JOIN eligible_matches m ON m.id=p.match_id AND m.owner_id=p.owner_id
+  LEFT JOIN LATERAL (
+    SELECT mr.home_score,mr.away_score FROM public.match_results mr
+    WHERE mr.match_id=m.id AND mr.owner_id=m.owner_id AND mr.verified
+    ORDER BY mr.verified_at DESC NULLS LAST,mr.created_at DESC LIMIT 1
+  ) r ON true
+  WHERE p.owner_id=(SELECT auth.uid())
+    AND (p.model_version='MONEYBALL GLOBAL 3.8' OR p.model_version LIKE 'MANUAL%')
+    AND p.verdict='WYBRANY' AND p.settlement_status='pending'
+    AND p.probability>75 AND p.selection<>'—'
+    AND public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
+    AND public.moneyball_prediction_has_fresh_confirmed_odds(p.odds,p.data_coverage,now())
+    AND m.kickoff_at>now()
+    AND lower(m.status) NOT IN ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
+  ORDER BY m.brussels_day,m.home_key,m.away_key,p.market,p.selection,p.created_at DESC,p.id DESC
+)
+SELECT prediction_id,market,selection,probability,odds,settlement_status,match_id,home_team,away_team,competition,league,kickoff_at,kickoff_date,match_status,home_score,away_score,rationale,confidence,data_coverage
+FROM ranked_picks
+ORDER BY kickoff_at ASC NULLS LAST,market,selection
+LIMIT 100;
+$function$;
 
 CREATE OR REPLACE FUNCTION public.moneyball_statistics_page_data()
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO 'pg_catalog', 'public', 'auth'
-AS $function$
-declare
-  v_owner uuid := auth.uid();
-begin
-  if v_owner is null then
-    raise exception 'authentication required' using errcode = '42501';
-  end if;
-
-  return (
-    with eligible_matches as materialized (
-      select
-        m.id, m.competition, m.country, m.gender, m.home_team, m.away_team,
-        m.kickoff_at, m.league, m.kickoff_date,
-        result.home_score, result.away_score
-      from public.matches m
-      left join lateral (
-        select r.home_score, r.away_score
-        from public.match_results r
-        where r.owner_id = m.owner_id and r.match_id = m.id and r.verified is true
-        order by r.verified_at desc nulls last, r.created_at desc
-        limit 1
-      ) result on true
-      where m.owner_id = v_owner
-        and public.moneyball_is_eligible_european_match(
-          m.country, coalesce(m.competition, m.league), m.gender, m.home_team, m.away_team
-        ) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER
+SET search_path TO 'pg_catalog','public','auth' AS $function$
+DECLARE v_owner uuid:=auth.uid();
+BEGIN
+  IF v_owner IS NULL THEN RAISE EXCEPTION 'authentication required' USING errcode='42501'; END IF;
+  RETURN (
+    WITH eligible_matches AS MATERIALIZED (
+      SELECT DISTINCT ON (
+        (m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,
+        regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g'),
+        regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g')
+      )
+        m.id,m.competition,m.country,m.gender,m.home_team,m.away_team,m.kickoff_at,m.league,m.kickoff_date,
+        (m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date AS brussels_day,
+        regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g') AS home_key,
+        regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g') AS away_key,
+        result.home_score,result.away_score
+      FROM public.matches m
+      LEFT JOIN LATERAL (
+        SELECT r.home_score,r.away_score FROM public.match_results r
+        WHERE r.owner_id=m.owner_id AND r.match_id=m.id AND r.verified IS TRUE
+        ORDER BY r.verified_at DESC NULLS LAST,r.created_at DESC LIMIT 1
+      ) result ON true
+      WHERE m.owner_id=v_owner AND m.kickoff_at IS NOT NULL
+        AND public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
+        AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
+      ORDER BY (m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,
+        regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g'),
+        regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g'),
+        (lower(coalesce(m.source,''))='footynomad') DESC,coalesce(m.updated_at,m.created_at) DESC,m.id
     ),
-    active_predictions as (
-      select
-        p.id, p.match_id, p.model_version, p.market, p.selection, p.probability,
-        p.verdict, p.rationale, p.odds, p.settlement_status, p.verified,
-        p.stake, p.potential_return, p.profit_loss
-      from public.predictions p
-      where p.owner_id = v_owner
-        and (p.model_version = 'MONEYBALL GLOBAL 3.8' or p.model_version like 'MANUAL%')
-        and public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
-        and exists (select 1 from eligible_matches m where m.id = p.match_id)
+    active_predictions_ranked AS (
+      SELECT DISTINCT ON (m.brussels_day,m.home_key,m.away_key,p.market,p.selection)
+        p.id,p.match_id,p.model_version,p.market,p.selection,p.probability,p.verdict,p.rationale,p.odds,
+        p.settlement_status,p.verified,p.stake,p.potential_return,p.profit_loss,p.created_at
+      FROM public.predictions p
+      JOIN eligible_matches m ON m.id=p.match_id
+      WHERE p.owner_id=v_owner
+        AND (p.model_version='MONEYBALL GLOBAL 3.8' OR p.model_version LIKE 'MANUAL%')
+        AND public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
+      ORDER BY m.brussels_day,m.home_key,m.away_key,p.market,p.selection,p.created_at DESC,p.id DESC
     ),
-    scoped_coupon_ids as (
-      select c.id
-      from public.coupons c
-      where c.owner_id = v_owner
-        and c.coupon_type in ('MAIN','MEGA','EXTRA')
-        and coalesce(c.source_class,'MODEL') <> 'PAPER'
-        and c.target_legs in (1,3)
-        and (select count(*) from public.coupon_legs l where l.owner_id=v_owner and l.coupon_id=c.id)=c.target_legs
-        and exists (select 1 from public.coupon_legs l where l.owner_id = v_owner and l.coupon_id = c.id)
-        and not exists (
-          select 1 from public.coupon_legs l
-          where l.owner_id = v_owner and l.coupon_id = c.id
-            and not exists (select 1 from eligible_matches m where m.id = l.match_id)
+    active_predictions AS (
+      SELECT id,match_id,model_version,market,selection,probability,verdict,rationale,odds,
+        settlement_status,verified,stake,potential_return,profit_loss
+      FROM active_predictions_ranked
+    ),
+    scoped_coupon_ids AS (
+      SELECT c.id
+      FROM public.coupons c
+      WHERE c.owner_id=v_owner AND c.coupon_type IN ('MAIN','MEGA','EXTRA')
+        AND coalesce(c.source_class,'MODEL')<>'PAPER' AND c.target_legs IN (1,3)
+        AND (SELECT count(*) FROM public.coupon_legs l WHERE l.owner_id=v_owner AND l.coupon_id=c.id)=c.target_legs
+        AND EXISTS (SELECT 1 FROM public.coupon_legs l WHERE l.owner_id=v_owner AND l.coupon_id=c.id)
+        AND NOT EXISTS (
+          SELECT 1 FROM public.coupon_legs l
+          WHERE l.owner_id=v_owner AND l.coupon_id=c.id
+            AND NOT EXISTS (SELECT 1 FROM eligible_matches m WHERE m.id=l.match_id)
         )
     ),
-    scoped_coupons as (
-      select c.id, c.status, c.stake
-      from public.coupons c
-      join scoped_coupon_ids ids on ids.id = c.id
-      where c.owner_id = v_owner
+    scoped_coupons AS (
+      SELECT c.id,c.status,c.stake FROM public.coupons c
+      JOIN scoped_coupon_ids ids ON ids.id=c.id WHERE c.owner_id=v_owner
     ),
-    scoped_legs as (
-      select l.id, l.coupon_id, l.match_id, l.odds, l.status
-      from public.coupon_legs l
-      join scoped_coupon_ids ids on ids.id = l.coupon_id
-      where l.owner_id = v_owner
+    scoped_legs AS (
+      SELECT l.id,l.coupon_id,l.match_id,l.odds,l.status FROM public.coupon_legs l
+      JOIN scoped_coupon_ids ids ON ids.id=l.coupon_id WHERE l.owner_id=v_owner
     )
-    select jsonb_build_object(
-      'matches', coalesce((select jsonb_agg(to_jsonb(m) order by m.kickoff_at asc nulls last, m.id) from eligible_matches m), '[]'::jsonb),
-      'predictions', coalesce((select jsonb_agg(to_jsonb(p) order by p.model_version, p.market, p.match_id, p.selection) from active_predictions p), '[]'::jsonb),
-      'coupons', coalesce((select jsonb_agg(to_jsonb(c) order by c.id) from scoped_coupons c), '[]'::jsonb),
-      'legs', coalesce((select jsonb_agg(to_jsonb(l) order by l.coupon_id, l.id) from scoped_legs l), '[]'::jsonb)
+    SELECT jsonb_build_object(
+      'matches',coalesce((SELECT jsonb_agg(to_jsonb(m) ORDER BY m.kickoff_at ASC NULLS LAST,m.id) FROM eligible_matches m),'[]'::jsonb),
+      'predictions',coalesce((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.model_version,p.market,p.match_id,p.selection) FROM active_predictions p),'[]'::jsonb),
+      'coupons',coalesce((SELECT jsonb_agg(to_jsonb(c) ORDER BY c.id) FROM scoped_coupons c),'[]'::jsonb),
+      'legs',coalesce((SELECT jsonb_agg(to_jsonb(l) ORDER BY l.coupon_id,l.id) FROM scoped_legs l),'[]'::jsonb)
     )
   );
-end;
-$function$
-
+END;
+$function$;
 
 DO $scope_assertions$
 BEGIN
