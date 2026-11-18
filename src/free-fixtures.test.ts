@@ -136,6 +136,28 @@ describe("ESPN European daily fixture fallback", () => {
     expect(fixtures[0]).toMatchObject({ id: "espn|401", countryCode: "SWE", competition: "UEFA Women's Champions League, League Phase", date: "2026-11-18", time: "18:45", home: "BK Häcken", away: "Manchester City", source: "ESPN" });
   });
 
+  it("recognizes UEFA countries with alternate and diacritic venue names", () => {
+    const countries = [
+      { name: "Israel", code: "ISR" },
+      { name: "Kazakhstan", code: "KAZ" },
+      { name: "Republic of Ireland", code: "IRE" },
+      { name: "Türkiye", code: "TUR" },
+    ];
+    const fixtures = parseEspnEuropeanFixtures({ events: countries.map((country, index) => ({
+      id: 410 + index,
+      date: "2026-11-18T17:45:00Z",
+      competitions: [{
+        altGameNote: "Domestic League",
+        venue: { address: { country: country.name } },
+        competitors: [
+          { homeAway: "home", team: { displayName: "Home FC" } },
+          { homeAway: "away", team: { displayName: "Away FC" } },
+        ],
+      }],
+    })) }, "2026-11-18");
+    expect(fixtures.map(fixture => fixture.countryCode)).toEqual(countries.map(country => country.code));
+  });
+
   it("uses Brussels date when an event timestamp crosses UTC midnight", () => {
     const fixtures = parseEspnEuropeanFixtures({ events: [{
       id: 403, date: "2026-11-17T23:30:00Z",
