@@ -961,3 +961,11 @@
 - Commits for this stage: `e9eb92a80a6ea25fc3f311caa3fff97b478d932f`, `a72dd1f2ea4f7ce01ac58d020bb462701b1d218a`, `1d7c216d778201a15179e2e1b255788840baae04`, `85390046d06d3d9cbb3e658f0d332ef73864b928`, `e329e374354a3f04e334c6b7742dff22704d78f4`.
 - Verification limitation: GitHub combined status still reports a Vercel build-rate-limit failure only. The available GitHub connector does not expose workflow dispatch/list operations for the push-triggered Cloudflare workflow; no Cloudflare run success is verified. Do not claim deployment. TinyFish wallet was previously verified at $0.00; interactive browser scan remains blocked until funded.
 - No production `main` changes; no local browser Tracker or bankroll records were deleted.
+
+
+## Stage 78 — metric-panel explanations and verified deployment (2026-11-18)
+- After the user asked to continue without stopping, inspected the live GitHub Actions workflow history rather than relying on the incomplete Vercel status check. Latest run #463 for commit `807d1f21f5d325712bc05f92e02d60ac6f1b52f4` completed successfully; job `build-and-deploy` succeeded, including dependency install, TypeScript check, unit tests, production build and deploy to the separate Cloudflare Worker. Logs confirm 20 test files / 145 tests passed and Worker version `39f7bfcb-a822-491b-9d52-f0b579e058a5` was deployed.
+- Live Worker's fixture proxy endpoints were reachable: `/api/footynomad/fixtures/2026-11-18` returned structured fixture JSON, and `/api/espn/scoreboard/20261118` returned structured ESPN scoreboard JSON. This verifies API proxy connectivity, not completeness of the full merged European list.
+- Expanded panel drill-down coverage further: added a reusable DetailMetric component with a clickable “Szczegóły” disclosure to every Intelligence 1X2/DC metric and each betting/P&L metric. Each disclosure explains sample size, accuracy, Brier, log loss, ROI, settled vs open stake, rejected hypothetical picks and average odds.
+- CSS for metric explanations added. These new edits are after run #463 and therefore still require their own CI/deploy confirmation.
+- Live shell extraction confirms the app is served by the expected Cloudflare Worker. The extraction tool reads the static shell and does not prove React client-side interactions; the visual mobile test remains outstanding.
