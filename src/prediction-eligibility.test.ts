@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isEvidenceQualifiedCandidate } from "./prediction-eligibility";
+import { getPredictionDisplayStatus, isEvidenceQualifiedCandidate } from "./prediction-eligibility";
 import type { TrackerRecord } from "./tracker-store";
 
 function row(overrides: Partial<TrackerRecord> = {}): TrackerRecord {
@@ -24,5 +24,18 @@ describe("evidence-qualified candidate gate", () => {
     expect(isEvidenceQualifiedCandidate(row({ status: "ODRZUCONY" }), "1X2")).toBe(false);
     expect(isEvidenceQualifiedCandidate(row({ kind: "match" }), "1X2")).toBe(false);
     expect(isEvidenceQualifiedCandidate(undefined, "1X2")).toBe(false);
+  });
+});
+
+describe("prediction display status", () => {
+  it("does not label a high raw model probability as a qualified candidate when evidence is missing", () => {
+    const rejected = row({ status: "ODRZUCONY", details: { evidenceComplete: false, strongCandidate: false, strongDoubleChance: false } });
+    expect(getPredictionDisplayStatus(rejected, "1X2", 0.755)).toBe("WSTĘPNA PROGNOZA · NIEKWALIFIKOWANA");
+    expect(getPredictionDisplayStatus(rejected, "DOUBLE_CHANCE", 0.909)).toBe("WSTĘPNA PROGNOZA · NIEKWALIFIKOWANA");
+    expect(isEvidenceQualifiedCandidate(rejected, "1X2")).toBe(false);
+    expect(isEvidenceQualifiedCandidate(rejected, "DOUBLE_CHANCE")).toBe(false);
+  });
+  it("shows qualified status only when evidence and market-specific strong flag pass", () => {
+    expect(getPredictionDisplayStatus(row(), "1X2", 0.80)).toBe("KANDYDAT ≥75%");
   });
 });
