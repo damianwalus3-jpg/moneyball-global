@@ -152,3 +152,28 @@ Corrections committed on MAIN:
 - `2831819`: added the new test file to the MAIN GitHub Actions CI workflow.
 
 Validation status at the time of this entry: GitHub Actions was triggered for MAIN commit `2831819`; its run was queued when checked. Do not describe CI or the production Edge Function deployments as passed until the run completes and the two affected Edge Functions are deployed and smoke-tested. No database rows, match records, predictions, coupons, settlements or bankroll values were changed by these source edits.
+
+
+## Live Europe-wide fixture and gender-classification audit — 2026-11-18
+
+Read-only audit of the FootyNomad 18 Nov 2026 page:
+- The source page advertises 185 fixtures; its live HTML contains 185 fixture anchors and 185 complete home/away team cards.
+- Replayed the current MAIN FootyNomad parser's anchor, country-section and league-group extraction against the live page HTML, then applied the MAIN geographic-Europe, domestic-senior-league and reserve/youth filters.
+- Result: 31 eligible senior men's domestic-league fixtures across 7 countries: Germany 2, Bulgaria 5, Bosnia and Herzegovina 1, England 2, Poland 1, Scotland 6 and Spain 14.
+- Examples demonstrate the required all-tier scope: Germany Oberliga/Regionalliga, Bulgaria Third League, Bosnia First League RS, England Non-League Premier, Poland III Liga, Scotland Lowland League and Spain Segunda/Tercera RFEF. Cups, women, reserve sides and non-European fixtures are excluded.
+- The independent OpenMatchday/ESPN/OpenLigaDB/TheSportsDB aggregator returned zero eligible European fixtures for this date. OpenMatchday checked 47 eligible catalogue folders but had no fixture rows for 18 Nov. This is a supplemental-source gap for this date, not evidence that FootyNomad has no matches; the FootyNomad primary source remains essential.
+
+A second parser defect was found during this comparison: `/\bW\b|Women|female|girls/i` treated a lowercase final `w` as the women's `W` suffix. It misclassified Poland's Barycz Sułów vs Polonia Nysa. The correction adds shared `isWomensTeam` logic: uppercase standalone `W` is case-sensitive, while explicit women's words/competition markers remain case-insensitive. Both `footynomad-sync` and `moneyball-results-sync` now use the shared detector. Regression tests cover Barycz Sułów, Wolves, Häcken W, Women, WSL, and additional lower-tier competition aliases.
+
+Code/history:
+- `1bb5fe6`: shared women's-team detector.
+- `cbe8d5b`: regression tests for false women's classification.
+- `ab3b71c`: FootyNomad importer uses the shared detector.
+- `b6c4518`: result-sync parser uses the shared detector.
+- `21ebaa0`: adds Bulgaria Third League, Bosnia First League RS and Poland III Liga to all-tier scope regression tests.
+
+Validation boundary: the new Deno regression test passed in the CI run for `b6c4518`; type-check and app tests also passed there, while the build was still running at the time of this entry. The later scope-alias test commit `21ebaa0` requires its own completed CI result. The live authenticated `footynomad-sync` endpoint remains JWT-protected (GET without a user session returns 401), so this source-page replay is not a substitute for the pending authenticated owner scan/database readback. Do not claim the owner import is verified until that scan succeeds.
+
+Deployments: `moneyball-public-sources` v66 is ACTIVE with corrected parser regexes; `footynomad-sync` v106 is ACTIVE but predates the new gender-detector change; `moneyball-results-sync` still requires the matching source deployment. Deploy these affected functions only after MAIN CI passes, preserving `footynomad-sync verify_jwt=true` and the existing results-sync setting.
+
+No production match, prediction, coupon, result, settlement, or bankroll rows were changed by these read-only audits or code commits.
