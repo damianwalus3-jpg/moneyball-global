@@ -1096,3 +1096,12 @@
 - Football API (footballapi.org): free tier is restricted to Premier League and 50 calls/day; broader 68-competition coverage is paid. Not integrated.
 - Decision: keep existing public feeds for fixtures and recent results; do not fabricate xG. Only add historical datasets after verifying exact provenance, usable fields, attribution and a real evaluation split. A broad historical dataset ending 2023 cannot be used to claim current-season form.
 - Sources reviewed: schochastics/football-data README and issue #5; StatsBomb Open Data terms/README; Football Soccer API terms, acceptable-use policy, matches documentation, changelog and pricing; footballapi.org documentation and terms.
+
+
+## Stage 88 — prediction-level data provenance (2026-11-18)
+- Added a structured `history` object to newly saved prediction Tracker rows: per-team source names, provider update timestamps, unique historical match counts, home/away sample counts and the exclusive fixture-date cutoff.
+- Persisted the prediction method and its actual sample counts alongside the probability record. This makes later model audits reproducible and lets the UI/exported Tracker retain which free sources supported each prediction.
+- Existing Tracker rows remain unchanged; fields are additive and optional for legacy records. Prediction calculation, 75% eligibility and coupon logic are unchanged.
+- Implementation commit: 396a633a217df067ceb0544dc3e53d33521d48f1.
+- CI and Cloudflare deployment are pending verification on the newest HEAD.
+- Zero-cost constraint reaffirmed: no paid fixture/history/xG service, subscription, paid API key or paid database may be required. A paid source may only be mentioned as a rejected alternative, never silently enabled.
