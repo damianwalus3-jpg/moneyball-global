@@ -1741,3 +1741,10 @@
 - Removed a stale hard-coded “7 public sources” label from the dashboard stage summary; the active source set is described without a brittle count.
 - No prediction, odds, fixture, coupon, settlement, Tracker or bankroll data was modified.
 - Code commit: `ff2077779c83cd5a4afb59137c4c18a0c1e55667`. CI, Rebuild Checks and production deployment are triggered; record their final status after completion.
+
+
+### Stage 148 — API-Football Pro server-side gateway (2026-11-18)
+- Added `API_FOOTBALL_KEY` to the Cloudflare Worker environment contract and a date-scoped `GET /api/api-football/fixtures/YYYY-MM-DD` proxy.
+- Uses API-Sports v3 fixtures with explicit `Europe/Brussels` timezone, 5-minute cache, upstream status/error handling, and server-side secret only. The key is never returned to the browser or written to repository files.
+- This first integration exposes raw provider fixture data for validation; it does not yet merge API-Football fixtures into the canonical European fixture list or claim complete coverage. Statistics, injuries and lineups require separate endpoints and will be added after validating the subscription response.
+- Code commit: `adc5602944faf7bb5b95c7f89dcb3275254abe2a`. Secret presence and upstream response must be verified by the production smoke test before claiming the paid key is active.
