@@ -26,7 +26,7 @@ export function valueThreeLegCoupon(
   if (new Set(candidate.legs.map(leg => leg.fixtureId)).size !== 3) return null;
   const valuations = candidate.legs.map(leg => {
     // Current bookmaker snapshots contain only 1X2 prices. Never price DC legs as 1X2.
-    if (leg.market !== "1X2") return null;
+    if (leg.market !== "1X2" || (leg.selection !== "1" && leg.selection !== "X" && leg.selection !== "2")) return null;
     const fixturePredictions = records
       .filter(row => row.kind === "prediction" && row.details.fixtureId === leg.fixtureId)
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
