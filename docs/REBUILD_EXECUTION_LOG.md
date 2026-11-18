@@ -1408,3 +1408,10 @@
 - Added a Worker regression test asserting the exact Cache-Control values for upcoming (600 seconds) and played-only (21600 seconds) league schedules. This change does not increase request volume beyond the existing scan's bounded concurrency and ten-minute upstream cache.
 - Previous date-aware season hardening was deployed successfully on commit f2b17bd1ca11a65dee67a118274dc33de7221e18 (Cloudflare Version ID d9a4fdb7-093d-4f0e-9b41-984e04a4e638). Stage 117 code/test commits 0d33bc0785939335e3b5a417bfe6d3d59cf6080e and 9a892b81c589393e72b7ebeebb5de6e7e9a85f8b are awaiting their own CI/deployment confirmation.
 - Live provider catalogue and fixture counts were not re-queried in this stage; no completeness claim is made. No predictions, Tracker rows, coupons, settlements or bankroll data were modified.
+
+
+## Stage 118 — cache-policy regression test harness correction (2026-11-18)
+- The first CI run for Stage 117 exposed one failing test in the new cache-policy regression. The production code typechecked; the failure was isolated to the test mock: `mockResolvedValue` reused one `Response` instance for two upstream calls, but a Response body can only be consumed once. The second call therefore entered the Worker error path and returned `Cache-Control: no-store`, falsely appearing to violate the played-history cache policy.
+- Corrected the test fixture to construct a fresh Response for each mocked upstream request. No production Worker logic was changed in this correction.
+- This is recorded as a test-harness defect, not as a production cache regression. The Stage 117 cache policy remains: 600 seconds for upcoming/all league schedules and date feeds; 21600 seconds for played-only league history and catalogue/metadata; existing live and lineup policies unchanged.
+- New test commit b00f36b1963fd43531f27bbad7390d95bd423421 is awaiting CI and deployment confirmation. Do not claim Stage 117 is deployed until the latest branch workflows pass.
