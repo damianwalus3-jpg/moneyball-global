@@ -9,7 +9,7 @@ import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from ".
 import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
-import { describeHistoryProvenance, hasMissingPredictionMarket, hasValidPredictionMarket, shouldAppendPrediction } from "./prediction-record";
+import { describeHistoryProvenance, hasValidPredictionMarket, shouldAppendPrediction, shouldRetryPredictionAttempt } from "./prediction-record";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import { auditOddsFixtureMatches } from "./odds-matching";
 import { auditMarketCoverage } from "./market-coverage";
