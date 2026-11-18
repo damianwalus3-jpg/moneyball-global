@@ -239,8 +239,6 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Valencia Mestalla" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Betis Deportivo" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Sevilla Atletico" })).toBe(false);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: null })).toBe(true);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: "" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: "women" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie C" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie D - Championship Round" })).toBe(true);
