@@ -171,7 +171,9 @@ export function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
   const shortcut = (league.leagueShortcut ?? "").toLowerCase();
   if (OPENLIGA_EXCLUDED_SHORTCUTS.has(shortcut)) return false;
   const name = (league.leagueName ?? "").toLowerCase();
-  if (league.sport?.sportName && !league.sport.sportName.toLowerCase().includes("football") && !league.sport.sportName.toLowerCase().includes("fußball") && !league.sport.sportName.toLowerCase().includes("fussball")) return false;
+  const sportName = league.sport?.sportName?.trim().toLowerCase() ?? "";
+  if (!sportName) return false;
+  if (!sportName.includes("football") && !sportName.includes("fußball") && !sportName.includes("fussball")) return false;
   if (COUNTRY_NAMES.some(country => name.includes(country))) return true;
   const countryCodeFeed = [...EUROPEAN_COUNTRY_SHORTCUTS].some(code => new RegExp("^" + code + "(?:[0-9]|[-_])").test(shortcut));
   const namedFeed = EUROPEAN_SHORTCUT_PREFIXES.some(prefix => shortcut === prefix || shortcut.startsWith(prefix));
