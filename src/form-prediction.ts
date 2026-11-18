@@ -13,7 +13,7 @@ export interface FormPrediction {
     awayAttack: number;
     awayDefence: number;
   };
-  method: "recent-form-goals-poisson" | "pitchapi-recent-xg-poisson";
+  method: "recent-form-goals-poisson" | "pitchapi-recent-xg-poisson" | "neutral-prior-poisson";
   note: string;
 }
 
@@ -93,5 +93,28 @@ export function predictFromPitchApiXgForm(home: PitchApiXgForm, away: PitchApiXg
     samples: { homeAttack: homeSample.length, homeDefence: homeSample.length, awayAttack: awaySample.length, awayDefence: awaySample.length },
     method: "pitchapi-recent-xg-poisson",
     note: "Model oparty na średnim xG/xGA z wcześniejszych zakończonych meczów PitchAPI. Nie jest jeszcze skalibrowany out-of-sample; nie stanowi samodzielnego potwierdzenia mocnego typu.",
+  };
+}
+
+/**
+ * Explicit fallback for fixtures with no trustworthy team history.
+ * These are generic prior assumptions, not observed team statistics, and can
+ * never qualify as a strong candidate or coupon selection.
+ */
+export function predictFromNeutralPrior(): FormPrediction {
+  const homeExpectedGoals = 1.35;
+  const awayExpectedGoals = 1.05;
+  const prediction = predictFromExpectedGoals({ homeExpectedGoals, awayExpectedGoals });
+  const ranked = [
+    { pick: "1" as const, probability: prediction.probabilities.home },
+    { pick: "X" as const, probability: prediction.probabilities.draw },
+    { pick: "2" as const, probability: prediction.probabilities.away },
+  ].sort((a, b) => b.probability - a.probability);
+  return {
+    prediction, pick: ranked[0].pick, topProbability: ranked[0].probability,
+    strongCandidate: false,
+    samples: { homeAttack: 0, homeDefence: 0, awayAttack: 0, awayDefence: 0 },
+    method: "neutral-prior-poisson",
+    note: "PROGNOZA AWARYJNA — brak wystarczającej, zweryfikowanej historii obu drużyn. Użyto neutralnego prioru Poissona (λ gospodarze 1,35; goście 1,05), a nie danych tych zespołów. Nie używać do kuponów ani jako mocnego typu; prawdopodobieństwa nie są skalibrowane dla tej ligi.",
   };
 }
