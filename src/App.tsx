@@ -200,11 +200,14 @@ function savePredictionRecord(
     const couponEligible = !!variant && method !== "neutral-prior-poisson" && modelSampleQualified
       && hasKnownKickoff(match.date, match.time);
     const topProbability = variant?.topProbability ?? null;
-    const strongCandidate = couponEligible && typeof topProbability === "number" && topProbability >= 0.75;
+    const modelStrongCandidate = couponEligible && typeof topProbability === "number" && topProbability >= 0.75;
+    const strongCandidate = modelStrongCandidate && evidenceAudit.complete;
     const dcOptions = [{ selection: "1X", probability: dc?.oneX ?? null }, { selection: "X2", probability: dc?.xTwo ?? null }, { selection: "12", probability: dc?.oneTwo ?? null }];
     const bestDc = dcOptions.filter(item => typeof item.probability === "number").sort((a, b) => (b.probability as number) - (a.probability as number))[0];
     const dcProbability = typeof bestDc?.probability === "number" ? bestDc.probability : null;
-    const strongDoubleChance = couponEligible && dcProbability !== null && dcProbability >= 0.75;
+    const modelStrongDoubleChance = couponEligible && dcProbability !== null && dcProbability >= 0.75;
+    const strongDoubleChance = modelStrongDoubleChance && evidenceAudit.complete;
+    const evidenceRejectionReason = evidenceAudit.complete ? null : "ODRZUCONY: brak wymaganych danych: " + getEvidenceGaps(evidenceAudit).join(", ");
     const common = {
       ...shared, model, modelName: method, predictionMethod: variant?.method ?? null, modelMethod: variant?.method ?? null,
       expectedGoalsBasis: method === "pitchapi-recent-xg-poisson" ? "historyczne xG/xGA PitchAPI" : method === "recent-form-goals-poisson" ? "wyniki i gole historyczne (nie xG)" : "brak danych zespołów",
@@ -212,12 +215,12 @@ function savePredictionRecord(
       sampleCounts: variant ? JSON.stringify(variant.samples) : null,
       historySampleCounts: JSON.stringify({ home: homeForm?.matches.length ?? 0, away: awayForm?.matches.length ?? 0, xgHome: pitchApiXgForms?.home.sampleSize ?? 0, xgAway: pitchApiXgForms?.away.sampleSize ?? 0 }),
       minimumTeamHistoryMatches: 3, couponEligible,
-      reason: reason ?? (!couponEligible ? "ODRZUCONY: model wymaga co najmniej 3 wcześniejszych meczów dla obu drużyn oraz zweryfikowanej godziny rozpoczęcia." : null),
+      reason: reason ?? (!couponEligible ? "ODRZUCONY: model wymaga co najmniej 3 wcześniejszych meczów dla obu drużyn oraz zweryfikowanej godziny rozpoczęcia." : evidenceRejectionReason ?? (topProbability === null ? "Brak prawidłowej prognozy 1X2." : topProbability < 0.75 ? "Najwyższe prawdopodobieństwo 1X2 poniżej 75%." : null)),
     };
     const oneXTwoDetails = { ...common, market: "1X2", selection: variant?.pick ?? null,
       p1: probabilities?.home ?? null, px: probabilities?.draw ?? null, p2: probabilities?.away ?? null,
       dc1x: dc?.oneX ?? null, dcx2: dc?.xTwo ?? null, dc12: dc?.oneTwo ?? null,
-      topProbability, strongCandidate, source: match.source };
+      topProbability, modelStrongCandidate, strongCandidate, source: match.source };
     const hasOneXTwoProbabilities = !!probabilities
       && [probabilities.home, probabilities.draw, probabilities.away].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
       && Math.abs(probabilities.home + probabilities.draw + probabilities.away - 1) <= 0.0001;
