@@ -1748,3 +1748,15 @@
 - Uses API-Sports v3 fixtures with explicit `Europe/Brussels` timezone, 5-minute cache, upstream status/error handling, and server-side secret only. The key is never returned to the browser or written to repository files.
 - This first integration exposes raw provider fixture data for validation; it does not yet merge API-Football fixtures into the canonical European fixture list or claim complete coverage. Statistics, injuries and lineups require separate endpoints and will be added after validating the subscription response.
 - Code commit: `adc5602944faf7bb5b95c7f89dcb3275254abe2a`. Secret presence and upstream response must be verified by the production smoke test before claiming the paid key is active.
+
+
+### Stage 149 — API-Football Pro in canonical European fixture scan (2026-11-18)
+- Production smoke test confirmed the server-side API-Football Pro key is configured and the v3 fixtures endpoint returned HTTP 200 with 183 provider fixtures for Europe/Brussels date 2026-11-18. This validates the key and fixtures endpoint only; it does not prove that all 183 are European or that odds/statistics/lineups are included.
+- Integrated the API-Football daily response into `scanTodayEuropeanFixtures` as an additional source. Fixtures are admitted only when the provider's country maps to a known European country code and the kickoff converts to the requested `Europe/Brussels` date. Non-European, unknown-country, malformed, and wrong-date records are excluded.
+- API-Football fixtures merge into the existing canonical fixture map using the same normalized fixture key; source provenance and provider fixture/league IDs are retained without overwriting historical records.
+- Added API-Football coverage counters (provider response count, European same-day mapped count, source errors) to the scan result.
+- Added unit tests for Brussels date rollover, country filtering, provider IDs/provenance, empty payload and malformed response.
+- Code commits: `00e3829c8ecbd2de4d1797581f973f976f27f899` (integration), `084b091fb1edc4c45807d3d5dcda79dcdafc5754` (tests).
+- Validation/deployment workflow runs are recorded after the final documentation commit. Do not claim full European coverage from this source; API-Football is one additional feed in the multi-source reconciliation.
+- Next: after production deployment, compare API-Football's mapped European same-day fixtures with FootyNomad/Flashscore and inspect source disagreements. Then validate separate API endpoints and plan entitlements for statistics, injuries, lineups and odds before integrating those datasets.
+- Scope preserved: only repository `damianwalus3-jpg/moneyball-global`, branch `moneyball-rebuild`, and Cloudflare REBUILT. No MAIN/TEST/Vercel/Lovable or legacy Supabase projects touched. No tracker history, predictions, coupons, settlements, results or bankroll were modified.
