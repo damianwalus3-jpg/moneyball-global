@@ -73,7 +73,7 @@ function footyHtmlText(value: string): string {
     .replace(/&#x([0-9a-f]+);/gi, (_match, code: string) => String.fromCodePoint(parseInt(code, 16)))
     .replace(/\s+/g, " ").trim();
 }
-export function parseFootyNomadFixtures(html: string, pageDate: string, targetDate: string): { fixtures: Array<Record<string, unknown>>; pageMatches: number; skippedNoTimestamp: number } {
+export function parseFootyNomadFixtures(html: string, targetDate: string): { fixtures: Array<Record<string, unknown>>; pageMatches: number; skippedNoTimestamp: number } {
   const headings = [...html.matchAll(/<h2\b[^>]*>([\s\S]*?)<\/h2>/gi)];
   const fixtures: Array<Record<string, unknown>> = [];
   let pageMatches = 0;
@@ -297,7 +297,7 @@ export default {
           const html = await upstream.text();
           if (!upstream.ok) throw new Error("footynomad_upstream_http_" + upstream.status + " for " + pageDate);
           if (!html.includes("/fixture/") || !html.includes("<h1")) throw new Error("footynomad_invalid_html for " + pageDate);
-          return parseFootyNomadFixtures(html, pageDate, date);
+          return parseFootyNomadFixtures(html, date);
         }));
         const byId = new Map<string, Record<string, unknown>>();
         for (const page of pages) for (const fixture of page.fixtures) byId.set(String(fixture.id), fixture);
