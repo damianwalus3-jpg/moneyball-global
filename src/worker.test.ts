@@ -39,6 +39,12 @@ describe("FootyNomad fixture parser", () => {
     expect(result.fixtures).toHaveLength(0);
     expect(result.skippedNoTimestamp).toBe(1);
   });
+  it("includes Israeli domestic fixtures in the European country map", () => {
+    const html = '<h2>Israel <span>1</span></h2><details class="league-group"><summary><a href="/league/5">Premier League</a></summary><a href="/fixture/105-home-vs-away" class="ticket ticket-ns"><time datetime="2026-11-18T17:00:00Z">19:00</time><span class="ticket-home">Maccabi Haifa</span><span class="ticket-away">Hapoel Be'er Sheva</span></a></details>';
+    const result = parseFootyNomadFixtures(html, "2026-11-18");
+    expect(result.fixtures).toHaveLength(1);
+    expect(result.fixtures[0]).toMatchObject({ id: "footynomad|105", countryCode: "ISR", competition: "Premier League", date: "2026-11-18", time: "18:00" });
+  });
 });
 
 describe("FootyNomad daily fixtures Worker proxy", () => {
