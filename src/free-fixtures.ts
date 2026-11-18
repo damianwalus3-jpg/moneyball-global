@@ -161,7 +161,10 @@ const OPENLIGA_SHORTCUT_COUNTRY_CODES: Record<string, string> = {
   am: "ARM", az: "AZE", mk: "MKD", me: "MNE", ad: "AND", fo: "FRO", gi: "GIB",
   il: "ISR", ko: "KOS", by: "BLR", li: "LIE", sm: "SMR", pl1: "POL",
   bl: "GER", la1: "ESP", ere: "NED", obl: "AUT", wcl: "UEFA", ucl: "UEFA",
-  uel: "UEFA", uecl: "UEFA", nla: "UEFA", unl: "UEFA", pl: "ENG",\n  blo: "AUT", dfb: "GER", dfbf: "GER", dfbn: "GER", blsupercup: "GER", ffb1: "GER", ffb2: "GER",\n  fna: "GER", wsc: "GER", u21dfb: "GER", nofvon: "GER", nofvos: "GER", rlno: "GER", rln: "GER",\n  "regio-bayern": "GER", "rlw-frauen": "GER", "thuli-26": "GER", oh: "GER", ol1: "GER",
+  uel: "UEFA", uecl: "UEFA", nla: "UEFA", unl: "UEFA", pl: "ENG",
+  blo: "AUT", dfb: "GER", dfbf: "GER", dfbn: "GER", blsupercup: "GER", ffb1: "GER", ffb2: "GER",
+  fna: "GER", wsc: "GER", u21dfb: "GER", nofvon: "GER", nofvos: "GER", rlno: "GER", rln: "GER",
+  "regio-bayern": "GER", "rlw-frauen": "GER", "thuli-26": "GER", oh: "GER", ol1: "GER",
 };
 export function openLigaCountryCode(league: OpenLigaLeague): string {
   const name = (league.leagueName ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
