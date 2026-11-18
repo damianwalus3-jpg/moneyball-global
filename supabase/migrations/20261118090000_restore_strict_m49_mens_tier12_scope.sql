@@ -113,9 +113,9 @@ $function$;
 
 CREATE OR REPLACE FUNCTION public.moneyball_is_openmatchday_tier(p_source text,p_external_id text)
 RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path TO '' AS $function$
-  SELECT lower(coalesce(p_source,'')) <> 'openmatchday'
+  SELECT lower(btrim(coalesce(p_source,''))) <> 'openmatchday'
     OR (
-      coalesce(p_external_id,'') ~ '^om:[A-Z]{3}_[12]_[A-Za-z0-9-]+:'
+      coalesce(p_external_id,'') ~* '^om:[A-Z]{3}_[12]_[A-Za-z0-9-]+:'
       AND coalesce(p_external_id,'') !~* '(cup|women|womens|female|youth|academy|reserve|u[0-9]{1,2})'
     );
 $function$;
@@ -157,7 +157,7 @@ BEGIN
 END;
 $function$;
 DROP TRIGGER IF EXISTS trg_moneyball_block_test_coupon ON public.coupons;
-CREATE TRIGGER trg_moneyball_block_test_coupon BEFORE INSERT ON public.coupons FOR EACH ROW EXECUTE FUNCTION public.moneyball_block_new_test_coupon();
+CREATE TRIGGER trg_moneyball_block_test_coupon BEFORE INSERT OR UPDATE OF coupon_type ON public.coupons FOR EACH ROW EXECUTE FUNCTION public.moneyball_block_new_test_coupon();
 
 CREATE OR REPLACE FUNCTION public.moneyball_guard_coupon_leg_scope()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO '' AS $function$
@@ -171,6 +171,9 @@ BEGIN
   END IF;
   IF (v_coupon.target_legs=1 AND v_coupon.coupon_type<>'MAIN') OR (v_coupon.target_legs=3 AND v_coupon.coupon_type NOT IN ('MEGA','EXTRA')) OR v_coupon.target_legs NOT IN (1,3) THEN
     RAISE EXCEPTION 'Coupon type and target leg count are inconsistent.';
+  END IF;
+  IF NEW.leg_number > v_coupon.target_legs OR (SELECT count(*) FROM public.coupon_legs l WHERE l.coupon_id=NEW.coupon_id) >= v_coupon.target_legs THEN
+    RAISE EXCEPTION 'Coupon cannot contain more legs than its fixed target.';
   END IF;
   SELECT m.id,m.owner_id,m.country,m.competition,m.league,m.gender,m.home_team,m.away_team,m.source,m.external_id,m.kickoff_at,m.status
     INTO v_match FROM public.matches m WHERE m.id=NEW.match_id AND m.owner_id=v_coupon.owner_id;
@@ -440,18 +443,23 @@ BEGIN
   IF public.moneyball_is_eligible_european_match('England','Premier League','men','Arsenal B','Chelsea') THEN RAISE EXCEPTION 'Reserve team incorrectly accepted.'; END IF;
   IF public.moneyball_is_eligible_european_match('World','UEFA Nations League','men','Belgium','France') THEN RAISE EXCEPTION 'UEFA Nations League incorrectly accepted.'; END IF;
   IF public.moneyball_is_eligible_european_match('Turkey','Super Lig','men','Galatasaray','Fenerbahce') THEN RAISE EXCEPTION 'Non-M49 Turkey scope incorrectly accepted.'; END IF;
+  IF public.moneyball_is_openmatchday_tier('OpenMatchday','om:ENG_3_League-One:2026-11-18:fixture') THEN RAISE EXCEPTION 'OpenMatchday tier 3 incorrectly accepted.'; END IF;
+  IF NOT public.moneyball_is_openmatchday_tier('OpenMatchday','om:ENG_2_Championship:2026-11-18:fixture') THEN RAISE EXCEPTION 'OpenMatchday tier 2 unexpectedly rejected.'; END IF;
   IF public.moneyball_is_geographic_europe_country('Türkiye') THEN RAISE EXCEPTION 'UEFA membership incorrectly widened geographic Europe.'; END IF;
 END;
 $scope_assertions$;
 
 DO $test_coupon_guard$
-DECLARE v_blocked boolean := false;
+DECLARE v_error text := '';
 BEGIN
   BEGIN
     INSERT INTO public.coupons(owner_id,name,coupon_type,target_legs,stake,source_class)
     VALUES (gen_random_uuid(),'MAIN audit guard test','TEST',3,0,'PAPER');
-  EXCEPTION WHEN others THEN v_blocked := true;
+  EXCEPTION WHEN others THEN
+    GET STACKED DIAGNOSTICS v_error = MESSAGE_TEXT;
   END;
-  IF NOT v_blocked THEN RAISE EXCEPTION 'New TEST coupon was not blocked.'; END IF;
+  IF v_error NOT LIKE '%New TEST coupons are disabled%' THEN
+    RAISE EXCEPTION 'New TEST coupon guard failed: %',v_error;
+  END IF;
 END;
 $test_coupon_guard$;
