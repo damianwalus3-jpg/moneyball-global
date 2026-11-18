@@ -231,8 +231,8 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Betis Deportivo" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Sevilla Atletico" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: "women" })).toBe(false);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie C" })).toBe(true);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie D - Championship Round" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie C" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie D - Championship Round" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Sweden", competition: "Damallsvenskan", gender: null })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "Premier League - Summer Series" })).toBe(false);
     // OpenMatchday's source folder is authoritative tier metadata; display names
@@ -512,6 +512,7 @@ describe("manual odds promotion", () => {
   const eligible = prediction("p", "m1", 82, {
     verdict: "ODRZUCONY",
     rejection_reason: "Brak aktualnego, potwierdzonego kursu dla tego rynku i typu.",
+    odds: 1.8,
     data_source: "MONEYBALL_VERIFIED_HISTORY",
     rationale: "Model oparty na historii obu drużyn.",
     data_coverage: {
@@ -519,6 +520,14 @@ describe("manual odds promotion", () => {
       model_source_type: "PARTIAL_VERIFIED_HISTORY",
       home_history_matches: 4,
       away_history_matches: 5,
+      market_odds: true,
+      odds_source: "manual",
+      odds_bookmaker: "Bwin Belgium",
+      odds_captured_at: "2026-11-10T11:30:00.000Z",
+      odds_phase: "prematch",
+      odds_status: "CONFIRMED",
+      odds_suspended: false,
+      odds_source_url: "https://www.bwin.be/",
     },
   });
 
@@ -541,7 +550,7 @@ describe("manual odds promotion", () => {
     expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_source_type: "BASELINE_ONLY" } }, match("m1"), now)).toBe(false);
     expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, home_history_matches: 2 } }, match("m1"), now)).toBe(false);
     expect(canPromoteManualOdds({ ...eligible, data_coverage: { model_coverage: 60, model_source_type: "PARTIAL_VERIFIED_HISTORY" } }, match("m1"), now)).toBe(false);
-    expect(canPromoteManualOdds({ ...eligible, data_coverage: { model_coverage: 75, model_source_type: "TIPSAUDIT_FAIR_MARKET", market_odds: true } }, match("m1"), now)).toBe(true);
+    expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_coverage: 75, model_source_type: "PARTIAL_VERIFIED_HISTORY", market_odds: true, odds_source: "TipsAudit fair market", odds_bookmaker: "TipsAudit" } }, match("m1"), now)).toBe(false);
     expect(canPromoteManualOdds({ ...eligible, rejection_reason: "Prawdopodobieństwo poniżej progu." }, match("m1"), now)).toBe(false);
   });
 

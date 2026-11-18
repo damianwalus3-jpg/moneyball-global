@@ -344,7 +344,8 @@ export function canPromoteManualOdds(prediction: Prediction, match: Match | unde
   if (!isMissingOddsRejectionReason(prediction.rejection_reason)) return false;
   if (prediction.probability == null || !Number.isFinite(Number(prediction.probability)) || Number(prediction.probability) <= CANDIDATE_MIN_PROBABILITY) return false;
   if (!hasSufficientPredictionEvidence(prediction)) return false;
-  return isCouponCandidate({ ...prediction, verdict: "WYBRANY" }, match, nowMs);
+  const promoted = { ...prediction, verdict: "WYBRANY" };
+  return isCouponCandidate(promoted, match, nowMs) && hasFreshConfirmedOdds(promoted, nowMs);
 }
 
 /** Persistence-boundary rule: only selected predictions above 75% with verified model evidence may enter a coupon. */
