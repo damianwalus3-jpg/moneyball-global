@@ -12,6 +12,7 @@ import { auditTrackerPredictions } from "./model-audit";
 import { describeHistoryProvenance, hasValidPredictionMarket, shouldAppendPrediction, shouldRetryPredictionAttempt } from "./prediction-record";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import { auditOddsFixtureMatches } from "./odds-matching";
+import { brusselsDateToday, getSelectedFixturePredictions } from "./selected-matches";
 import { auditMarketCoverage } from "./market-coverage";
 import { buildBetSettlementRows } from "./bet-settlement";
 import { listOddsBookmakers, shouldAutoFetchDailyOdds } from "./odds-value";
@@ -729,7 +730,8 @@ export default function App() {
       reasons: [...reasons.entries()].sort((a, b) => b[1] - a[1]),
       oneXTwoRecords: oneXTwo.length, doubleChanceRecords: doubleChance.length };
   }, [records, fixtureScan?.date]);
-  const safestPick = useMemo(() => getSafestPick(records), [records]);
+  const activeFixtureDate = fixtureScan?.date ?? brusselsDateToday();
+  const safestPick = useMemo(() => getSafestPick(records, 0.75, activeFixtureDate), [records, activeFixtureDate]);
   const visibleRecords = useMemo(() => records.filter(row => (active === "tracker" ? true : row.kind === (active === "matches" ? "match" : active === "coupons" ? "coupon" : active === "pick" ? "prediction" : "scan")) && (row.title.toLowerCase().includes(query.toLowerCase()) || row.status.toLowerCase().includes(query.toLowerCase()))), [records, active, query]);
   const refreshRecords = () => setRecords(readRecords());
   const betInputFor = (prediction: TrackerRecord) => betInputs[String(prediction.details.fixtureId)] ?? {
@@ -1016,23 +1018,7 @@ export default function App() {
           <p>Pokazujemy najnowszą zapisaną prognozę każdego rynku dla meczu. Procent jest prawdopodobieństwem przypisanym dokładnie do wskazanego typu, a nie gwarancją wyniku.</p>
           {safestPick && <div className="safest-pick-card"><span className="safest-pick-label">NAJMOCNIEJSZY KANDYDAT · NIE GWARANCJA</span><h3>{safestPick.title}</h3><b className="safest-pick-market">{safestPick.market} · {(safestPick.probability * 100).toFixed(1)}%</b><p>{safestPick.competition} · {safestPick.kickoff} (Europe/Brussels)</p><small>{safestPick.reason}</small></div>}
           {(() => {
-            const latest = new Map<string, TrackerRecord>();
-            for (const row of records.filter(item => item.kind === "prediction" && typeof item.details.fixtureId === "string")
-              .sort((a,b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))) {
-              const market = row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2";
-              const key = String(row.details.fixtureId) + "|" + market;
-              const prior = latest.get(key);
-              const priority = (item: TrackerRecord) => item.details.predictionMethod === "pitchapi-recent-xg-poisson" ? 3 : item.details.predictionMethod === "recent-form-goals-poisson" ? 2 : 1;
-              if (!prior || priority(row) > priority(prior) || (priority(row) === priority(prior) && Date.parse(row.createdAt) > Date.parse(prior.createdAt))) latest.set(key,row);
-            }
-            const fixtures = new Map<string, { one?: TrackerRecord; dc?: TrackerRecord }>();
-            for (const row of latest.values()) {
-              const id = String(row.details.fixtureId);
-              const item = fixtures.get(id) ?? {};
-              if (row.details.market === "DOUBLE_CHANCE") item.dc = row; else item.one = row;
-              fixtures.set(id,item);
-            }
-            const ordered = [...fixtures.entries()].sort((a,b) => String(b[1].one?.details.fixtureDate ?? b[1].dc?.details.fixtureDate ?? "").localeCompare(String(a[1].one?.details.fixtureDate ?? a[1].dc?.details.fixtureDate ?? "")) || String(a[1].one?.title ?? a[1].dc?.title ?? "").localeCompare(String(b[1].one?.title ?? b[1].dc?.title ?? "")));
+            const ordered = getSelectedFixturePredictions(records, activeFixtureDate);
             const chosenProbability = (row: TrackerRecord | undefined, market: "1X2" | "DOUBLE_CHANCE") => {
               if (!row || typeof row.details.selection !== "string") return null;
               const key = market === "1X2" ? ({ "1":"p1", "X":"px", "2":"p2" } as Record<string,string>)[row.details.selection] : ({ "1X":"p1x", "X2":"px2", "12":"p12" } as Record<string,string>)[row.details.selection];
@@ -1060,8 +1046,9 @@ export default function App() {
               </div>;
             };
             return <div className="selected-fixture-list">
-              <div className="module-status"><span className="status-dot"/> Mecze: {fixtures.size} · kandydaci 1X2 ≥75%: {[...latest.values()].filter(row => row.details.market !== "DOUBLE_CHANCE" && row.details.evidenceComplete === true && row.details.strongCandidate === true).length} · kandydaci DC ≥75%: {[...latest.values()].filter(row => row.details.market === "DOUBLE_CHANCE" && row.details.evidenceComplete === true && row.details.strongDoubleChance === true).length}</div>
-              {ordered.map(([id,item]) => {
+              <div className="module-status"><span className="status-dot"/> Mecze z dnia {activeFixtureDate}: {ordered.length} · kandydaci 1X2 ≥75%: {ordered.filter(item => item.one?.details.evidenceComplete === true && item.one?.details.strongCandidate === true).length} · kandydaci DC ≥75%: {ordered.filter(item => item.dc?.details.evidenceComplete === true && item.dc?.details.strongDoubleChance === true).length}</div>
+              {ordered.map(item => {
+                const id = item.fixtureId;
                 const row = item.one ?? item.dc!;
                 return <article className="selected-fixture-card" key={id}>
                   <div className="selected-fixture-title"><div><b>{String(row.details.home ?? "Gospodarze")} – {String(row.details.away ?? "Goście")}</b><small>{String(row.details.competition ?? "Rozgrywki")} · {String(row.details.fixtureDate ?? "Data nieznana")} {String(row.details.fixtureTime ?? "")}</small></div><span>{item.one && item.dc ? "1X2 + DC" : item.one ? "1X2" : "DC"}</span></div>
