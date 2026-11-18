@@ -264,7 +264,7 @@ export default {
       if (cached) return cached;
       try {
         const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-        const searchUrl = "https://site.web.api.espn.com/apis/common/v3/search?query=" + encodeURIComponent(teamQuery) + "&limit=10&type=team";
+        const searchUrl = "https://site.api.espn.com/apis/common/v3/search?query=" + encodeURIComponent(teamQuery) + "&limit=10&type=team";
         const searchResponse = await fetch(searchUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
         if (!searchResponse.ok) throw new Error("espn_team_search_http_" + searchResponse.status);
         const searchPayload = await searchResponse.json() as { items?: Array<{ id?: string; displayName?: string; name?: string; sport?: string; defaultLeagueSlug?: string }> };
