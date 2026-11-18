@@ -38,6 +38,13 @@ describe("safest daily pick", () => {
     expect(getSafestPick([dcOnly])?.market).toBe("1X");
   });
 
+  it("qualifies Double Chance from 75%, independently of the 1X2 gate", () => {
+    const dcAt75 = prediction({ dc1x: 0.75, dcx2: 0.74, dc12: 0.70, strongCandidate: false, strongDoubleChance: true }, "KANDYDAT_DC");
+    expect(getSafestPick([dcAt75])?.market).toBe("1X");
+    const below75 = prediction({ dc1x: 0.749, dcx2: 0.74, dc12: 0.70, strongCandidate: false, strongDoubleChance: false }, "ODRZUCONY");
+    expect(getSafestPick([below75])).toBeNull();
+  });
+
   it("does not surface rejected, weak or started predictions", () => {
     expect(getSafestPick([prediction({}, "ODRZUCONY")])).toBeNull();
     expect(getSafestPick([prediction({ dc1x: 0.79, dcx2: 0.77, dc12: 0.78 })])).toBeNull();
