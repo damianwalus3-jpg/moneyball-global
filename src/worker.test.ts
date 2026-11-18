@@ -493,3 +493,39 @@ describe("PitchAPI secure Worker proxy", () => {
     expect(cache.put).not.toHaveBeenCalled();
   });
 });
+
+
+describe("API-Football Pro secure status proxy", () => {
+  const env = { ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "server-only-test-secret" };
+  it("exposes subscription and rate-limit metadata but never account personal data or the key", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      response: {
+        account: { firstname: "Private", email: "private@example.com" },
+        subscription: { plan: "Pro", active: true, end: "2027-01-01T00:00:00Z" },
+        requests: { current: 12, limit_day: 7500 },
+      },
+    }), { status: 200, headers: { "X-RateLimit-Limit": "300", "X-RateLimit-Remaining": "299", "x-ratelimit-requests-remaining": "7488" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/status", {
+      headers: { Origin: "https://moneyball-global-rebuild.damianwalus3.workers.dev" },
+    }), env, { waitUntil: vi.fn() });
+    const body = await response.json() as Record<string, any>;
+    expect(response.status).toBe(200);
+    expect(body.subscription).toMatchObject({ plan: "Pro", active: true });
+    expect(body.requests).toMatchObject({ perMinuteLimit: "300", perMinuteRemaining: "299", dailyRemaining: "7488" });
+    expect(JSON.stringify(body)).not.toContain("private@example.com");
+    expect(JSON.stringify(body)).not.toContain("Private");
+    expect(JSON.stringify(body)).not.toContain("server-only-test-secret");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://v3.football.api-sports.io/status");
+    expect(cache.put).toHaveBeenCalledTimes(1);
+  });
+  it("does not call the provider when the secret is absent", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/status"), { ASSETS: { fetch: vi.fn() } }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(503);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
