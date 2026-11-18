@@ -104,6 +104,7 @@ export function listOddsBookmakers(records: TrackerRecord[], fixtureIds: string[
 export function shouldAutoFetchDailyOdds(input: {
   fixtureDate: string;
   tokenSaved: boolean;
+  providerReady: boolean;
   lastSuccessfulDate: string;
   lastAttemptedDate: string;
 }): boolean {
@@ -113,5 +114,5 @@ export function shouldAutoFetchDailyOdds(input: {
   const day = Number(input.fixtureDate.slice(8, 10));
   const parsed = new Date(Date.UTC(year, month - 1, day));
   if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return false;
-  return input.tokenSaved && input.lastSuccessfulDate !== input.fixtureDate && input.lastAttemptedDate !== input.fixtureDate;
+  return input.tokenSaved && input.providerReady && input.lastSuccessfulDate !== input.fixtureDate && input.lastAttemptedDate !== input.fixtureDate;
 }
