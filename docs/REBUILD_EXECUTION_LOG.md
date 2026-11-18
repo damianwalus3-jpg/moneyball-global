@@ -1272,3 +1272,10 @@
 - Product boundaries recorded in README: source catalogues do not prove exhaustive European coverage; recent-form Poisson predictions are not xG-trained and do not include confirmed squads/injuries; odds pilot is disabled and no live odds/EV is available; Tracker is localStorage and does not sync across devices; coupons are paper records and are not placed with bookmakers.
 - Updated README and this log so the active source list, successful final deployment, limitations and handoff are accurate.
 - **Release/maintenance decision:** treat this build as released for the implemented local-first analytical and paper-tracking scope. Stop creating open-ended feature stages. Reopen development only for a reproducible defect, a production source outage, a security issue, or an explicitly requested feature. No claim of 100% European match coverage is permitted.
+
+
+## Stage 104 — release dashboard consistency and handoff boundary (2026-11-18)
+- Final source review found two stale dashboard labels: the fixture-source row still said six sources although the scanner now combines seven, and the acceptance row implied the visual Android check was merely pending without distinguishing it from completed CI/deployment checks.
+- Corrected the dashboard to show seven public fixture sources, explicitly state that coverage is not exhaustive, and mark the remaining physical Android visual check as a documented limitation rather than an open development stage.
+- No fixture data, Tracker rows, predictions, coupons, settlement records or bankroll values were changed by this text-only UI correction.
+- Release remains limited to the documented free/local-first scope. Reopen only for reproducible defects, provider outages, security issues or an explicitly requested feature; do not create new stages by default.
