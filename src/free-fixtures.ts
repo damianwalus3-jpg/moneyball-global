@@ -1,7 +1,7 @@
 import { scanOpenFootball } from "./openfootball";
 import { cacheOpenLigaTeamForms } from "./team-form";
 import { seasonCode } from "./season";
-import { fetchPitchApiDate, fetchPitchApiLeague, fetchPitchApiLeagueCatalog, fetchPitchApiLeagueMatches, isPitchApiCountryEligible } from "./pitchapi";
+import { fetchPitchApiDate, fetchPitchApiLeague, fetchPitchApiLeagueCatalog, fetchPitchApiLeagueMatches, isPitchApiCountryEligible, type PitchApiLeague, type PitchApiLeagueMatch } from "./pitchapi";
 import { EUROPEAN_COUNTRY_CODES } from "./european-countries";
 export interface FreeFixture {
   id: string;
@@ -51,9 +51,9 @@ interface OpenLigaMatch {
 }
 const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const OPENLIGA = "/api/openligadb";
-const SOURCE = "Flashscore + FootyNomad + open-matchday + OpenLigaDB + openfootball + ESPN + timezone.football (publiczne terminarze)";
+const SOURCE = "Flashscore + FootyNomad + open-matchday + OpenLigaDB + openfootball + ESPN + timezone.football + PitchAPI catalogue (publiczne terminarze)";
 const EUROPE = EUROPEAN_COUNTRY_CODES;
-const CACHE_KEY = "moneyball.free-fixtures.v13";
+const CACHE_KEY = "moneyball.free-fixtures.v14";
 const CACHE_MS = 15 * 60 * 1000;
 const TIMEZONE_FEED_CACHE_KEY = "moneyball.timezone-football.v1";
 const TIMEZONE_FEED_CACHE_MS = 15 * 60 * 1000;
@@ -253,6 +253,27 @@ export function mergeFixtureSource(existing: FreeFixture, incoming: FreeFixture)
   if (!existing.sourceUrl && incoming.sourceUrl) existing.sourceUrl = incoming.sourceUrl;
   if ((!existing.sourceUpdatedAt || existing.sourceUpdatedAt === "not provided by OpenLigaDB") && incoming.sourceUpdatedAt) existing.sourceUpdatedAt = incoming.sourceUpdatedAt;
   return existing;
+}
+
+export function parsePitchApiLeagueFixtures(league: PitchApiLeague, matches: PitchApiLeagueMatch[], targetDate: string, updatedAt: string): FreeFixture[] {
+  if (!isPitchApiCountryEligible(league.country_code)) return [];
+  return matches.flatMap(item => {
+    if (item.status !== "not_started" || !item.time_utc || !item.home_team?.name || !item.away_team?.name) return [];
+    const kickoff = new Date(item.time_utc);
+    if (!Number.isFinite(kickoff.getTime())) return [];
+    const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(kickoff);
+    const get = (key: string) => parts.find(part => part.type === key)?.value ?? "";
+    const localDate = get("year") + "-" + get("month") + "-" + get("day");
+    if (localDate !== targetDate) return [];
+    return [{
+      id: "pitchapi|" + item.id, competition: league.name, countryCode: (league.country_code ?? "").toUpperCase(),
+      leagueFolder: "", date: localDate, time: get("hour") + ":" + get("minute"),
+      home: item.home_team.name, away: item.away_team.name, source: "PitchAPI catalogue",
+      sourceUpdatedAt: updatedAt, pitchApiMatchId: item.id,
+      pitchApiHomeTeamId: item.home_team.id, pitchApiAwayTeamId: item.away_team.id,
+      pitchApiLeagueId: league.id, pitchApiSeason: league.seasons?.[0] ?? league.season ?? undefined,
+    }];
+  });
 }
 
 export function fixtureKey(date: string, home: string, away: string, competition = ""): string {
@@ -631,23 +652,9 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
         continue;
       }
       pitchApiCatalogueUpcomingFixtures += result.fixtures.length;
-      for (const item of result.fixtures) {
-        if (item.status !== "not_started" || !item.time_utc || !item.home_team?.name || !item.away_team?.name) continue;
-        const kickoff = new Date(item.time_utc);
-        if (!Number.isFinite(kickoff.getTime())) continue;
-        const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(kickoff);
-        const get = (key: string) => parts.find(part => part.type === key)?.value ?? "";
-        const localDate = get("year") + "-" + get("month") + "-" + get("day");
-        if (localDate !== date) continue;
-        pitchApiCatalogueDateFixtures++;
-        const fixture: FreeFixture = {
-          id: "pitchapi|" + item.id, competition: result.league.name, countryCode: (result.league.country_code ?? "").toUpperCase(),
-          leagueFolder: "", date: localDate, time: get("hour") + ":" + get("minute"),
-          home: item.home_team.name, away: item.away_team.name, source: "PitchAPI catalogue",
-          sourceUpdatedAt: new Date().toISOString(), pitchApiMatchId: item.id,
-          pitchApiHomeTeamId: item.home_team.id, pitchApiAwayTeamId: item.away_team.id,
-          pitchApiLeagueId: result.league.id, pitchApiSeason: result.season,
-        };
+      const parsedFixtures = parsePitchApiLeagueFixtures(result.league, result.fixtures, date, new Date().toISOString());
+      pitchApiCatalogueDateFixtures += parsedFixtures.length;
+      for (const fixture of parsedFixtures) {
         const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
         const existing = byKey.get(key);
         if (existing) mergeFixtureSource(existing, fixture);
