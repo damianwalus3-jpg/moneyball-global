@@ -3,7 +3,7 @@ import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from ".
 import { addRecord, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, loadRecentTeamFormAcrossCountry, mergeVerifiedTeamForms, type TeamForm } from "./team-form";
 import { predictFromRecentForm, predictFromPitchApiXgForm, type FormPrediction } from "./form-prediction";
-import { fetchPitchApiXgFormsForFixture, type PitchApiXgForm } from "./pitchapi";
+import { fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, type PitchApiLineups, type PitchApiXgForm } from "./pitchapi";
 import { buildThreeLegCandidates } from "./coupon-engine";
 import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from "./openfootball";
 import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
@@ -55,11 +55,24 @@ function DetailMetric({ label, value, detail, valueClass }: { label: string; val
   return <article className="detail-metric"><small>{label}</small><b className={valueClass}>{value}</b><details><summary>Szczegóły</summary><p>{detail}</p></details></article>;
 }
 
-function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, reason?: string, homeForm?: TeamForm, awayForm?: TeamForm, pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm }): TrackerRecord[] {
+function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, reason?: string, homeForm?: TeamForm, awayForm?: TeamForm, pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm }, pitchApiLineups?: PitchApiLineups): TrackerRecord[] {
   const model = "recent-form-goals-poisson-v2-evidence-gated";
   const evidenceAudit = buildBaselineEvidenceAudit();
   if (pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3) {
     evidenceAudit.areas.xg_xga = { status: "VERIFIED", source: "PitchAPI", observedAt: new Date().toISOString(), note: "Średnie xG/xGA z co najmniej 3 zakończonych, wcześniejszych meczów każdej drużyny; wartości pobrane z oficjalnego endpointu statystyk meczowych." };
+  }
+  if (pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3) {
+    const shotsComplete = [pitchApiXgForms.home, pitchApiXgForms.away].every(form =>
+      form.shotsForPerMatch != null && form.shotsOnTargetForPerMatch != null && form.bigChancesForPerMatch != null);
+    if (shotsComplete) evidenceAudit.areas.shots_and_chances = { status: "VERIFIED", source: "PitchAPI", observedAt: new Date().toISOString(), note: "Strzały, celne strzały i duże sytuacje z historii zakończonych meczów; próbka co najmniej 3 spotkań każdej drużyny." };
+    const tacticsComplete = [pitchApiXgForms.home, pitchApiXgForms.away].every(form =>
+      form.ppdaPerMatch != null && form.fieldTiltPerMatch != null && form.boxEntriesPerMatch != null);
+    if (tacticsComplete) evidenceAudit.areas.tactics = { status: "VERIFIED", source: "PitchAPI advanced", observedAt: new Date().toISOString(), note: "Średnie PPDA, field tilt i wejścia w pole karne z wcześniejszych zakończonych spotkań; dane taktyczne nie są prognozą." };
+  }
+  if (pitchApiLineups) {
+    const confirmed = pitchApiLineups.home.confirmed === true && pitchApiLineups.away.confirmed === true
+      && (pitchApiLineups.home.starters?.length ?? 0) === 11 && (pitchApiLineups.away.starters?.length ?? 0) === 11;
+    evidenceAudit.areas.confirmed_lineups = { status: confirmed ? "VERIFIED" : "PARTIAL", source: "PitchAPI", observedAt: new Date().toISOString(), note: confirmed ? "Obie jedenastki oznaczone przez dostawcę jako confirmed=true." : "Dostępny skład przewidywany lub niekompletny; nie jest traktowany jako potwierdzony." };
   }
   const evidenceComplete = evidenceAudit.complete;
   const probabilities = prediction?.prediction.probabilities;
@@ -120,6 +133,7 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
       expectedGoalsBasis: prediction?.method === "pitchapi-recent-xg-poisson" ? "PitchAPI historical xG/xGA" : prediction ? "goals-derived lambda proxy (not xG)" : null,
       pitchApiXgSamples: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.sampleSize, away: pitchApiXgForms.away.sampleSize, source: "PitchAPI" }) : null,
       pitchApiXgHistory: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.matches, away: pitchApiXgForms.away.matches }) : null,
+      pitchApiLineups: pitchApiLineups ? JSON.stringify(pitchApiLineups) : null,
       historyProvenance: homeForm && awayForm ? JSON.stringify({
         home: { source: homeForm.source, sourceUpdatedAt: homeForm.sourceUpdatedAt, matches: homeForm.matches.length, homeMatches: homeForm.home.length, awayMatches: homeForm.away.length },
         away: { source: awayForm.source, sourceUpdatedAt: awayForm.sourceUpdatedAt, matches: awayForm.matches.length, homeMatches: awayForm.home.length, awayMatches: awayForm.away.length },
@@ -158,7 +172,7 @@ export default function App() {
   const settlementLock = useRef(false);
   const [settleProgress, setSettleProgress] = useState(0);
   const [scanError, setScanError] = useState("");
-  const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm }; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
+  const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm }; pitchApiLineups?: PitchApiLineups; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
   const loadFixtureForms = async (match: NonNullable<typeof fixtureScan>["fixtures"][number]) => {
     if (!hasKnownKickoff(match.date, match.time)) {
       const reason = "ODRZUCONY: brak zweryfikowanej godziny rozpoczęcia. Nie tworzymy prognozy przedmeczowej bez potwierdzonego czasu.";
@@ -199,15 +213,19 @@ export default function App() {
       if (merged.matches.length < 3) throw new Error(failures.concat("Po scaleniu źródeł tylko " + merged.matches.length + "/3 unikalnych, zgodnych wyników").join(" · "));
       return merged;
     };
-    const [historyResult, xgResult] = await Promise.allSettled([
+    const [historyResult, xgResult, lineupResult] = await Promise.allSettled([
       Promise.all([load(match.home), load(match.away)]),
       match.pitchApiLeagueId && match.pitchApiHomeTeamId && match.pitchApiAwayTeamId
         ? fetchPitchApiXgFormsForFixture({ leagueId: match.pitchApiLeagueId, season: match.pitchApiSeason, homeTeamId: match.pitchApiHomeTeamId, awayTeamId: match.pitchApiAwayTeamId, beforeDate: match.date })
         : Promise.reject(new Error("Brak identyfikatorów meczu PitchAPI — analiza xG niedostępna dla tego spotkania.")),
+      match.pitchApiMatchId
+        ? fetchPitchApiMatchLineups(match.pitchApiMatchId)
+        : Promise.reject(new Error("Brak identyfikatora meczu PitchAPI — składy niedostępne.")),
     ]);
     const homeForm = historyResult.status === "fulfilled" ? historyResult.value[0] : undefined;
     const awayForm = historyResult.status === "fulfilled" ? historyResult.value[1] : undefined;
     const pitchApiXgForms = xgResult.status === "fulfilled" ? xgResult.value : undefined;
+    const pitchApiLineups = lineupResult.status === "fulfilled" ? lineupResult.value : undefined;
     let prediction: FormPrediction | undefined;
     const errors: string[] = [];
     if (pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3) {
@@ -224,8 +242,8 @@ export default function App() {
     }
     if (historyResult.status === "rejected") errors.push(historyResult.reason instanceof Error ? historyResult.reason.message : "Historia wyników niedostępna");
     const predictionError = prediction ? undefined : errors.join(" · ") || "Brak wystarczających danych do prognozy.";
-    setTeamForms(current => ({ ...current, [match.id]: { home: homeForm, away: awayForm, pitchApiXgForms, prediction, predictionError, loading: false } }));
-    setRecords(savePredictionRecord(match, prediction, predictionError, homeForm, awayForm, pitchApiXgForms));
+    setTeamForms(current => ({ ...current, [match.id]: { home: homeForm, away: awayForm, pitchApiXgForms, pitchApiLineups, prediction, predictionError, loading: false } }));
+    setRecords(savePredictionRecord(match, prediction, predictionError, homeForm, awayForm, pitchApiXgForms, pitchApiLineups));
   };
   const analyzeAllFixtures = async () => {
     if (!fixtureScan || bulkLoading || scanLoading) return;
