@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildPitchApiXgForm, fetchPitchApiLeagueCatalog, fetchPitchApiLeagueMatches, fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiAdvancedStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
+import { buildPitchApiXgForm, fetchPitchApiLeagueCatalog, fetchPitchApiLeagueMatches, selectPitchApiSeason, fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiAdvancedStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
 
 const match: PitchApiLeagueMatch = {
   id: "m_Ab12Cd", time_utc: "2026-11-17T19:00:00Z", status: "finished",
@@ -74,11 +74,25 @@ describe("PitchAPI xG history parsing", () => {
   });
 });
 
+describe("PitchAPI season selection", () => {
+  it("selects the season covering a November date even when the provider lists oldest first", () => {
+    expect(selectPitchApiSeason({ id: "l_Den123", name: "Denmark 1. Division", seasons: ["2024/2025", "2026/2027", "2025/2026"] }, "2026-11-19")).toBe("2026/2027");
+  });
+  it("selects the previous season for a January date", () => {
+    expect(selectPitchApiSeason({ id: "l_Den123", name: "Denmark 1. Division", seasons: ["2026/2027", "2024/2025", "2025/2026"] }, "2026-01-19")).toBe("2025/2026");
+  });
+  it("supports calendar-year competitions", () => {
+    expect(selectPitchApiSeason({ id: "l_Swe123", name: "Allsvenskan", seasons: ["2024", "2026", "2025"] }, "2026-11-19")).toBe("2026");
+  });
+  it("does not choose a future season when only prior seasons are available", () => {
+    expect(selectPitchApiSeason({ id: "l_Den123", name: "Denmark 1. Division", seasons: ["2024/2025", "2025/2026", "2027/2028"] }, "2026-11-19")).toBe("2025/2026");
+  });
+});
 describe("PitchAPI league catalogue", () => {
   afterEach(() => vi.unstubAllGlobals());
   it("reads country codes and current seasons from the league catalogue", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { leagues: [
-      { id: "l_Bel123", name: "Belgian Pro League", country_code: "BEL", seasons: ["2026/2027", "2025/2026"] },
+      { id: "l_Bel123", name: "Belgian Pro League", country_code: "BEL", seasons: ["2026/2027", "2025/2026"], is_free: true },
       { id: "l_Den123", name: "1. Division", country_code: "DEN", seasons: ["2026/2027"] },
     ] } }), { status: 200 })));
     const leagues = await fetchPitchApiLeagueCatalog();
