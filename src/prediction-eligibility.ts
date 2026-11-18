@@ -13,3 +13,18 @@ export function isEvidenceQualifiedCandidate(
     ? row.details.strongCandidate === true
     : row.details.strongDoubleChance === true;
 }
+
+/** UI wording separates a model's raw probability from evidence-qualified coupon eligibility. */
+export function getPredictionDisplayStatus(
+  row: TrackerRecord | undefined,
+  market: PredictionMarket,
+  probability: number | null,
+): string {
+  if (!row || row.kind !== "prediction") return "BRAK PROGNOZY";
+  if (isEvidenceQualifiedCandidate(row, market)) return "KANDYDAT ≥75%";
+  if (row.details.evidenceComplete !== true && typeof probability === "number") {
+    return "WSTĘPNA PROGNOZA · NIEKWALIFIKOWANA";
+  }
+  if (probability === null) return "BRAK POPRAWNEGO TYPU";
+  return "PONIŻEJ PROGU 75%";
+}
