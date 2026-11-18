@@ -1245,3 +1245,9 @@
 - The temporary diagnostic endpoint was removed after the connectivity test. No debug feed/sample remains exposed.
 - Earlier baseline sources returned: FootyNomad 102 normalized date fixtures (2 pages checked; 197 page matches), OpenLigaDB 88 season catalogue entries, ESPN 28 raw events. These are separate provider counts and must not be summed as unique fixtures.
 - Final validation and deployment for the latest commits are running; production endpoint verification is pending. No MAIN Tracker records, predictions, coupons, settlements or bankroll were modified. No paid API or API key added.
+
+
+## Stage 101 — Flashscore parser regression fixture correction (2026-11-18)
+- CI caught a test-fixture placement issue: the "next-day" row inherited the preceding Concacaf competition header, so the parser correctly counted it as non-European rather than as a European wrong-date row.
+- Moved the synthetic next-day row under an explicit England competition header. This makes the test exercise the intended Brussels-date exclusion path rather than confounding it with confederation filtering.
+- No production data was involved; all changes are confined to source tests and fixture ingestion.
