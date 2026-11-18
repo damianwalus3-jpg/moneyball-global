@@ -15,7 +15,7 @@ import { auditOddsFixtureMatches } from "./odds-matching";
 import { buildBetSettlementRows } from "./bet-settlement";
 import { listOddsBookmakers } from "./odds-value";
 import { valueThreeLegCoupon } from "./coupon-value";
-import { buildBaselineEvidenceAudit, getEvidenceGaps } from "./analysis-evidence";
+import { buildBaselineEvidenceAudit, getEvidenceGaps, isEvidenceAuditComplete } from "./analysis-evidence";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
@@ -63,7 +63,9 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
   }
   if (pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3) {
     const shotsComplete = [pitchApiXgForms.home, pitchApiXgForms.away].every(form =>
-      form.shotsForPerMatch != null && form.shotsOnTargetForPerMatch != null && form.bigChancesForPerMatch != null);
+      form.shotsForPerMatch != null && form.shotsAgainstPerMatch != null
+      && form.shotsOnTargetForPerMatch != null && form.shotsOnTargetAgainstPerMatch != null
+      && form.bigChancesForPerMatch != null && form.bigChancesAgainstPerMatch != null);
     if (shotsComplete) evidenceAudit.areas.shots_and_chances = { status: "VERIFIED", source: "PitchAPI", observedAt: new Date().toISOString(), note: "Strzały, celne strzały i duże sytuacje z historii zakończonych meczów; próbka co najmniej 3 spotkań każdej drużyny." };
     const tacticsComplete = [pitchApiXgForms.home, pitchApiXgForms.away].every(form =>
       form.ppdaPerMatch != null && form.fieldTiltPerMatch != null && form.boxEntriesPerMatch != null);
@@ -74,6 +76,7 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
       && (pitchApiLineups.home.starters?.length ?? 0) === 11 && (pitchApiLineups.away.starters?.length ?? 0) === 11;
     evidenceAudit.areas.confirmed_lineups = { status: confirmed ? "VERIFIED" : "PARTIAL", source: "PitchAPI", observedAt: new Date().toISOString(), note: confirmed ? "Obie jedenastki oznaczone przez dostawcę jako confirmed=true." : "Dostępny skład przewidywany lub niekompletny; nie jest traktowany jako potwierdzony." };
   }
+  evidenceAudit.complete = isEvidenceAuditComplete(evidenceAudit);
   const evidenceComplete = evidenceAudit.complete;
   const probabilities = prediction?.prediction.probabilities;
   const hasProbabilities = !!probabilities;
@@ -130,6 +133,7 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
       pitchApiAwayBoxEntries: pitchApiXgForms?.away.boxEntriesPerMatch ?? null,
       pitchApiHomeXThreat: pitchApiXgForms?.home.xThreatPerMatch ?? null,
       pitchApiAwayXThreat: pitchApiXgForms?.away.xThreatPerMatch ?? null,
+      predictionMethod: prediction?.method ?? null,
       expectedGoalsBasis: prediction?.method === "pitchapi-recent-xg-poisson" ? "PitchAPI historical xG/xGA" : prediction ? "goals-derived lambda proxy (not xG)" : null,
       pitchApiXgSamples: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.sampleSize, away: pitchApiXgForms.away.sampleSize, source: "PitchAPI" }) : null,
       pitchApiXgHistory: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.matches, away: pitchApiXgForms.away.matches }) : null,
