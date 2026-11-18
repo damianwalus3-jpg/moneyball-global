@@ -14,6 +14,9 @@ import {
   isCouponCandidate,
   isEligibleCouponPrediction,
   hasFreshConfirmedOdds,
+  hasSufficientPredictionEvidence,
+  isValidOddsSourceUrl,
+  isFreshOddsTimestamp,
   canPromoteManualOdds,
   isMissingOddsRejectionReason,
   modelHitRate,
@@ -45,7 +48,9 @@ const prediction = (id: string, match_id: string, probability: number, extra: Pa
     probability,
     confidence: "high",
     verdict: "WYBRANY",
-    rationale: null,
+    rationale: "Model oparty na zweryfikowanej historii obu drużyn.",
+    data_source: "MONEYBALL_VERIFIED_HISTORY",
+    data_coverage: { model_source_type: "VERIFIED_HISTORY", model_coverage: 75, home_history_matches: 10, away_history_matches: 10, baseline_only: false },
     created_at: "2026-11-10T10:00:00.000Z",
     group_name: "TEST",
     odds: 1.8,
@@ -190,11 +195,15 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("World", "UEFA U21 Championship - Qualification")).toBe(false);
     const eligibleBase = { country: "Ukraine", competition: "Persha Liga", league: null, gender: "men" as const, home_team: "UCSA", away_team: "Polissya" };
     expect(isEligibleEuropeanMatch(eligibleBase)).toBe(true);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "France", competition: "National 2 - Group C", home_team: "Andrezieux", away_team: "Chateauroux" })).toBe(true);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Czech Republic", competition: "3. liga - CFL B", home_team: "Pardubice", away_team: "Horni Redice" })).toBe(true);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "National League - North", home_team: "Oxford City", away_team: "Macclesfield" })).toBe(true);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Scotland", competition: "Football League - Lowland League", home_team: "Brechin", away_team: "Stirling University" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "France", competition: "National 2 - Group C", home_team: "Andrezieux", away_team: "Chateauroux" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Czech Republic", competition: "3. liga - CFL B", home_team: "Pardubice", away_team: "Horni Redice" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "National League - North", home_team: "Oxford City", away_team: "Macclesfield" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Scotland", competition: "Football League - Lowland League", home_team: "Brechin", away_team: "Stirling University" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "EFL Trophy" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "Premier League", gender: "women" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "Premier League", home_team: "Arsenal U21" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "Premier League", home_team: "Arsenal B" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "World", competition: "UEFA Nations League" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Czech Republic", competition: "3. liga - CFL B", home_team: "Pardubice II", away_team: "Horní Ředice" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Scotland", competition: "Football League - Lowland League", home_team: "Newton Stewart", away_team: "Celtic II" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bulgaria", competition: "efbet League" })).toBe(true);
@@ -461,10 +470,42 @@ describe("fresh bookmaker quote validation", () => {
     expect(hasFreshConfirmedOdds(prediction("p", "m1", 90, { data_coverage: { ...fresh, odds_captured_at: "2026-11-16T12:05:00.000Z" } }), now)).toBe(false);
   });
   it("allows a manual price only when its source timestamp is recent", () => {
-    expect(hasFreshConfirmedOdds(prediction("p", "m1", 2.1, { data_coverage: { ...fresh, odds_source: "manual" } }), now)).toBe(true);
+    expect(hasFreshConfirmedOdds(prediction("p", "m1", 2.1, { data_coverage: { ...fresh, odds_source: "manual", odds_source_url: "https://www.bwin.be/" } }), now)).toBe(true);
   });
 });
 
+
+
+describe("prediction evidence and payout quote gates", () => {
+  it("requires provenance, coverage and three history matches per team or explicit market odds", () => {
+    expect(hasSufficientPredictionEvidence(prediction("p","m1",82))).toBe(true);
+    expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"BASELINE_ONLY", model_coverage:100, home_history_matches:10, away_history_matches:10 } }))).toBe(false);
+    expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"PARTIAL_VERIFIED_HISTORY", model_coverage:54, home_history_matches:10, away_history_matches:10 } }))).toBe(false);
+    expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"PARTIAL_VERIFIED_HISTORY", model_coverage:60, home_history_matches:2, away_history_matches:2 } }))).toBe(false);
+    expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"MARKET_ODDS_MODEL", model_coverage:60, market_odds:true } }))).toBe(true);
+    expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_source:"", rationale:"" }))).toBe(false);
+  });
+
+  it("validates manual source URLs and six-hour timestamps", () => {
+    const now = Date.parse("2026-11-16T12:00:00.000Z");
+    expect(isValidOddsSourceUrl("https://www.bwin.be/")).toBe(true);
+    expect(isValidOddsSourceUrl("ftp://example.com/")).toBe(false);
+    expect(isValidOddsSourceUrl("javascript:alert(1)")).toBe(false);
+    expect(isFreshOddsTimestamp("2026-11-16T11:30:00.000Z",now)).toBe(true);
+    expect(isFreshOddsTimestamp("2026-11-16T05:00:00.000Z",now)).toBe(false);
+    expect(isFreshOddsTimestamp("2026-11-16T12:05:00.000Z",now)).toBe(false);
+  });
+
+  it("rejects manual payout quotes without bookmaker, valid URL, or confirmed status", () => {
+    const now = Date.parse("2026-11-16T12:00:00.000Z");
+    const manual = { odds_source:"manual",odds_bookmaker:"Bwin",odds_source_url:"https://www.bwin.be/",odds_captured_at:"2026-11-16T11:30:00.000Z",odds_phase:"prematch",odds_suspended:false,odds_status:"CONFIRMED" };
+    expect(hasFreshConfirmedOdds(prediction("p","m1",2.1,{data_coverage:manual}),now)).toBe(true);
+    expect(hasFreshConfirmedOdds(prediction("p","m1",2.1,{data_coverage:{...manual,odds_bookmaker:""}}),now)).toBe(false);
+    expect(hasFreshConfirmedOdds(prediction("p","m1",2.1,{data_coverage:{...manual,odds_source_url:""}}),now)).toBe(false);
+    expect(hasFreshConfirmedOdds(prediction("p","m1",2.1,{data_coverage:{...manual,odds_status:"MISSING"}}),now)).toBe(false);
+    expect(hasFreshConfirmedOdds(prediction("p","m1",2.1,{data_coverage:{...manual,odds_source:"TIPSAUDIT_FAIR_MARKET"}}),now)).toBe(false);
+  });
+});
 
 describe("manual odds promotion", () => {
   const now = Date.parse("2026-11-10T12:00:00.000Z");

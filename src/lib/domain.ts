@@ -241,92 +241,118 @@ export function dedupeEuropeanMatches(matches: Match[]): Match[] {
 function isOpenMatchdayLeagueMatch(match: Pick<Match, "country" | "competition"> & Partial<Pick<Match, "source" | "external_id">>): boolean {
   if (String(match.source ?? "").toLowerCase() !== "openmatchday") return false;
   const folder = (String(match.external_id ?? "").match(/^om:([^:]+):/) || [])[1] || "";
-  if (!/^[A-Z]{3}_[1-9][0-9]*_[A-Za-z0-9-]+$/i.test(folder)) return false;
-  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  const country = normalize(String(match.country ?? ""));
-  const competition = normalize(String(match.competition ?? ""));
-  if (!EUROPEAN_COUNTRIES.has(country) || country === "europe" || country === "uefa") return false;
-  return !/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series|cup|copa|trophy|youth|academy|reserves?)\b/.test(folder + " " + competition);
+  const tier = folder.match(/^[A-Z]{3}_([1-9][0-9]*)_[A-Za-z0-9-]+$/i);
+  if (!tier || Number(tier[1]) > 2) return false;
+  return isEuropeanTopTwoLeague(match.country, match.competition);
 }
 
-/** True for all senior men's domestic league tiers in geographic Europe, excluding reserve/B teams. */
+function isWomensTeamName(value: string | null | undefined): boolean {
+  const team = String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return /\b(?:women|womens|woman|female|frauen|feminine|femminile|femenina|femenino|ladies|girls|wfc|fcw)\b/.test(team)
+    || /(^| )w$/.test(team);
+}
+
+function isExcludedSeniorTeamName(value: string | null | undefined): boolean {
+  const team = String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return /\b(?:reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico|u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23))\b/.test(team)
+    || /(^| )(ii|iii|b)$/.test(team);
+}
+
+/** The application admits only geographic-Europe domestic men's tier 1/2 fixtures. */
 export function isEligibleEuropeanMatch(match: Pick<Match, "country" | "competition" | "league" | "gender" | "home_team" | "away_team"> & Partial<Pick<Match, "source" | "external_id">>): boolean {
-  if (!isOpenMatchdayLeagueMatch(match) && !isEuropeanDomesticLeague(match.country, match.competition ?? match.league)) return false;
   if (match.gender && match.gender !== "men") return false;
-  const isReserve = (value: string | null | undefined) => {
-    const team = String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    return /\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico|u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23))\b/.test(team)
-      || /(^| )(ii|iii|b)$/.test(team);
-  };
-  return !isReserve(match.home_team) && !isReserve(match.away_team);
+  if (isWomensTeamName(match.home_team) || isWomensTeamName(match.away_team)) return false;
+  if (isExcludedSeniorTeamName(match.home_team) || isExcludedSeniorTeamName(match.away_team)) return false;
+  return isOpenMatchdayLeagueMatch(match) || isEuropeanTopTwoLeague(match.country, match.competition ?? match.league);
 }
 
 export function isFinishedStatus(status: string | null | undefined) {
-  return status === "finished" || status === "cancelled" || status === "postponed";
+  return ["finished","ft","aet","pen","cancelled","postponed","abandoned"].includes(String(status ?? "").toLowerCase());
 }
 
 /** A coupon price must have a source timestamp, be unsuspended, prematch and at most six hours old. */
+/** Model evidence gate shared by manual-odds promotion, coupons and dashboard candidates. */
+export function hasSufficientPredictionEvidence(
+  prediction: Pick<Prediction, "model_version" | "data_source" | "rationale" | "data_coverage">,
+): boolean {
+  const coverage = prediction.data_coverage ?? {};
+  if (!String(prediction.data_source ?? "").trim() || !String(prediction.rationale ?? "").trim()) return false;
+  if (coverage["baseline_only"] === true || String(coverage["baseline_only"] ?? "").toLowerCase() === "true") return false;
+  const modelSource = String(coverage["model_source_type"] ?? "").trim().toUpperCase();
+  if (modelSource === "BASELINE_ONLY" || modelSource === "BEYONDELO_ONLY") return false;
+  if (String(prediction.model_version ?? "").toUpperCase().startsWith("MANUAL")) return true;
+  const modelCoverage = Number(coverage["model_coverage"]);
+  const homeMatches = Number(coverage["home_history_matches"]);
+  const awayMatches = Number(coverage["away_history_matches"]);
+  const historyCovered = Number.isFinite(homeMatches) && Number.isFinite(awayMatches) && homeMatches >= 3 && awayMatches >= 3;
+  const marketCovered = coverage["market_odds"] === true || String(coverage["market_odds"] ?? "").toLowerCase() === "true";
+  return !!modelSource && Number.isFinite(modelCoverage) && modelCoverage >= 55 && (historyCovered || marketCovered);
+}
+
+export function isValidOddsSourceUrl(value: unknown): boolean {
+  try {
+    const url = new URL(String(value ?? "").trim());
+    return (url.protocol === "http:" || url.protocol === "https:") && !!url.hostname;
+  } catch {
+    return false;
+  }
+}
+
+export function isFreshOddsTimestamp(value: unknown, nowMs: number): boolean {
+  const capturedAt = Date.parse(String(value ?? ""));
+  const ageMs = nowMs - capturedAt;
+  return Number.isFinite(capturedAt) && ageMs >= 0 && ageMs <= 6 * 60 * 60 * 1000;
+}
+
+/** Coupon payout odds must be confirmed, sourced, prematch, unsuspended and no older than six hours. */
 export function hasFreshConfirmedOdds(prediction: Prediction, nowMs: number): boolean {
   const odds = Number(prediction.odds);
   const coverage = prediction.data_coverage;
   if (prediction.odds == null || !Number.isFinite(odds) || odds <= 1 || !coverage) return false;
-  const source = String(coverage["odds_source"] ?? "");
-  const capturedAt = Date.parse(String(coverage["odds_captured_at"] ?? ""));
-  const ageMs = nowMs - capturedAt;
-  if (!source || !Number.isFinite(capturedAt) || ageMs < 0 || ageMs > 6 * 60 * 60 * 1000) return false;
-  if (coverage["odds_suspended"] === true || String(coverage["odds_phase"] ?? "prematch").toLowerCase() !== "prematch") return false;
-  const status = String(coverage["odds_status"] ?? "");
-  return status !== "STALE" && status !== "SUSPENDED" && status !== "MISSING";
+  const source = String(coverage["odds_source"] ?? "").trim();
+  const bookmaker = String(coverage["odds_bookmaker"] ?? "").trim();
+  if (!source || !bookmaker || /tipsaudit|fair.?market|fair.?odds/i.test(source)) return false;
+  if (!isFreshOddsTimestamp(coverage["odds_captured_at"], nowMs)) return false;
+  if (coverage["odds_suspended"] === true || String(coverage["odds_suspended"] ?? "").toLowerCase() === "true") return false;
+  if (String(coverage["odds_phase"] ?? "").toLowerCase() !== "prematch") return false;
+  if (String(coverage["odds_status"] ?? "").toUpperCase() !== "CONFIRMED") return false;
+  if (source.toLowerCase() === "manual" && !isValidOddsSourceUrl(coverage["odds_source_url"])) return false;
+  return true;
 }
 
 export function isCouponCandidate(prediction: Prediction, match: Match | undefined, nowMs: number): boolean {
-  if (!match) return false;
-  if (!isEligibleEuropeanMatch(match)) return false;
-  if (match.gender && match.gender !== "men") return false;
-  const reserveTeam = (value: string | null | undefined) => {
-    const team = String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-    return /\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico)\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
-  };
-  if (reserveTeam(match.home_team) || reserveTeam(match.away_team)) return false;
-  if (prediction.verdict !== "WYBRANY") return false;
-  if (prediction.settlement_status !== "pending") return false;
-  if (prediction.probability == null || Number(prediction.probability) <= CANDIDATE_MIN_PROBABILITY) return false;
-  if (isFinishedStatus(match.status) || match.status === "live") return false;
+  if (!match || !isEligibleEuropeanMatch(match)) return false;
+  if (prediction.verdict !== "WYBRANY" || prediction.settlement_status !== "pending") return false;
+  if (prediction.probability == null || !Number.isFinite(Number(prediction.probability)) || Number(prediction.probability) <= CANDIDATE_MIN_PROBABILITY) return false;
+  if (isFinishedStatus(match.status) || ["live","inplay","1h","2h","ht"].includes(String(match.status ?? "").toLowerCase())) return false;
   if (!match.kickoff_at || new Date(match.kickoff_at).getTime() <= nowMs) return false;
-  return prediction.selection !== "—" && isValidPick(prediction.market, prediction.selection);
+  return hasSufficientPredictionEvidence(prediction) && prediction.selection !== "—" && isValidPick(prediction.market, prediction.selection);
 }
-
 
 export function isMissingOddsRejectionReason(reason: string | null | undefined): boolean {
   return /Brak (?:aktualnego, )?potwierdzonego kursu/i.test(String(reason ?? ""));
 }
 
 /** A manual price may unlock a model pick only when the model already passed every non-odds gate. */
+/** A manual price may unlock a model pick only when the model already passed every non-odds gate. */
 export function canPromoteManualOdds(prediction: Prediction, match: Match | undefined, nowMs: number): boolean {
-  const coverage = prediction.data_coverage;
-  if (!coverage || prediction.verdict !== "ODRZUCONY") return false;
+  if (!match || prediction.verdict !== "ODRZUCONY") return false;
   if (!isMissingOddsRejectionReason(prediction.rejection_reason)) return false;
   if (prediction.probability == null || !Number.isFinite(Number(prediction.probability)) || Number(prediction.probability) <= CANDIDATE_MIN_PROBABILITY) return false;
-  const modelCoverage = Number(coverage["model_coverage"]);
-  const homeMatches = Number(coverage["home_history_matches"]);
-  const awayMatches = Number(coverage["away_history_matches"]);
-  const modelSource = String(coverage["model_source_type"] ?? "");
-  const historyCovered = Number.isFinite(homeMatches) && Number.isFinite(awayMatches) && homeMatches >= 3 && awayMatches >= 3;
-  const marketCovered = coverage["market_odds"] === true;
-  if (!Number.isFinite(modelCoverage) || modelCoverage < 55 || (!historyCovered && !marketCovered)) return false;
-  if (coverage["baseline_only"] === true || modelSource === "BASELINE_ONLY" || modelSource === "BEYONDELO_ONLY") return false;
-  if (!prediction.data_source || !prediction.rationale?.trim()) return false;
+  if (!hasSufficientPredictionEvidence(prediction)) return false;
   return isCouponCandidate({ ...prediction, verdict: "WYBRANY" }, match, nowMs);
 }
 
-/** Coupons are built only from matches kicking off today (Europe/Brussels calendar day). */
-/** Persistence-boundary rule: only live selected predictions above 75% may enter a coupon. */
-export function isEligibleCouponPrediction(prediction: Pick<Prediction, "verdict" | "settlement_status" | "probability">): boolean {
+/** Persistence-boundary rule: only selected predictions above 75% with verified model evidence may enter a coupon. */
+export function isEligibleCouponPrediction(
+  prediction: Pick<Prediction, "verdict" | "settlement_status" | "probability" | "model_version" | "data_source" | "rationale" | "data_coverage">,
+): boolean {
   return prediction.verdict === "WYBRANY"
     && prediction.settlement_status === "pending"
     && prediction.probability != null
     && Number.isFinite(Number(prediction.probability))
-    && Number(prediction.probability) > CANDIDATE_MIN_PROBABILITY;
+    && Number(prediction.probability) > CANDIDATE_MIN_PROBABILITY
+    && hasSufficientPredictionEvidence(prediction);
 }
 
 export function isKickoffToday(kickoffAt: string | null | undefined, nowMs: number): boolean {
