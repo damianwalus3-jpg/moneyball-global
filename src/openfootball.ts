@@ -174,7 +174,7 @@ async function discoverEuropeanOpenFootballFeeds(date: string): Promise<OpenFoot
   if (discoveredCatalogueCache?.season === season && Date.now() - discoveredCatalogueCache.cachedAt < CACHE_MS) return discoveredCatalogueCache.feeds;
   const repositories = ["europe", ...Object.keys(NATIONAL_OPENFOOTBALL_REPOSITORIES)];
   const settled = await Promise.allSettled(repositories.map(async repository => {
-    const response = await fetch("https://api.github.com/repos/openfootball/" + repository + "/git/trees/master?recursive=1", { headers: { Accept: "application/vnd.github+json" } });
+    const response = await fetch("https://api.github.com/repos/openfootball/" + repository + "/git/trees/master?recursive=1", { headers: { Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!response.ok) throw new Error("HTTP " + response.status);
     const tree = await response.json() as OpenFootballTree;
     if (!Array.isArray(tree.tree) || tree.truncated) throw new Error("catalogue is incomplete");
@@ -193,6 +193,7 @@ async function discoverEuropeanOpenFootballFeeds(date: string): Promise<OpenFoot
   return feeds;
 }
 const MONTHS: Record<string, number> = { Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12 };
+const FETCH_TIMEOUT_MS = 15_000;
 const CACHE_KEY = "moneyball.openfootball.v2:";
 const CACHE_MS = 15 * 60 * 1000;
 
@@ -267,7 +268,7 @@ export function parseOpenFootballFixtures(text: string, feed: OpenFootballFeed, 
   return parseOpenFootballMatches(text, feed, targetDate);
 }
 async function fetchText(url: string): Promise<string> {
-  const response=await fetch(url,{headers:{Accept:"text/plain"}});
+  const response=await fetch(url,{headers:{Accept:"text/plain"},signal:AbortSignal.timeout(FETCH_TIMEOUT_MS)});
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.text();
 }
