@@ -238,6 +238,7 @@ export default {
         ok: true,
         service: "moneyball-global-rebuild",
         pitchapiConfigured: !!env.PITCHAPI_API_KEY && /^pk_(?:live|test)_[A-Za-z0-9_-]{16,}$/.test(env.PITCHAPI_API_KEY),
+        apiFootballConfigured: !!env.API_FOOTBALL_KEY,
       }, 200, origin);
     }
 
