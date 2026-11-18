@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TrackerRecord } from "./tracker-store";
-import { listOddsBookmakers, shouldAutoFetchDailyOdds, valueSelectionFromOdds } from "./odds-value";
+import { listFreshOddsSnapshots, listOddsBookmakers, shouldAutoFetchDailyOdds, valueSelectionFromOdds } from "./odds-value";
 
 const now = "2026-11-17T20:00:00.000Z";
 function odds(overrides: Partial<TrackerRecord["details"]> = {}, status = "COMPLETE_1X2"): TrackerRecord {
@@ -37,12 +37,23 @@ describe("verified odds valuation", () => {
     expect(valueSelectionFromOdds([odds({}, "INCOMPLETE_1X2")], "fixture-1", "1", "Book A", model, now)).toBeNull();
     expect(valueSelectionFromOdds([odds({ capturedAt: "2026-11-17T10:00:00.000Z" })], "fixture-1", "1", "Book A", model, now)).toBeNull();
     expect(valueSelectionFromOdds([odds({ capturedAt: "2026-11-17T21:00:00.000Z" })], "fixture-1", "1", "Book A", model, now)).toBeNull();
-    expect(valueSelectionFromOdds([odds({ capturedAt: "2026-11-17T19:44:00.000Z" })], "fixture-1", "1", "Book A", model, now)).toBeNull();
+    expect(valueSelectionFromOdds([odds({ capturedAt: "2026-11-17T18:59:00.000Z" })], "fixture-1", "1", "Book A", model, now)).toBeNull();
     expect(valueSelectionFromOdds([odds({ oddsX: null })], "fixture-1", "1", "Book A", model, now)).toBeNull();
   });
 
   it("rejects invalid model probability distributions", () => {
     expect(valueSelectionFromOdds([odds()], "fixture-1", "1", "Book A", { p1: 0.6, px: 0.3, p2: 0.3 }, now)).toBeNull();
+  });
+
+  it("shows only complete odds captured within the 60-minute provider refresh window", () => {
+    const rows = [
+      odds({ capturedAt: "2026-11-17T19:55:00.000Z" }),
+      odds({ id: "stale", capturedAt: "2026-11-17T18:59:00.000Z" }),
+      odds({ id: "future", capturedAt: "2026-11-17T20:01:00.000Z" }),
+      odds({ id: "incomplete", complete1X2: false }, "INCOMPLETE_1X2"),
+      odds({ id: "other", fixtureId: "fixture-2" }),
+    ];
+    expect(listFreshOddsSnapshots(rows, "fixture-1", now).map(row => row.id)).toEqual(["odds-1"]);
   });
 
   it("lists only bookmakers with fresh complete prices", () => {
