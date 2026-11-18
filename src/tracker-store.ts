@@ -45,6 +45,16 @@ export function addRecord(input: NewTrackerRecord): TrackerRecord {
   return row;
 }
 
+/** Persist a related group of records with one localStorage write. This prevents
+ * partial market/model batches when a multi-step save is interrupted. */
+export function addRecords(inputs: NewTrackerRecord[]): TrackerRecord[] {
+  if (!inputs.length) return [];
+  const createdAt = new Date().toISOString();
+  const rows = inputs.map(input => ({ ...input, id: crypto.randomUUID(), createdAt }));
+  writeRecords([...rows, ...readRecords()]);
+  return rows;
+}
+
 /**
  * Adds records only when no existing record of the same kind has the same
  * string value in uniqueDetailField. Existing rows are never overwritten.
