@@ -433,7 +433,7 @@ describe("PitchAPI secure Worker proxy", () => {
   it("caches upcoming league schedules for ten minutes but keeps played history cached for six hours", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { matches: [] } }), { status: 200 }));
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { matches: [] } }), { status: 200 })));
     vi.stubGlobal("fetch", fetchMock);
     const upcoming = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/leagues/l_Ab12Cd/matches?season=2026%2F2027&status=upcoming"), env("pk_test_12345678901234567890"), { waitUntil: vi.fn() });
     const played = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/leagues/l_Ab12Cd/matches?season=2026%2F2027&status=played"), env("pk_test_12345678901234567890"), { waitUntil: vi.fn() });
