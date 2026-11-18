@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import { addRecord, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, validateBackup } from "./tracker-store";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { addRecord, addRecords, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, validateBackup } from "./tracker-store";
 
 const memory = new Map<string, string>();
 Object.defineProperty(globalThis, "localStorage", { configurable: true, value: {
@@ -15,6 +15,16 @@ describe("local tracker", () => {
   it("persists records locally", () => {
     addRecord({ kind: "match", title: "Team A — Team B", status: "scheduled", details: {} });
     expect(readRecords()).toHaveLength(1);
+  });
+  it("writes a complete multi-market prediction batch with one storage operation", () => {
+    const write = vi.spyOn(localStorage, "setItem");
+    const rows = addRecords([
+      { kind: "prediction", title: "Fixture · 1X2", status: "ODRZUCONY", details: { fixtureId: "fx-atomic", market: "1X2", p1: 0.5, px: 0.25, p2: 0.25 } },
+      { kind: "prediction", title: "Fixture · DC", status: "ODRZUCONY", details: { fixtureId: "fx-atomic", market: "DOUBLE_CHANCE", p1x: 0.75, px2: 0.75, p12: 0.5 } },
+    ]);
+    expect(rows).toHaveLength(2);
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(readRecords().filter(row => row.details.fixtureId === "fx-atomic")).toHaveLength(2);
   });
   it("exports a versioned backup", () => {
     addRecord({ kind: "prediction", title: "1X2", status: "candidate", details: { home: 0.5 } });
