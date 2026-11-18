@@ -31,6 +31,7 @@ export function getSafestPick(records: TrackerRecord[], minimum = 0.75, targetDa
   const candidates: SafestPick[] = [];
   for (const row of latest.values()) {
     const d = row.details;
+    if (d.evidenceComplete !== true) continue;
     if (targetDate && d.fixtureDate !== targetDate) continue;
     if (row.status !== "KANDYDAT" && row.status !== "KANDYDAT_DC") continue;
     if (typeof d.fixtureDate !== "string" || typeof d.fixtureTime !== "string" || !hasKnownKickoff(d.fixtureDate, d.fixtureTime)
