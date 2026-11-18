@@ -1494,3 +1494,71 @@ No new provider was enabled, no API key was added, and no provider credits were 
 - Browser profile inventory has no saved sign-in for the Cloudflare Worker domain. Signed-in Matches/Predictions click-through remains pending. Issue #77 stays OPEN.
 - Detailed evidence: `docs/FOOTBALLCHARTS_RATE_LIMIT_RECOVERY_AND_SOURCE_AUDIT_2026-11-17.md`.
 - No match, prediction, coupon, settlement, bankroll or historical data was changed during this audit.
+
+
+## 2026-11-18 — Full production MAIN audit after morning scan
+
+### Repository, CI and production Worker
+- Work remained exclusively on `damianwalus3-jpg/moneyball-global`, branch `main`.
+- Latest HEAD: `18b6df92900c466b716d0be96eda1735528656ff`.
+- Moneyball CI `44291149679` SUCCESS; Cloudflare deploy `44291149555` SUCCESS. The full CI run recorded 99/99 tests passed, Deno Edge type checks, TypeScript and build passed.
+- Production URL: https://moneyball-global.damianwalus3.workers.dev/
+- Smoke results: root loads with title MONEYBALL GLOBAL 2.0; metadata reports `europe-m49-men-domestic-tier1-2-2026-11-18`; `/login` renders; unauthenticated `/panel` returns `login_required`. This is a shell/auth smoke test, not authenticated UI E2E.
+
+### Production migrations and strict scope
+Applied migration ledger entries:
+1. `20261118105302 expand_european_scan_scope_to_women_reserves_and_uefa_nations_league`
+2. `20261118105631 restore_strict_m49_mens_tier12_scope`
+3. `20261118105640 fix_provider_cache_rls_and_manual_scan_scope`
+4. `20261118110428 revoke_coupon_leg_guard_rpc_access`
+
+The first migration temporarily widened helper scope as required by the repository's ordered migration chain; the strict M49 men's tier 1/2 migration was applied immediately afterward. No scan or candidate-generation action occurred in between. The final database state is strict: geographic Europe M49, explicit men's gender, domestic national league tiers 1/2 only; excludes cups, UEFA competitions, national teams, women, youth, academies, reserves and lower tiers. Existing historical matches/predictions remain untouched.
+
+The strict SQL scope migration initially failed validation because accented Spanish RFEF labels (e.g. Segunda/Tercera División RFEF) could pass the SQL helper. Added a general RFEF exclusion, aligned with existing normalized frontend/Edge checks, and added a frontend Tercera RFEF regression assertion. Validation then passed. Apostrophes in SQL error strings were escaped. The broad migration's `women's` assertion string was also escaped before application.
+
+The new `moneyball_manual_prediction_scan_page` RPC uses the strict helper. The matches/predictions BEFORE INSERT guards remain active. Coupon-leg scope trigger remains attached to INSERT and association-field updates only; settlement status updates are not intercepted. Odds locking remains separate.
+
+### Import, scan state and coverage
+- 18 Nov 08:00 scheduled import was logged on predictor v250 and public-sources v66:
+  - `ok=true`
+  - `feed_rows=30`
+  - `public_rows=0`
+  - `eligible_rows=30` (the old v250 importer filter, before v251 deployment)
+  - `inserted=8`, `skipped_existing=22`
+  - `deduplicated_candidates=0`
+  - `source_counts={FootyNomad:30}`
+  - `feed_error=null`, `public_source_error=null`
+- 18 Nov scan-state row: completed, lease token/until null, 30 fixtures processed, no error, next scan at 14:00 UTC / 15:00 Brussels.
+- Active functions now: predictor v251, public-sources v66, results-sync v73, MoviOdds sync v7, FootyNomad sync v107. The 15:00 scan is expected to use v251/v66; it has not yet run in this audit. Do not manually invoke the scan or bypass cooldown.
+- Raw 18 Nov `moneyball_global_fixture_feed`: 31 rows, 1 eligible under the strict helper, 30 out of scope. Raw `matches`: 114, 1 eligible, zero duplicate Brussels-date/home/away groups.
+- Latest `moneyball_global_scan_runs` feed-cache row: 30 raw fixtures, 1 strict-scope eligible. Separate legacy `scan_runs` row: 55 raw matches, PARTIAL, only 1 strict-scope eligible. Legacy notes explicitly include all domestic tiers, women's leagues, reserves and a separate UEFA Nations League check; its 0 EUR TEST paper coupon remains historical. None of the out-of-scope rows are used as application candidates.
+- The only eligible match is FK Romanija Pale vs Kozara Gradiška, Bosnia 1st League RS, men's, scheduled 18 Nov 13:00 Brussels. It has 12 predictions: 1X2=1, Double Chance=3, GOALS=8. All are ODRZUCONY. Evidence: PARTIAL_VERIFIED_HISTORY, model coverage 75, ten history matches for each team, rationale and data source present. No market odds or confirmed bookmaker prices. `xg_used=false`; no real xG fields/sources. No baseline-only row is qualified.
+- The remaining raw predictions are preserved but excluded from today's app views, statistics and coupon generator by the strict frontend/RPC scope.
+
+### Odds and provider safety
+- 18 Nov `provider_odds`: zero rows; `odds_snapshots`: zero manual rows. No fresh prematch Belgian bookmaker quote exists; no selection can be promoted and no new coupon should be generated.
+- Manual odds form code requires odds > 1, bookmaker, HTTP(S) source URL and capture time within six hours. Promotion additionally requires the complete evidence/model gates; only then are verdict/decision status promoted and EUR 4 stake/potential return recalculated. Manual quote merge in predictor preserves valid manual quotes. No manual quote was added in this audit.
+- MoviOdds v7 GET health returns `key_configured=false`. Source code returns skipped before provider network request if `MOVIODDS_API_KEY` is absent; no POST was run and no provider request/500 was observed. No paid key or provider was added.
+- TipsAudit fair odds are not treated as payout/bookmaker odds.
+
+### Coupons and bankroll
+- Counts: 10 coupons, 25 legs, 9 bankroll transactions.
+- Historical records are preserved: legacy TEST coupons, EUR 5 historical MAIN single, and the 18 Nov 0 EUR TEST paper coupon are not rewritten. The 12 Nov TEST coupon marked won still has no odds/potential return and no return transaction; leave incomplete, do not invent a payout.
+- The two historical EUR 4 three-leg TEST coupons have returns EUR 4.36 and EUR 6.07; they remain TEST history, not reclassified as official MEGA/EXTRA.
+- Finance audit used separate pre-aggregated leg and ledger CTEs (no 1:N fan-out): deposit EUR 91.60, stakes EUR 23.00, returns EUR 15.68, current balance EUR 84.28; 9 transactions, zero balance_after mismatches, zero coupons with duplicate stake/return transactions.
+- `coupon_legs.match_id` is NOT NULL; unique index `coupon_legs_unique_coupon_match_idx(coupon_id,match_id)`; zero null IDs, duplicate coupon/match groups or duplicate leg numbers.
+- New MAIN single flow remains target_legs=1, one leg, EUR 4 and recordStake=true. New AKO flow remains exactly 3 distinct matches, EUR 4, one stake and at most one return. No new official coupon was created because there are no fresh odds.
+- New TEST creation is blocked by the UI, `validateNewCouponType`/save helper and database trigger. Existing TEST coupon updates with unchanged type remain allowed; trigger does not block historical settlement/status updates. The coupon-leg guard is not fired for settlement status changes.
+- Coupon generator now offers only MEGA/EXTRA; MAIN single is separate. Added a per-coupon Szczegóły dialog exposing match, market, rationale, data source, model type/coverage, form, xG flags, bookmaker/source/timestamp/URL, result and finance summary.
+
+### Security, performance and health
+- Revoked `EXECUTE` on `public.moneyball_guard_coupon_leg_scope()` from PUBLIC, anon and authenticated; service_role retains execute. Privileges verified false/false/true respectively. Rollback-only no-op update verified the existing trigger still invokes the function.
+- Provider-cache policies now use scalar `(select auth.uid())`; auth_rls_initplan warning disappeared.
+- Security advisor remaining findings: five RLS-enabled service-only tables with no client policies (intentional); pg_net in public schema; six authenticated SECURITY DEFINER RPCs that are intentionally owner-scoped; leaked-password protection disabled in Auth. No public policies added.
+- Performance advisor: 25 unused-index notices remain. No index dropped because EXPLAIN and real workload evidence are required. Health advisor: no findings.
+
+### Results sync and outstanding work
+- Results-sync v73 at 07:00 UTC fetched 185 FootyNomad fixtures for 18 Nov; 0 matches matched, 0 results saved, 0 predictions/coupon legs settled, 0 errors. Financial reconciliation checked 7 coupons, 0 failures. No new verified result was available; this is not a sync failure.
+- Open: inspect the 18 Nov 15:00 scheduled predictor scan for v251/v66, `public_source_error=null` and no HTTP 401; verify eligible count is strict and no out-of-scope inserts occur.
+- Open: authenticated browser E2E for saving and settling a MAIN single and a three-leg AKO, including bankroll and statistics refresh. Previous rollback-only SQL tests passed; do not repeat absent regression.
+- Open: coverage remains limited by lack of fresh bookmaker odds and real xG/confirmed lineups. No picks are selected. Project is NOT complete.
