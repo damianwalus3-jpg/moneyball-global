@@ -1837,3 +1837,13 @@
 - Wewnętrzny warunek `KANDYDAT`, `evidenceComplete === true` oraz reguły kuponów nie zostały poluzowane. Sam procent nie może automatycznie promować typu.
 - Zmiany: UI `47f0adcf2f88dae593603291b2ac3838e5fa5d31`; CSS `e61968c438de2fa1b6909bf7304be80e40c405b7`.
 - Bez modyfikacji zapisanych rekordów, historii, kuponów, rozliczeń i bankrolla. Walidacja CI/deploy Stage 155 oczekuje na zakończenie.
+
+
+### Stage 156 — diagnostyka planu i limitów API-Football (2026-11-19)
+- Po wdrożeniu Stage 155 pełny audyt europejski zakończył się sukcesem technicznym, ale API-Football Pro pozostał zdegradowany: 0 fixture, 1 błąd. Dokładny komunikat: `Too many requests. You have exceeded the limit of requests per minute of your subscription.`
+- Oficjalna dokumentacja API-FOOTBALL opisuje endpoint `/status`, który nie zużywa dziennego limitu. Dodano serwerowy, cache'owany endpoint `/api/api-football/status`.
+- Endpoint zwraca wyłącznie plan, aktywność i datę końca subskrypcji oraz bieżące liczniki/limity dzienne i nagłówki limitu na minutę. Dane osobowe konta i klucz API są celowo pomijane.
+- Odpowiedź z dziennego feedu fixtures wzbogacono o nagłówki limitu minutowego i pozostałego limitu dziennego, jeśli dostawca je zwróci.
+- Dodano testy bezpieczeństwa, konfiguracji sekretu, cache i maskowania danych prywatnych. Zmiany kodu: worker `0297599e14c9224c9a8e62626d7de8265bc02287`; testy `6aba45bbe5668f64ce3b62efb965163e71c16baa`.
+- To narzędzie diagnostyczne — nie deklarujemy jeszcze naprawy rate limit. Po wdrożeniu odczytamy rzeczywisty plan i limity przypisane do klucza, a potem dobierzemy harmonogram i cache.
+- Bez zmian w rekordach trackerów, kuponach, rozliczeniach i bankrollu.
