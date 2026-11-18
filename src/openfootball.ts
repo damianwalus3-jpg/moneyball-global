@@ -122,14 +122,50 @@ export function buildEuropeanOpenFootballFeeds(paths: string[], date: string): O
   return output;
 }
 
+const NATIONAL_OPENFOOTBALL_REPOSITORIES: Record<string, { code: string; label: string; timeZone: string }> = {
+  england: { code: "ENG", label: "England", timeZone: "Europe/London" },
+  deutschland: { code: "GER", label: "Germany", timeZone: "Europe/Berlin" },
+  italy: { code: "ITA", label: "Italy", timeZone: "Europe/Rome" },
+  espana: { code: "ESP", label: "Spain", timeZone: "Europe/Madrid" },
+  belgium: { code: "BEL", label: "Belgium", timeZone: "Europe/Brussels" },
+  austria: { code: "AUT", label: "Austria", timeZone: "Europe/Vienna" },
+};
+
+export function buildNationalOpenFootballFeeds(repository: string, paths: string[], date: string): OpenFootballFeed[] {
+  const country = NATIONAL_OPENFOOTBALL_REPOSITORIES[repository];
+  if (!country) return [];
+  const season = openFootballSeasonFolder(date);
+  return paths.flatMap(path => {
+    if (!path.startsWith(season + "/") || !path.endsWith(".txt")) return [];
+    const relative = path.slice(season.length + 1);
+    if (!relative || relative.startsWith("rsssf/") || relative.includes("/rsssf/")) return [];
+    const competitionPath = relative.slice(0, -4);
+    if (!/^[a-z0-9_/-]+$/i.test(competitionPath)) return [];
+    const competition = competitionPath.split("/").map(part => part.replace(/[_-]+/g, " ").replace(/\b\w/g, char => char.toUpperCase())).join(" · ");
+    const id = "openfootball-national-" + repository + "-" + competitionPath.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    return [{
+      id,
+      countryCode: country.code,
+      competition: country.label + " · " + competition,
+      urlForSeason: () => "https://raw.githubusercontent.com/openfootball/" + repository + "/master/" + path,
+      timeZone: country.timeZone,
+    }];
+  });
+}
+
 async function discoverEuropeanOpenFootballFeeds(date: string): Promise<OpenFootballFeed[]> {
   const season = openFootballSeasonFolder(date);
   if (discoveredCatalogueCache?.season === season && Date.now() - discoveredCatalogueCache.cachedAt < CACHE_MS) return discoveredCatalogueCache.feeds;
-  const response = await fetch("https://api.github.com/repos/openfootball/europe/git/trees/master?recursive=1", { headers: { Accept: "application/vnd.github+json" } });
-  if (!response.ok) throw new Error("katalog OpenFootball HTTP " + response.status);
-  const tree = await response.json() as OpenFootballTree;
-  if (!Array.isArray(tree.tree) || tree.truncated) throw new Error("niepełny katalog OpenFootball");
-  const feeds = buildEuropeanOpenFootballFeeds(tree.tree.filter(entry => entry.type === "blob").map(entry => entry.path), date);
+  const repositories = ["europe", ...Object.keys(NATIONAL_OPENFOOTBALL_REPOSITORIES)];
+  const catalogues = await Promise.all(repositories.map(async repository => {
+    const response = await fetch("https://api.github.com/repos/openfootball/" + repository + "/git/trees/master?recursive=1", { headers: { Accept: "application/vnd.github+json" } });
+    if (!response.ok) throw new Error(repository + " catalogue HTTP " + response.status);
+    const tree = await response.json() as OpenFootballTree;
+    if (!Array.isArray(tree.tree) || tree.truncated) throw new Error(repository + " catalogue is incomplete");
+    const paths = tree.tree.filter(entry => entry.type === "blob").map(entry => entry.path);
+    return repository === "europe" ? buildEuropeanOpenFootballFeeds(paths, date) : buildNationalOpenFootballFeeds(repository, paths, date);
+  }));
+  const feeds = catalogues.flat();
   for (const feed of feeds) discoveredFeedRegistry.set(feed.id, feed);
   discoveredCatalogueCache = { season, cachedAt: Date.now(), feeds };
   return feeds;
