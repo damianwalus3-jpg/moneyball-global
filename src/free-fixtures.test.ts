@@ -201,6 +201,15 @@ describe("ESPN European daily fixture fallback", () => {
           ],
         }],
       },
+      {
+        id: 422, date: "2026-11-17T21:00:00Z", competitions: [{
+          altGameNote: "CONMEBOL Libertadores", venue: { address: { country: "England" } },
+          competitors: [
+            { homeAway: "home", team: { displayName: "Flamengo" } },
+            { homeAway: "away", team: { displayName: "River Plate" } },
+          ],
+        }],
+      },
     ] }, "2026-11-17");
     expect(fixtures).toHaveLength(1);
     expect(fixtures[0]).toMatchObject({ countryCode: "UEFA", competition: "UEFA Nations League", leagueShortcut: "nla", leagueSeason: "2026", home: "Denmark", away: "Norway" });
