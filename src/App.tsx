@@ -53,7 +53,7 @@ function DetailMetric({ label, value, detail, valueClass }: { label: string; val
   return <article className="detail-metric"><small>{label}</small><b className={valueClass}>{value}</b><details><summary>Szczegóły</summary><p>{detail}</p></details></article>;
 }
 
-function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, reason?: string): TrackerRecord[] {
+function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, reason?: string, homeForm?: TeamForm, awayForm?: TeamForm): TrackerRecord[] {
   const model = "recent-form-goals-poisson-v1";
   const probabilities = prediction?.prediction.probabilities;
   const hasProbabilities = !!probabilities;
@@ -90,6 +90,13 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
       strongCandidate: prediction?.strongCandidate ?? false,
       strongDoubleChance: prediction ? Math.max(dc?.oneX ?? 0, dc?.xTwo ?? 0, dc?.oneTwo ?? 0) >= 0.75 : false,
       source: match.source,
+      history: homeForm && awayForm ? {
+        home: { source: homeForm.source, sourceUpdatedAt: homeForm.sourceUpdatedAt, matches: homeForm.matches.length, homeMatches: homeForm.home.length, awayMatches: homeForm.away.length },
+        away: { source: awayForm.source, sourceUpdatedAt: awayForm.sourceUpdatedAt, matches: awayForm.matches.length, homeMatches: awayForm.home.length, awayMatches: awayForm.away.length },
+        cutoffDateExclusive: match.date,
+      } : null,
+      modelMethod: prediction?.method ?? null,
+      sampleCounts: prediction?.samples ?? null,
       reason: reason ?? (prediction && !prediction.strongCandidate && Math.max(dc?.oneX ?? 0, dc?.xTwo ?? 0, dc?.oneTwo ?? 0) < 0.75 ? "Najwyższe prawdopodobieństwo 1X2 i Double Chance poniżej progu 75%." : null),
     },
   });
@@ -164,7 +171,7 @@ export default function App() {
       try { prediction = predictFromRecentForm(home, away); }
       catch (error) { predictionError = error instanceof Error ? error.message : "Za mało danych do prognozy."; }
       setTeamForms(current => ({ ...current, [match.id]: { home, away, prediction, predictionError, loading: false } }));
-      setRecords(savePredictionRecord(match, prediction, predictionError));
+      setRecords(savePredictionRecord(match, prediction, predictionError, home, away));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Nie udało się pobrać formy.";
       setTeamForms(current => ({ ...current, [match.id]: { loading: false, error: message } }));
