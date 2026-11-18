@@ -1,4 +1,4 @@
-import { hasFreshConfirmedOdds, isEligibleCouponPrediction, isEligibleEuropeanMatch, isKickoffToday, isFinishedStatus, stakeBalances, totalOdds, validateBatch } from "./domain";
+import { dedupeEuropeanMatches, hasFreshConfirmedOdds, isEligibleCouponPrediction, isEligibleEuropeanMatch, isKickoffToday, isFinishedStatus, stakeBalances, totalOdds, validateBatch } from "./domain";
 import { cancelCouponForOwner, deleteRow, fetchAll, fetchMatchesByIds, insertRow, insertRows, updateRow } from "./db";
 import type { CouponType, Prediction, SourceClass } from "./types";
 
@@ -43,6 +43,7 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
   if (new Set(matchIds).size !== matchIds.length) throw new Error("Ten sam mecz nie może wystąpić więcej niż raz w zapisywanym zestawie kuponów.");
   const nowMs = Date.now();
   const matches = await fetchMatchesByIds(matchIds);
+  if (dedupeEuropeanMatches(matches).length !== matches.length) throw new Error("Ten sam mecz występuje więcej niż raz w zestawie kuponów (data Brussels + para drużyn).");
   const matchById = new Map(matches.map((match) => [match.id, match]));
   for (const prediction of flatPredictions) {
     const match = matchById.get(prediction.match_id);
