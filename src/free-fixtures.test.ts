@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixtureKey, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaCountryCode, openLigaSeasonYears, parseEspnEuropeanFixtures, espnScoreboardDatesForBrusselsDay } from "./free-fixtures";
+import { fixtureKey, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaCountryCode, openLigaSeasonYears, parseEspnEuropeanFixtures, espnScoreboardDatesForBrusselsDay, parseTimezoneFootballFixtures } from "./free-fixtures";
 
 describe("European fixture source classification", () => {
   it("accepts known European country names and competition prefixes", () => {
@@ -118,6 +118,30 @@ describe("OpenLigaDB European country shortcut coverage", () => {
   });
 });
 
+
+describe("timezone.football supplemental European fixtures", () => {
+  it("imports only mapped European competitions on the exact Brussels date and preserves attribution links", () => {
+    const fixtures = parseTimezoneFootballFixtures({
+      generated: "2026-11-18T02:43:00.263Z",
+      matches: [
+        { competition: "premier-league", home: "Arsenal", away: "Chelsea", kickoff: "2026-11-18T17:00:00Z", status: "TIMED", url: "https://timezone.football/premier-league/match/arsenal-v-chelsea/" },
+        { competition: "bundesliga", home: "Bayern", away: "Köln", kickoff: "2026-11-17T23:30:00Z", status: "TIMED", url: "https://timezone.football/bundesliga/match/bayern-v-koln/" },
+        { competition: "unknown-competition", home: "Home", away: "Away", kickoff: "2026-11-18T17:00:00Z", url: "https://timezone.football/unknown/" },
+        { competition: "premier-league", home: "Home", away: "Away", kickoff: "2026-11-18T17:00:00Z", url: "https://example.com/not-attributed/" },
+      ],
+    }, "2026-11-18");
+    expect(fixtures).toHaveLength(1);
+    expect(fixtures[0]).toMatchObject({
+      countryCode: "ENG", competition: "England · Premier League", date: "2026-11-18", time: "18:00",
+      home: "Arsenal", away: "Chelsea", source: "timezone.football",
+      sourceUrl: "https://timezone.football/premier-league/match/arsenal-v-chelsea/",
+    });
+  });
+
+  it("rejects malformed feed payloads rather than reporting a successful empty source", () => {
+    expect(() => parseTimezoneFootballFixtures({ matches: null }, "2026-11-18")).toThrow("nieprawidłowy feed");
+  });
+});
 
 describe("ESPN European daily fixture fallback", () => {
   it("keeps European venue fixtures and excludes non-European venues", () => {
