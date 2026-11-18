@@ -227,7 +227,7 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
-    const flashscoreFixtures = url.pathname.match(/^\/api\/flashscore\/fixtures\/(\\d{4}-\\d{2}-\\d{2})$/);
+    const flashscoreFixtures = url.pathname.match(/^\/api\/flashscore\/fixtures\/(\d{4}-\d{2}-\d{2})$/);
     if (flashscoreFixtures) {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
       const date = flashscoreFixtures[1];
