@@ -1121,3 +1121,12 @@
 - Added tests for valid multi-source metadata, legacy/malformed values and invalid sample counts.
 - No historical Tracker rows, predictions, coupons, settlements or bankroll values were rewritten. No paid service or key added.
 - Stage 89 code changes committed; CI and deployment validation pending.
+
+
+## Stage 90 — OpenFootball country catalogue coverage correction (2026-11-18)
+- Live code audit found that the dynamic OpenFootball Europe repository-tree scanner recognised many European country folders but omitted five major country keys: Belgium, England, Germany, Italy and Spain. The static fallback list covered only selected competitions in those countries, so dynamically available lower divisions and additional competitions in those five countries were silently skipped.
+- Added the five missing country/time-zone mappings to the dynamic catalogue parser. The existing Europe-only country allowlist, season selection, timezone conversion and source attribution remain unchanged.
+- Added a regression test proving that current-season feeds from all five country folders are discovered and assigned the correct country codes.
+- Implementation commit: 1ffb8b797f2c73750bdc9031e18c25aa93ed065f; regression test commit: eafccdef13468caba799423bfca474a755ed6273.
+- Validation and Cloudflare REBUILD deployment are pending the resulting GitHub Actions runs. Do not mark Stage 90 deployed until CI and Worker deployment both pass.
+- No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
