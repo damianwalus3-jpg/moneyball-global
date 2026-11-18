@@ -1161,3 +1161,11 @@
 - Reviewed Football Charts: its free API has 98 leagues and a 200-request/day free key, but a key is required for the free quota and its terms limit free-key use to private projects; the app's no-API-key constraint rules it out for this build. Do not silently add a key or use it as a scraper workaround.
 - Current decision: retain the six already-integrated public fixture sources and focus next on measuring per-country/per-competition overlap and omissions from FootyNomad vs OpenLigaDB, open-matchday, OpenFootball and ESPN. Never scrape a provider whose terms prohibit it; never treat a directory's advertised league count as proof that each league has fixtures for the requested date.
 - No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
+
+
+## Stage 94 — OpenLigaDB non-football category guard regression (2026-11-18)
+- Queried the live REBUILD OpenLigaDB proxy's 2026 catalogue: 88 competition entries were returned, with explicit sport metadata on every entry. Sport categories included Fußball, Frauenfußball, Eishockey and Test.
+- Confirmed the current European football filter rejects non-football sport names, including the live catalogue's Darts entries classified as sportName `Test`. Added a regression test for the exact observed `Poland Darts Open 2026` catalogue shape so it cannot accidentally be admitted in a future filter refactor.
+- This is a test-only hardening change; fixture selection behavior is unchanged. No new provider was added.
+- Regression test commit: cdf7ba5259e0099df9a914ed2605260e69712d16. CI and deploy for the resulting latest HEAD must pass before recording validation.
+- No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
