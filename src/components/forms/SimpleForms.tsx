@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "@/components/app/ui-bits";
 import { insertRow, updateRow, fetchAll } from "@/lib/db";
-import { canPromoteManualOdds, isCouponCandidate, isFreshOddsTimestamp, isValidOddsSourceUrl, signedAmount, TX_LABELS } from "@/lib/domain";
+import { canPromoteManualOdds, hasFreshConfirmedOdds, isCouponCandidate, isFreshOddsTimestamp, isValidOddsSourceUrl, signedAmount, TX_LABELS } from "@/lib/domain";
 import { matchLabel, parseDecimal } from "@/lib/format";
 import { useAction } from "@/lib/queries";
 import { brusselsInputToISO, isoToBrusselsInput, nowBrusselsInput } from "@/lib/time";
@@ -78,23 +78,27 @@ export function ScanRunForm({ open, onOpenChange, scan }: { open: boolean; onOpe
     if (!row.bookmaker || row.odds == null || row.odds <= 1 || !quoteFresh || !sourceUrlValid)
       throw new Error("Kurs wymaga bukmachera, wartości powyżej 1,00, poprawnego URL http/https i czasu nie starszego niż 6 godzin.");
     const match = matchById.get(prediction.match_id);
-    const canPromote = canPromoteManualOdds(prediction, match, nowMs);
-    const canUsePrice = canPromote || isCouponCandidate(prediction, match, nowMs);
+    const manualCoverage = {
+      ...(prediction.data_coverage ?? {}),
+      market_odds: true,
+      odds_source: "manual",
+      odds_bookmaker: row.bookmaker,
+      odds_captured_at: row.captured_at,
+      odds_suspended: false,
+      odds_phase: "prematch",
+      odds_status: "CONFIRMED",
+      odds_source_url: row.source_url,
+    };
+    const quotedPrediction = { ...prediction, odds: row.odds, data_coverage: manualCoverage };
+    const canPromote = canPromoteManualOdds(prediction, match, nowMs, row);
+    const canUsePrice = hasFreshConfirmedOdds(quotedPrediction, nowMs)
+      && (canPromote || isCouponCandidate(quotedPrediction, match, nowMs));
     if (snapshot) await updateRow("odds_snapshots", snapshot.id, row);
     else await insertRow("odds_snapshots", row);
     await updateRow("predictions", prediction.id, {
       odds: row.odds,
-      data_coverage: {
-        ...(prediction.data_coverage ?? {}),
-        odds_source: "manual",
-        odds_bookmaker: row.bookmaker,
-        odds_captured_at: row.captured_at,
-        odds_suspended: false,
-        odds_phase: "prematch",
-        odds_status: "CONFIRMED",
-        odds_source_url: row.source_url,
-      },
-      ...(canPromote ? { verdict: "WYBRANY", selection_status: "WYBRANY", rejection_reason: null } : {}),
+      data_coverage: manualCoverage,
+      ...(canPromote ? { verdict: "WYBRANY", selection_status: "WYBRANY", decision_status: "FINAL", rejection_reason: null } : {}),
       ...(canUsePrice ? { stake: 4, potential_return: Math.round(4 * Number(row.odds) * 100) / 100 } : {}),
     });
   }, { success: "Zapisano kurs i przypisano go do wybranego typu", onDone: () => onOpenChange(false) });

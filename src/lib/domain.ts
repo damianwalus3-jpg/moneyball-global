@@ -345,13 +345,34 @@ export function isMissingOddsRejectionReason(reason: string | null | undefined):
 
 /** A manual price may unlock a model pick only when the model already passed every non-odds gate. */
 /** A manual price may unlock a model pick only when the model already passed every non-odds gate. */
-export function canPromoteManualOdds(prediction: Prediction, match: Match | undefined, nowMs: number): boolean {
+export function canPromoteManualOdds(
+  prediction: Prediction,
+  match: Match | undefined,
+  nowMs: number,
+  quote?: { odds: number; bookmaker: string; captured_at: string; source_url: string | null },
+): boolean {
   if (!match || prediction.verdict !== "ODRZUCONY") return false;
   if (!isMissingOddsRejectionReason(prediction.rejection_reason)) return false;
   if (prediction.probability == null || !Number.isFinite(Number(prediction.probability)) || Number(prediction.probability) <= CANDIDATE_MIN_PROBABILITY) return false;
-  if (!hasSufficientPredictionEvidence(prediction)) return false;
-  const promoted = { ...prediction, verdict: "WYBRANY" };
-  return isCouponCandidate(promoted, match, nowMs) && hasFreshConfirmedOdds(promoted, nowMs);
+  const promoted = quote ? {
+    ...prediction,
+    verdict: "WYBRANY" as const,
+    odds: quote.odds,
+    data_coverage: {
+      ...(prediction.data_coverage ?? {}),
+      market_odds: true,
+      odds_source: "manual",
+      odds_bookmaker: quote.bookmaker,
+      odds_captured_at: quote.captured_at,
+      odds_suspended: false,
+      odds_phase: "prematch",
+      odds_status: "CONFIRMED",
+      odds_source_url: quote.source_url,
+    },
+  } : { ...prediction, verdict: "WYBRANY" as const };
+  return hasSufficientPredictionEvidence(promoted)
+    && isCouponCandidate(promoted, match, nowMs)
+    && hasFreshConfirmedOdds(promoted, nowMs);
 }
 
 /** Persistence-boundary rule: only selected predictions above 75% with verified model evidence may enter a coupon. */
