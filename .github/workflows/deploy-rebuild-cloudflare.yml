@@ -46,3 +46,5 @@ jobs:
           TODAY="$(TZ=Europe/Brussels date +%F)"
           curl --fail --location --silent --show-error "$BASE/api/pitchapi/date/$TODAY?status=all" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);if(!Array.isArray(p.data?.matches)){console.error("PitchAPI date feed missing data.matches:",p);process.exit(1)}console.log("PitchAPI live date feed OK:",p.data.matches.length,"matches for",p.data.date)})'
           curl --fail --location --silent --show-error "$BASE/api/footynomad/fixtures/$TODAY" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);if(!Array.isArray(p.fixtures)||!Number.isInteger(p.pagesChecked)||p.pagesChecked<1){console.error("FootyNomad live date feed invalid:",p);process.exit(1)}console.log("FootyNomad live date feed OK:",p.fixtures.length,"European fixtures from",p.pagesChecked,"UTC pages")})'
+      - name: Full current-day European source reconciliation
+        run: npx --yes tsx scripts/audit-live-fixtures.ts
