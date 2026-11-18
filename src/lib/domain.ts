@@ -179,7 +179,7 @@ export function isEuropeanTopTwoLeague(country: string | null | undefined, compe
     || (["turkey", "turkiye", "tur"].includes(c) && /\b2 lig\b/.test(league))
     || (["denmark", "dnk", "norway", "nor", "belarus", "blr"].includes(c) && /\b2 division\b/.test(league))
     || (["denmark", "dnk"].includes(c) && /\b2nd division\b/.test(league))
-    || (["russia", "rus"].includes(c) && /\bsecond league\b/.test(league))
+    || (["russia", "rus", "belarus", "blr"].includes(c) && /\bsecond league\b/.test(league))
     || (["spain", "esp"].includes(c) && /\b(primera division rfef|segunda division rfef)\b/.test(league))
     || (["switzerland", "sui", "che"].includes(c) && /\b1 liga (promotion|classic)\b/.test(league))
     || (["sweden", "swe"].includes(c) && /\bdivision [12]\b/.test(league))

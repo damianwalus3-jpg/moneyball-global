@@ -30,7 +30,7 @@ export function isEligibleDomesticTopTwoLeague(country: unknown, competition: un
   if (["scotland","sco"].includes(countryKey) && /\b(?:lowland league|highland league)\b/.test(label)) return false;
   if (["denmark","dnk","norway","nor","belarus","blr"].includes(countryKey) && /\b2 division\b/.test(label)) return false;
   if (["denmark","dnk"].includes(countryKey) && /\b2nd division\b/.test(label)) return false;
-  if (["russia","rus"].includes(countryKey) && /\bsecond league\b/.test(label)) return false;
+  if (["russia","rus","belarus","blr"].includes(countryKey) && /\bsecond league\b/.test(label)) return false;
   if (["spain","esp"].includes(countryKey) && /\b(?:primera division rfef|segunda division rfef)\b/.test(label)) return false;
   if (["switzerland","sui","che"].includes(countryKey) && /\b1 liga (?:promotion|classic)\b/.test(label)) return false;
   if (["sweden","swe"].includes(countryKey) && /\bdivision [12]\b/.test(label)) return false;
