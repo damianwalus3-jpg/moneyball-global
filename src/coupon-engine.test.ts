@@ -32,16 +32,10 @@ describe("three-leg coupon candidates", () => {
 
   it("qualifies Double Chance-only coupon legs at 75% without requiring the 1X2 gate", () => {
     const dc = (id: string, probability: number): TrackerRecord => ({
-      ...prediction(id, 0.60),
-      details: {
-        ...prediction(id, 0.60).details,
-        strongCandidate: false,
-        strongDoubleChance: true,
-        evidenceComplete: true,
-        dc1x: probability,
-        dcx2: probability - 0.01,
-        dc12: probability - 0.02,
-      },
+      ...prediction(id, 0.60), title: "DC " + id,
+      details: { ...prediction(id, 0.60).details, model: "test-v1", market: "DOUBLE_CHANCE", selection: "1X", probability,
+        p1x: probability, px2: probability - 0.01, p12: probability - 0.02,
+        strongCandidate: false, strongDoubleChance: true, couponEligible: true, evidenceComplete: true },
     });
     const candidates = buildThreeLegCandidates([
       dc("dc-a", 0.75), dc("dc-b", 0.82), dc("dc-c", 0.79),
@@ -51,6 +45,14 @@ describe("three-leg coupon candidates", () => {
     expect(candidates[0].legs.every(leg => leg.market === "DOUBLE_CHANCE" && leg.probability >= 0.75)).toBe(true);
   });
 
+  it("does not allow the same fixture twice when it qualifies in both markets", () => {
+    const oneXTwo = prediction("shared", 0.80);
+    const dc = { ...prediction("shared", 0.90), id: "shared-dc", details: { ...prediction("shared", 0.90).details, market: "DOUBLE_CHANCE", selection: "1X", probability: 0.95, p1x: 0.95, px2: 0.8, p12: 0.8, strongCandidate: false, strongDoubleChance: true, couponEligible: true } };
+    const candidates = buildThreeLegCandidates([oneXTwo, dc, prediction("b", 0.82), prediction("c", 0.85)], "2026-11-17");
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].legs.filter(leg => leg.fixtureId === "shared")).toHaveLength(1);
+    expect(candidates[0].legs.find(leg => leg.fixtureId === "shared")?.market).toBe("DOUBLE_CHANCE");
+  });
   it("does not mix different dates or duplicate fixtures", () => {
     const candidates = buildThreeLegCandidates([
       prediction("a", 0.9), prediction("b", 0.9), prediction("c", 0.9, "2026-11-18"),

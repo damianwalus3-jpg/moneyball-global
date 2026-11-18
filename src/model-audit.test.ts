@@ -31,6 +31,22 @@ describe("tracker model audit", () => {
     expect(audit.doubleChance?.accuracy).toBe(1);
     expect(audit.doubleChance?.brierScore).toBeCloseTo((0.1 ** 2 + 0.2 ** 2 + 0.1 ** 2) / 3);
   });
+  it("audits explicit Double Chance records separately from 1X2", () => {
+    const oneXTwo = { ...prediction, details: { fixtureId: "f1", model: "goals-poisson", market: "1X2", p1: 0.8, px: 0.1, p2: 0.1 } };
+    const dc = { ...prediction, id: "dc1", details: { fixtureId: "f1", model: "goals-poisson", market: "DOUBLE_CHANCE", p1x: 0.9, px2: 0.2, p12: 0.9 } };
+    const audit = auditTrackerPredictions([dc, oneXTwo, result]);
+    expect(audit.metrics?.count).toBe(1);
+    expect(audit.doubleChance?.count).toBe(3);
+    expect(audit.modelComparisons.filter(item => item.model === "goals-poisson")).toHaveLength(2);
+  });
+  it("compares xG and goals models and flags samples below 30 matches", () => {
+    const goals = { ...prediction, details: { fixtureId: "f1", model: "goals-poisson", market: "1X2", p1: 0.8, px: 0.1, p2: 0.1 } };
+    const xg = { ...prediction, id: "pxg", details: { fixtureId: "f1", model: "xg-poisson", market: "1X2", p1: 0.4, px: 0.3, p2: 0.3 } };
+    const audit = auditTrackerPredictions([goals, xg, result]);
+    expect(audit.modelComparisons.filter(item => item.market === "1X2")).toHaveLength(2);
+    expect(audit.modelComparisons.every(item => item.sampleQualified === false)).toBe(true);
+    expect(audit.minimumSampleSize).toBe(30);
+  });
   it("does not count predictions without a matching result", () => {
     const audit = auditTrackerPredictions([prediction]);
     expect(audit.metrics).toBeNull();

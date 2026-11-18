@@ -65,6 +65,22 @@ describe("paper coupon settlement", () => {
     expect(row.details.profitLoss).toBeNull();
     expect(row.details.potentialReturn).toBeNull();
   });
+  it("settles Double Chance legs independently from 1X2 outcomes", () => {
+    const mixed = { ...coupon, details: { legsJson: JSON.stringify([
+      { fixtureId: "a", selection: "1X", market: "DOUBLE_CHANCE" },
+      { fixtureId: "b", selection: "X2", market: "DOUBLE_CHANCE" },
+      { fixtureId: "c", selection: "12", market: "DOUBLE_CHANCE" },
+    ]) } };
+    const settled = evaluatePaperCoupon(mixed, results)!;
+    expect(settled.correctLegs).toBe(3);
+    expect(settled.legResults.every(leg => leg.market === "DOUBLE_CHANCE" && leg.correct)).toBe(true);
+  });
+  it("rejects a three-leg coupon with repeated fixture IDs even across markets", () => {
+    const duplicate = { ...coupon, details: { legsJson: JSON.stringify([
+      { fixtureId: "a", selection: "1" }, { fixtureId: "a", selection: "1X" }, { fixtureId: "b", selection: "X" },
+    ]) } };
+    expect(evaluatePaperCoupon(duplicate, results)).toBeNull();
+  });
   it("marks three correct legs as paper hit", () => {
     const allCorrect = results.map((row, index) => index === 2 ? { ...row, details: { fixtureId: "c", actual: "2" } } : row);
     expect(evaluatePaperCoupon(coupon, allCorrect)?.status).toBe("PAPER_HIT");

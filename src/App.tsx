@@ -73,103 +73,111 @@ function DetailMetric({ label, value, detail, valueClass }: { label: string; val
   return <article className="detail-metric"><small>{label}</small><b className={valueClass}>{value}</b><details><summary>Szczegóły</summary><p>{detail}</p></details></article>;
 }
 
-function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, reason?: string, homeForm?: TeamForm, awayForm?: TeamForm, pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm }, pitchApiLineups?: PitchApiLineups): TrackerRecord[] {
-  const model = "recent-form-goals-poisson-v2-evidence-gated";
+function savePredictionRecord(
+  match: FreeFixture,
+  prediction?: FormPrediction,
+  reason?: string,
+  homeForm?: TeamForm,
+  awayForm?: TeamForm,
+  pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm },
+  pitchApiLineups?: PitchApiLineups,
+  comparisonPredictions: FormPrediction[] = [],
+): TrackerRecord[] {
   const evidenceAudit = buildBaselineEvidenceAudit();
-  if (pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3) {
-    evidenceAudit.areas.xg_xga = { status: "VERIFIED", source: "PitchAPI", observedAt: new Date().toISOString(), note: "Średnie xG/xGA z co najmniej 3 zakończonych, wcześniejszych meczów każdej drużyny; wartości pobrane z oficjalnego endpointu statystyk meczowych." };
-  }
-  if (pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3) {
-    const shotsComplete = [pitchApiXgForms.home, pitchApiXgForms.away].every(form =>
-      form.shotsForPerMatch != null && form.shotsAgainstPerMatch != null
-      && form.shotsOnTargetForPerMatch != null && form.shotsOnTargetAgainstPerMatch != null
-      && form.bigChancesForPerMatch != null && form.bigChancesAgainstPerMatch != null);
-    if (shotsComplete) evidenceAudit.areas.shots_and_chances = { status: "VERIFIED", source: "PitchAPI", observedAt: new Date().toISOString(), note: "Strzały, celne strzały i duże sytuacje z historii zakończonych meczów; próbka co najmniej 3 spotkań każdej drużyny." };
-    const tacticsComplete = [pitchApiXgForms.home, pitchApiXgForms.away].every(form =>
-      form.ppdaPerMatch != null && form.fieldTiltPerMatch != null && form.boxEntriesPerMatch != null);
-    if (tacticsComplete) evidenceAudit.areas.tactics = { status: "VERIFIED", source: "PitchAPI advanced", observedAt: new Date().toISOString(), note: "Średnie PPDA, field tilt i wejścia w pole karne z wcześniejszych zakończonych spotkań; dane taktyczne nie są prognozą." };
+  const xgReady = !!pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3;
+  if (xgReady) evidenceAudit.areas.xg_xga = { status: "VERIFIED", source: "PitchAPI", observedAt: new Date().toISOString(), note: "Średnie xG/xGA z co najmniej 3 zakończonych, wcześniejszych meczów każdej drużyny." };
+  if (xgReady && pitchApiXgForms) {
+    const shotsComplete = [pitchApiXgForms.home, pitchApiXgForms.away].every(form => form.shotsForPerMatch != null && form.shotsAgainstPerMatch != null
+      && form.shotsOnTargetForPerMatch != null && form.shotsOnTargetAgainstPerMatch != null && form.bigChancesForPerMatch != null && form.bigChancesAgainstPerMatch != null);
+    if (shotsComplete) evidenceAudit.areas.shots_and_chances = { status: "VERIFIED", source: "PitchAPI", observedAt: new Date().toISOString(), note: "Strzały, celne strzały i duże sytuacje z wcześniejszych zakończonych spotkań." };
+    const tacticsComplete = [pitchApiXgForms.home, pitchApiXgForms.away].every(form => form.ppdaPerMatch != null && form.fieldTiltPerMatch != null && form.boxEntriesPerMatch != null);
+    if (tacticsComplete) evidenceAudit.areas.tactics = { status: "VERIFIED", source: "PitchAPI advanced", observedAt: new Date().toISOString(), note: "PPDA, field tilt i wejścia w pole karne z wcześniejszych zakończonych spotkań." };
   }
   if (pitchApiLineups) {
     const confirmed = pitchApiLineups.home.confirmed === true && pitchApiLineups.away.confirmed === true
       && (pitchApiLineups.home.starters?.length ?? 0) === 11 && (pitchApiLineups.away.starters?.length ?? 0) === 11;
-    evidenceAudit.areas.confirmed_lineups = { status: confirmed ? "VERIFIED" : "PARTIAL", source: "PitchAPI", observedAt: new Date().toISOString(), note: confirmed ? "Obie jedenastki oznaczone przez dostawcę jako confirmed=true." : "Dostępny skład przewidywany lub niekompletny; nie jest traktowany jako potwierdzony." };
+    evidenceAudit.areas.confirmed_lineups = { status: confirmed ? "VERIFIED" : "PARTIAL", source: "PitchAPI", observedAt: new Date().toISOString(), note: confirmed ? "Obie jedenastki confirmed=true." : "Skład przewidywany lub niekompletny." };
   }
   evidenceAudit.assessedAt = new Date().toISOString();
   evidenceAudit.complete = isEvidenceAuditComplete(evidenceAudit);
-  const evidenceComplete = evidenceAudit.complete;
-  const probabilities = prediction?.prediction.probabilities;
-  const hasProbabilities = !!probabilities;
-  const currentRecords = readRecords();
-  if (!shouldAppendPrediction(currentRecords, match.id, model, hasProbabilities, prediction?.method)) return currentRecords;
-  const dc = prediction?.prediction.doubleChance;
-  addRecord({
-    kind: "prediction",
-    title: `${match.date} · ${match.home} vs ${match.away}`,
-    status: prediction && evidenceComplete && (prediction.strongCandidate || Math.max(prediction.prediction.doubleChance.oneX, prediction.prediction.doubleChance.xTwo, prediction.prediction.doubleChance.oneTwo) >= 0.75) ? "KANDYDAT" : "ODRZUCONY",
-    details: {
-      fixtureId: match.id,
-      fixtureDate: match.date,
-      fixtureTime: match.time,
-      home: match.home,
-      away: match.away,
-      leagueFolder: match.leagueFolder ?? null,
-      leagueShortcut: match.leagueShortcut ?? null,
-      leagueSeason: match.leagueSeason ?? null,
-      openFootballFeedId: match.openFootballFeedId ?? null,
-      competition: match.competition,
-      model,
-      market: "1X2",
-      selection: prediction?.pick ?? null,
-      p1: probabilities?.home ?? null,
-      px: probabilities?.draw ?? null,
-      p2: probabilities?.away ?? null,
-      dc1x: dc?.oneX ?? null,
-      dcx2: dc?.xTwo ?? null,
-      dc12: dc?.oneTwo ?? null,
-      lambdaProxyHome: prediction?.prediction.expectedGoals.home ?? null,
-      lambdaProxyAway: prediction?.prediction.expectedGoals.away ?? null,
-      topProbability: prediction?.topProbability ?? null,
-      strongCandidate: evidenceComplete && (prediction?.strongCandidate ?? false),
-      evidenceComplete,
-      evidenceAudit: JSON.stringify(evidenceAudit),
-      strongDoubleChance: evidenceComplete && prediction ? Math.max(dc?.oneX ?? 0, dc?.xTwo ?? 0, dc?.oneTwo ?? 0) >= 0.75 : false,
-      source: match.source,
-      pitchApiXgHome: pitchApiXgForms?.home.xgForPerMatch ?? null,
-      pitchApiXgHomeAgainst: pitchApiXgForms?.home.xgAgainstPerMatch ?? null,
-      pitchApiXgAway: pitchApiXgForms?.away.xgForPerMatch ?? null,
-      pitchApiXgAwayAgainst: pitchApiXgForms?.away.xgAgainstPerMatch ?? null,
-      pitchApiXgHomeXgot: pitchApiXgForms?.home.xgOnTargetForPerMatch ?? null,
-      pitchApiXgAwayXgot: pitchApiXgForms?.away.xgOnTargetForPerMatch ?? null,
-      pitchApiHomeShotsOnTarget: pitchApiXgForms?.home.shotsOnTargetForPerMatch ?? null,
-      pitchApiAwayShotsOnTarget: pitchApiXgForms?.away.shotsOnTargetForPerMatch ?? null,
-      pitchApiHomeBigChances: pitchApiXgForms?.home.bigChancesForPerMatch ?? null,
-      pitchApiAwayBigChances: pitchApiXgForms?.away.bigChancesForPerMatch ?? null,
-      pitchApiHomePpda: pitchApiXgForms?.home.ppdaPerMatch ?? null,
-      pitchApiAwayPpda: pitchApiXgForms?.away.ppdaPerMatch ?? null,
-      pitchApiHomeFieldTilt: pitchApiXgForms?.home.fieldTiltPerMatch ?? null,
-      pitchApiAwayFieldTilt: pitchApiXgForms?.away.fieldTiltPerMatch ?? null,
-      pitchApiHomeBoxEntries: pitchApiXgForms?.home.boxEntriesPerMatch ?? null,
-      pitchApiAwayBoxEntries: pitchApiXgForms?.away.boxEntriesPerMatch ?? null,
-      pitchApiHomeXThreat: pitchApiXgForms?.home.xThreatPerMatch ?? null,
-      pitchApiAwayXThreat: pitchApiXgForms?.away.xThreatPerMatch ?? null,
-      predictionMethod: prediction?.method ?? null,
-      expectedGoalsBasis: prediction?.method === "pitchapi-recent-xg-poisson" ? "PitchAPI historical xG/xGA" : prediction ? "goals-derived lambda proxy (not xG)" : null,
-      pitchApiXgSamples: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.sampleSize, away: pitchApiXgForms.away.sampleSize, source: "PitchAPI" }) : null,
-      pitchApiXgHistory: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.matches, away: pitchApiXgForms.away.matches }) : null,
-      pitchApiLineups: pitchApiLineups ? JSON.stringify(pitchApiLineups) : null,
-      historyProvenance: homeForm && awayForm ? JSON.stringify({
-        home: { source: homeForm.source, sourceUpdatedAt: homeForm.sourceUpdatedAt, matches: homeForm.matches.length, homeMatches: homeForm.home.length, awayMatches: homeForm.away.length },
-        away: { source: awayForm.source, sourceUpdatedAt: awayForm.sourceUpdatedAt, matches: awayForm.matches.length, homeMatches: awayForm.home.length, awayMatches: awayForm.away.length },
-        cutoffDateExclusive: match.date,
-      }) : null,
-      modelMethod: prediction?.method ?? null,
-      sampleCounts: prediction ? JSON.stringify(prediction.samples) : null,
-      reason: reason ?? (!evidenceComplete ? "ODRZUCONY: brak zweryfikowanych danych wymaganych do selekcji: " + getEvidenceGaps(evidenceAudit).join(", ") + "." : prediction && !prediction.strongCandidate && Math.max(dc?.oneX ?? 0, dc?.xTwo ?? 0, dc?.oneTwo ?? 0) < 0.75 ? "Najwyższe prawdopodobieństwo 1X2 i Double Chance poniżej progu 75%." : null),
-    },
-  });
-  return readRecords();
+  const variants = [prediction, ...comparisonPredictions].filter((item): item is FormPrediction => !!item);
+  const uniqueVariants = [...new Map(variants.map(item => [item.method, item])).values()];
+  if (!uniqueVariants.length) uniqueVariants.push(undefined as unknown as FormPrediction);
+  const shared = {
+    fixtureId: match.id, fixtureDate: match.date, fixtureTime: match.time,
+    home: match.home, away: match.away, competition: match.competition, source: match.source,
+    leagueFolder: match.leagueFolder ?? null, leagueShortcut: match.leagueShortcut ?? null,
+    leagueSeason: match.leagueSeason ?? null, openFootballFeedId: match.openFootballFeedId ?? null,
+    pitchApiXgHome: pitchApiXgForms?.home.xgForPerMatch ?? null,
+    pitchApiXgHomeAgainst: pitchApiXgForms?.home.xgAgainstPerMatch ?? null,
+    pitchApiXgAway: pitchApiXgForms?.away.xgForPerMatch ?? null,
+    pitchApiXgAwayAgainst: pitchApiXgForms?.away.xgAgainstPerMatch ?? null,
+    pitchApiXgHomeXgot: pitchApiXgForms?.home.xgOnTargetForPerMatch ?? null,
+    pitchApiXgAwayXgot: pitchApiXgForms?.away.xgOnTargetForPerMatch ?? null,
+    pitchApiHomeShotsOnTarget: pitchApiXgForms?.home.shotsOnTargetForPerMatch ?? null,
+    pitchApiAwayShotsOnTarget: pitchApiXgForms?.away.shotsOnTargetForPerMatch ?? null,
+    pitchApiHomeBigChances: pitchApiXgForms?.home.bigChancesForPerMatch ?? null,
+    pitchApiAwayBigChances: pitchApiXgForms?.away.bigChancesForPerMatch ?? null,
+    pitchApiHomePpda: pitchApiXgForms?.home.ppdaPerMatch ?? null,
+    pitchApiAwayPpda: pitchApiXgForms?.away.ppdaPerMatch ?? null,
+    pitchApiHomeFieldTilt: pitchApiXgForms?.home.fieldTiltPerMatch ?? null,
+    pitchApiAwayFieldTilt: pitchApiXgForms?.away.fieldTiltPerMatch ?? null,
+    pitchApiHomeBoxEntries: pitchApiXgForms?.home.boxEntriesPerMatch ?? null,
+    pitchApiAwayBoxEntries: pitchApiXgForms?.away.boxEntriesPerMatch ?? null,
+    pitchApiHomeXThreat: pitchApiXgForms?.home.xThreatPerMatch ?? null,
+    pitchApiAwayXThreat: pitchApiXgForms?.away.xThreatPerMatch ?? null,
+    pitchApiXgSamples: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.sampleSize, away: pitchApiXgForms.away.sampleSize, source: "PitchAPI" }) : null,
+    pitchApiXgHistory: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.matches, away: pitchApiXgForms.away.matches }) : null,
+    pitchApiLineups: pitchApiLineups ? JSON.stringify(pitchApiLineups) : null,
+    historyProvenance: homeForm && awayForm ? JSON.stringify({
+      home: { source: homeForm.source, sourceUpdatedAt: homeForm.sourceUpdatedAt, matches: homeForm.matches.length, homeMatches: homeForm.home.length, awayMatches: homeForm.away.length },
+      away: { source: awayForm.source, sourceUpdatedAt: awayForm.sourceUpdatedAt, matches: awayForm.matches.length, homeMatches: awayForm.home.length, awayMatches: awayForm.away.length },
+      cutoffDateExclusive: match.date,
+    }) : null,
+    evidenceComplete: evidenceAudit.complete, evidenceAudit: JSON.stringify(evidenceAudit),
+    evidenceGaps: getEvidenceGaps(evidenceAudit).join(", "),
+  };
+  let current = readRecords();
+  for (const variant of uniqueVariants) {
+    const method = variant?.method ?? "unavailable", model = "moneyball:" + method;
+    const probabilities = variant?.prediction.probabilities, dc = variant?.prediction.doubleChance;
+    const sampleValues = variant ? Object.values(variant.samples) : [];
+    const couponEligible = !!variant && method !== "neutral-prior-poisson" && sampleValues.length === 4
+      && sampleValues.every(value => Number.isFinite(value) && value >= 3) && hasKnownKickoff(match.date, match.time);
+    const topProbability = variant?.topProbability ?? null;
+    const strongCandidate = couponEligible && typeof topProbability === "number" && topProbability >= 0.75;
+    const dcOptions = [{ selection: "1X", probability: dc?.oneX ?? null }, { selection: "X2", probability: dc?.xTwo ?? null }, { selection: "12", probability: dc?.oneTwo ?? null }];
+    const bestDc = dcOptions.filter(item => typeof item.probability === "number").sort((a, b) => (b.probability as number) - (a.probability as number))[0];
+    const dcProbability = typeof bestDc?.probability === "number" ? bestDc.probability : null;
+    const strongDoubleChance = couponEligible && dcProbability !== null && dcProbability >= 0.75;
+    const common = {
+      ...shared, model, modelName: method, predictionMethod: variant?.method ?? null, modelMethod: variant?.method ?? null,
+      expectedGoalsBasis: method === "pitchapi-recent-xg-poisson" ? "historyczne xG/xGA PitchAPI" : method === "recent-form-goals-poisson" ? "wyniki i gole historyczne (nie xG)" : "brak danych zespołów",
+      lambdaProxyHome: variant?.prediction.expectedGoals.home ?? null, lambdaProxyAway: variant?.prediction.expectedGoals.away ?? null,
+      sampleCounts: variant ? JSON.stringify(variant.samples) : null, couponEligible,
+      reason: reason ?? (!couponEligible ? "ODRZUCONY: model wymaga co najmniej 3 wcześniejszych meczów dla obu drużyn oraz zweryfikowanej godziny rozpoczęcia." : null),
+    };
+    const oneXTwoDetails = { ...common, market: "1X2", selection: variant?.pick ?? null,
+      p1: probabilities?.home ?? null, px: probabilities?.draw ?? null, p2: probabilities?.away ?? null,
+      dc1x: dc?.oneX ?? null, dcx2: dc?.xTwo ?? null, dc12: dc?.oneTwo ?? null,
+      topProbability, strongCandidate, source: match.source };
+    if (shouldAppendPrediction(current, match.id, model, !!probabilities, method, "1X2")) {
+      addRecord({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · 1X2 · " + method,
+        status: strongCandidate ? "KANDYDAT" : "ODRZUCONY", details: oneXTwoDetails });
+      current = readRecords();
+    }
+    const dcDetails = { ...common, market: "DOUBLE_CHANCE", selection: bestDc?.selection ?? null, probability: dcProbability,
+      p1x: dc?.oneX ?? null, px2: dc?.xTwo ?? null, p12: dc?.oneTwo ?? null,
+      strongCandidate: false, strongDoubleChance, source: match.source,
+      reason: reason ?? (!couponEligible ? "ODRZUCONY: brak minimalnej próbki lub wiarygodnej godziny meczu." : dcProbability === null ? "Brak prawidłowych prawdopodobieństw Double Chance." : dcProbability < 0.75 ? "Najwyższe prawdopodobieństwo Double Chance poniżej 75%." : null) };
+    if (shouldAppendPrediction(current, match.id, model, !!dc, method, "DOUBLE_CHANCE")) {
+      addRecord({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · DOUBLE CHANCE · " + method,
+        status: strongDoubleChance ? "KANDYDAT" : "ODRZUCONY", details: dcDetails });
+      current = readRecords();
+    }
+  }
+  return current;
 }
-
 export default function App() {
   const [active, setActive] = useState<Tab>("dashboard");
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -254,32 +262,34 @@ export default function App() {
     const awayForm = historyResult.status === "fulfilled" ? historyResult.value[1] : undefined;
     const pitchApiXgForms = xgResult.status === "fulfilled" ? xgResult.value : undefined;
     const pitchApiLineups = lineupResult.status === "fulfilled" ? lineupResult.value : undefined;
-    let prediction: FormPrediction | undefined;
+    let goalsPrediction: FormPrediction | undefined;
+    let xgPrediction: FormPrediction | undefined;
     const errors: string[] = [];
     if (pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3) {
-      try { prediction = predictFromPitchApiXgForm(pitchApiXgForms.home, pitchApiXgForms.away); }
+      try { xgPrediction = predictFromPitchApiXgForm(pitchApiXgForms.home, pitchApiXgForms.away); }
       catch (error) { errors.push(error instanceof Error ? error.message : "Błąd modelu xG"); }
     } else if (xgResult.status === "rejected") {
       errors.push(xgResult.reason instanceof Error ? xgResult.reason.message : "PitchAPI xG niedostępne");
     } else if (pitchApiXgForms) {
       errors.push("PitchAPI xG: za mało wcześniejszych meczów z kompletnymi statystykami (home " + pitchApiXgForms.home.sampleSize + "/3, away " + pitchApiXgForms.away.sampleSize + "/3).");
     }
-    if (!prediction && homeForm && awayForm) {
-      try { prediction = predictFromRecentForm(homeForm, awayForm); }
+    if (homeForm && awayForm) {
+      try { goalsPrediction = predictFromRecentForm(homeForm, awayForm); }
       catch (error) { errors.push(error instanceof Error ? error.message : "Błąd bazowego modelu goli"); }
     }
     if (historyResult.status === "rejected") errors.push(historyResult.reason instanceof Error ? historyResult.reason.message : "Historia wyników niedostępna");
-    if (!prediction) prediction = predictFromNeutralPrior();
+    const prediction = xgPrediction ?? goalsPrediction ?? predictFromNeutralPrior();
+    const comparisonPredictions = [goalsPrediction, xgPrediction].filter((item): item is FormPrediction => !!item);
     const predictionError = prediction ? undefined : errors.join(" · ") || "Brak wystarczających danych do prognozy.";
     setTeamForms(current => ({ ...current, [match.id]: { home: homeForm, away: awayForm, pitchApiXgForms, pitchApiLineups, prediction, predictionError, loading: false } }));
-    setRecords(savePredictionRecord(match, prediction, predictionError, homeForm, awayForm, pitchApiXgForms, pitchApiLineups));
+    setRecords(savePredictionRecord(match, prediction, predictionError, homeForm, awayForm, pitchApiXgForms, pitchApiLineups, comparisonPredictions));
   };
   const analyzeAllFixtures = async (fixtures?: FreeFixture[]) => {
     const sourceMatches = fixtures ?? fixtureScan?.fixtures;
     if (!sourceMatches || bulkAnalysisLock.current || (!fixtures && scanLoading)) return;
     const latestByFixture = new Map<string, TrackerRecord>();
     for (const row of readRecords()) {
-      if (row.kind === "prediction" && typeof row.details.fixtureId === "string" && !latestByFixture.has(row.details.fixtureId)) latestByFixture.set(row.details.fixtureId, row);
+      if (row.kind === "prediction" && row.details.market !== "DOUBLE_CHANCE" && typeof row.details.fixtureId === "string" && !latestByFixture.has(row.details.fixtureId)) latestByFixture.set(row.details.fixtureId, row);
     }
     const matches = [...new Map(sourceMatches.map(match => [match.id, match])).values()].filter(match => {
       if (hasKickoffPassed(match.date, match.time)) return false;
@@ -598,22 +608,31 @@ export default function App() {
   const fileRef = useRef<HTMLInputElement>(null);
   const modelAudit = useMemo(() => auditTrackerPredictions(records), [records]);
   const predictionDiagnostics = useMemo(() => {
-    const latest = new Map<string, TrackerRecord>();
-    for (const row of records) {
-      if (row.kind !== "prediction" || typeof row.details.fixtureId !== "string" || latest.has(row.details.fixtureId)) continue;
-      latest.set(row.details.fixtureId, row);
+    const latestByFixtureMarketModel = new Map<string, TrackerRecord>();
+    for (const row of [...records].filter(item => item.kind === "prediction").sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
+      const fixtureId = row.details.fixtureId;
+      if (typeof fixtureId !== "string") continue;
+      const market = row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2";
+      const model = typeof row.details.model === "string" ? row.details.model : "legacy";
+      const key = fixtureId + "|" + market + "|" + model;
+      if (!latestByFixtureMarketModel.has(key)) latestByFixtureMarketModel.set(key, row);
     }
-    const predictions = [...latest.values()];
-    const rejected = predictions.filter(row => row.status === "ODRZUCONY");
-    const candidates = predictions.filter(row => row.details.strongCandidate === true);
-    const dcCandidates = predictions.filter(row => row.details.strongDoubleChance === true || (typeof row.details.dc1x === "number" && typeof row.details.dcx2 === "number" && typeof row.details.dc12 === "number" && Math.max(row.details.dc1x, row.details.dcx2, row.details.dc12) >= 0.75));
-    const withoutProbabilities = predictions.filter(row => ![row.details.p1, row.details.px, row.details.p2].every(value => typeof value === "number" && Number.isFinite(value)));
+    const oneXTwo = [...latestByFixtureMarketModel.values()].filter(row => row.details.market !== "DOUBLE_CHANCE");
+    const doubleChance = [...latestByFixtureMarketModel.values()].filter(row => row.details.market === "DOUBLE_CHANCE");
+    const fixtures = new Set(oneXTwo.map(row => String(row.details.fixtureId)));
+    const candidates = new Set(oneXTwo.filter(row => row.details.strongCandidate === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
+    const dcCandidates = new Set(doubleChance.filter(row => row.details.strongDoubleChance === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
+    const withProbabilities = new Set(oneXTwo.filter(row => [row.details.p1, row.details.px, row.details.p2].every(value => typeof value === "number" && Number.isFinite(value))).map(row => String(row.details.fixtureId)));
+    const latestPerFixture = new Map<string, TrackerRecord>();
+    for (const row of oneXTwo.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
+      const id = String(row.details.fixtureId); if (!latestPerFixture.has(id)) latestPerFixture.set(id, row);
+    }
+    const rejected = [...latestPerFixture.values()].filter(row => !candidates.has(String(row.details.fixtureId)));
     const reasons = new Map<string, number>();
-    for (const row of rejected) {
-      const reason = String(row.details.reason ?? "Nie zapisano konkretnego powodu");
-      reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
-    }
-    return { total: predictions.length, rejected: rejected.length, candidates: candidates.length, dcCandidates: dcCandidates.length, withoutProbabilities: withoutProbabilities.length, reasons: [...reasons.entries()].sort((x,y) => y[1]-x[1]) };
+    for (const row of rejected) { const reason = String(row.details.reason ?? "Nie zapisano konkretnego powodu"); reasons.set(reason, (reasons.get(reason) ?? 0) + 1); }
+    return { total: fixtures.size, rejected: rejected.length, candidates: candidates.size, dcCandidates: dcCandidates.size,
+      withoutProbabilities: fixtures.size - withProbabilities.size, reasons: [...reasons.entries()].sort((a, b) => b[1] - a[1]),
+      oneXTwoRecords: oneXTwo.length, doubleChanceRecords: doubleChance.length };
   }, [records]);
   const safestPick = useMemo(() => getSafestPick(records), [records]);
   const visibleRecords = useMemo(() => records.filter(row => (active === "tracker" ? true : row.kind === (active === "matches" ? "match" : active === "coupons" ? "coupon" : active === "pick" ? "prediction" : "scan")) && (row.title.toLowerCase().includes(query.toLowerCase()) || row.status.toLowerCase().includes(query.toLowerCase()))), [records, active, query]);
@@ -807,7 +826,7 @@ export default function App() {
           })()}
           {notice && <div className="tracker-notice">{notice}</div>}
         </section>}
-        {active === "tracker" && <section className="tracker-panel"><div className="tracker-toolbar"><div><h2>Twój lokalny rejestr</h2><p>Dane są zapisywane w pamięci tej przeglądarki. Eksportuj kopię, aby ich nie utracić.</p></div><div className="backup-actions"><button onClick={downloadBackup}>Eksport JSON</button><button onClick={downloadCsv}>Eksport CSV</button><button onClick={() => fileRef.current?.click()}>Import JSON</button><input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={e => void loadBackup(e.target.files?.[0])}/></div></div><div className="tracker-form"><select value={newKind} onChange={e => setNewKind(e.target.value as TrackerKind)}><option value="match">Mecz</option><option value="prediction">Prognoza</option><option value="coupon">Kupon</option><option value="scan">Skan</option><option value="result">Wynik</option><option value="odds">Kurs</option><option value="ledger">Bankroll</option><option value="category">Kategoria</option><option value="jackpot">Jackpot</option></select><input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Dodaj wpis do Trackera…"/><button onClick={saveRecord} disabled={!newTitle.trim()}><Plus size={16}/> Zapisz</button></div>{notice && <div className="tracker-notice">{notice}</div>}<div className="tracker-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Szukaj wpisów…"/><span>{visibleRecords.length} wpisów</span></div><div className="tracker-table"><div className="tracker-head"><span>TYP</span><span>NAZWA</span><span>STATUS</span><span>DATA</span><span/></div>{visibleRecords.map(row => <div className="tracker-row tracker-row-detail" key={row.id}><span>{row.kind}</span><b>{row.title}</b><span>{row.status}</span><time>{new Date(row.createdAt).toLocaleString("pl-BE")}</time><details className="record-details"><summary>Szczegóły</summary><dl>{Object.entries(row.details).map(([key,value]) => <div key={key}><dt>{key}</dt><dd>{key === "historyProvenance" ? describeHistoryProvenance(value) : typeof value === "object" ? JSON.stringify(value) : String(value ?? "—")}</dd></div>)}</dl></details><button aria-label="Usuń wpis" onClick={() => { removeRecord(row.id); refreshRecords(); }}>×</button></div>)}{visibleRecords.length === 0 && <div className="tracker-empty">Brak wpisów. Dodaj pierwszy rekord lub zaimportuj kopię zapasową.</div>}</div></section>}
+        {active === "tracker" && <section className="tracker-panel"><div className="tracker-toolbar"><div><h2>Twój lokalny rejestr</h2><p>Dane są zapisywane w pamięci tej przeglądarki. Eksportuj kopię, aby ich nie utracić.</p></div><div className="backup-actions"><button onClick={downloadBackup}>Eksport JSON</button><button onClick={downloadCsv}>Eksport CSV</button><button onClick={() => fileRef.current?.click()}>Import JSON</button><input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={e => void loadBackup(e.target.files?.[0])}/></div></div><div className="tracker-form"><select value={newKind} onChange={e => setNewKind(e.target.value as TrackerKind)}><option value="match">Mecz</option><option value="prediction">Prognoza</option><option value="coupon">Kupon</option><option value="scan">Skan</option><option value="result">Wynik</option><option value="odds">Kurs</option><option value="ledger">Bankroll</option><option value="category">Kategoria</option><option value="jackpot">Jackpot</option></select><input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="Dodaj wpis do Trackera…"/><button onClick={saveRecord} disabled={!newTitle.trim()}><Plus size={16}/> Zapisz</button></div>{notice && <div className="tracker-notice">{notice}</div>}<div className="tracker-search"><Search size={16}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Szukaj wpisów…"/><span>{visibleRecords.length} wpisów</span></div><div className="tracker-table"><div className="tracker-head"><span>TYP</span><span>NAZWA</span><span>STATUS</span><span>DATA</span><span/></div>{visibleRecords.map(row => <div className="tracker-row tracker-row-detail" key={row.id}><span>{row.kind}</span><b>{row.title}</b><span>{row.status}</span><time>{new Date(row.createdAt).toLocaleString("pl-BE")}</time><details className="record-details"><summary>Szczegóły</summary><dl>{Object.entries(row.details).map(([key,value]) => <div key={key}><dt>{key}</dt><dd>{key === "historyProvenance" ? describeHistoryProvenance(value) : typeof value === "object" ? JSON.stringify(value) : String(value ?? "—")}</dd></div>)}</dl></details><span className="history-protected" title="Historia jest chroniona — użyj kopii zapasowej do przenoszenia danych">Zapis chroniony</span></div>)}{visibleRecords.length === 0 && <div className="tracker-empty">Brak wpisów. Dodaj pierwszy rekord lub zaimportuj kopię zapasową.</div>}</div></section>}
 
         {active === "coupons" && <section className="module-panel coupon-module">
           <div className="module-icon"><Ticket/></div>
@@ -827,7 +846,7 @@ export default function App() {
               <div className="coupon-candidate-heading"><b>{candidates.length} kombinacji spełnia próg</b><small>Kolejność według iloczynu prawdopodobieństw modelu</small></div>
               {candidates.slice(0, 10).map((coupon, index) => {
                 const priced = selectedOddsBookmaker ? valueThreeLegCoupon(coupon, records, selectedOddsBookmaker) : null;
-                const couponKey = [coupon.date, ...coupon.legs.map(leg => `${leg.fixtureId}:${leg.selection}`), priced?.bookmaker ?? "NO_ODDS"].join("|");
+                const couponKey = [coupon.date, ...coupon.legs.map(leg => `${leg.fixtureId}:${leg.market}:${leg.selection}`), priced?.bookmaker ?? "NO_ODDS"].join("|");
                 const alreadySaved = records.some(row => row.kind === "coupon" && row.details.couponKey === couponKey);
                 return <article className="coupon-candidate" key={coupon.legs.map(leg => leg.fixtureId).join("|")}>
                   <div className="coupon-candidate-top"><b>Kupon testowy #{index + 1}</b><span>3/3 mecze</span></div>
@@ -836,7 +855,7 @@ export default function App() {
                   </div>)}
                   <div className="coupon-candidate-bottom">
                     <span>Prawdopodobieństwo modelu: {(coupon.combinedProbability * 100).toFixed(1)}%</span>
-                    {priced ? <span>AKO {priced.combinedOdds.toFixed(2)} · EV {(priced.expectedValue * 100).toFixed(1)}%</span> : <span>{selectedOddsBookmaker ? "Brak kompletnych/świeżych kursów dla wszystkich 3 meczów" : "Wybierz bukmachera — kursy niepotwierdzone"}</span>}
+                    {priced ? <span>AKO {priced.combinedOdds.toFixed(2)} · EV {(priced.expectedValue * 100).toFixed(1)}%</span> : <span>{coupon.legs.some(leg => leg.market === "DOUBLE_CHANCE") ? "Brak zweryfikowanych kursów DC — kupon bez wyceny" : selectedOddsBookmaker ? "Brak kompletnych/świeżych kursów dla wszystkich 3 meczów" : "Wybierz bukmachera — kursy niepotwierdzone"}</span>}
                   </div>
                   {priced && <p className="source-note">Stawka €{priced.stake.toFixed(2)} · możliwy zwrot €{priced.potentialReturn.toFixed(2)} · możliwy zysk €{priced.potentialProfit.toFixed(2)} · {priced.bookmaker}</p>}
                   <button disabled={alreadySaved} onClick={() => {
@@ -848,7 +867,7 @@ export default function App() {
                         date: coupon.date,
                         couponKey,
                         legsJson: JSON.stringify(coupon.legs.map((leg, legIndex) => ({
-                          fixtureId: leg.fixtureId, selection: leg.selection, probability: leg.probability,
+                          fixtureId: leg.fixtureId, selection: leg.selection, market: leg.market, probability: leg.probability,
                           odds: priced?.legs[legIndex].decimalOdds ?? null,
                         }))),
                         combinedProbability: coupon.combinedProbability,
@@ -874,6 +893,16 @@ export default function App() {
           <p>Metryki liczone wyłącznie z prognoz połączonych z rzeczywistym wynikiem przez identyfikator meczu.</p>
           {modelAudit.metrics ? <><div className="audit-metrics"><DetailMetric label="Próba" value={modelAudit.metrics.count} detail="Liczba różnych meczów z prognozą 1X2 i dopasowanym rzeczywistym wynikiem. Duplikaty tego samego meczu nie zwiększają próby."/><DetailMetric label="Skuteczność 1X2" value={(modelAudit.metrics.accuracy*100).toFixed(1)+"%"} detail="Odsetek rozliczonych meczów, w których najwyższe prawdopodobieństwo 1X2 wskazało prawidłowy wynik."/><DetailMetric label="Brier score" value={modelAudit.metrics.brierScore.toFixed(4)} detail="Średni kwadratowy błąd prawdopodobieństw. Niższa wartość oznacza lepszą jakość probabilistyczną."/><DetailMetric label="Log loss" value={modelAudit.metrics.logLoss.toFixed(4)} detail="Kara za przypisywanie niskiego prawdopodobieństwa wynikowi, który faktycznie wystąpił. Niżej znaczy lepiej."/></div>{modelAudit.doubleChance && <><h3>Double Chance · osobny audyt rynku</h3><div className="audit-metrics"><DetailMetric label="Próba DC (3 rynki/mecz)" value={modelAudit.doubleChance.count} detail="Każdy rozliczony mecz dostarcza do trzech obserwacji: 1X, X2 i 12. To nie jest liczba meczów."/><DetailMetric label="Skuteczność DC" value={(modelAudit.doubleChance.accuracy*100).toFixed(1)+"%"} detail="Odsetek rynków Double Chance, dla których prognoza przekroczyła 50% i zdarzenie rzeczywiście zaszło."/><DetailMetric label="Brier DC" value={modelAudit.doubleChance.brierScore.toFixed(4)} detail="Średni kwadratowy błąd prawdopodobieństw dla trzech rynków Double Chance. Niższa wartość jest lepsza."/><DetailMetric label="Log loss DC" value={modelAudit.doubleChance.logLoss.toFixed(4)} detail="Logarytmiczna kara dla prognoz Double Chance, szczególnie za zbyt pewne nietrafione wskazania."/></div></>}<h3>Kalibracja pewności</h3><div className="audit-buckets">{modelAudit.buckets.map(bucket => <div key={bucket.label}><b>{bucket.label}</b><span>Prognoza: {(bucket.averageConfidence*100).toFixed(1)}%</span><span>Trafienia: {(bucket.observedAccuracy*100).toFixed(1)}%</span><small>n={bucket.count}</small></div>)}</div></> : <div className="tracker-empty">Brak rozliczonych prognoz. Zapisz wynik z tym samym fixtureId co prognoza, aby uruchomić Brier score, log loss, skuteczność i kalibrację.</div>}
           <details className="scan-warnings" open><summary>Diagnostyka prognoz: {predictionDiagnostics.total} meczów · 1X2 ≥75%: {predictionDiagnostics.candidates} · DC ≥75%: {predictionDiagnostics.dcCandidates} · bez progu: {predictionDiagnostics.rejected}</summary><p>Bez pełnych prawdopodobieństw 1X2: {predictionDiagnostics.withoutProbabilities}. To zwykle oznacza brak historii, niedostępny feed wyników albo brak potwierdzonej godziny meczu.</p>{predictionDiagnostics.reasons.length ? predictionDiagnostics.reasons.map(([reason,count]) => <p key={reason}><b>{count}×</b> {reason}</p>) : <p>Brak zapisanych odrzuceń w najnowszej prognozie każdego meczu.</p>}<p>Kandydat 1X2: 75%. Kandydat Double Chance: 75%. To niezależne kryteria — mecz może spełnić próg DC, nawet jeśli nie spełnia progu 1X2.</p></details>
+          {modelAudit.modelComparisons.length > 0 && <><h3>Porównanie modeli · osobne rynki</h3><div className="audit-metrics">{modelAudit.modelComparisons.map(item => {
+            const metric = item.metrics;
+            return <DetailMetric key={item.market + "|" + item.model} label={item.market + " · " + item.model}
+              value={metric ? "Brier " + metric.brierScore.toFixed(4) : "Brak rozliczeń"}
+              detail={"Próba: " + item.count + (item.market === "DOUBLE_CHANCE" ? " zdarzeń DC" : " prognoz") + " / " + item.sampleMatches + " różnych meczów"
+                + "; minimum do oceny: " + item.minimumSampleSize + " meczów; " + (item.sampleQualified ? "próba wystarczająca" : "PRÓBA ZA MAŁA")
+                + "; log loss: " + (metric ? metric.logLoss.toFixed(4) : "—")
+                + "; skuteczność: " + (metric ? (metric.accuracy * 100).toFixed(1) + "%" : "—")
+                + "; ECE: " + (item.expectedCalibrationError === null ? "—" : item.expectedCalibrationError.toFixed(4))} />;
+          })}</div><p className="source-note">Minimalna próbka kalibracji: {modelAudit.minimumSampleSize} różnych meczów na model i rynek. Wynik poniżej progu jest wyłącznie orientacyjny; ECE bliższe 0 oznacza lepszą kalibrację.</p></>}
           <div className="module-status"><span className="status-dot"/> Rozliczone: {modelAudit.settledPredictions} · oczekujące na wynik: {modelAudit.unmatchedPredictions} · nierozliczone w kolejce: {settling ? settleProgress : "—"}</div>
           <p className="source-note">Nie pokazujemy skuteczności dla prognoz bez wyniku. Metryki nie są wyliczane z typów odrzuconych bez prawdopodobieństw.</p>
         </section>}

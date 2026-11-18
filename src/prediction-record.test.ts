@@ -28,6 +28,12 @@ describe("prediction record refresh policy", () => {
     const fallback = { ...row("fallback", [0.34, 0.32, 0.34]), details: { ...row("fallback", [0.34, 0.32, 0.34]).details, predictionMethod: "neutral-prior-poisson" } };
     expect(shouldAppendPrediction([fallback], "fixture-1", "model-v1", true, "neutral-prior-poisson")).toBe(false);
   });
+  it("keeps 1X2 and Double Chance records independent for the same fixture/model", () => {
+    const oneXTwo = row("one-x-two", [0.6, 0.2, 0.2]);
+    const dc = { ...row("dc", [null, null, null]), details: { ...row("dc", [null, null, null]).details, market: "DOUBLE_CHANCE" } };
+    expect(shouldAppendPrediction([oneXTwo, dc], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "1X2")).toBe(false);
+    expect(shouldAppendPrediction([oneXTwo, dc], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "DOUBLE_CHANCE")).toBe(true);
+  });
   it("ignores records from another model or fixture", () => {
     expect(shouldAppendPrediction([row("other", [0.6, 0.2, 0.2])], "fixture-2", "model-v1", true)).toBe(true);
   });

@@ -28,7 +28,7 @@ export function valueThreeLegCoupon(
     // Current bookmaker snapshots contain only 1X2 prices. Never price DC legs as 1X2.
     if (leg.market !== "1X2" || (leg.selection !== "1" && leg.selection !== "X" && leg.selection !== "2")) return null;
     const fixturePredictions = records
-      .filter(row => row.kind === "prediction" && row.details.fixtureId === leg.fixtureId)
+      .filter(row => row.kind === "prediction" && row.details.fixtureId === leg.fixtureId && row.details.market !== "DOUBLE_CHANCE" && row.details.model === leg.model)
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
     // Never price a coupon against a stale/overridden prediction. The newest
     // prediction must still be the same qualified 75%+ 1X2 selection.
