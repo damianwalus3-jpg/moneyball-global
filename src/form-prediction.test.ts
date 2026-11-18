@@ -47,12 +47,14 @@ describe("PitchAPI xG Poisson model", () => {
     shotsForPerMatch: 12, shotsAgainstPerMatch: 8,
     shotsOnTargetForPerMatch: 5, shotsOnTargetAgainstPerMatch: 3,
     bigChancesForPerMatch: 2, bigChancesAgainstPerMatch: 1,
-    xgOnTargetForPerMatch: 1.2, xgOnTargetAgainstPerMatch: 0.6, source: "PitchAPI",
+    xgOnTargetForPerMatch: 1.2, xgOnTargetAgainstPerMatch: 0.6,
+    ppdaPerMatch: 9, fieldTiltPerMatch: 55, boxEntriesPerMatch: 10, xThreatPerMatch: 0.8, xAssistedGoalsPerMatch: 0.6, directSpeedPerMatch: 1.8, source: "PitchAPI",
     matches: Array.from({ length: 5 }, (_, index) => ({
       matchId: "m_" + team + index, date: `2026-11-${String(17-index).padStart(2,"0")}`,
       isHome, xgFor, xgAgainst, goalsFor: 1, goalsAgainst: 0, shotsFor: 12, shotsAgainst: 8,
       shotsOnTargetFor: 5, shotsOnTargetAgainst: 3, bigChancesFor: 2, bigChancesAgainst: 1,
       xgOnTargetFor: 1.2, xgOnTargetAgainst: 0.6, xgNonPenaltyFor: xgFor, xgNonPenaltyAgainst: xgAgainst,
+      ppdaFor: 9, fieldTiltFor: 55, boxEntriesFor: 10, xThreatFor: 0.8, xAssistedGoalsFor: 0.6, directSpeedFor: 1.8,
     })),
   });
   it("uses observed xG rather than goals-derived lambda and labels the model separately", () => {
