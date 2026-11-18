@@ -33,6 +33,8 @@ jobs:
         run: deno test --no-check supabase/functions/_shared/openmatchday-time.test.ts
       - name: Test result-sync European tier scope
         run: deno test --no-check supabase/functions/_shared/results-sync-scope.test.ts
+      - name: Test fresh Belgian bookmaker odds validation
+        run: deno test --no-check supabase/functions/_shared/provider-odds-validation.test.ts
       - name: Test MoviOdds missing-key guard
         run: deno test --no-check supabase/functions/_shared/movi-odds-config.test.ts
       - name: Test public-source service-role key fallback
