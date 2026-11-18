@@ -42,9 +42,17 @@ describe("European fixture source classification", () => {
     })).toBe(false);
   });
 
-  it("deduplicates source variants using normalized date and team names", () => {
+  it("deduplicates source variants while keeping women's and men's fixtures separate", () => {
     expect(fixtureKey("2026-11-17", "FC Zürich", "Bayern München"))
       .toBe(fixtureKey("2026-11-17", "fc zurich", "bayern munchen"));
+    expect(fixtureKey("2026-11-17", "Chelsea F.C. Women", "Paris Saint-Germain (Women)", "UEFA Women's Champions League"))
+      .toBe(fixtureKey("2026-11-17", "Chelsea", "Paris Saint-Germain", "UEFA Women's Champions League, League Phase"));
+    expect(fixtureKey("2026-11-17", "Juventus FC (Women)", "Oud-Heverlee Leuven (Women)", "UEFA Women's Champions League"))
+      .toBe(fixtureKey("2026-11-17", "Juventus", "OH Leuven", "UEFA Women's Champions League"));
+    expect(fixtureKey("2026-11-17", "Real Madrid (Women)", "Inter Milan (Women)", "UEFA Women's Champions League"))
+      .toBe(fixtureKey("2026-11-17", "Real Madrid", "Internazionale", "UEFA Women's Champions League, League Phase"));
+    expect(fixtureKey("2026-11-17", "Chelsea", "Paris Saint-Germain", "Premier League"))
+      .not.toBe(fixtureKey("2026-11-17", "Chelsea Women", "Paris Saint-Germain Women", "UEFA Women's Champions League"));
     expect(fixtureKey("2026-11-17", "Home FC", "Away FC"))
       .not.toBe(fixtureKey("2026-11-18", "Home FC", "Away FC"));
   });
