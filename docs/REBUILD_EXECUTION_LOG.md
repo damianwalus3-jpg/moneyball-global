@@ -1788,3 +1788,14 @@
 - Odpowiedź API-Football z HTTP 200 i pustą listą z wcześniejszego przebiegu nie powtórzyła się. Wprowadzona walidacja pola `errors` pozostaje aktywna, aby błędy providera nie były mylone z prawidłowym pustym dniem.
 - Ograniczenie: snapshot potwierdza bieżące pokrycie, ale nie dowodzi kompletności wszystkich federacji, lig kobiecych, młodzieżowych i amatorskich w Europie. Kontynuować porównanie brakujących rozgrywek.
 - Bez zmian w historycznych rekordach, kuponach, rozliczeniach i bankrollu.
+
+
+## Stage 153 — bezpieczny pilot kursów API-Football (2026-11-19)
+- Dodano do istniejącego chronionego endpointu `/api/odds/pilot` parametr `apiFootballFixtureId` (wyłącznie numeryczne ID fixture z API-Football).
+- Endpoint odpytuje `GET /odds?fixture={id}` z kluczem API-Football wyłącznie po stronie Workera; klucz nie trafia do przeglądarki ani odpowiedzi.
+- Dostęp nadal wymaga właścicielskiego `ODDS_PILOT_TOKEN`; źródło nie pobiera kursów przy publicznym wejściu do aplikacji.
+- Odpowiedzi są cache'owane na edge 15 minut, aby ograniczyć zużycie limitu API. Zwracane są status, liczba wyników, błędy dostawcy i surowe dane bookmaker/market bez automatycznego zapisywania do Tracker, kuponów lub P/L.
+- Rozróżniamy `ok`, `provider_error`, `not_configured` i `error`; brak kursów w danym fixture nie jest przedstawiany jako kurs 0 ani jako oferta bukmachera.
+- Dokumentacja API-Football opisuje endpoint odds i informuje, że pokrycie odds jest zależne od ligi/sezonu; pole coverage ligi może mieć wartość false. Sam plan Pro daje dostęp do endpointu, ale nie gwarantuje kursów dla każdego spotkania.
+- Źródła dokumentacji: API-Football v3 docs i oficjalna tabela planów/coverage (sprawdzone 2026-11-19).
+- Wdrożenie i testy CI są wymagane przed uznaniem pilota za aktywny produkcyjnie. Nie wykonywano jeszcze zapytań live o kursy na konkretnych meczach.
