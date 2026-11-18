@@ -1,6 +1,7 @@
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   PITCHAPI_API_KEY?: string;
+  API_FOOTBALL_KEY?: string;
   ODDSPAPI_API_KEY?: string;
   STRIKERAPI_API_KEY?: string;
   ODDS_PILOT_TOKEN?: string;
@@ -569,6 +570,41 @@ export default {
       }
     }
 
+
+
+    // API-Football Pro: server-side only; never expose the subscription key to the browser.
+    const apiFootballDate = url.pathname.match(/^\/api\/api-football\/fixtures\/(\d{4}-\d{2}-\d{2})$/);
+    if (apiFootballDate) {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
+      if (!env.API_FOOTBALL_KEY) return json({ error: "api_football_not_configured", message: "API_FOOTBALL_KEY is not configured as a Cloudflare Worker secret." }, 503, origin);
+      const date = apiFootballDate[1];
+      const [year, month, day] = date.split("-").map(Number);
+      const parsed = new Date(Date.UTC(year, month - 1, day));
+      if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return json({ error: "invalid_date" }, 400, origin);
+      const cacheKey = new Request(url.toString(), { method: "GET" });
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+      try {
+        const upstream = await fetch("https://v3.football.api-sports.io/fixtures?date=" + date + "&timezone=Europe%2FBrussels", {
+          headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        });
+        const raw = await upstream.text();
+        let payload: unknown;
+        try { payload = JSON.parse(raw); } catch { return json({ error: "api_football_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
+        if (!upstream.ok) return json({ error: "api_football_upstream_http_" + upstream.status, upstreamStatus: upstream.status }, upstream.status, origin);
+        const data = payload as { response?: unknown[]; errors?: unknown; results?: number; paging?: unknown };
+        const response = json({ provider: "API-Football Pro", date, timezone: "Europe/Brussels", generatedAt: new Date().toISOString(), results: data.results ?? data.response?.length ?? 0, paging: data.paging ?? null, errors: data.errors ?? null, fixtures: Array.isArray(data.response) ? data.response : [] }, 200, origin);
+        response.headers.set("X-MONEYBALL-SOURCE", "API-Football Pro");
+        response.headers.set("Cache-Control", "public, max-age=300");
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "api_football_upstream_error" }, 502, origin);
+      }
+    }
 
     const pitchDate = url.pathname.match(/^\/api\/pitchapi\/date\/(\d{4}-\d{2}-\d{2})$/);
     const pitchLeagues = new RegExp("^/api/pitchapi/leagues/?$").test(url.pathname);
