@@ -1769,3 +1769,11 @@
 - Nie zmieniono danych historycznych, kuponów, rozliczeń ani bankrolla.
 - Weryfikacja Stage 149: commit `bbcae7f`, CI + Rebuild Checks + Cloudflare deploy + live reconciliation — SUCCESS; 26 plików testowych, 247 testów.
 - Następny krok: sprawdzić dlaczego API-Football zwrócił 0 w pełnym skanie mimo wcześniejszego 183, a następnie porównać jego listę meczów z FootyNomad/Flashscore bez dopisywania duplikatów.
+
+
+## Stage 151 — wykrywanie błędów API-Football przy HTTP 200 (2026-11-18)
+- Audyt Stage 149 pokazał, że endpoint API-Football zwrócił HTTP 200, ale 0 fixtures, podczas gdy wcześniejszy smoke test dla tej daty raportował 183. Sam kod HTTP nie wystarcza więc do uznania odpowiedzi za poprawną.
+- Parser API-Football odrzuca teraz payloady z niepustym polem `errors` (obiekt lub tablica), aby błędy autoryzacji, limitów lub parametrów nie były mylone z poprawnym pustym dniem.
+- Dodano testy dla błędów providera ukrytych za HTTP 200.
+- Audyt źródeł rozszerzono w Stage 150 o status API-Football; po tej poprawce nieprawidłowa odpowiedź zwiększy liczbę błędów źródła i oznaczy je jako zdegradowane.
+- Oczekiwana walidacja: typecheck, pełny zestaw testów, build, wdrożenie REBUILT i porównanie surowej odpowiedzi z dziennym feedem. Nie zakładamy, że 0 fixtures oznacza brak meczów.
