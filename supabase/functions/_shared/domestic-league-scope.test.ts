@@ -18,7 +18,7 @@ Deno.test("raw inventory excludes cups, UEFA, women and youth competitions", () 
     ["England","EFL Trophy"],["England","Premier League Cup"],["Italy","Coppa Italia Serie D"],
     ["France","Coupe de France"],["Spain","Primera Federación U19"],["England","Professional Development League"],
     ["Sweden","Damallsvenskan"],["Poland","Ekstraliga Women"],["Serbia","Kupa Srbije"],["Poland","Puchar Polski"],["Portugal","Taça de Portugal"],["World","UEFA Nations League"],
-    ["World","UEFA Champions League"],["England","Premier League 2"]
+    ["World","UEFA Champions League"],["England","Premier League 2"],["England","Premier League - Summer Series"]
   ];
   for (const [country,competition] of rejected) {
     if (isEligibleDomesticSeniorLeague(country,competition)) throw new Error(`Unexpected raw fixture: ${country} / ${competition}`);
