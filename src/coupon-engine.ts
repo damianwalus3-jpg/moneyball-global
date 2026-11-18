@@ -1,4 +1,5 @@
 import type { TrackerRecord } from "./tracker-store";
+import { hasKickoffPassed } from "./safest-pick";
 export interface CouponLegCandidate {
   fixtureId: string; title: string; competition: string;
   selection: "1" | "X" | "2" | "1X" | "X2" | "12";
@@ -12,6 +13,7 @@ function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCand
   const d = record.details;
   if (record.kind !== "prediction" || record.status !== "KANDYDAT" || d.fixtureDate !== date || typeof d.fixtureId !== "string" || !d.fixtureId) return null;
   if (d.couponEligible !== true && d.evidenceComplete !== true) return null;
+  if (typeof d.fixtureTime === "string" && hasKickoffPassed(date, d.fixtureTime)) return null;
   const base = { fixtureId: d.fixtureId, title: record.title,
     competition: typeof d.competition === "string" ? d.competition : "Rozgrywki nieznane",
     source: typeof d.source === "string" ? d.source : "unknown", model: typeof d.model === "string" ? d.model : "unknown" };

@@ -53,6 +53,10 @@ describe("three-leg coupon candidates", () => {
     expect(candidates[0].legs.filter(leg => leg.fixtureId === "shared")).toHaveLength(1);
     expect(candidates[0].legs.find(leg => leg.fixtureId === "shared")?.market).toBe("DOUBLE_CHANCE");
   });
+  it("excludes candidates after the verified kickoff time", () => {
+    const started = { ...prediction("started", 0.90), details: { ...prediction("started", 0.90).details, fixtureTime: "00:00" } };
+    expect(buildThreeLegCandidates([started, prediction("b", 0.85), prediction("c", 0.86)], "2026-11-18")).toHaveLength(0);
+  });
   it("does not mix different dates or duplicate fixtures", () => {
     const candidates = buildThreeLegCandidates([
       prediction("a", 0.9), prediction("b", 0.9), prediction("c", 0.9, "2026-11-18"),
