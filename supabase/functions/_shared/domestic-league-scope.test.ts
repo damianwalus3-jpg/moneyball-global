@@ -6,7 +6,7 @@ Deno.test("raw source inventory includes senior men's domestic leagues at every 
     ["Czech Republic","3. liga - CFL B"],["England","National League - North"],
     ["England","Non League Premier - Isthmian"],["Scotland","Football League - Lowland League"],
     ["Ukraine","Persha Liga"],["Germany","Oberliga - Hessen"],["Bulgaria","Third League - Northeast"],
-    ["Bosnia","1st League - RS"],["Poland","III Liga - Group 3"],["Spain","Tercera División RFEF - Group 13"]
+    ["Bosnia","1st League - RS"],["Poland","III Liga - Group 3"],["Spain","Tercera División RFEF - Group 13"],["Lithuania","TOPLYGA"],["Albania","Abissnet Superiore"],["San Marino","Campionato Sammarinese"],["Finland","Kakkonen"],["Faroe Islands","Meistaradeildin menn"]
   ];
   for (const [country,competition] of accepted) {
     if (!isEligibleDomesticSeniorLeague(country,competition)) throw new Error(`Expected raw senior fixture: ${country} / ${competition}`);
@@ -26,7 +26,7 @@ Deno.test("raw inventory excludes cups, UEFA, women and youth competitions", () 
   if (!isUefaNationsLeagueCompetition("UEFA Nations League - League B")) throw new Error("Nations League classifier regression");
 });
 
-Deno.test("production scope includes only geographic-Europe domestic men's tiers one and two", () => {
+Deno.test("OpenMatchday source scope includes only its published geographic-Europe tiers one and two", () => {
   const accepted: Array<[string,string]> = [
     ["England","Premier League"],["England","Championship"],["Germany","Bundesliga"],
     ["Germany","2. Bundesliga"],["France","Ligue 1"],["France","Ligue 2"],
