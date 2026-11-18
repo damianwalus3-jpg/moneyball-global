@@ -55,6 +55,10 @@ describe("European fixture source classification", () => {
       .not.toBe(fixtureKey("2026-11-17", "Chelsea Women", "Paris Saint-Germain Women", "UEFA Women's Champions League"));
     expect(fixtureKey("2026-11-17", "Home FC", "Away FC"))
       .not.toBe(fixtureKey("2026-11-18", "Home FC", "Away FC"));
+    expect(fixtureKey("2026-11-18", "Chelsea W", "Paris Saint Germain W", "WSL Cup"))
+      .toBe(fixtureKey("2026-11-18", "Chelsea Women", "Paris Saint Germain Women", "WSL Cup"));
+    expect(fixtureKey("2026-11-18", "Chelsea W", "Paris Saint Germain W", "WSL Cup"))
+      .not.toBe(fixtureKey("2026-11-18", "Chelsea", "Paris Saint Germain", "Premier League"));
   });
 });
 
