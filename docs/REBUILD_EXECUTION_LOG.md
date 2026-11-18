@@ -1847,3 +1847,12 @@
 - Dodano testy bezpieczeństwa, konfiguracji sekretu, cache i maskowania danych prywatnych. Zmiany kodu: worker `0297599e14c9224c9a8e62626d7de8265bc02287`; testy `6aba45bbe5668f64ce3b62efb965163e71c16baa`.
 - To narzędzie diagnostyczne — nie deklarujemy jeszcze naprawy rate limit. Po wdrożeniu odczytamy rzeczywisty plan i limity przypisane do klucza, a potem dobierzemy harmonogram i cache.
 - Bez zmian w rekordach trackerów, kuponach, rozliczeniach i bankrollu.
+
+
+### Stage 156 — walidacja produkcyjna i smoke test statusu API-Football (2026-11-19)
+- Commit `aa2aadbf`: CI, Rebuild Checks i Cloudflare Deploy SUCCESS. Produkcyjny smoke test potwierdził API-Football Pro: 111 fixtures dla daty Brussels 2026-11-19.
+- Pełny audyt po wdrożeniu: 48 unikalnych meczów, 15 krajów, 27 rozgrywek; wszystkie 9 źródeł healthy, 0 źródeł zdegradowanych, 0 błędów, 0 duplikatów, 0 meczów spoza daty i 0 nieeuropejskich.
+- Dodano dodatkowy smoke test w workflow deploy dla endpointu `/api/api-football/status`, aby przy każdym wdrożeniu weryfikować strukturę bezpiecznych metadanych subskrypcji i liczników limitów bez ujawniania danych prywatnych.
+- Workflow change commit: `efb241f50d08cf199f9f973ab2e67ea7445abed2`. Walidacja i wdrożenie tego dodatkowego smoke testu oczekują na CI.
+- Endpoint statusu nie został jeszcze niezależnie odczytany poza workflow; nie deklarujemy potwierdzenia dokładnego planu/licznika konta, dopóki smoke test nie przejdzie.
+- Brak zmian w historycznych rekordach, kuponach, rozliczeniach i bankrollu.
