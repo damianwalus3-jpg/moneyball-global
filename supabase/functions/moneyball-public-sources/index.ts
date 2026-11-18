@@ -121,7 +121,7 @@ function githubTeamForm(team: string, date: string, history: any) {
   };
 }
 function genderFromCompetition(folder:string):string {
-  if (/women|womens|female|frauen|femenin|damallsvenskan|\\bwsl\\b|d1-arkema|liga-f/i.test(folder)) return "women";
+  if (/women|womens|female|frauen|femenin|damallsvenskan|\bwsl\b|d1-arkema|liga-f/i.test(folder)) return "women";
   if (/mixed|coed/i.test(folder)) return "mixed";
   // National league and cup folders are men's by default unless the source labels them otherwise.
   return "men";
@@ -556,7 +556,7 @@ async function theSportsDb(date:string) {
   const rawTime=String(e?.strTimeLocal||e?.strTime||"").slice(0,5);
   let kickoff:string|null=null;
   const timestamp=String(e?.strTimestamp||"");
-  if(/[zZ]$|[+-]\\d{2}:?\\d{2}$/.test(timestamp)){
+  if(/[zZ]$|[+-]\d{2}:?\d{2}$/.test(timestamp)){
    const parsed=Date.parse(timestamp);if(Number.isFinite(parsed))kickoff=new Date(parsed).toISOString();
   } else if(rawTime) kickoff=localKickoffToIso(date,rawTime,countryCode||"BEL");
   const statusRaw=String(e?.strStatus||"").toLowerCase();
@@ -564,7 +564,7 @@ async function theSportsDb(date:string) {
   const finished=/^(ft|aet|pen|finished|match finished)$/.test(statusRaw)||/full time/.test(statusRaw);
   const live=/live|in progress|1st half|2nd half|half time/.test(statusRaw);
   const league=norm(e?.strLeague||"");
-  const women=/women|womens|frauen|femenin|female|vrouwen|damallsvenskan|liga f|\\bwsl\\b|feminine/i.test(league);
+  const women=/women|womens|frauen|femenin|female|vrouwen|damallsvenskan|liga f|\bwsl\b|feminine/i.test(league);
   const hs=e?.intHomeScore==null||e.intHomeScore===""?null:Number(e.intHomeScore);
   const as=e?.intAwayScore==null||e.intAwayScore===""?null:Number(e.intAwayScore);
   return [{
@@ -707,7 +707,7 @@ async function sportsDbTeamHistory(fixtures:any[],targetDate:string) {
     try{
       const data=await safeJson("https://www.thesportsdb.com/api/v1/json/123/eventsseason.php?id="+encodeURIComponent(league.id)+"&s="+encodeURIComponent(league.season));
       const events=Array.isArray(data?.events)?data.events:[];
-      const firstDate=events.map((x:any)=>String(x?.dateEvent||"").slice(0,10)).filter((x:string)=>/^\\d{4}-\\d{2}-\\d{2}$/.test(x)).sort()[0]||"";
+      const firstDate=events.map((x:any)=>String(x?.dateEvent||"").slice(0,10)).filter((x:string)=>/^\d{4}-\d{2}-\d{2}$/.test(x)).sort()[0]||"";
       return {key:league.id+"|"+league.season,league,events,firstDate};
     }catch(error){errors.push("league "+league.id+": "+String(error).slice(0,120));return {key:league.id+"|"+league.season,league,events:[],firstDate:""};}
   });
