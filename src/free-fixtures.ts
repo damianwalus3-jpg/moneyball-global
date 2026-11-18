@@ -15,6 +15,7 @@ export interface FreeFixture {
   away: string;
   source: string;
   sourceUpdatedAt: string;
+  sourceUrl?: string;
 }
 interface LeagueIndex {
   generated_utc: string;
@@ -27,6 +28,8 @@ interface OpenLigaLeague {
   leagueSeason?: string | null;
   sport?: { sportName?: string | null; sportId?: number };
 }
+interface TimezoneFootballMatch { competition?: string; home?: string; away?: string; kickoff?: string; status?: string; url?: string }
+interface TimezoneFootballFeed { generated?: string; matches?: TimezoneFootballMatch[] }
 interface OpenLigaMatch {
   matchID?: number;
   matchDateTime?: string | null;
@@ -41,10 +44,12 @@ interface OpenLigaMatch {
 }
 const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const OPENLIGA = "/api/openligadb";
-const SOURCE = "FootyNomad + open-matchday + OpenLigaDB + openfootball + ESPN (publiczne terminarze)";
+const SOURCE = "FootyNomad + open-matchday + OpenLigaDB + openfootball + ESPN + timezone.football (publiczne terminarze)";
 const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","ISR","KOS","BLR","LIE","SMR","MCO","VAT","UEFA"]);
 const CACHE_KEY = "moneyball.free-fixtures.v10";
 const CACHE_MS = 15 * 60 * 1000;
+const TIMEZONE_FEED_CACHE_KEY = "moneyball.timezone-football.v1";
+const TIMEZONE_FEED_CACHE_MS = 15 * 60 * 1000;
 const COUNTRY_NAMES = [
   "england","scotland","wales","northern ireland","ireland","france","germany","italy","spain","portugal","netherlands","belgium","austria","switzerland","turkey","greece","denmark","sweden","norway","romania","poland","croatia","czech","ukraine","cyprus","slovakia","slovenia","finland","kazakhstan","albania","serbia","bosnia","bulgaria","hungary","iceland","luxembourg","malta","estonia","latvia","lithuania","moldova","georgia","armenia","azerbaijan","macedonia","montenegro","andorra","faroe","gibraltar","israel","kosovo","belarus","liechtenstein","san marino","monaco","vatican","uefa","deutschland","österreich"
 ];
@@ -83,6 +88,46 @@ function brusselsParts(date: Date): { date: string; time: string } {
   return { date: `${get("year")}-${get("month")}-${get("day")}`, time: `${get("hour")}:${get("minute")}` };
 }
 function brusselsDate(now = new Date()): string { return brusselsParts(now).date; }
+const TIMEZONE_COMPETITIONS: Record<string, { countryCode: string; label: string }> = {
+  "premier-league": { countryCode: "ENG", label: "England · Premier League" },
+  "la-liga": { countryCode: "ESP", label: "Spain · La Liga" },
+  bundesliga: { countryCode: "GER", label: "Germany · Bundesliga" },
+  "serie-a": { countryCode: "ITA", label: "Italy · Serie A" },
+  "ligue-1": { countryCode: "FRA", label: "France · Ligue 1" },
+  "champions-league": { countryCode: "UEFA", label: "UEFA Champions League" },
+  "europa-league": { countryCode: "UEFA", label: "UEFA Europa League" },
+  "dfb-pokal": { countryCode: "GER", label: "Germany · DFB-Pokal" },
+  "coppa-italia": { countryCode: "ITA", label: "Italy · Coppa Italia" },
+};
+export function parseTimezoneFootballFixtures(payload: unknown, targetDate: string): FreeFixture[] {
+  if (!payload || typeof payload !== "object" || !Array.isArray((payload as TimezoneFootballFeed).matches)) throw new Error("timezone.football: nieprawidłowy feed lub brak tablicy matches");
+  return ((payload as TimezoneFootballFeed).matches ?? []).flatMap(match => {
+    const mapped = TIMEZONE_COMPETITIONS[match.competition ?? ""];
+    if (!mapped || !match.kickoff || !Number.isFinite(Date.parse(match.kickoff)) || !match.home?.trim() || !match.away?.trim()) return [];
+    const kickoff = brusselsParts(new Date(match.kickoff));
+    if (kickoff.date !== targetDate) return [];
+    return [{
+      id: "timezone-football|" + [match.competition, match.kickoff, match.home, match.away].join("|"),
+      competition: mapped.label, countryCode: mapped.countryCode, leagueFolder: "", date: kickoff.date, time: kickoff.time,
+      home: match.home.trim(), away: match.away.trim(), source: "timezone.football",
+      sourceUpdatedAt: (payload as TimezoneFootballFeed).generated ?? "not provided by timezone.football",
+      sourceUrl: match.url && /^https:\/\/timezone\.football\//.test(match.url) ? match.url : undefined,
+    } satisfies FreeFixture];
+  });
+}
+async function fetchTimezoneFootballFeed(): Promise<TimezoneFootballFeed> {
+  try {
+    const cached = localStorage.getItem(TIMEZONE_FEED_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached) as { cachedAt?: number; payload?: TimezoneFootballFeed };
+      if (parsed.payload && typeof parsed.cachedAt === "number" && Date.now() - parsed.cachedAt < TIMEZONE_FEED_CACHE_MS) return parsed.payload;
+    }
+  } catch { /* ignore invalid cache */ }
+  const payload = await fetchJson<TimezoneFootballFeed>("https://timezone.football/api/v1/watch.json");
+  if (!Array.isArray(payload.matches)) throw new Error("nieprawidłowa odpowiedź feedu");
+  try { localStorage.setItem(TIMEZONE_FEED_CACHE_KEY, JSON.stringify({ cachedAt: Date.now(), payload })); } catch { /* storage may be unavailable */ }
+  return payload;
+}
 async function fetchText(url: string): Promise<string> {
   const response = await fetch(url, { headers: { Accept: "text/plain" } });
   if (!response.ok) throw new Error(`HTTP ${response.status}: ${url.split("/").slice(-2).join("/")}`);
@@ -246,6 +291,7 @@ export interface FixtureScan {
     openFootball: { feedsChecked: number; fixtures: number; errors: number };
     espn: { scoreboardsChecked: number; fixtures: number; errors: number };
     footyNomad: { pagesChecked: number; pageMatches: number; fixtures: number; skippedNoTimestamp: number; errors: number };
+    timezoneFootball: { feedMatches: number; fixtures: number; generatedAt: string; errors: number };
   };
 }
 export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureScan> {
@@ -275,6 +321,9 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   let footyNomadPageMatches = 0;
   let footyNomadFixturesFound = 0;
   let footyNomadSkippedNoTimestamp = 0;
+  let timezoneFootballFeedMatches = 0;
+  let timezoneFootballFixturesFound = 0;
+  let timezoneFootballGeneratedAt = "";
 
   // Source 1: every European folder in open-matchday, including cups and youth competitions.
   try {
@@ -449,12 +498,31 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   } catch (error) {
     errors.push("FootyNomad · " + (error instanceof Error ? error.message : "źródło niedostępne"));
   }
+  // Source 6: timezone.football's attributed, 14-day JSON feed. Cache for 15 minutes per its terms.
+  try {
+    const feed = await fetchTimezoneFootballFeed();
+    timezoneFootballFeedMatches = Array.isArray(feed.matches) ? feed.matches.length : 0;
+    timezoneFootballGeneratedAt = feed.generated ?? "";
+    const timezoneFixtures = parseTimezoneFootballFixtures(feed, date);
+    timezoneFootballFixturesFound = timezoneFixtures.length;
+    for (const fixture of timezoneFixtures) {
+      const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
+      const existing = byKey.get(key);
+      if (existing) {
+        existing.source = existing.source + " + timezone.football";
+        existing.sourceUrl = fixture.sourceUrl ?? existing.sourceUrl;
+      } else byKey.set(key, fixture);
+    }
+  } catch (error) {
+    errors.push("timezone.football · " + (error instanceof Error ? error.message : "źródło niedostępne"));
+  }
+
   const fixtures = [...byKey.values()].sort((a,b) => a.time.localeCompare(b.time) || a.competition.localeCompare(b.competition));
   const result: FixtureScan = {
     date,
     generatedAt,
     fixtures,
-    leaguesChecked: openMatchdayChecked + openLigaChecked + openFootballChecked + espnChecked + footyNomadPagesChecked,
+    leaguesChecked: openMatchdayChecked + openLigaChecked + openFootballChecked + espnChecked + footyNomadPagesChecked + (timezoneFootballGeneratedAt ? 1 : 0),
     leaguesFailed: errors,
     source: SOURCE,
     cache: false,
@@ -464,6 +532,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       openFootball: { feedsChecked: openFootballChecked, fixtures: openFootballFixturesFound, errors: errors.filter(error => error.startsWith("openfootball ·")).length },
       espn: { scoreboardsChecked: espnChecked, fixtures: espnFixturesFound, errors: errors.filter(error => error.startsWith("ESPN ·")).length },
       footyNomad: { pagesChecked: footyNomadPagesChecked, pageMatches: footyNomadPageMatches, fixtures: footyNomadFixturesFound, skippedNoTimestamp: footyNomadSkippedNoTimestamp, errors: errors.filter(error => error.startsWith("FootyNomad ·")).length },
+      timezoneFootball: { feedMatches: timezoneFootballFeedMatches, fixtures: timezoneFootballFixturesFound, generatedAt: timezoneFootballGeneratedAt, errors: errors.filter(error => error.startsWith("timezone.football ·")).length },
     },
   };
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ...result, cachedAt: Date.now() })); } catch { /* storage may be full */ }
