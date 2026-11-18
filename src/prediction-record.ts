@@ -18,6 +18,15 @@ export function shouldAppendPrediction(records: TrackerRecord[], fixtureId: stri
 }
 
 /** True when a scanned fixture has no independent record for either market. */
+/** Returns whether the newest record for a fixture/model/market has a mathematically valid probability vector. */
+export function hasValidPredictionMarket(records: TrackerRecord[], fixtureId: string, market: string, model?: string): boolean {
+  const rows = records.filter(row => row.kind === "prediction" && row.details.fixtureId === fixtureId
+    && (row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2") === market
+    && (model === undefined || row.details.model === model))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  return rows.length > 0 && hasValidProbabilities(rows[0].details, market);
+}
+
 export function hasMissingPredictionMarket(records: TrackerRecord[], fixtureId: string): boolean {
   const markets = new Set(records.filter(row => row.kind === "prediction" && row.details.fixtureId === fixtureId)
     .map(row => row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2"));
