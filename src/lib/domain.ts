@@ -190,7 +190,7 @@ export function isEuropeanTopTwoLeague(country: string | null | undefined, compe
     || (["poland", "pol"].includes(c) && /\b(ii|2) liga\b/.test(league))) return false;
   if (/\bserie c\b|\bserie d\b|\blega pro\b|\bserie c1\b|\bserie c2\b/.test(league)) return false;
   if (/\bleague one\b|\bleague two\b|\bleague three\b/.test(league)) return false;
-  if (/\b(uefa|nations league|champions league|europa league|conference league|world cup|international|national [2-5]|cup|copa|trophy|play ?offs?)\b/.test(league)) return false;
+  if (/\b(uefa|nations league|champions league|europa league|conference league|world cup|international|national [2-5]|rfef|cup|copa|trophy|play ?offs?)\b/.test(league)) return false;
   if (!EUROPEAN_COUNTRIES.has(c)) return false;
   if (/\b(premier league 2|pl2|professional development league|u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend|reserves?|b team|cup|copa|trophy|play ?offs?|women|woman|female|frauen|damen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series)\b/.test(league)) return false;
   if (/\bdruha liga\b|\b(3|4|5|6|7|8|9|iii|iv|v|vi)\s*\.?\s*(liga|league|division|div|bundesliga|serie|snl|hnl|federal|federation)\b|\b(third|fourth|fifth|regional|regionalliga|oberliga|national league north|national league south|non league|non-league)\b/.test(league)) return false;

@@ -97,6 +97,7 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Russia", "Second League - Group 1")).toBe(false);
     expect(isEuropeanTopTwoLeague("Spain", "Primera División RFEF - Group 1")).toBe(false);
     expect(isEuropeanTopTwoLeague("Spain", "Segunda División RFEF - Group 1")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Spain", "Tercera División RFEF - Group 13")).toBe(false);
     expect(isEuropeanTopTwoLeague("Switzerland", "1. Liga Promotion")).toBe(false);
     expect(isEuropeanTopTwoLeague("Switzerland", "1. Liga Classic - Group 1")).toBe(false);
     expect(isEuropeanTopTwoLeague("Russia", "First League")).toBe(true);
