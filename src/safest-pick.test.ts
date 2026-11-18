@@ -45,6 +45,13 @@ describe("safest daily pick", () => {
     expect(getSafestPick([below75])).toBeNull();
   });
 
+  it("limits the dashboard safest pick to the requested Brussels scan date", () => {
+    const today = prediction({ fixtureId: "today", fixtureDate: "2099-06-01", fixtureTime: "18:00" });
+    const tomorrow = prediction({ fixtureId: "tomorrow", fixtureDate: "2099-06-02", fixtureTime: "18:00", dc1x: 0.99, dcx2: 0.98, dc12: 0.97 });
+    expect(getSafestPick([today, tomorrow], 0.75, "2099-06-01")?.fixtureId).toBe("today");
+    expect(getSafestPick([tomorrow], 0.75, "2099-06-01")).toBeNull();
+  });
+
   it("does not surface rejected, weak or started predictions", () => {
     expect(getSafestPick([prediction({}, "ODRZUCONY")])).toBeNull();
     expect(getSafestPick([prediction({ dc1x: 0.74, dcx2: 0.73, dc12: 0.749 })])).toBeNull();
