@@ -1111,3 +1111,13 @@
 - Initial CI caught that TrackerRecord.details intentionally accepts primitive JSON values only, not nested objects. The app change was corrected to serialize the provenance and sample-count structures as JSON strings, preserving the existing storage schema and backward compatibility.
 - Corrective commit: 3ee68109d11ed5de256869be200c5b3205df18ee.
 - No Tracker data was migrated or rewritten. Fresh CI and deploy must pass before release confirmation.
+
+
+## 2026-11-18 — Stage 89: readable prediction history provenance
+- Confirmed the latest rebuild HEAD `19c0505ca07e7a20fd001566cc7130f1ae9be400` passed all three workflows: rebuild CI, Rebuild Checks and Cloudflare Free Worker deployment (runs `44266341464`, `44266341494`, `44266341386`).
+- Reviewed the Tracker rendering path and found Stage 88's multi-source history provenance was persisted as JSON text but displayed as opaque raw JSON.
+- Added safe parsing and human-readable formatting for each side's contributing history source, total/home/away sample counts, source update timestamp and exclusive fixture-date cutoff.
+- Tracker detail view now renders this metadata in readable Polish; old records, absent values and malformed JSON remain safe and unchanged.
+- Added tests for valid multi-source metadata, legacy/malformed values and invalid sample counts.
+- No historical Tracker rows, predictions, coupons, settlements or bankroll values were rewritten. No paid service or key added.
+- Stage 89 code changes committed; CI and deployment validation pending.
