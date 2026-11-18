@@ -97,3 +97,19 @@ E. Nie dodawać żadnego klucza do GitHub ani frontendowego kodu. Klucz (jeśli 
 - Nie istnieje możliwość dosłownego przeszukania całego Internetu ani wszystkich prywatnych forów. Przeszukano publicznie indeksowane źródła, dokumentacje dostawców, GitHub, publiczne wątki Reddit/r/algobetting i porównywarki.
 - Dane o limitach i coverage OddsPapi są częściowo deklaracjami dostawcy; należy potwierdzić przez live test konta i sprawdzenie odpowiedzi API.
 - Nie wykonano jeszcze zapytań z kontem/kluczem użytkownika; nie pobrano realnego kursu do produkcji.
+
+
+## 2026-11-18 — aktualizacja planów i rekomendacji do budżetu ~20 EUR
+
+Sprawdzone ponownie na oficjalnych stronach dostawców:
+
+- **API-Football Pro**: oficjalna strona główna pokazała $16/miesiąc, 7 500 requestów/dzień i dostęp do wszystkich endpointów, w tym pre-match odds, live odds, lineups, injuries i statistics. Osobna oficjalna strona pricing w tym samym okresie nadal pokazywała $19/miesiąc; cena wymaga potwierdzenia w checkout, a VAT/przewalutowanie mogą zmienić końcową kwotę. To najlepszy pierwszy kandydat do testu przy limicie około 20 EUR, ale nie dowód pełnej dostępności kursów w każdej europejskiej lidze ani u każdego belgijskiego bukmachera.
+- **StrikerAPI Starter**: oficjalna strona pokazuje $19/miesiąc i 10 000 kredytów/miesiąc; Free nadal daje 500 kredytów. Odczyt dzienny odds kosztuje 10 kredytów, a provider opisuje aktualizację kursów co godzinę dla spotkań z najbliższych 4 dni. Zakres dziennych kursów/bookmakerów jest zmienny; w części sezonów feed zawiera tylko 1–2 bukmacherów na mecz. Plan Starter może przekroczyć limit 20 EUR po VAT.
+- W REBUILT pozostawiono obecny pilotaż StrikerAPI jako opcjonalny i owner-only. Nie dodano nowego płatnego planu, nie skopiowano sekretów z MAIN/Supabase do Cloudflare i nie uruchomiono płatnych zapytań.
+- Rekomendacja techniczna: przed wyborem płatnego dostawcy wykonać próbkę 8–12 realnych fixture'ów z różnych lig, mierząc dokładne dopasowanie, kompletność 1X2, nazwę bukmachera, timestamp i dostępność Bwin/Unibet/Ladbrokes/Circus/betFIRST. Nie uznawać globalnej listy bookmakerów za potwierdzenie belgijskiej oferty.
+
+Oficjalne źródła:
+- API-Football pricing: https://www.api-football.com/pricing/
+- API-Football homepage/pricing: https://www.api-football.com/
+- StrikerAPI pricing and coverage: https://strikerapi.com/
+- StrikerAPI get_odds: https://strikerapi.com/docs/get-odds
