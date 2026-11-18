@@ -90,6 +90,7 @@ export function ScanRunForm({ open, onOpenChange, scan }: { open: boolean; onOpe
       odds_source_url: row.source_url,
     };
     const quotedPrediction = { ...prediction, odds: row.odds, data_coverage: manualCoverage };
+    if (!hasFreshConfirmedOdds(quotedPrediction, nowMs)) throw new Error("Kurs musi pochodzić z Bwin, Unibet, Ladbrokes, Circus lub betFIRST i spełniać pozostałe warunki aktualności.");
     const canPromote = canPromoteManualOdds(prediction, match, nowMs, row);
     const canUsePrice = hasFreshConfirmedOdds(quotedPrediction, nowMs)
       && (canPromote || isCouponCandidate(quotedPrediction, match, nowMs));
