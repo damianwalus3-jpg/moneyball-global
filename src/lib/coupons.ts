@@ -6,6 +6,12 @@ export function getCouponSourceClass(couponType: CouponType): SourceClass {
   return couponType === "TEST" ? "PAPER" : "MODEL";
 }
 
+export function validateNewCouponType(couponType: CouponType, targetLegs: 1 | 3): void {
+  if (couponType === "TEST") throw new Error("New TEST coupons are disabled in the production MAIN.");
+  if (targetLegs === 1 && couponType !== "MAIN") throw new Error("A single pick must be saved as a MAIN coupon.");
+  if (targetLegs === 3 && couponType !== "MEGA" && couponType !== "EXTRA") throw new Error("An AKO coupon must use MEGA or EXTRA.");
+}
+
 export function shouldRecordCouponStake(couponType: CouponType, recordStake?: boolean): boolean {
   return recordStake === true && getCouponSourceClass(couponType) !== "PAPER";
 }
@@ -27,9 +33,7 @@ export async function saveCouponBatch(coupons: Prediction[][], options: SaveBatc
   const targetLegs = options.targetLegs ?? 3;
   if (targetLegs !== 1 && targetLegs !== 3) throw new Error("MONEYBALL zapisuje wyłącznie single albo kupony 3-zdarzeniowe.");
   const couponType = options.couponType ?? (targetLegs === 1 ? "MAIN" : "MEGA");
-  if (couponType === "TEST") throw new Error("Nowe kupony TEST są wyłączone w produkcyjnym MAIN.");
-  if (targetLegs === 1 && couponType !== "MAIN") throw new Error("Pojedynczy typ musi być zapisany jako kupon MAIN.");
-  if (targetLegs === 3 && !["MEGA","EXTRA"].includes(couponType)) throw new Error("Kupon AKO musi mieć typ MEGA lub EXTRA.");
+  validateNewCouponType(couponType, targetLegs);
   const sourceClass = getCouponSourceClass(couponType);
   const recordStake = shouldRecordCouponStake(couponType, options.recordStake ?? true);
   if (!recordStake) throw new Error("Każdy nowy kupon MAIN/AKO musi zapisać dokładnie jedną stawkę w bankrollu.");
