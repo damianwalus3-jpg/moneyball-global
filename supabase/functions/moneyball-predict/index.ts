@@ -12,7 +12,7 @@ function isEuropeanFixture(country: unknown, _competition?: unknown, _home?: unk
   return isGeographicEuropeCountry(country);
 }
 
-function isEligibleOpenMatchdayMatchfunction isEligibleOpenMatchdayMatch(m:any):boolean {
+function isEligibleOpenMatchdayMatch(m:any):boolean {
  const folder=(String(m?.external_id||"").match(/^om:([^:]+):/)||[])[1]||String(m?.source_competition_id||"");
  const competition=String(m?.competition||m?.league||"");
  const country=String(m?.country||"");
