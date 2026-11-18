@@ -15,7 +15,7 @@ export function hasKickoffPassed(date: string, time: string): boolean {
   const now = brusselsNowParts();
   return date < now.date || (date === now.date && time <= now.time);
 }
-export function getSafestPick(records: TrackerRecord[], minimum = 0.75): SafestPick | null {
+export function getSafestPick(records: TrackerRecord[], minimum = 0.75, targetDate?: string): SafestPick | null {
   const now = brusselsNowParts();
   const latest = new Map<string, TrackerRecord>();
   for (const row of records) {
@@ -31,6 +31,7 @@ export function getSafestPick(records: TrackerRecord[], minimum = 0.75): SafestP
   const candidates: SafestPick[] = [];
   for (const row of latest.values()) {
     const d = row.details;
+    if (targetDate && d.fixtureDate !== targetDate) continue;
     if (row.status !== "KANDYDAT" && row.status !== "KANDYDAT_DC") continue;
     if (typeof d.fixtureDate !== "string" || typeof d.fixtureTime !== "string" || !hasKnownKickoff(d.fixtureDate, d.fixtureTime)
       || d.fixtureDate < now.date || (d.fixtureDate === now.date && d.fixtureTime <= now.time)) continue;
