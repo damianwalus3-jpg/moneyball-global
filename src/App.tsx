@@ -450,6 +450,9 @@ export default function App() {
         typeof game.gameId === "string" && typeof game.startsAt === "string"
         && typeof game.home === "string" && typeof game.away === "string"
       );
+      if (games.length === 0) {
+        throw new Error(`StrikerAPI przyjęło żądanie, ale nie zwróciło żadnych meczów dla daty UTC ${utcDate}. Dzisiejsza próba pozostaje zablokowana, aby nie zużyć kolejnych kredytów.`);
+      }
       const audit = auditOddsFixtureMatches(fixtureScan.fixtures, games);
       const fixtureById = new Map(fixtureScan.fixtures.map(fixture => [fixture.id, fixture]));
       const gameById = new Map(games.map(game => [game.gameId, game]));
