@@ -22,6 +22,10 @@ describe("API-Football Pro European fixture integration", () => {
     expect(parseApiFootballEuropeanFixtures(response, "2026-11-18", "2026-11-18T22:48:00.000Z")).toHaveLength(1);
     expect(parseApiFootballEuropeanFixtures({ results: 0, fixtures: [] }, "2026-11-18", "now")).toEqual([]);
   });
+  it("rejects HTTP-200 provider payloads that contain API-Football errors", () => {
+    expect(() => parseApiFootballEuropeanFixtures({ results: 0, fixtures: [], errors: { token: "invalid" } }, "2026-11-18", "now")).toThrow(/błędy/);
+    expect(() => parseApiFootballEuropeanFixtures({ results: 0, fixtures: [], errors: ["rate limit"] }, "2026-11-18", "now")).toThrow(/błędy/);
+  });
   it("rejects malformed provider payloads", () => {
     expect(() => parseApiFootballEuropeanFixtures({ response: [] }, "2026-11-18", "now")).toThrow(/API-Football/);
   });
