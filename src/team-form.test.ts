@@ -124,3 +124,22 @@ describe("multi-source historical form merge", () => {
     expect(merged.matches).toHaveLength(0);
   });
 });
+
+describe("calcio.it Serie D fallback parsers", () => {
+  it("resolves team names to their Serie D group", async () => {
+    const { parseCalcioItSerieDTeams } = await import("./team-form");
+    const html = '<a href="/serie-d-girone-b/squadre/piacenza">3 Piacenza</a><a href="/serie-d-girone-e/squadre/lucchese">7 Lucchese</a>';
+    expect(parseCalcioItSerieDTeams(html)).toEqual([{ group: "b", team: "Piacenza" }, { group: "e", team: "Lucchese" }]);
+  });
+  it("extracts completed match results and round from a results page", async () => {
+    const { parseCalcioItSerieDResults } = await import("./team-form");
+    const html = '<h1>Risultati · giornata 11</h1><a href="/serie-d-girone-b/partite/2026-11-08-brusaporto-piacenza">Brusaporto 0 - 2 08/11 14:30 Piacenza</a><a href="/serie-d-girone-b/partite/2026-11-08-rovato-piacenza">Rovato Vertova 1 - 3 08/11 14:30 Piacenza</a>';
+    expect(parseCalcioItSerieDResults(html)).toEqual({
+      round: 11,
+      matches: [
+        { date: "2026-11-08", home: "Brusaporto", away: "Piacenza", homeGoals: 0, awayGoals: 2 },
+        { date: "2026-11-08", home: "Rovato Vertova", away: "Piacenza", homeGoals: 1, awayGoals: 3 },
+      ],
+    });
+  });
+});
