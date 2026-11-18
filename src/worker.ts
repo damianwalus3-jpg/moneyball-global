@@ -57,7 +57,7 @@ const FOOTYNOMAD_COUNTRIES: Record<string, string> = {
   cyprus: "CYP", "czech republic": "CZE", czechia: "CZE", denmark: "DEN", england: "ENG",
   estonia: "EST", "faroe islands": "FRO", finland: "FIN", france: "FRA", georgia: "GEO",
   germany: "GER", gibraltar: "GIB", greece: "GRE", hungary: "HUN", iceland: "ISL", ireland: "IRE",
-  italy: "ITA", kosovo: "KOS", latvia: "LVA", liechtenstein: "LIE", lithuania: "LTU",
+  italy: "ITA", israel: "ISR", kosovo: "KOS", latvia: "LVA", liechtenstein: "LIE", lithuania: "LTU",
   luxembourg: "LUX", malta: "MLT", moldova: "MDA", monaco: "MCO", montenegro: "MNE",
   netherlands: "NED", "north macedonia": "MKD", "northern ireland": "NIR", norway: "NOR",
   poland: "POL", portugal: "POR", romania: "ROU", russia: "RUS", "san marino": "SMR",
