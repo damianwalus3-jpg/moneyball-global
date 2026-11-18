@@ -1194,3 +1194,15 @@
 - First CI run exposed a regression in the UEFA key assignment: after narrowing the Nations League regex, a valid Denmark-hosted UEFA Nations League fixture was attributed to DEN instead of UEFA. This was a test failure; that build was not deployed.
 - Corrected assignment to preserve the UEFA key only for explicit UEFA Nations League notes, while leaving the venue-country mapping unchanged for other fixtures. The Concacaf regression case remains in the test.
 - Follow-up source commit: 3cb05202f78da94d9c13ee14bb5147246267426a. Latest test/deploy validation is pending.
+
+
+### Stage 96 additional confederation guard
+- Further review showed that relying only on the venue country would still admit an explicitly CONCACAF/CONMEBOL/AFC/CAF/OFC event if it happened to use a neutral venue in Europe.
+- Added an explicit non-UEFA confederation exclusion before geographic venue checks, plus a regression test for a CONMEBOL event at an England venue. The observed Guadeloupe-hosted Concacaf Nations League case remains covered.
+- Follow-up implementation commit: c62fa63400a14f0e5ff5571892ca0e3fb10177a1. Test commit: 21e1cd27109d84c50898d3d5e156d08483ac4c6d. Validation pending.
+
+## Stage 97 — date-specific source overlap audit (2026-11-18)
+- Read the 62 European open-matchday current-season CSVs for 2026-11-18. Exactly six fixtures were listed for that date, all from Copa del Rey First Round (Spain); no matches were listed for the 10 sampled top-flight domestic league feeds, UEFA men's club competition feeds, or the other 51 European feed files checked.
+- Compared those six Spanish cup fixtures with the live FootyNomad date proxy: two of six were also present there (Alcoyano–Mallorca and Badajoz–Tenerife); four were absent from FootyNomad. The live ESPN scoreboard independently contained all six Spanish cup fixtures, so the multi-source design can recover these omissions.
+- The six open-matchday fixtures plus ESPN events show why a single global source is insufficient: provider coverage differs by competition and fixture, even on one date. Keep the source provenance when merging and do not infer missing matches from a competition directory alone.
+- This is a one-day snapshot; it is not a season-wide completeness estimate. No data rows were written into the app's historical Tracker.
