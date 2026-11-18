@@ -73,4 +73,22 @@ describe("tracker model audit", () => {
     expect(audit.unmatchedPredictions).toBe(1);
     expect(audit.metrics).toBeNull();
   });
+
+  it("falls back to valid embedded Double Chance when the explicit DC row is malformed", () => {
+    const oneXTwo = {
+      ...prediction,
+      details: { fixtureId: "f1", model: "goals-poisson", market: "1X2",
+        p1: 0.8, px: 0.1, p2: 0.1, dc1x: 0.9, dcx2: 0.2, dc12: 0.9 },
+    };
+    const malformedDc = {
+      ...prediction, id: "dc-bad",
+      details: { fixtureId: "f1", model: "goals-poisson", market: "DOUBLE_CHANCE",
+        p1x: 1.2, px2: 0.2, p12: 0.6 },
+    };
+    const audit = auditTrackerPredictions([malformedDc, oneXTwo, result]);
+    const dc = audit.modelComparisons.find(item => item.model === "goals-poisson" && item.market === "DOUBLE_CHANCE");
+    expect(dc?.count).toBe(3);
+    expect(dc?.sampleMatches).toBe(1);
+    expect(dc?.sampleQualified).toBe(false);
+  });
 });
