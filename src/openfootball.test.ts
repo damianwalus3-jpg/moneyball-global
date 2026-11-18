@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm, openFootballSeasonFolder, parseOpenFootballFixtures, parseOpenFootballMatches, type OpenFootballFeed } from "./openfootball";
+import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm, mergeOpenFootballCatalogueResults, openFootballSeasonFolder, parseOpenFootballFixtures, parseOpenFootballMatches, type OpenFootballFeed } from "./openfootball";
 import { vi } from "vitest";
 
 const france: OpenFootballFeed = {
@@ -129,5 +129,22 @@ describe("dynamic European OpenFootball catalogue", () => {
     const feeds = buildEuropeanOpenFootballFeeds(["finland/2026_fi1.txt", "finland/2025_fi1.txt"], "2026-07-10");
     expect(feeds).toHaveLength(1);
     expect(feeds[0].countryCode).toBe("FIN");
+  });
+});
+
+describe("OpenFootball catalogue resilience", () => {
+  it("keeps feeds from healthy catalogues when another repository fails", () => {
+    const feed: OpenFootballFeed = {
+      id: "healthy-feed", countryCode: "BEL", competition: "Belgium · Pro League",
+      urlForSeason: () => "https://example.test/feed.txt", timeZone: "Europe/Brussels",
+    };
+    const result = mergeOpenFootballCatalogueResults([
+      { repository: "europe", feeds: [feed] },
+      { repository: "england", error: "HTTP 502" },
+      { repository: "belgium", feeds: [feed] },
+    ]);
+    expect(result.feeds).toHaveLength(1);
+    expect(result.feeds[0].id).toBe("healthy-feed");
+    expect(result.failed).toEqual(["england catalogue: HTTP 502"]);
   });
 });
