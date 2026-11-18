@@ -60,23 +60,25 @@ function shouldRetryMissingXg(fixtureId: string): boolean {
 
 
 function shouldRetryIncompletePrediction(fixtureId: string, prior: TrackerRecord | undefined, market: "1X2" | "DOUBLE_CHANCE"): boolean {
-  if (!prior) return true;
-  const probabilities = market === "DOUBLE_CHANCE"
-    ? [prior.details.p1x, prior.details.px2, prior.details.p12]
-    : [prior.details.p1, prior.details.px, prior.details.p2];
-  const expectedTotal = market === "DOUBLE_CHANCE" ? 2 : 1;
-  const valid = probabilities.every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
-    && Math.abs((probabilities as number[]).reduce((sum, value) => sum + value, 0) - expectedTotal) <= 0.0001;
-  if (valid) return false;
+  if (prior) {
+    const probabilities = market === "DOUBLE_CHANCE"
+      ? [prior.details.p1x, prior.details.px2, prior.details.p12]
+      : [prior.details.p1, prior.details.px, prior.details.p2];
+    const expectedTotal = market === "DOUBLE_CHANCE" ? 2 : 1;
+    const valid = probabilities.every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
+      && Math.abs((probabilities as number[]).reduce((sum, value) => sum + value, 0) - expectedTotal) <= 0.0001;
+    if (valid) return false;
+  }
   try {
     const key = "moneyball.incompletePredictionRetryAt";
     const raw = localStorage.getItem(key);
     const parsed: unknown = raw ? JSON.parse(raw) : {};
     const attempts = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
     const attemptKey = fixtureId + "|" + market;
+    const now = Date.now();
     const lastAttempt = attempts[attemptKey];
-    if (typeof lastAttempt === "number" && Number.isFinite(lastAttempt) && Date.now() - lastAttempt < FALLBACK_RETRY_INTERVAL_MS) return false;
-    localStorage.setItem(key, JSON.stringify({ ...attempts, [attemptKey]: Date.now() }));
+    if (!shouldRetryPredictionAttempt(lastAttempt, now, FALLBACK_RETRY_INTERVAL_MS)) return false;
+    localStorage.setItem(key, JSON.stringify({ ...attempts, [attemptKey]: now }));
     return true;
   } catch { return false; }
 }
@@ -351,7 +353,6 @@ export default function App() {
       const priorDc = latestByFixtureMarket.get(match.id + "|DOUBLE_CHANCE");
       const missingProbabilities = shouldRetryIncompletePrediction(match.id, prior, "1X2")
         || shouldRetryIncompletePrediction(match.id, priorDc, "DOUBLE_CHANCE");
-      const missingMarket = hasMissingPredictionMarket(currentRecords, match.id);
       const xgModel = "moneyball:pitchapi-recent-xg-poisson";
       const xgModelComplete = hasValidPredictionMarket(currentRecords, match.id, "1X2", xgModel)
         && hasValidPredictionMarket(currentRecords, match.id, "DOUBLE_CHANCE", xgModel);
@@ -359,7 +360,7 @@ export default function App() {
         && !xgModelComplete && shouldRetryMissingXg(match.id);
       // Each market is checked independently, including its probability normalization.
       // Failed lookups are retried at most every six hours, not on every 15-minute refresh.
-      return missingProbabilities || missingMarket || shouldRetryNeutralFallback(match.id, prior) || missingXgModel;
+      return missingProbabilities || shouldRetryNeutralFallback(match.id, prior) || missingXgModel;
     });
     if (!matches.length) { setRecords(readRecords()); return; }
     bulkAnalysisLock.current = true;
