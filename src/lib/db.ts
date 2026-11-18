@@ -1041,6 +1041,23 @@ export async function fetchAll<K extends TableName>(table: K): Promise<TableRows
   return rows;
 }
 
+export async function fetchMatchesByIds(ids: string[]): Promise<TableRows["matches"][]> {
+  const uniqueIds = [...new Set(ids.filter((id) => typeof id === "string" && id.trim()))];
+  if (uniqueIds.length === 0) return [];
+  const uid = await currentUserId();
+  const { data, error } = await requireSupabase()
+    .from("matches")
+    .select(COLUMNS.matches.join(","))
+    .eq(OWNER_COLUMN, uid)
+    .in("id", uniqueIds);
+  if (error) throw new Error(humanizeError(error, "matches"));
+  return ((data ?? []) as unknown as TableRows["matches"][]).map((row) => ({
+    ...row,
+    competition: row.competition ?? row.league ?? null,
+    league: row.league ?? row.competition ?? null,
+  }));
+}
+
 export async function insertRows<K extends TableName>(
   table: K,
   rows: Record<string, unknown>[],

@@ -23,7 +23,7 @@ export const Route = createFileRoute("/_authenticated/kupony")({
   component: Kupony,
 });
 
-const COUPON_TYPES: CouponType[] = ["TEST", "MAIN", "MEGA", "EXTRA"];
+const COUPON_TYPES: CouponType[] = ["MAIN", "MEGA", "EXTRA"];
 const STATUS_FILTERS: ("all" | CouponStatus)[] = ["all", "pending", "won", "lost", "void", "cancelled"];
 
 function statusLabel(status: CouponStatus) {
@@ -50,7 +50,7 @@ function Kupony() {
   const [couponCount, setCouponCount] = useState("2");
   const couponSize = 3 as const;
   const recordStake = true;
-  const [couponType, setCouponType] = useState<CouponType>("TEST");
+  const [couponType, setCouponType] = useState<CouponType>("MEGA");
   const [namePrefix, setNamePrefix] = useState("MONEYBALL");
   const [excludeActive, setExcludeActive] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"all" | CouponStatus>("all");
