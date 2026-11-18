@@ -70,3 +70,14 @@ Automated FotMob/Sofascore scraping is intentionally not used: their terms/offic
 - The coupon engine enforces exactly three distinct fixtures and a 75% model-probability gate. Coupon calculations are paper/analytical records, not bookmaker bet placement.
 - Browser-level interactive acceptance on a physical Android device has not been completed. CI and live endpoint checks prove deployment and API behavior, not every visual interaction.
 - **Release decision:** deployed and operational for the documented local-first fixture, prediction, paper-coupon and Tracker scope, with the above data/product boundaries. Do not open more feature stages by default. Only reopen work for a reproducible defect, a production source outage, a security issue, or a user-requested change. Never claim exhaustive European fixture coverage.
+
+
+## Rebuilt market and model controls (2026-11-18)
+
+- Every scanned European fixture receives independent Tracker prediction rows for `1X2` and `DOUBLE_CHANCE`. Fixtures that have already kicked off are explicitly recorded as rejected pre-match analyses rather than silently omitted.
+- The goals-only Poisson model and the PitchAPI xG/xGA Poisson model are evaluated independently whenever their own historical samples are available. The UI shows model/market comparisons using Brier score, log loss, accuracy, calibration buckets and expected calibration error (ECE).
+- Calibration qualification requires at least 30 settled distinct fixtures per model and market. Below that threshold, metrics are shown as provisional and must not be treated as validated.
+- Team-history eligibility for a coupon requires at least 3 previous matches for each team and a verified kickoff. Neutral-prior placeholders are never coupon-eligible.
+- Coupon candidates require a selected market probability of at least 75%. Each generated coupon contains exactly 3 distinct fixtures; a fixture qualifying in both markets can appear only once. Double Chance legs are settled as 1X/X2/12 and are not assigned bookmaker odds unless a complete DC odds feed exists.
+- Tracker records remain append-only in the UI; destructive per-row deletion is disabled. Backup import merges missing record IDs and never overwrites existing rows.
+- PitchAPI is a free API source (key required) and is accessed server-side through the Cloudflare Worker secret `PITCHAPI_API_KEY`; no API key is exposed in browser code. See [PitchAPI reference](https://pitchapi.dev/).

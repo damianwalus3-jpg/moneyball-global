@@ -1495,3 +1495,14 @@
 - Retained concurrency of two fixture analyses to limit load on free public sources. The existing neutral-prior fallback remains visibly marked and evidence-gated; it cannot become a strong candidate or enter coupons.
 - The manual “Analizuj wszystkie” action remains available for recovery. The scan UI's progress count is based on the number of fixtures actually queued for analysis.
 - This change does not request paid odds, add API keys, change historical prediction values, or modify coupons, settlements, bankroll, or existing Tracker records. CI, rebuild checks, and Cloudflare deployment must pass before activation is claimed.
+
+
+## 2026-11-18 — independent 1X2/DC markets, model comparison and coupon guards
+
+- Added independent Tracker rows per fixture/model for 1X2 and Double Chance; 1X2 and DC duplicate prevention is scoped by market.
+- The scan coverage diagnostic now compares today's fixture register against both market registers and reports missing 1X2/DC rows. Started fixtures receive explicit rejected pre-match records, never fake pre-match picks.
+- The goals-only and PitchAPI xG/xGA Poisson models are run side-by-side when each has at least three prior matches per team. Each model/market is independently evaluated after results arrive.
+- Model audit reports Brier score, log loss, accuracy, five calibration bands and ECE. Minimum sample qualification is 30 distinct settled matches per model/market; smaller samples are labelled provisional.
+- Coupon selection enforces 75% per selected market, exact three legs, three distinct fixture IDs, latest-per-model/market records, and excludes fixtures after kickoff. Paper settlement supports 1X2 and Double Chance selections separately.
+- Tracker UI no longer exposes destructive row deletion; imports remain merge-only and preserve existing history.
+- CI/test history: initial test failures were traced to legacy single-row Double Chance and coupon-value compatibility. Backward-compatible reads were restored; latest commit `d8b20b2` passed the main CI validation.

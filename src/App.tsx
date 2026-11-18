@@ -155,9 +155,13 @@ function savePredictionRecord(
   for (const variant of uniqueVariants) {
     const method = variant?.method ?? "unavailable", model = "moneyball:" + method;
     const probabilities = variant?.prediction.probabilities, dc = variant?.prediction.doubleChance;
-    const sampleValues = variant ? Object.values(variant.samples) : [];
-    const couponEligible = !!variant && method !== "neutral-prior-poisson" && sampleValues.length === 4
-      && sampleValues.every(value => Number.isFinite(value) && value >= 3) && hasKnownKickoff(match.date, match.time);
+    const modelSampleQualified = method === "recent-form-goals-poisson"
+      ? (homeForm?.matches.length ?? 0) >= 3 && (awayForm?.matches.length ?? 0) >= 3
+      : method === "pitchapi-recent-xg-poisson"
+        ? (pitchApiXgForms?.home.sampleSize ?? 0) >= 3 && (pitchApiXgForms?.away.sampleSize ?? 0) >= 3
+        : false;
+    const couponEligible = !!variant && method !== "neutral-prior-poisson" && modelSampleQualified
+      && hasKnownKickoff(match.date, match.time);
     const topProbability = variant?.topProbability ?? null;
     const strongCandidate = couponEligible && typeof topProbability === "number" && topProbability >= 0.75;
     const dcOptions = [{ selection: "1X", probability: dc?.oneX ?? null }, { selection: "X2", probability: dc?.xTwo ?? null }, { selection: "12", probability: dc?.oneTwo ?? null }];
@@ -168,7 +172,9 @@ function savePredictionRecord(
       ...shared, model, modelName: method, predictionMethod: variant?.method ?? null, modelMethod: variant?.method ?? null,
       expectedGoalsBasis: method === "pitchapi-recent-xg-poisson" ? "historyczne xG/xGA PitchAPI" : method === "recent-form-goals-poisson" ? "wyniki i gole historyczne (nie xG)" : "brak danych zespołów",
       lambdaProxyHome: variant?.prediction.expectedGoals.home ?? null, lambdaProxyAway: variant?.prediction.expectedGoals.away ?? null,
-      sampleCounts: variant ? JSON.stringify(variant.samples) : null, couponEligible,
+      sampleCounts: variant ? JSON.stringify(variant.samples) : null,
+      historySampleCounts: JSON.stringify({ home: homeForm?.matches.length ?? 0, away: awayForm?.matches.length ?? 0, xgHome: pitchApiXgForms?.home.sampleSize ?? 0, xgAway: pitchApiXgForms?.away.sampleSize ?? 0 }),
+      minimumTeamHistoryMatches: 3, couponEligible,
       reason: reason ?? (!couponEligible ? "ODRZUCONY: model wymaga co najmniej 3 wcześniejszych meczów dla obu drużyn oraz zweryfikowanej godziny rozpoczęcia." : null),
     };
     const oneXTwoDetails = { ...common, market: "1X2", selection: variant?.pick ?? null,
