@@ -71,3 +71,17 @@ describe("PitchAPI xG Poisson model", () => {
     expect(() => predictFromPitchApiXgForm(short, xgForm("Away", 1, 1, false))).toThrow(/co najmniej 3/);
   });
 });
+
+describe("neutral prior fallback", () => {
+  it("always returns a normalized but explicitly non-qualified 1X2/DC prediction", async () => {
+    const { predictFromNeutralPrior } = await import("./form-prediction");
+    const result = predictFromNeutralPrior();
+    const p = result.prediction.probabilities;
+    expect(p.home + p.draw + p.away).toBeCloseTo(1, 10);
+    expect(result.pick).toBe(["1", "X", "2"][([p.home, p.draw, p.away].indexOf(Math.max(p.home, p.draw, p.away)))]);
+    expect(result.method).toBe("neutral-prior-poisson");
+    expect(result.strongCandidate).toBe(false);
+    expect(result.samples).toEqual({ homeAttack: 0, homeDefence: 0, awayAttack: 0, awayDefence: 0 });
+    expect(result.note).toContain("PROGNOZA AWARYJNA");
+  });
+});
