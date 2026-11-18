@@ -16,6 +16,7 @@ export interface PitchApiLeague {
   country_code?: string | null;
   season?: string | null;
   seasons?: string[];
+  is_free?: boolean;
 }
 export interface PitchApiLeagueCatalog {
   leagues: PitchApiLeague[];
@@ -195,6 +196,26 @@ export async function fetchPitchApiDate(date: string): Promise<PitchApiFixture[]
   const data = await getData<{ matches?: PitchApiFixture[] }>(`/api/pitchapi/date/${date}?status=all`);
   return Array.isArray(data.matches) ? data.matches : [];
 }
+/** Pick the season that covers the requested date, independent of provider array order. */
+export function selectPitchApiSeason(league: PitchApiLeague, targetDate: string): string | undefined {
+  const year = Number(targetDate.slice(0, 4));
+  const month = Number(targetDate.slice(5, 7));
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return league.season ?? undefined;
+  const expectedStartYear = month >= 7 ? year : year - 1;
+  const options = [...new Set([...(league.seasons ?? []), ...(league.season ? [league.season] : [])])]
+    .filter(value => /^\d{4}(?:\/\d{4})?$/.test(value));
+  const startYear = (value: string) => Number(value.slice(0, 4));
+  const exact = options.filter(value => startYear(value) === expectedStartYear)
+    .sort((a, b) => Number(b.split("/")[1] ?? b.slice(0, 4)) - Number(a.split("/")[1] ?? a.slice(0, 4)));
+  if (exact.length) return exact[0];
+  // Calendar-year competitions publish seasons such as "2026" rather than "2025/2026".
+  const calendarYear = options.find(value => !value.includes("/") && startYear(value) === year);
+  if (calendarYear) return calendarYear;
+  const notFuture = options.filter(value => startYear(value) <= expectedStartYear)
+    .sort((a, b) => startYear(b) - startYear(a) || Number(b.split("/")[1] ?? b.slice(0, 4)) - Number(a.split("/")[1] ?? a.slice(0, 4)));
+  return notFuture[0] ?? league.season ?? options.sort((a, b) => startYear(b) - startYear(a))[0];
+}
+
 export async function fetchPitchApiLeagueCatalog(): Promise<PitchApiLeague[]> {
   const data = await getData<PitchApiLeagueCatalog>("/api/pitchapi/leagues");
   return Array.isArray(data.leagues) ? data.leagues : [];
