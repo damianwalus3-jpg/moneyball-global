@@ -56,7 +56,9 @@ describe("tracker model audit", () => {
     const newer: TrackerRecord = { ...result, id: "r-new", details: { fixtureId: "f1", actual: "2" } };
     const older = { ...result, id: "r-old", createdAt: "2026-11-16T20:00:00Z", details: { fixtureId: "f1", actual: "1" } };
     const audit = auditTrackerPredictions([prediction, newer, older]);
+    const reversedAudit = auditTrackerPredictions([prediction, older, newer]);
     expect(audit.metrics?.accuracy).toBe(0);
+    expect(reversedAudit.metrics?.accuracy).toBe(0);
   });
   it("counts only the newest prediction per fixture in model metrics", () => {
     const older = { ...prediction, id: "p-old", details: { fixtureId: "f1", p1: 0.1, px: 0.1, p2: 0.8 } };
