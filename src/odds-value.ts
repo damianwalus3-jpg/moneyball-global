@@ -37,7 +37,7 @@ export function valueSelectionFromOdds(
   bookmaker: string,
   modelProbabilities: { p1: number; px: number; p2: number },
   now = new Date().toISOString(),
-  maxAgeMinutes = 360,
+  maxAgeMinutes = 15,
 ): OddsValuation | null {
   if (!fixtureId || !bookmaker.trim() || !Number.isFinite(Date.parse(now)) || maxAgeMinutes < 0) return null;
   const probabilities = [modelProbabilities.p1, modelProbabilities.px, modelProbabilities.p2];
@@ -80,7 +80,7 @@ export function valueSelectionFromOdds(
   };
 }
 
-export function listOddsBookmakers(records: TrackerRecord[], fixtureIds: string[], now = new Date().toISOString(), maxAgeMinutes = 360): string[] {
+export function listOddsBookmakers(records: TrackerRecord[], fixtureIds: string[], now = new Date().toISOString(), maxAgeMinutes = 15): string[] {
   const ids = new Set(fixtureIds);
   const current = Date.parse(now);
   if (!Number.isFinite(current)) return [];

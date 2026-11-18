@@ -50,7 +50,7 @@ export function predictFromRecentForm(home: TeamForm, away: TeamForm): FormPredi
     prediction,
     pick: ranked[0].pick,
     topProbability: ranked[0].probability,
-    strongCandidate: ranked[0].probability >= 0.75,
+    strongCandidate: false,
     samples: {
       homeAttack: homeAttackRows.length,
       homeDefence: homeDefenceRows.length,
@@ -58,6 +58,6 @@ export function predictFromRecentForm(home: TeamForm, away: TeamForm): FormPredi
       awayDefence: awayDefenceRows.length,
     },
     method: "recent-form-goals-poisson",
-    note: "Model bramkowy z ostatnich wyników; to nie jest xG. Nie uwzględnia składów, kontuzji ani kursów.",
+    note: "Bazowy model Poissona z ostatnich bramek. λ jest estymatą z goli, NIE xG. Brak potwierdzonych składów, absencji, taktyki, pełnych statystyk i kursów — prawdopodobieństwa nie są zweryfikowane ani kwalifikowane jako mocny typ.",
   };
 }

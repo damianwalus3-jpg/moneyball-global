@@ -9,7 +9,7 @@ function odds(overrides: Partial<TrackerRecord["details"]> = {}, status = "COMPL
     createdAt: now,
     details: {
       fixtureId: "fixture-1", bookmaker: "Book A", market: "1X2", complete1X2: true,
-      odds1: 2.2, oddsX: 3.4, odds2: 3.1, capturedAt: "2026-11-17T19:30:00.000Z",
+      odds1: 2.2, oddsX: 3.4, odds2: 3.1, capturedAt: "2026-11-17T19:50:00.000Z",
       ...overrides,
     },
   };
@@ -27,7 +27,7 @@ describe("verified odds valuation", () => {
 
   it("uses the newest snapshot for the selected bookmaker only", () => {
     const older = odds({ capturedAt: "2026-11-17T18:00:00.000Z", odds1: 1.8 });
-    const newer = odds({ capturedAt: "2026-11-17T19:45:00.000Z", odds1: 2.4 });
+    const newer = odds({ capturedAt: "2026-11-17T19:55:00.000Z", odds1: 2.4 });
     const result = valueSelectionFromOdds([newer, older], "fixture-1", "1", "Book A", model, now);
     expect(result?.decimalOdds).toBe(2.4);
     expect(valueSelectionFromOdds([odds()], "fixture-1", "1", "Other Book", model, now)).toBeNull();
@@ -37,6 +37,7 @@ describe("verified odds valuation", () => {
     expect(valueSelectionFromOdds([odds({}, "INCOMPLETE_1X2")], "fixture-1", "1", "Book A", model, now)).toBeNull();
     expect(valueSelectionFromOdds([odds({ capturedAt: "2026-11-17T10:00:00.000Z" })], "fixture-1", "1", "Book A", model, now)).toBeNull();
     expect(valueSelectionFromOdds([odds({ capturedAt: "2026-11-17T21:00:00.000Z" })], "fixture-1", "1", "Book A", model, now)).toBeNull();
+    expect(valueSelectionFromOdds([odds({ capturedAt: "2026-11-17T19:44:00.000Z" })], "fixture-1", "1", "Book A", model, now)).toBeNull();
     expect(valueSelectionFromOdds([odds({ oddsX: null })], "fixture-1", "1", "Book A", model, now)).toBeNull();
   });
 

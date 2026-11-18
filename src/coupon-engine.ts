@@ -22,6 +22,7 @@ function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCand
   const d = record.details;
   if (record.kind !== "prediction" || record.status !== "KANDYDAT") return null;
   if (d.fixtureDate !== date || typeof d.fixtureId !== "string" || !d.fixtureId) return null;
+  if (d.evidenceComplete !== true) return null;
 
   const base = {
     fixtureId: d.fixtureId,

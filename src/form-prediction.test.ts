@@ -30,6 +30,7 @@ describe("recent-form Poisson baseline", () => {
     expect(prediction.prediction.doubleChance.oneX).toBeCloseTo(p.home + p.draw, 10);
     expect(prediction.method).toBe("recent-form-goals-poisson");
     expect(prediction.pick).toBe("1");
+    expect(prediction.strongCandidate).toBe(false);
   });
 
   it("refuses to predict with fewer than three historical matches", () => {
