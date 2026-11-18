@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
-import { addRecord, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, type TrackerKind, type TrackerRecord } from "./tracker-store";
+import { addRecord, addRecords, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, loadRecentTeamFormAcrossCountry, mergeVerifiedTeamForms, loadCalcioItSerieDTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, predictFromPitchApiXgForm, predictFromNeutralPrior, type FormPrediction } from "./form-prediction";
 import { fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, type PitchApiLineups, type PitchApiXgForm } from "./pitchapi";
@@ -185,7 +185,8 @@ function savePredictionRecord(
     evidenceComplete: evidenceAudit.complete, evidenceAudit: JSON.stringify(evidenceAudit),
     evidenceGaps: getEvidenceGaps(evidenceAudit).join(", "),
   };
-  let current = readRecords();
+  const current = readRecords();
+  const pendingPredictionRecords: Array<Omit<TrackerRecord, "id" | "createdAt">> = [];
   for (const variant of uniqueVariants) {
     const method = variant?.method ?? "unavailable", model = "moneyball:" + method;
     const probabilities = variant?.prediction.probabilities, dc = variant?.prediction.doubleChance;
@@ -219,9 +220,8 @@ function savePredictionRecord(
       && [probabilities.home, probabilities.draw, probabilities.away].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
       && Math.abs(probabilities.home + probabilities.draw + probabilities.away - 1) <= 0.0001;
     if (shouldAppendPrediction(current, match.id, model, hasOneXTwoProbabilities, method, "1X2")) {
-      addRecord({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · 1X2 · " + method,
+      pendingPredictionRecords.push({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · 1X2 · " + method,
         status: strongCandidate ? "KANDYDAT" : "ODRZUCONY", details: oneXTwoDetails });
-      current = readRecords();
     }
     const dcDetails = { ...common, market: "DOUBLE_CHANCE", selection: bestDc?.selection ?? null, probability: dcProbability,
       p1x: dc?.oneX ?? null, px2: dc?.xTwo ?? null, p12: dc?.oneTwo ?? null,
@@ -231,12 +231,12 @@ function savePredictionRecord(
       && [dc.oneX, dc.xTwo, dc.oneTwo].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
       && Math.abs(dc.oneX + dc.xTwo + dc.oneTwo - 2) <= 0.0001;
     if (shouldAppendPrediction(current, match.id, model, hasDcProbabilities, method, "DOUBLE_CHANCE")) {
-      addRecord({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · DOUBLE CHANCE · " + method,
+      pendingPredictionRecords.push({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · DOUBLE CHANCE · " + method,
         status: strongDoubleChance ? "KANDYDAT" : "ODRZUCONY", details: dcDetails });
-      current = readRecords();
     }
   }
-  return current;
+  addRecords(pendingPredictionRecords);
+  return readRecords();
 }
 export default function App() {
   const [active, setActive] = useState<Tab>("dashboard");
