@@ -29,6 +29,12 @@ jobs:
         run: deno test --no-check supabase/functions/_shared/bearer-token.test.ts
       - name: Test shared team normalization and reserve exclusions
         run: deno test --no-check supabase/functions/_shared/team-normalization.test.ts
+      - name: Test OpenMatchday fixed CET-1 conversion
+        run: deno test --no-check supabase/functions/_shared/openmatchday-time.test.ts
+      - name: Test MoviOdds missing-key guard
+        run: deno test --no-check supabase/functions/_shared/movi-odds-config.test.ts
+      - name: Test public-source service-role key fallback
+        run: deno test --no-check supabase/functions/_shared/service-role-key.test.ts
       - name: Type-check Supabase Edge Functions
         run: deno check --node-modules-dir=auto --no-lock supabase/functions/*/index.ts
       - name: Run tests
