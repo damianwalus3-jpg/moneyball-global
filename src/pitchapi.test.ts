@@ -95,6 +95,9 @@ describe("PitchAPI season selection", () => {
   it("does not choose a future season when only prior seasons are available", () => {
     expect(selectPitchApiSeason({ id: "l_Den123", name: "Denmark 1. Division", seasons: ["2024/2025", "2025/2026", "2027/2028"] }, "2026-11-19")).toBe("2025/2026");
   });
+  it("fails closed when the catalogue contains only future seasons", () => {
+    expect(selectPitchApiSeason({ id: "l_Den123", name: "Denmark 1. Division", season: "2027/2028", seasons: ["2027/2028", "2028/2029"] }, "2026-11-19")).toBeUndefined();
+  });
 });
 describe("PitchAPI league catalogue", () => {
   afterEach(() => vi.unstubAllGlobals());
