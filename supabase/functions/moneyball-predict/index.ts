@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
-import { isEligibleDomesticTopTwoLeague, isEligibleOpenMatchdayTier } from "../_shared/domestic-league-scope.ts";
+import { isEligibleDomesticSeniorLeague, isEligibleDomesticTopTwoLeague, isEligibleOpenMatchdayTier } from "../_shared/domestic-league-scope.ts";
 import { isExcludedSeniorTeam, isMenGender, isWomensTeam } from "../_shared/team-normalization.ts";
 import { isRealXgObservation } from "../_shared/xg-validation.ts";
 import { compareBelgianProviderQuotes, isFreshConfirmedBelgianProviderQuote, isFreshConfirmedManualBelgianQuote } from "../_shared/provider-odds-validation.ts";
