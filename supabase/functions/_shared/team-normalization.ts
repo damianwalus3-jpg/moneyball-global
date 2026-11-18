@@ -1,7 +1,7 @@
 /**
- * Shared football-team identity and exclusion rules.
- * Keep provider adapters aligned so reserve/youth teams cannot leak into
- * senior fixtures and team-form lookups use the same normalized identity.
+ * Shared football-team identity and history-source guard rules.
+ * Reserve/youth teams stay isolated from senior-team history lookups; fixture
+ * eligibility is decided by the competition scope, not by team-name suffixes.
  */
 export function normalizeTeamName(value: unknown): string {
   return String(value ?? "")
@@ -33,6 +33,6 @@ export function teamHistoryKey(value: unknown): string {
  */
 export function isWomensTeam(value: unknown): boolean {
   const raw = String(value ?? "");
-  return /\bW\b/.test(raw)
+  return /(?:^|\s)W(?:\s|$)/u.test(raw)
     || /\b(women|female|girls|damallsvenskan|wsl|liga f|frauen|femenina|femenino|feminin|damen|ladies)\b/i.test(raw);
 }
