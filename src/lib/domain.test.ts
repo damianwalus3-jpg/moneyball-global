@@ -460,7 +460,7 @@ describe("fresh bookmaker quote validation", () => {
   const now = Date.parse("2026-11-16T12:00:00.000Z");
   const fresh = {
     odds_source: "MoviOdds",
-    odds_bookmaker: "bet365",
+    odds_bookmaker: "Bwin Belgium",
     odds_captured_at: "2026-11-16T11:30:00.000Z",
     odds_phase: "prematch",
     odds_suspended: false,
@@ -468,6 +468,9 @@ describe("fresh bookmaker quote validation", () => {
   };
   it("accepts a recent, sourced, unsuspended prematch quote", () => {
     expect(hasFreshConfirmedOdds(prediction("p", "m1", 90, { data_coverage: fresh }), now)).toBe(true);
+  });
+  it("rejects non-Belgian bookmakers even when the quote is otherwise fresh", () => {
+    expect(hasFreshConfirmedOdds(prediction("p", "m1", 2.1, { data_coverage: { ...fresh, odds_bookmaker: "bet365" } }), now)).toBe(false);
   });
   it("rejects missing source/time, stale, suspended and in-play quotes", () => {
     expect(hasFreshConfirmedOdds(prediction("p", "m1", 90), now)).toBe(false);
