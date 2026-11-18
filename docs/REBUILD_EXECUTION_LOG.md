@@ -1567,3 +1567,14 @@
 - Dalszy przegląd źródeł: Football Charts ma bezpłatne 200 żądań/dzień z kluczem, lecz jego regulamin ogranicza darmowy plan do użytku osobistego/badawczego; aplikacja/strona/bot używany przez inne osoby wymaga planu Commercial (39 EUR/mies.). Nie integrujemy go do publicznie dostępnej aplikacji na darmowym planie. Statyczny zbiór OpenPlay zawiera 26 536 meczów z eventami, 669 404 strzały z xG i licencję CC BY 4.0, ale obejmuje wybrane męskie rozgrywki do sezonu 2025/26, nie aktualne mecze i nie pełną Europę. Jest potencjalnym źródłem historycznego benchmarku, po osobnym sprawdzeniu rozmiaru, kompletności i pipeline'u importu.
 - Źródła: https://www.football-charts.com/developers ; https://www.football-charts.com/about ; https://github.com/nlbair/openplay/releases/tag/data-v0.1.0 ; https://github.com/nlbair/openplay/blob/main/DATA_DICTIONARY.md
 - Zmiany kodu/testów: oczekują na CI, testy i wdrożenie. Bez płatnych API, bez nowych sekretów i bez zmian MAIN/TEST/Tracker/kuponów/bankrolla.
+
+
+## Stage 133 — limity czasu żądań źródeł publicznych (2026-11-18)
+
+- Po wdrożeniu Stage 132 testy, TypeScript i build zakończyły się sukcesem (24 pliki / 229 testów). Deployment Cloudflare i smoke test produkcyjnego Worker oraz PitchAPI również przeszły.
+- Live reconciliation dla Stage 132 utknęło na kroku skanującym wszystkie źródła; w poprzednim audycie ten sam krok trwał około 71 sekund, a część funkcji pobierających dane nie miała limitu czasu. Nie można pozwolić, aby pojedynczy zawieszony feed blokował raport i kolejne automatyczne audyty.
+- Dodano 15-sekundowy timeout do bezpośrednich żądań w skanerze (JSON/CSV), katalogów GitHub OpenFootball, plików feedów OpenFootball i wszystkich żądań PitchAPI. Błąd timeoutu pozostaje błędem konkretnego źródła i nie blokuje wyników pozostałych providerów.
+- Poprawiono też rozpoznawanie przeglądarkowego komunikatu `Failed to fetch` w mechanizmie jednorazowego retry PitchAPI; Node'owe `fetch failed` i błędy sieciowe nadal są obsługiwane. Dodano test dla obu wariantów komunikatu.
+- Nie dodano nieograniczonych retry. PitchAPI nadal ponawia maksymalnie raz błędy sieciowe i 502/503/504; timeout pojedynczego żądania to 15 sekund. Odpowiedzi 4xx i 429 nie są ponawiane.
+- Stage 132 live audit nie został uznany za zaliczony, ponieważ nie zakończył się przed przerwaniem przez nowszy commit. Ostatni kompletny audyt nadal pozostaje snapshotem 171 meczów / 20 krajów / 63 rozgrywki z dwoma przejściowymi błędami żądań podrzędnych PitchAPI; nie ogłaszamy nowej kompletności bez ponownego audytu.
+- Zmiany kodu Stage 133 i testu komunikatu przeglądarkowego: oczekują na CI, Rebuild Checks, deployment i pełny live audit. Zakres wyłącznie `moneyball-rebuild` / Worker REBUILT.
