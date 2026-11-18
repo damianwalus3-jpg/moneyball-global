@@ -128,3 +128,46 @@ export async function fetchPitchApiLeagueMatches(leagueId: string, season?: stri
 export async function fetchPitchApiMatchStats(matchId: string): Promise<PitchApiTeamMatchStats> {
   return getData<PitchApiTeamMatchStats>(`/api/pitchapi/matches/${encodeURIComponent(matchId)}/stats`);
 }
+
+function brusselsDate(utc: string): string {
+  const date = new Date(utc);
+  if (!Number.isFinite(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const get = (key: string) => parts.find(part => part.type === key)?.value ?? "";
+  return get("year") + "-" + get("month") + "-" + get("day");
+}
+export async function fetchPitchApiXgFormsForFixture(input: {
+  leagueId: string; season?: string; homeTeamId: string; awayTeamId: string; beforeDate: string;
+}): Promise<{ home: PitchApiXgForm; away: PitchApiXgForm }> {
+  const leagueMatches = await fetchPitchApiLeagueMatches(input.leagueId, input.season);
+  const eligible = leagueMatches.filter(match => match.status === "finished"
+    && brusselsDate(match.time_utc) < input.beforeDate
+    && Number.isInteger(match.score_home) && Number.isInteger(match.score_away));
+  const homeMatches = eligible.filter(match => match.home.id === input.homeTeamId || match.away.id === input.homeTeamId)
+    .sort((a,b) => b.time_utc.localeCompare(a.time_utc)).slice(0,5);
+  const awayMatches = eligible.filter(match => match.home.id === input.awayTeamId || match.away.id === input.awayTeamId)
+    .sort((a,b) => b.time_utc.localeCompare(a.time_utc)).slice(0,5);
+  const selected = [...new Map([...homeMatches, ...awayMatches].map(match => [match.id, match])).values()];
+  const statsByMatch = new Map<string, PitchApiTeamMatchStats>();
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(4, selected.length) }, async () => {
+    while (cursor < selected.length) {
+      const match = selected[cursor++];
+      try { statsByMatch.set(match.id, await fetchPitchApiMatchStats(match.id)); } catch { /* missing match analytics stays missing */ }
+    }
+  }));
+  const homeRows = homeMatches.flatMap(match => {
+    const stats = statsByMatch.get(match.id);
+    const row = stats ? parsePitchApiXgStats(stats, input.homeTeamId, match) : null;
+    return row ? [row] : [];
+  });
+  const awayRows = awayMatches.flatMap(match => {
+    const stats = statsByMatch.get(match.id);
+    const row = stats ? parsePitchApiXgStats(stats, input.awayTeamId, match) : null;
+    return row ? [row] : [];
+  });
+  return {
+    home: buildPitchApiXgForm(homeMatches[0]?.home.id === input.homeTeamId ? homeMatches[0].home.name : homeMatches[0]?.away.name ?? input.homeTeamId, homeRows),
+    away: buildPitchApiXgForm(awayMatches[0]?.home.id === input.awayTeamId ? awayMatches[0].home.name : awayMatches[0]?.away.name ?? input.awayTeamId, awayRows),
+  };
+}
