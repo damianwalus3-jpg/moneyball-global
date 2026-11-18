@@ -272,6 +272,10 @@ export function isFinishedStatus(status: string | null | undefined) {
 }
 
 /** A coupon price must have a source timestamp, be unsuspended, prematch and at most six hours old. */
+function isAllowedBelgianBookmaker(value: unknown): boolean {
+  return /\\b(?:bwin|unibet|ladbrokes|circus|bet\\s*first)\\b/i.test(String(value ?? ""));
+}
+
 /** Model evidence gate shared by manual-odds promotion, coupons and dashboard candidates. */
 export function hasSufficientPredictionEvidence(
   prediction: Pick<Prediction, "model_version" | "data_source" | "rationale" | "data_coverage">,
@@ -289,7 +293,7 @@ export function hasSufficientPredictionEvidence(
     && String(coverage["odds_status"] ?? "").toUpperCase() === "CONFIRMED"
     && String(coverage["odds_phase"] ?? "").toLowerCase() === "prematch"
     && String(coverage["odds_suspended"] ?? "false").toLowerCase() !== "true"
-    && !!String(coverage["odds_bookmaker"] ?? "").trim()
+    && isAllowedBelgianBookmaker(coverage["odds_bookmaker"])
     && !/tipsaudit|fair.?market|fair.?odds/i.test(String(coverage["odds_source"] ?? ""));
   return !!modelSource && Number.isFinite(modelCoverage) && modelCoverage >= 55 && (historyCovered || marketCovered);
 }
@@ -316,7 +320,7 @@ export function hasFreshConfirmedOdds(prediction: Prediction, nowMs: number): bo
   if (prediction.odds == null || !Number.isFinite(odds) || odds <= 1 || !coverage) return false;
   const source = String(coverage["odds_source"] ?? "").trim();
   const bookmaker = String(coverage["odds_bookmaker"] ?? "").trim();
-  if (!source || !bookmaker || /tipsaudit|fair.?market|fair.?odds/i.test(source)) return false;
+  if (!source || !isAllowedBelgianBookmaker(bookmaker) || /tipsaudit|fair.?market|fair.?odds/i.test(source)) return false;
   if (!isFreshOddsTimestamp(coverage["odds_captured_at"], nowMs)) return false;
   if (coverage["odds_suspended"] === true || String(coverage["odds_suspended"] ?? "").toLowerCase() === "true") return false;
   if (String(coverage["odds_phase"] ?? "").toLowerCase() !== "prematch") return false;

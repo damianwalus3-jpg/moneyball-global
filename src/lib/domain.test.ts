@@ -490,6 +490,7 @@ describe("prediction evidence and payout quote gates", () => {
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"PARTIAL_VERIFIED_HISTORY", model_coverage:54, home_history_matches:10, away_history_matches:10 } }))).toBe(false);
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"PARTIAL_VERIFIED_HISTORY", model_coverage:60, home_history_matches:2, away_history_matches:2 } }))).toBe(false);
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"MARKET_ODDS_MODEL", model_coverage:60, market_odds:true, odds_status:"CONFIRMED", odds_phase:"prematch", odds_suspended:false, odds_bookmaker:"Bwin", odds_source:"Bwin" } }))).toBe(true);
+    expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"MARKET_ODDS_MODEL", model_coverage:60, market_odds:true, odds_status:"CONFIRMED", odds_phase:"prematch", odds_suspended:false, odds_bookmaker:"bet365", odds_source:"MoviOdds" } }))).toBe(false);
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_source:"", rationale:"" }))).toBe(false);
   });
 
@@ -507,6 +508,7 @@ describe("prediction evidence and payout quote gates", () => {
     const now = Date.parse("2026-11-16T12:00:00.000Z");
     const manual = { odds_source:"manual",odds_bookmaker:"Bwin",odds_source_url:"https://www.bwin.be/",odds_captured_at:"2026-11-16T11:30:00.000Z",odds_phase:"prematch",odds_suspended:false,odds_status:"CONFIRMED" };
     expect(hasFreshConfirmedOdds(prediction("p","m1",2.1,{data_coverage:manual}),now)).toBe(true);
+    expect(hasFreshConfirmedOdds(prediction("p","m1",2.1,{data_coverage:{...manual,odds_bookmaker:"bet365"}}),now)).toBe(false);
     expect(hasFreshConfirmedOdds(prediction("p","m1",2.1,{data_coverage:{...manual,odds_bookmaker:""}}),now)).toBe(false);
     expect(hasFreshConfirmedOdds(prediction("p","m1",2.1,{data_coverage:{...manual,odds_source_url:""}}),now)).toBe(false);
     expect(hasFreshConfirmedOdds(prediction("p","m1",2.1,{data_coverage:{...manual,odds_status:"MISSING"}}),now)).toBe(false);

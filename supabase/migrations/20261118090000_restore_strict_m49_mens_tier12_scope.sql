@@ -87,7 +87,7 @@ RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path TO '' AS $function$
         AND upper(coalesce(p_data_coverage->>'odds_status',''))='CONFIRMED'
         AND lower(coalesce(p_data_coverage->>'odds_phase',''))='prematch'
         AND lower(coalesce(p_data_coverage->>'odds_suspended','false')) <> 'true'
-        AND nullif(btrim(coalesce(p_data_coverage->>'odds_bookmaker','')),'') IS NOT NULL
+        AND btrim(coalesce(p_data_coverage->>'odds_bookmaker','')) ~* '(bwin|unibet|ladbrokes|circus|bet\\s*first)'
         AND coalesce(p_data_coverage->>'odds_source','') !~* '(tipsaudit|fair.?market|fair.?odds)'
       )
     );
@@ -100,7 +100,7 @@ DECLARE
   v_bookmaker text := btrim(coalesce(p_data_coverage->>'odds_bookmaker',''));
   v_captured timestamptz := public.moneyball_safe_timestamptz(p_data_coverage->>'odds_captured_at');
 BEGIN
-  IF p_odds IS NULL OR p_odds <= 1 OR v_source='' OR v_bookmaker='' THEN RETURN false; END IF;
+  IF p_odds IS NULL OR p_odds <= 1 OR v_source='' OR v_bookmaker !~* '(bwin|unibet|ladbrokes|circus|bet\\s*first)' THEN RETURN false; END IF;
   IF v_source ~* '(tipsaudit|fair.?market|fair.?odds)' THEN RETURN false; END IF;
   IF upper(coalesce(p_data_coverage->>'odds_status','')) <> 'CONFIRMED' THEN RETURN false; END IF;
   IF lower(coalesce(p_data_coverage->>'odds_phase','')) <> 'prematch' THEN RETURN false; END IF;
