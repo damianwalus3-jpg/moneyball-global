@@ -230,8 +230,8 @@ function savePredictionRecord(
     }
     const dcDetails = { ...common, market: "DOUBLE_CHANCE", selection: bestDc?.selection ?? null, probability: dcProbability,
       p1x: dc?.oneX ?? null, px2: dc?.xTwo ?? null, p12: dc?.oneTwo ?? null,
-      strongCandidate: false, strongDoubleChance, source: match.source,
-      reason: reason ?? (!couponEligible ? "ODRZUCONY: brak minimalnej próbki lub wiarygodnej godziny meczu." : dcProbability === null ? "Brak prawidłowych prawdopodobieństw Double Chance." : dcProbability < 0.75 ? "Najwyższe prawdopodobieństwo Double Chance poniżej 75%." : null) };
+      strongCandidate: false, modelStrongDoubleChance, strongDoubleChance, source: match.source,
+      reason: reason ?? (!couponEligible ? "ODRZUCONY: brak minimalnej próbki lub wiarygodnej godziny meczu." : evidenceRejectionReason ?? (dcProbability === null ? "Brak prawidłowych prawdopodobieństw Double Chance." : dcProbability < 0.75 ? "Najwyższe prawdopodobieństwo Double Chance poniżej 75%." : null)) };
     const hasDcProbabilities = !!dc
       && [dc.oneX, dc.xTwo, dc.oneTwo].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
       && Math.abs(dc.oneX + dc.xTwo + dc.oneTwo - 2) <= 0.0001;
