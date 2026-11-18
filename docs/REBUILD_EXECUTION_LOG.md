@@ -1602,3 +1602,14 @@
 ### Stage 134 — canonical REBUILT project addresses
 - Saved the current application, health-check, repository/branch, deployment workflow, execution-log and live feed endpoint addresses in `docs/PROJECT_ENDPOINTS_REBUILT.md`.
 - Explicitly distinguished the active REBUILT Worker from the older MAIN Worker to prevent accidental deployment or testing against the wrong environment.
+
+
+## Stage 135 — fallback audytu Double Chance po uszkodzonym rekordzie (2026-11-18)
+
+- Przegląd src/model-audit.ts wykazał, że sama obecność osobnego rekordu DOUBLE_CHANCE blokowała użycie poprawnych wartości DC zachowanych w rekordzie 1X2, nawet jeśli osobny rekord DC miał nieprawidłowy wektor prawdopodobieństw.
+- Zmieniono kwalifikację osobnego rekordu DC: blokuje fallback wyłącznie wtedy, gdy jego najnowszy rekord ma poprawne, znormalizowane prawdopodobieństwa DC. Nieprawidłowy rekord DC nie może ukrywać poprawnych wartości dc1x/dcx2/dc12 zapisanych w 1X2.
+- Dodano test regresyjny obejmujący uszkodzony osobny rekord DC i poprawne wartości DC w 1X2; test sprawdza także, że próbka DC liczona jest jako jeden odrębny mecz, a nie trzy zdarzenia.
+- Zmiany kodu: c689aa86ef2bf2e78b318647ba1abeb527ca4577; test: acba3caaef38cf014c859988704c219b3325c48c.
+- Walidacja CI na commicie kodu c689aa8: TypeScript PASS, 24 pliki / 230 testów PASS, build PASS. Ponieważ test regresyjny został zapisany w następnym commicie, końcowa walidacja musi objąć aktualny HEAD acba3ca przed oznaczeniem etapu jako wdrożonego.
+- Deployment i live smoke test dla aktualnego HEAD pozostają wymagane. Do czasu ich zakończenia nie oznaczać Stage 135 jako wdrożonego.
+- Zakres wyłącznie moneyball-rebuild / REBUILT. Bez zmian MAIN, TEST, historii lokalnego Trackera, kuponów, rozliczeń i bankrolla; bez płatnych API.
