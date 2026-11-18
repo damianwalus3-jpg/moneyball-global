@@ -200,11 +200,11 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch(eligibleBase)).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: null })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bosnia", competition: "1st League - RS" })).toBe(true);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bulgaria", competition: "Third League - Northeast" })).toBe(false);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "France", competition: "National 2 - Group C", home_team: "Andrezieux", away_team: "Chateauroux" })).toBe(false);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Czech Republic", competition: "3. liga - CFL B", home_team: "Pardubice", away_team: "Horni Redice" })).toBe(false);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "National League - North", home_team: "Oxford City", away_team: "Macclesfield" })).toBe(false);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Scotland", competition: "Football League - Lowland League", home_team: "Brechin", away_team: "Stirling University" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bulgaria", competition: "Third League - Northeast" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "France", competition: "National 2 - Group C", home_team: "Andrezieux", away_team: "Chateauroux" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Czech Republic", competition: "3. liga - CFL B", home_team: "Pardubice", away_team: "Horni Redice" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "National League - North", home_team: "Oxford City", away_team: "Macclesfield" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Scotland", competition: "Football League - Lowland League", home_team: "Brechin", away_team: "Stirling University" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "EFL Trophy" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "Premier League", gender: "women" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "Premier League", home_team: "Arsenal U21" })).toBe(false);
@@ -231,14 +231,17 @@ describe("European domestic league scope", () => {
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Georgia", competition: "Erovnuli Liga 2" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya II" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, away_team: "Polissya B" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Poland", competition: "III Liga - Group 3", home_team: "Barycz Sułów", away_team: "Polonia Nysa" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Poland", competition: "III Liga - Group 3", home_team: "Barycz Sułów II", away_team: "Polonia Nysa" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Sweden", competition: "Division 1", home_team: "Häcken W", away_team: "Rosengård" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Real Madrid Castilla" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Celta Fortuna" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Valencia Mestalla" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Betis Deportivo" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, home_team: "Sevilla Atletico" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: "women" })).toBe(false);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie C" })).toBe(false);
-    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie D - Championship Round" })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie C" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Italy", competition: "Serie D - Championship Round" })).toBe(true);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Sweden", competition: "Damallsvenskan", gender: null })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "Premier League - Summer Series" })).toBe(false);
     // OpenMatchday's source folder is authoritative tier metadata; display names
@@ -278,7 +281,7 @@ describe("European domestic league scope", () => {
       competition: "National League - North",
       source: "FootyNomad",
       external_id: "fn:eng-national-league-north-2026-11-17",
-    })).toBe(false);
+    })).toBe(true);
     expect(isEligibleEuropeanMatch({
       ...openMatchdayBase,
       external_id: "om:BEL_2_challenger-pro-league:2026-11-17:club-a:club-b",

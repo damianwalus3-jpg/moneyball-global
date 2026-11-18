@@ -11,6 +11,8 @@ import type {
   TransactionType,
 } from "./types";
 import { brusselsDayKey } from "./time";
+import { isEligibleDomesticSeniorLeague } from "../../supabase/functions/_shared/domestic-league-scope.ts";
+import { isExcludedSeniorTeam, isWomensTeam } from "../../supabase/functions/_shared/team-normalization.ts";
 
 export const COUPON_SIZE = 3;
 export const CANDIDATE_MIN_PROBABILITY = 75;
@@ -198,13 +200,7 @@ export function isEuropeanTopTwoLeague(country: string | null | undefined, compe
 }
 
 export function isEuropeanDomesticLeague(country:string|null|undefined,competition:string|null|undefined):boolean {
- const norm=(v:string)=>v.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
- const c=norm(String(country??"")),league=norm(String(competition??""));
- if(!EUROPEAN_COUNTRIES.has(c)||!league)return false;
- if(/\b(uefa|fifa|nations league|champions league|europa league|conference league|world cup|international|qualif(?:ication|ying)|friendlies?)\b/.test(league))return false;
- if(/\b(cup|copa|coppa|supercopa|supercoppa|supercup|coupe|pokal|trophy|shield|super cup|taca|kupa|kup|puchar|cupa|play ?offs?)\b/.test(league))return false;
- if(/\b(women|womens|woman|frauen|femenina|femenino|feminin|female|damen|ladies|girls|damallsvenskan|wsl|liga f|summer series|u(?:[0-9]{1,2})|under ?(?:[0-9]{1,2})|youth|juniors?|academy|juvenil|jugend|premier league 2|pl2|professional development league)\b/.test(league))return false;
- return true;
+  return isEligibleDomesticSeniorLeague(country,competition);
 }
 /** Deduplicate the same fixture imported under different provider IDs. Prefer FootyNomad, then the most recently updated row. */
 export function dedupeEuropeanMatches(matches: Match[]): Match[] {
@@ -247,24 +243,20 @@ function isOpenMatchdayLeagueMatch(match: Pick<Match, "country" | "competition">
 }
 
 function isWomensTeamName(value: string | null | undefined): boolean {
-  const team = String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  return /\b(?:women|womens|woman|female|frauen|feminine|femminile|femenina|femenino|ladies|girls|wfc|fcw)\b/.test(team)
-    || /(^| )w$/.test(team);
+  return isWomensTeam(value);
 }
 
 function isExcludedSeniorTeamName(value: string | null | undefined): boolean {
-  const team = String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  return /\b(?:reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico|u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23))\b/.test(team)
-    || /(^| )(ii|iii|b)$/.test(team);
+  return isExcludedSeniorTeam(value);
 }
 
-/** The application admits only geographic-Europe domestic men's tier 1/2 fixtures. */
+/** The application admits all geographic-Europe senior men's domestic tiers; OpenMatchday stays at its published tier 1/2 catalogue. */
 export function isEligibleEuropeanMatch(match: Pick<Match, "country" | "competition" | "league" | "gender" | "home_team" | "away_team"> & Partial<Pick<Match, "source" | "external_id">>): boolean {
   if (!["men","male","m","mens","men senior"].includes(String(match.gender ?? "").trim().toLowerCase())) return false;
   if (isWomensTeamName(match.home_team) || isWomensTeamName(match.away_team)) return false;
   if (isExcludedSeniorTeamName(match.home_team) || isExcludedSeniorTeamName(match.away_team)) return false;
   if (String(match.source ?? "").trim().toLowerCase() === "openmatchday") return isOpenMatchdayLeagueMatch(match);
-  return isEuropeanTopTwoLeague(match.country, match.competition ?? match.league);
+  return isEuropeanDomesticLeague(match.country, match.competition ?? match.league);
 }
 
 export function isFinishedStatus(status: string | null | undefined) {
