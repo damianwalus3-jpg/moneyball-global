@@ -1828,3 +1828,12 @@
 - Dodano testy rozdzielające status prezentacji od kwalifikacji; 1X2 i DC sprawdzane niezależnie.
 - Commity: `a5c43bc8` (logika statusu), `98d66ade` (testy), `363c841d` (UI).
 - Bez zmian w historycznych predykcjach, kuponach, rozliczeniach i bankrollu.
+
+
+### Stage 155 — czytelny status wysokich prognoz bez pełnych dowodów (2026-11-19)
+- Analiza zrzutu ekranu wykazała problem prezentacyjny: surowe prawdopodobieństwo 75,5% (1X2) i 90,9% (Double Chance) było wizualnie oznaczone czerwonym statusem odrzucenia, mimo że model poprawnie zachował te wartości jako prognozy niezakwalifikowane.
+- W widoku „Wytypowane mecze” status z niepełnymi dowodami otrzymuje osobną klasę wizualną `preliminary` (bursztynową), a opis wyraźnie mówi: „Wysokie prawdopodobieństwo modelu — prognoza wstępna. Nie oznacza potwierdzonego typu ani dopuszczenia do kuponu.”
+- Statusy rzeczywiście odrzucone z innych powodów pozostają czerwone; zakwalifikowani kandydaci pozostają zieloni.
+- Wewnętrzny warunek `KANDYDAT`, `evidenceComplete === true` oraz reguły kuponów nie zostały poluzowane. Sam procent nie może automatycznie promować typu.
+- Zmiany: UI `47f0adcf2f88dae593603291b2ac3838e5fa5d31`; CSS `e61968c438de2fa1b6909bf7304be80e40c405b7`.
+- Bez modyfikacji zapisanych rekordów, historii, kuponów, rozliczeń i bankrolla. Walidacja CI/deploy Stage 155 oczekuje na zakończenie.
