@@ -10,14 +10,32 @@ export function shouldRetryPredictionAttempt(lastAttempt: unknown, now: number, 
   return typeof lastAttempt !== "number" || !Number.isFinite(lastAttempt) || now - lastAttempt >= intervalMs;
 }
 
+/** Retry valid-probability rows when their evidence audit is still incomplete. */
+export function shouldRetryPredictionWithEvidence(
+  prior: TrackerRecord | undefined,
+  market: string,
+  lastAttempt: unknown,
+  now: number,
+  intervalMs: number,
+): boolean {
+  if (prior && prior.details.evidenceComplete === true && hasValidProbabilities(prior.details, market)) return false;
+  return shouldRetryPredictionAttempt(lastAttempt, now, intervalMs);
+}
+
 export function shouldAppendPrediction(records: TrackerRecord[], fixtureId: string, model: string,
-  nextProbabilitiesAvailable: boolean, nextMethod?: string, market = "1X2"): boolean {
+  nextProbabilitiesAvailable: boolean, nextMethod?: string, market = "1X2",
+  nextEvidenceComplete?: boolean, nextEvidenceGaps?: string): boolean {
   const existing = records.filter(row => row.kind === "prediction" && row.details.fixtureId === fixtureId
     && row.details.model === model && (typeof row.details.market === "string" ? row.details.market : "1X2") === market);
   const latestValid = existing.filter(row => hasValidProbabilities(row.details, market))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
-  if (latestValid) return latestValid.details.predictionMethod === "neutral-prior-poisson"
-    && nextProbabilitiesAvailable && nextMethod !== "neutral-prior-poisson";
+  if (latestValid) {
+    const evidenceChanged = (typeof nextEvidenceComplete === "boolean" && latestValid.details.evidenceComplete !== nextEvidenceComplete)
+      || (typeof nextEvidenceGaps === "string" && latestValid.details.evidenceGaps !== nextEvidenceGaps);
+    if (evidenceChanged) return true;
+    return latestValid.details.predictionMethod === "neutral-prior-poisson"
+      && nextProbabilitiesAvailable && nextMethod !== "neutral-prior-poisson";
+  }
   if (existing.length === 0) return true;
   return nextProbabilitiesAvailable;
 }
