@@ -41,7 +41,7 @@ interface OpenLigaMatch {
 }
 const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const OPENLIGA = "/api/openligadb";
-const SOURCE = "open-matchday + OpenLigaDB + openfootball + ESPN + API-Football (opcjonalny klucz bezpłatny)";
+const SOURCE = "open-matchday + OpenLigaDB + openfootball + ESPN (publiczne terminarze)";
 const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","ISR","KOS","BLR","LIE","SMR","MCO","VAT","UEFA"]);
 const CACHE_KEY = "moneyball.free-fixtures.v8";
 const CACHE_MS = 15 * 60 * 1000;
@@ -157,47 +157,6 @@ spain:"ESP", sweden:"SWE", switzerland:"SUI", turkey:"TUR", ukraine:"UKR", wales
 };
 interface ESPNCompetitor { homeAway?: string; team?: { displayName?: string; name?: string } }
 interface ESPNEvent { id?: string | number; date?: string; competitions?: Array<{ altGameNote?: string; venue?: { address?: { country?: string } }; notes?: Array<{ headline?: string }>; competitors?: ESPNCompetitor[] }> }
-interface ApiFootballFixture {
-  fixture?: { id?: number; date?: string };
-  league?: { id?: number; name?: string; country?: string; round?: string };
-  teams?: { home?: { name?: string }; away?: { name?: string } };
-}
-const API_FOOTBALL_COUNTRIES: Record<string,string> = {
-  ...ESPN_COUNTRIES,
-  "czech republic":"CZE", "north macedonia":"MKD", "faroe islands":"FRO",
-  "bosnia-herzegovina":"BIH", "rep. of ireland":"IRE", "united kingdom":"ENG",
-};
-export function parseApiFootballEuropeanFixtures(payload: unknown, targetDate: string): FreeFixture[] {
-  if (!payload || typeof payload !== "object") throw new Error("API-Football: nieprawidłowa odpowiedź");
-  const body = payload as { response?: ApiFootballFixture[]; errors?: unknown; results?: number };
-  if (!Array.isArray(body.response)) throw new Error("API-Football: brak tablicy response");
-  const output: FreeFixture[] = [];
-  for (const item of body.response) {
-    const country = (item.league?.country ?? "").trim().toLowerCase();
-    const leagueName = item.league?.name?.trim() ?? "";
-    const countryCode = API_FOOTBALL_COUNTRIES[country];
-    const europeanTournament = /\bUEFA\b|Europa League|Conference League|Champions League|European Championship|Nations League/i.test(leagueName)
-      && (country === "world" || country === "europe" || !country);
-    if (!countryCode && !europeanTournament) continue;
-    const home = item.teams?.home?.name?.trim();
-    const away = item.teams?.away?.name?.trim();
-    const kickoffText = item.fixture?.date;
-    if (!home || !away || !kickoffText || !Number.isFinite(Date.parse(kickoffText))) continue;
-    const kickoff = brusselsParts(new Date(kickoffText));
-    if (kickoff.date !== targetDate) continue;
-    const id = item.fixture?.id;
-    output.push({
-      id: "api-football|" + String(id ?? [targetDate, home, away].join("|")),
-      competition: leagueName || "API-Football",
-      countryCode: countryCode ?? "UEFA",
-      leagueFolder: "",
-      leagueShortcut: item.league?.id ? String(item.league.id) : undefined,
-      date: kickoff.date, time: kickoff.time, home, away,
-      source: "API-Football", sourceUpdatedAt: new Date().toISOString(),
-    });
-  }
-  return output;
-}
 export function espnScoreboardDatesForBrusselsDay(date: string): string[] {
   const [year, month, day] = date.split("-").map(Number);
   const previousUtcDate = new Date(Date.UTC(year, month - 1, day) - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
@@ -238,7 +197,6 @@ export interface FixtureScan {
     openLigaDB: { competitionsChecked: number; fixtures: number; errors: number };
     openFootball: { feedsChecked: number; fixtures: number; errors: number };
     espn: { scoreboardsChecked: number; fixtures: number; errors: number };
-    apiFootball: { configured: boolean; competitionsChecked: number; fixtures: number; errors: number };
   };
 }
 export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureScan> {
@@ -264,9 +222,6 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   let openFootballFixturesFound = 0;
   let espnChecked = 0;
   let espnFixturesFound = 0;
-  let apiFootballConfigured = false;
-  let apiFootballCompetitionsChecked = 0;
-  let apiFootballFixturesFound = 0;
 
   // Source 1: every European folder in open-matchday, including cups and youth competitions.
   try {
@@ -422,32 +377,12 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     errors.push(`ESPN · ${error instanceof Error ? error.message : "scoreboard niedostępny"}`);
   }
 
-  // Source 5: API-Football global fixtures. Free tier requires an owner-created key (100 requests/day).
-  // No provider request is made until the key is configured as an isolated Cloudflare Worker secret.
-  try {
-    const payload = await fetchJson<{ status?: string; response?: ApiFootballFixture[] }>(`/api/api-football/fixtures/${date}`);
-    if (payload.status !== "not_configured") {
-      apiFootballConfigured = true;
-      const fixtures = parseApiFootballEuropeanFixtures(payload, date);
-      apiFootballFixturesFound = fixtures.length;
-      apiFootballCompetitionsChecked = new Set(fixtures.map(fixture => fixture.competition)).size;
-      for (const fixture of fixtures) {
-        const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
-        const existing = byKey.get(key);
-        if (existing) existing.source = existing.source + " + API-Football";
-        else byKey.set(key, fixture);
-      }
-    }
-  } catch (error) {
-    errors.push(`API-Football · ${error instanceof Error ? error.message : "źródło niedostępne"}`);
-  }
-
   const fixtures = [...byKey.values()].sort((a,b) => a.time.localeCompare(b.time) || a.competition.localeCompare(b.competition));
   const result: FixtureScan = {
     date,
     generatedAt,
     fixtures,
-    leaguesChecked: openMatchdayChecked + openLigaChecked + openFootballChecked + espnChecked + apiFootballCompetitionsChecked,
+    leaguesChecked: openMatchdayChecked + openLigaChecked + openFootballChecked + espnChecked,
     leaguesFailed: errors,
     source: SOURCE,
     cache: false,
@@ -456,7 +391,6 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       openLigaDB: { competitionsChecked: openLigaChecked, fixtures: openLigaFixturesFound, errors: errors.filter(error => error.startsWith("OpenLigaDB ·")).length },
       openFootball: { feedsChecked: openFootballChecked, fixtures: openFootballFixturesFound, errors: errors.filter(error => error.startsWith("openfootball ·")).length },
       espn: { scoreboardsChecked: espnChecked, fixtures: espnFixturesFound, errors: errors.filter(error => error.startsWith("ESPN ·")).length },
-      apiFootball: { configured: apiFootballConfigured, competitionsChecked: apiFootballCompetitionsChecked, fixtures: apiFootballFixturesFound, errors: errors.filter(error => error.startsWith("API-Football ·")).length },
     },
   };
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ...result, cachedAt: Date.now() })); } catch { /* storage may be full */ }
