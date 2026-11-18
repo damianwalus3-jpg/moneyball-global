@@ -1039,3 +1039,17 @@
 - Final CI run #496 / run `44262768894` succeeded on commit `85102e26bb3430b65e5a8bfe785ebf5b91cc51c1`. TypeScript passed; **20/20 test files and 149/149 tests passed**; production build passed; isolated Cloudflare REBUILD deploy succeeded.
 - Cloudflare Worker `moneyball-global-rebuild` version: `2dc2e008-295e-4f71-9944-2a35118c3497`.
 - No MAIN changes.
+
+
+## Stage 85 — multi-source historical form acceptance and conflict-safe merge (2026-11-18)
+- User explicitly authorized accepting suitable historical match data from multiple sources and instructed that match analysis should combine several independent sources, not rely on a single provider.
+- Audited the existing prediction path: it previously stopped at the first source returning at least three matches. This discarded additional valid history from OpenLigaDB, OpenFootball and ESPN even when available.
+- Changed team-history loading to query every applicable provider for each team: open-matchday, OpenLigaDB, OpenFootball and ESPN. Provider-specific adapters retain their existing competition/feed context and validation.
+- Added `mergeVerifiedTeamForms`: filters invalid scores, collapses exact duplicate match rows, merges distinct historical matches, sorts chronologically and keeps the latest five overall/home/away. If two providers disagree on the score for the same date/opponent/venue, that match is excluded rather than arbitrarily selecting a result.
+- A prediction now requires at least three unique, non-conflicting completed matches after the multi-source merge. Source names and provider update timestamps are retained in the resulting form metadata. Failures from individual providers do not discard successful data from other providers.
+- Added tests for multi-provider aggregation, duplicate collapse and conflict rejection.
+- Research findings: OpenFootball Europe declares its datasets public domain and provides historical results for selected European leagues; its coverage is selective. The open-football curated catalogue identifies additional results/statistics datasets including StatsBomb Open Data (attribution terms), schochastics/football-data (ODC-BY, 1.2M+ historical results through 2023), Fjelstul English and World Cup databases (CC BY-SA 4.0), and footballcsv (CC0). The openfootball/leagues repository also states public-domain data. These are research candidates for further validation; they are not automatically imported merely because a repository is public.
+- Football-Data.co.uk's current download page reports a 16 Nov 2026 update and lists 16 country datasets, but its reuse restrictions already audited in Stage 81 prohibit the intended automated app ingestion; it remains excluded.
+- Current public research references: https://github.com/openfootball/europe ; https://github.com/openfootball/leagues ; https://github.com/withqwerty/open-football ; https://github.com/xgabora/Club-Football-Match-Data ; https://github.com/datasets/football-datasets .
+- Code commits: `e0a40f59d7252b835e5126c232727637b7a6c136` (merge helper), `8071a155ec0fb18b997567a3ed8c0f8103ccff45` (prediction path), `dc789652ac538ffa40545ef013f6bd63334a8531` (tests). CI/deployment status must be verified before calling this stage deployed.
+- No production MAIN changes. No existing Tracker records, predictions, coupons, results or bankroll data were deleted or rewritten.
