@@ -182,15 +182,26 @@ describe("ESPN European daily fixture fallback", () => {
   });
 
   it("recognizes UEFA Nations League events and attaches the OpenLigaDB national-team history key", () => {
-    const fixtures = parseEspnEuropeanFixtures({ events: [{
-      id: 420, date: "2026-11-17T19:45:00Z", competitions: [{
-        altGameNote: "UEFA Nations League", venue: { address: { country: "Denmark" } },
-        competitors: [
-          { homeAway: "home", team: { displayName: "Denmark" } },
-          { homeAway: "away", team: { displayName: "Norway" } },
-        ],
-      }],
-    }] }, "2026-11-17");
+    const fixtures = parseEspnEuropeanFixtures({ events: [
+      {
+        id: 420, date: "2026-11-17T19:45:00Z", competitions: [{
+          altGameNote: "UEFA Nations League", venue: { address: { country: "Denmark" } },
+          competitors: [
+            { homeAway: "home", team: { displayName: "Denmark" } },
+            { homeAway: "away", team: { displayName: "Norway" } },
+          ],
+        }],
+      },
+      {
+        id: 421, date: "2026-11-17T20:00:00Z", competitions: [{
+          altGameNote: "Concacaf Nations League, Quarterfinals", venue: { address: { country: "Guadeloupe" } },
+          competitors: [
+            { homeAway: "home", team: { displayName: "French Guiana" } },
+            { homeAway: "away", team: { displayName: "St. Vincent and the Grenadines" } },
+          ],
+        }],
+      },
+    ] }, "2026-11-17");
     expect(fixtures).toHaveLength(1);
     expect(fixtures[0]).toMatchObject({ countryCode: "UEFA", competition: "UEFA Nations League", leagueShortcut: "nla", leagueSeason: "2026", home: "Denmark", away: "Norway" });
   });
