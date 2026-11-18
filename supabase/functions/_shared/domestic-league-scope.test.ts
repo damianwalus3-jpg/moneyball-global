@@ -34,7 +34,7 @@ Deno.test("production scope includes only geographic-Europe domestic men's tiers
     ["Northern Ireland","Championship"],["Scotland","Championship"],["Wales","Cymru North"],
     ["Iceland","Lengjudeild karla"],["Faroe Islands","Meistaradeildin"],
     ["Albania","Abissnet Superiore"],["Bosnia and Herzegovina","WWIN Liga Bosne i Hercegovine"],
-    ["Bulgaria","efbet League"],["Lithuania","TOPLYGA"],["Luxembourg","BGL Ligue"]
+    ["Bulgaria","efbet League"],["Lithuania","TOPLYGA"],["Luxembourg","BGL Ligue"],["Latvia","Virsliga"],["Estonia","Meistriliiga"],["Estonia","Esiliiga"],["Belgium","Jupiler Pro League"],["Belgium","Challenger Pro League"],["Switzerland","Challenge League"],["Northern Ireland","NIFL Championship"],["Malta","Maltese Challenge League"]
   ];
   for (const [country,competition] of accepted) {
     if (!isEligibleDomesticTopTwoLeague(country,competition)) throw new Error(`Expected tier 1/2: ${country} / ${competition}`);
