@@ -293,7 +293,7 @@ export default {
           const away = competitors.find(item => item.homeAway === "away");
           if (!home || !away) return [];
           const score = (item: EspnScheduleCompetitor): number => {
-            const raw = typeof item.score === "object" && item.score ? item.score.value : typeof item.score === "string" ? Number(item.score) : NaN;
+            const raw = typeof item.score === "object" && item.score ? Number(item.score.value) : typeof item.score === "string" ? Number(item.score) : NaN;
             return Number.isFinite(raw) ? raw : Number(typeof item.score === "object" && item.score ? item.score.displayValue : NaN);
           };
           const homeGoals = score(home), awayGoals = score(away);
