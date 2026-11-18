@@ -200,11 +200,11 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'Coupon leg match is missing or owned by another user.'; END IF;
   IF NOT public.moneyball_is_eligible_european_match(v_match.country,coalesce(v_match.competition,v_match.league),v_match.gender,v_match.home_team,v_match.away_team)
      OR NOT public.moneyball_is_openmatchday_tier(v_match.source,v_match.external_id) THEN
-    RAISE EXCEPTION 'Coupon leg is outside the European men's domestic tier 1-2 scope.';
+    RAISE EXCEPTION 'Coupon leg is outside the European men''s domestic tier 1-2 scope.';
   END IF;
   IF v_match.kickoff_at IS NULL OR v_match.kickoff_at<=now() OR (v_match.kickoff_at AT TIME ZONE 'Europe/Brussels')::date<>(now() AT TIME ZONE 'Europe/Brussels')::date
      OR lower(v_match.status) IN ('live','finished','ft','aet','pen','postponed','cancelled','abandoned') THEN
-    RAISE EXCEPTION 'Coupon legs must be today's future prematch fixtures.';
+    RAISE EXCEPTION 'Coupon legs must be today''s future prematch fixtures.';
   END IF;
   SELECT p.id,p.owner_id,p.match_id,p.model_version,p.data_source,p.rationale,p.data_coverage,p.verdict,p.settlement_status,p.probability,p.selection,p.odds
     INTO v_prediction FROM public.predictions p WHERE p.id=NEW.prediction_id AND p.match_id=NEW.match_id AND p.owner_id=v_coupon.owner_id;
@@ -485,12 +485,12 @@ $function$;
 
 DO $scope_assertions$
 BEGIN
-  IF NOT public.moneyball_is_eligible_european_match('England','Premier League','men','Arsenal','Chelsea') THEN RAISE EXCEPTION 'Premier League men's fixture unexpectedly rejected.'; END IF;
-  IF NOT public.moneyball_is_eligible_european_match('Germany','2. Bundesliga','men','Dresden','Hannover') THEN RAISE EXCEPTION '2. Bundesliga men's fixture unexpectedly rejected.'; END IF;
+  IF NOT public.moneyball_is_eligible_european_match('England','Premier League','men','Arsenal','Chelsea') THEN RAISE EXCEPTION 'Premier League men''s fixture unexpectedly rejected.'; END IF;
+  IF NOT public.moneyball_is_eligible_european_match('Germany','2. Bundesliga','men','Dresden','Hannover') THEN RAISE EXCEPTION '2. Bundesliga men''s fixture unexpectedly rejected.'; END IF;
   IF public.moneyball_is_eligible_european_match('England','National League North','men','Oxford City','Macclesfield') THEN RAISE EXCEPTION 'English tier 6 incorrectly accepted.'; END IF;
   IF public.moneyball_is_eligible_european_match('France','National 2 - Group C','men','Andrezieux','Chateauroux') THEN RAISE EXCEPTION 'French tier 4 incorrectly accepted.'; END IF;
-  IF public.moneyball_is_eligible_european_match('England','Premier League','women','Arsenal','Chelsea') THEN RAISE EXCEPTION 'Women's fixture incorrectly accepted.'; END IF;
-  IF public.moneyball_is_eligible_european_match('England','Premier League','men','Arsenal Women','Chelsea') THEN RAISE EXCEPTION 'Women's team incorrectly accepted.'; END IF;
+  IF public.moneyball_is_eligible_european_match('England','Premier League','women','Arsenal','Chelsea') THEN RAISE EXCEPTION 'Women''s fixture incorrectly accepted.'; END IF;
+  IF public.moneyball_is_eligible_european_match('England','Premier League','men','Arsenal Women','Chelsea') THEN RAISE EXCEPTION 'Women''s team incorrectly accepted.'; END IF;
   IF public.moneyball_is_eligible_european_match('England','Premier League','men','Arsenal U21','Chelsea') THEN RAISE EXCEPTION 'Youth team incorrectly accepted.'; END IF;
   IF public.moneyball_is_eligible_european_match('England','Premier League','men','Arsenal B','Chelsea') THEN RAISE EXCEPTION 'Reserve team incorrectly accepted.'; END IF;
   IF public.moneyball_is_eligible_european_match('World','UEFA Nations League','men','Belgium','France') THEN RAISE EXCEPTION 'UEFA Nations League incorrectly accepted.'; END IF;
