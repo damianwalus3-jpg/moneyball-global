@@ -2,11 +2,7 @@ import { footyNomadSectionAt } from "../_shared/footynomad-section.ts";
 import { extractBearerToken } from "../_shared/bearer-token.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 import { isEligibleDomesticSeniorLeague } from "../_shared/domestic-league-scope.ts";
-function isExcludedSeniorTeam(value: unknown): boolean {
- const team=String(value??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
- return /\b(reserves?|academy|youth|b team|celta fortuna|real madrid castilla|valencia mestalla|betis deportivo|sevilla atletico|u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23))\b/.test(team) || /(^| )(ii|iii|b)$/.test(team);
-}
-
+import { isExcludedSeniorTeam } from "../_shared/team-normalization.ts";
 function isTopTwoTierLeague(competition: unknown, country?: unknown): boolean {
   const scopeCountry = String(country ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
   const scopeLabel = String(competition ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
