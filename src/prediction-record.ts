@@ -1,14 +1,14 @@
 import type { TrackerRecord } from "./tracker-store";
-function hasValidProbabilities(details: TrackerRecord["details"]): boolean {
-  const values = [details.p1, details.px, details.p2];
+function hasValidProbabilities(details: TrackerRecord["details"], market: string): boolean {
+  const values = market === "DOUBLE_CHANCE" ? [details.p1x, details.px2, details.p12] : [details.p1, details.px, details.p2];
   if (values.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) return false;
-  return Math.abs((values[0] as number) + (values[1] as number) + (values[2] as number) - 1) <= 0.0001;
+  return market === "DOUBLE_CHANCE" || Math.abs((values[0] as number) + (values[1] as number) + (values[2] as number) - 1) <= 0.0001;
 }
 export function shouldAppendPrediction(records: TrackerRecord[], fixtureId: string, model: string,
   nextProbabilitiesAvailable: boolean, nextMethod?: string, market = "1X2"): boolean {
   const existing = records.filter(row => row.kind === "prediction" && row.details.fixtureId === fixtureId
     && row.details.model === model && (typeof row.details.market === "string" ? row.details.market : "1X2") === market);
-  const latestValid = existing.filter(row => hasValidProbabilities(row.details))
+  const latestValid = existing.filter(row => hasValidProbabilities(row.details, market))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
   if (latestValid) return latestValid.details.predictionMethod === "neutral-prior-poisson"
     && nextProbabilitiesAvailable && nextMethod !== "neutral-prior-poisson";

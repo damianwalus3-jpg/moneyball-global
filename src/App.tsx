@@ -191,7 +191,8 @@ function savePredictionRecord(
       p1x: dc?.oneX ?? null, px2: dc?.xTwo ?? null, p12: dc?.oneTwo ?? null,
       strongCandidate: false, strongDoubleChance, source: match.source,
       reason: reason ?? (!couponEligible ? "ODRZUCONY: brak minimalnej próbki lub wiarygodnej godziny meczu." : dcProbability === null ? "Brak prawidłowych prawdopodobieństw Double Chance." : dcProbability < 0.75 ? "Najwyższe prawdopodobieństwo Double Chance poniżej 75%." : null) };
-    if (shouldAppendPrediction(current, match.id, model, !!dc, method, "DOUBLE_CHANCE")) {
+    const hasDcProbabilities = !!dc && [dc.oneX, dc.xTwo, dc.oneTwo].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1);
+    if (shouldAppendPrediction(current, match.id, model, hasDcProbabilities, method, "DOUBLE_CHANCE")) {
       addRecord({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · DOUBLE CHANCE · " + method,
         status: strongDoubleChance ? "KANDYDAT" : "ODRZUCONY", details: dcDetails });
       current = readRecords();
