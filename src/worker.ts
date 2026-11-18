@@ -249,6 +249,71 @@ export default {
       }, 200, origin);
     }
 
+    const espnTeamForm = url.pathname === "/api/espn/team-form";
+    if (espnTeamForm) {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      const teamQuery = (url.searchParams.get("team") ?? "").trim();
+      const before = url.searchParams.get("before") ?? "";
+      if (teamQuery.length < 2 || teamQuery.length > 80 || !/^\d{4}-\d{2}-\d{2}$/.test(before)) return json({ error: "invalid_team_or_date" }, 400, origin);
+      const year = Number(before.slice(0,4)), month = Number(before.slice(5,7)), day = Number(before.slice(8,10));
+      const parsed = new Date(Date.UTC(year, month - 1, day));
+      if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return json({ error: "invalid_date" }, 400, origin);
+      const cacheKey = new Request(url.toString(), { method: "GET" });
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+      try {
+        const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        const searchUrl = "https://site.web.api.espn.com/apis/common/v3/search?query=" + encodeURIComponent(teamQuery) + "&limit=10&type=team";
+        const searchResponse = await fetch(searchUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+        if (!searchResponse.ok) throw new Error("espn_team_search_http_" + searchResponse.status);
+        const searchPayload = await searchResponse.json() as { items?: Array<{ id?: string; displayName?: string; name?: string; sport?: string; defaultLeagueSlug?: string }> };
+        const allowedLeaguePrefixes = ["uefa.", "eng.", "esp.", "ger.", "ita.", "fra.", "ned.", "por.", "bel.", "sco.", "aut.", "sui.", "gre.", "tur.", "pol.", "ukr.", "cro.", "srb.", "den.", "nor.", "swe.", "fin.", "cze.", "rou.", "bul.", "hun.", "irl.", "wal.", "isl.", "lux.", "mlt.", "cyp.", "kaz.", "aze.", "arm.", "geo.", "alb.", "mkd.", "mda.", "est.", "lat.", "ltu.", "blr.", "bih.", "svn.", "svk.", "and.", "lie.", "faro.", "nirl.", "uefa"];
+        const candidates = (searchPayload.items ?? []).filter(item => item.sport === "soccer" && item.id && (item.displayName || item.name) && item.defaultLeagueSlug && allowedLeaguePrefixes.some(prefix => item.defaultLeagueSlug!.startsWith(prefix)));
+        const exact = candidates.filter(item => normalize(item.displayName ?? item.name ?? "") === normalize(teamQuery));
+        const selected = exact[0] ?? candidates[0];
+        if (!selected?.id || !selected.defaultLeagueSlug) return json({ error: "espn_team_not_found", team: teamQuery }, 404, origin);
+        const scheduleUrl = "https://site.api.espn.com/apis/site/v2/sports/soccer/" + encodeURIComponent(selected.defaultLeagueSlug) + "/teams/" + encodeURIComponent(selected.id) + "/schedule";
+        const scheduleResponse = await fetch(scheduleUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+        if (!scheduleResponse.ok) throw new Error("espn_team_schedule_http_" + scheduleResponse.status);
+        const schedule = await scheduleResponse.json() as { timestamp?: string; events?: Array<{ id?: string; date?: string; competitions?: Array<{ competitors?: Array<{ homeAway?: string; team?: { displayName?: string; name?: string }; score?: { value?: number; displayValue?: string } | string }>; status?: { type?: { completed?: boolean } }> }> };
+        const events = (schedule.events ?? []).flatMap(event => {
+          const competition = event.competitions?.[0];
+          if (!event.date || !competition?.status?.type?.completed) return [];
+          const kickoff = new Date(event.date);
+          if (!Number.isFinite(kickoff.getTime())) return [];
+          const dateParts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(kickoff);
+          const get = (key: string) => dateParts.find(part => part.type === key)?.value ?? "";
+          const localDate = get("year") + "-" + get("month") + "-" + get("day");
+          if (localDate >= before) return [];
+          const competitors = competition.competitors ?? [];
+          const home = competitors.find(item => item.homeAway === "home");
+          const away = competitors.find(item => item.homeAway === "away");
+          if (!home || !away) return [];
+          const score = (item: typeof home) => {
+            const raw = typeof item.score === "object" && item.score ? item.score.value : typeof item.score === "string" ? Number(item.score) : NaN;
+            return Number.isFinite(raw) ? raw : Number(typeof item.score === "object" && item.score ? item.score.displayValue : NaN);
+          };
+          const homeGoals = score(home), awayGoals = score(away);
+          if (!Number.isInteger(homeGoals) || !Number.isInteger(awayGoals) || homeGoals < 0 || awayGoals < 0) return [];
+          const teamName = selected.displayName ?? selected.name ?? teamQuery;
+          const isHome = normalize(home.team?.displayName ?? home.team?.name ?? "") === normalize(teamName);
+          const isAway = normalize(away.team?.displayName ?? away.team?.name ?? "") === normalize(teamName);
+          if (!isHome && !isAway) return [];
+          return [{ id: event.id ?? "", date: localDate, opponent: isHome ? away.team?.displayName ?? away.team?.name ?? "" : home.team?.displayName ?? home.team?.name ?? "", venue: isHome ? "H" : "A", goalsFor: isHome ? homeGoals : awayGoals, goalsAgainst: isHome ? awayGoals : homeGoals }];
+        }).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 10);
+        const headers = corsHeaders(origin);
+        headers.set("Content-Type", "application/json; charset=utf-8");
+        headers.set("Cache-Control", "public, max-age=21600");
+        headers.set("X-MONEYBALL-SOURCE", "ESPN team schedule");
+        const response = new Response(JSON.stringify({ team: selected.displayName ?? selected.name ?? teamQuery, teamId: selected.id, league: selected.defaultLeagueSlug, generatedAt: schedule.timestamp ?? new Date().toISOString(), matches: events }), { status: 200, headers });
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "espn_team_form_error" }, 502, origin);
+      }
+    }
+
     const espnScoreboard = url.pathname.match(/^\/api\/espn\/scoreboard\/(\d{8})$/);
     if (espnScoreboard) {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
