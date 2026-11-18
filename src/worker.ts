@@ -508,10 +508,11 @@ export default {
 
 
     const pitchDate = url.pathname.match(/^\/api\/pitchapi\/date\/(\d{4}-\d{2}-\d{2})$/);
+    const pitchLeagues = url.pathname === "/api/pitchapi/leagues";
     const pitchLeague = url.pathname.match(/^\/api\/pitchapi\/leagues\/(l_[A-Za-z0-9]{6})$/);
     const pitchLeagueMatches = url.pathname.match(/^\/api\/pitchapi\/leagues\/(l_[A-Za-z0-9]{6})\/matches$/);
     const pitchMatch = url.pathname.match(/^\/api\/pitchapi\/matches\/(m_[A-Za-z0-9]{6})(?:\/(live|shots|lineups|events|momentum|stats|players|advanced(?:\/(?:network|players))?))?$/);
-    if (pitchDate || pitchLeague || pitchLeagueMatches || pitchMatch) {
+    if (pitchDate || pitchLeagues || pitchLeague || pitchLeagueMatches || pitchMatch) {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
       if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
       if (!env.PITCHAPI_API_KEY || !/^pk_(?:live|test)_[A-Za-z0-9_-]{16,}$/.test(env.PITCHAPI_API_KEY)) {
@@ -528,6 +529,8 @@ export default {
         const status = url.searchParams.get("status") ?? "upcoming";
         if (!["upcoming", "played", "all"].includes(status)) return json({ error: "invalid_status" }, 400, origin);
         upstreamPath = "/v1/date/" + date + "?status=" + status;
+      } else if (pitchLeagues) {
+        upstreamPath = "/v1/leagues";
       } else if (pitchLeague) {
         upstreamPath = "/v1/leagues/" + pitchLeague[1];
       } else if (pitchLeagueMatches) {
@@ -543,7 +546,7 @@ export default {
         upstreamPath = "/v1/matches/" + pitchMatch![1] + (pitchMatch![2] ? "/" + pitchMatch![2] : "");
       }
       const isLive = pitchMatch?.[2] === "live";
-      const cacheSeconds = isLive ? 0 : pitchDate ? 600 : pitchLeague || pitchLeagueMatches ? 21600 : pitchMatch?.[2] === "lineups" ? 120 : pitchMatch?.[2] === "shots" || pitchMatch?.[2] === "stats" || pitchMatch?.[2]?.startsWith("advanced") ? 21600 : 1800;
+      const cacheSeconds = isLive ? 0 : pitchDate ? 600 : pitchLeagues || pitchLeague || pitchLeagueMatches ? 21600 : pitchMatch?.[2] === "lineups" ? 120 : pitchMatch?.[2] === "shots" || pitchMatch?.[2] === "stats" || pitchMatch?.[2]?.startsWith("advanced") ? 21600 : 1800;
       const cacheKey = new Request(url.toString(), { method: "GET" });
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
       if (cacheSeconds > 0) {
