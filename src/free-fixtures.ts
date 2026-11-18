@@ -23,6 +23,8 @@ export interface FreeFixture {
   pitchApiAwayTeamId?: string;
   pitchApiLeagueId?: string;
   pitchApiSeason?: string;
+  apiFootballFixtureId?: string;
+  apiFootballLeagueId?: string;
 }
 interface LeagueIndex {
   generated_utc: string;
@@ -51,7 +53,7 @@ interface OpenLigaMatch {
 }
 const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const OPENLIGA = "/api/openligadb";
-const SOURCE = "Flashscore + FootyNomad + open-matchday + OpenLigaDB + openfootball + ESPN + timezone.football + PitchAPI catalogue (publiczne terminarze)";
+const SOURCE = "API-Football Pro + Flashscore + FootyNomad + open-matchday + OpenLigaDB + openfootball + ESPN + timezone.football + PitchAPI catalogue (publiczne terminarze)";
 const EUROPE = EUROPEAN_COUNTRY_CODES;
 const FETCH_TIMEOUT_MS = 15_000;
 const CACHE_KEY = "moneyball.free-fixtures.v14";
@@ -251,6 +253,8 @@ export function mergeFixtureSource(existing: FreeFixture, incoming: FreeFixture)
   if (!existing.pitchApiAwayTeamId && incoming.pitchApiAwayTeamId) existing.pitchApiAwayTeamId = incoming.pitchApiAwayTeamId;
   if (!existing.pitchApiLeagueId && incoming.pitchApiLeagueId) existing.pitchApiLeagueId = incoming.pitchApiLeagueId;
   if (!existing.pitchApiSeason && incoming.pitchApiSeason) existing.pitchApiSeason = incoming.pitchApiSeason;
+  if (!existing.apiFootballFixtureId && incoming.apiFootballFixtureId) existing.apiFootballFixtureId = incoming.apiFootballFixtureId;
+  if (!existing.apiFootballLeagueId && incoming.apiFootballLeagueId) existing.apiFootballLeagueId = incoming.apiFootballLeagueId;
   if (!existing.sourceUrl && incoming.sourceUrl) existing.sourceUrl = incoming.sourceUrl;
   if ((!existing.sourceUpdatedAt || existing.sourceUpdatedAt === "not provided by OpenLigaDB") && incoming.sourceUpdatedAt) existing.sourceUpdatedAt = incoming.sourceUpdatedAt;
   return existing;
@@ -305,6 +309,41 @@ netherlands:"NED", "north macedonia":"MKD", "northern ireland":"NIR", norway:"NO
 romania:"ROU", russia:"RUS", "san marino":"SMR", scotland:"SCO", serbia:"SRB", slovakia:"SVK", slovenia:"SVN",
 spain:"ESP", sweden:"SWE", switzerland:"SUI", turkey:"TUR", turkiye:"TUR", israel:"ISR", kazakhstan:"KAZ", "republic of ireland":"IRE", ukraine:"UKR", wales:"WAL",
 };
+interface ApiFootballFixturePayload {
+  fixture?: { id?: number; date?: string; status?: { short?: string } };
+  league?: { id?: number; name?: string; country?: string };
+  teams?: { home?: { name?: string }; away?: { name?: string } };
+}
+export function parseApiFootballEuropeanFixtures(payload: unknown, targetDate: string, updatedAt: string): FreeFixture[] {
+  if (!payload || typeof payload !== "object" || !Array.isArray((payload as { fixtures?: unknown }).fixtures)) {
+    throw new Error("API-Football: nieprawidłowa odpowiedź lub brak tablicy fixtures");
+  }
+  return ((payload as { fixtures: ApiFootballFixturePayload[] }).fixtures).flatMap(item => {
+    const country = (item.league?.country ?? "").trim().toLowerCase();
+    const countryCode = ESPN_COUNTRIES[country];
+    const kickoff = item.fixture?.date ? new Date(item.fixture.date) : new Date(NaN);
+    const home = item.teams?.home?.name?.trim();
+    const away = item.teams?.away?.name?.trim();
+    if (!countryCode || !EUROPE.has(countryCode) || !Number.isFinite(kickoff.getTime()) || !home || !away || !item.league?.name) return [];
+    const local = brusselsParts(kickoff);
+    if (local.date !== targetDate) return [];
+    const fixtureId = item.fixture?.id;
+    return [{
+      id: "api-football|" + (fixtureId ?? [targetDate, countryCode, item.league.name, home, away].join("|")),
+      competition: item.league.name,
+      countryCode,
+      leagueFolder: "",
+      date: local.date,
+      time: local.time,
+      home,
+      away,
+      source: "API-Football Pro",
+      sourceUpdatedAt: updatedAt,
+      ...(fixtureId ? { apiFootballFixtureId: String(fixtureId) } : {}),
+      ...(item.league.id ? { apiFootballLeagueId: String(item.league.id) } : {}),
+    } satisfies FreeFixture];
+  });
+}
 interface ESPNCompetitor { homeAway?: string; team?: { displayName?: string; name?: string } }
 interface ESPNEvent { id?: string | number; date?: string; competitions?: Array<{ altGameNote?: string; venue?: { address?: { country?: string } }; notes?: Array<{ headline?: string }>; competitors?: ESPNCompetitor[] }> }
 export function espnScoreboardDatesForBrusselsDay(date: string): string[] {
@@ -354,6 +393,7 @@ export interface FixtureScan {
     footyNomad: { pagesChecked: number; pageMatches: number; fixtures: number; skippedNoTimestamp: number; errors: number };
     timezoneFootball: { feedMatches: number; fixtures: number; generatedAt: string; errors: number };
     flashscore: { competitionsChecked: number; rawMatches: number; fixtures: number; skippedNonEuropean: number; skippedWrongDate: number; timestampMissing: number; errors: number };
+    apiFootball?: { providerFixtures: number; europeanDateFixtures: number; errors: number };
     pitchApi?: { fixtures: number; europeanFixtures: number; leaguesResolved: number; catalogueLeagues: number; europeanCatalogueLeagues: number; freeEuropeanCatalogueLeagues: number; skippedNonFreeCatalogueLeagues: number; catalogueUpcomingFixtures: number; catalogueDateFixtures: number; errors: number };
   };
 }
@@ -586,6 +626,8 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
 
   // Source 8: PitchAPI date feed. Resolve each league's official country code before
   // admitting fixtures; never infer Europe from a league display name or a global feed.
+  let apiFootballProviderFixturesFound = 0;
+  let apiFootballEuropeanFixturesFound = 0;
   let pitchApiFixturesFound = 0;
   let pitchApiEuropeanFixturesFound = 0;
   let pitchApiLeaguesResolved = 0;
@@ -672,6 +714,23 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     errors.push("PitchAPI catalogue · " + (error instanceof Error ? error.message : "katalog niedostępny"));
   }
 
+  // Source 9: API-Football Pro paid fixture feed. Provider data is independently mapped
+  // using its authoritative country field and Brussels-local kickoff date before deduplication.
+  try {
+    const payload = await fetchJson<{ results?: number; generatedAt?: string; fixtures?: unknown[] }>(`/api/api-football/fixtures/${date}`);
+    apiFootballProviderFixturesFound = Number(payload.results ?? payload.fixtures?.length ?? 0);
+    const mapped = parseApiFootballEuropeanFixtures(payload, date, payload.generatedAt || new Date().toISOString());
+    apiFootballEuropeanFixturesFound = mapped.length;
+    for (const fixture of mapped) {
+      const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
+      const existing = byKey.get(key);
+      if (existing) mergeFixtureSource(existing, fixture);
+      else byKey.set(key, fixture);
+    }
+  } catch (error) {
+    errors.push("API-Football Pro · " + (error instanceof Error ? error.message : "feed niedostępny"));
+  }
+
   // Source 7: Flashscore public daily feed, filtered server-side to the Brussels day and European competitions.
   try {
     const flashscore = await fetchJson<{
@@ -717,6 +776,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       footyNomad: { pagesChecked: footyNomadPagesChecked, pageMatches: footyNomadPageMatches, fixtures: footyNomadFixturesFound, skippedNoTimestamp: footyNomadSkippedNoTimestamp, errors: errors.filter(error => error.startsWith("FootyNomad ·")).length },
       timezoneFootball: { feedMatches: timezoneFootballFeedMatches, fixtures: timezoneFootballFixturesFound, generatedAt: timezoneFootballGeneratedAt, errors: errors.filter(error => error.startsWith("timezone.football ·")).length },
       flashscore: { competitionsChecked: flashscoreCompetitionsChecked, rawMatches: flashscoreRawMatches, fixtures: flashscoreFixturesFound, skippedNonEuropean: flashscoreSkippedNonEuropean, skippedWrongDate: flashscoreSkippedWrongDate, timestampMissing: flashscoreTimestampMissing, errors: errors.filter(error => error.startsWith("Flashscore ·")).length },
+      apiFootball: { providerFixtures: apiFootballProviderFixturesFound, europeanDateFixtures: apiFootballEuropeanFixturesFound, errors: errors.filter(error => error.startsWith("API-Football Pro")).length },
       pitchApi: { fixtures: pitchApiFixturesFound, europeanFixtures: pitchApiEuropeanFixturesFound, leaguesResolved: pitchApiLeaguesResolved, catalogueLeagues: pitchApiCatalogueLeagues, europeanCatalogueLeagues: pitchApiEuropeanCatalogueLeagues, freeEuropeanCatalogueLeagues: pitchApiFreeEuropeanCatalogueLeagues, skippedNonFreeCatalogueLeagues: pitchApiSkippedNonFreeCatalogueLeagues, catalogueUpcomingFixtures: pitchApiCatalogueUpcomingFixtures, catalogueDateFixtures: pitchApiCatalogueDateFixtures, errors: errors.filter(error => error.startsWith("PitchAPI")).length },
     },
   };
