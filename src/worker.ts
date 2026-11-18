@@ -122,6 +122,8 @@ export function parseFootyNomadFixtures(html: string, targetDate: string): { fix
           competition: competition || "FootyNomad",
           countryCode: resolvedCountryCode,
           leagueFolder: "",
+          leagueShortcut: /(?:UEFA\s+)?Nations\s+League/i.test(competition) ? "nla" : undefined,
+          leagueSeason: /(?:UEFA\s+)?Nations\s+League/i.test(competition) ? targetDate.slice(0, 4) : undefined,
           date: localDate,
           time: get("hour") + ":" + get("minute"),
           home,
