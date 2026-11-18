@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
+import { isWomensTeam } from "../_shared/team-normalization.ts";
 import { selectEspnLeagues } from "./espn-leagues.ts";
 const SUPABASE_URL="https://gzgeklcukrclgwbsmbsp.supabase.co";
 const SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -37,7 +38,7 @@ async function readDay(date:string){
   const away=clean((body.match(/<span[^>]*class=["'][^"']*ticket-away[^"']*["'][^>]*>([\s\S]*?)<\/span>/i)||[])[1]||"");
   const leagueStart=html.lastIndexOf('<details class="league-group',m.index),leagueEnd=leagueStart>=0?html.indexOf("</summary>",leagueStart):-1;
   const league=leagueStart>=0&&leagueEnd>leagueStart?clean((html.slice(leagueStart,leagueEnd).match(/href=["']\/league\/[^"']+["'][^>]*>([\s\S]*?)<\/a>/i)||[])[1]||""):"";
-  const gender=/\bW\b|Women|female|girls/i.test(home+" "+away+" "+league)?"women":"men";
+  const gender=isWomensTeam(home+" "+away+" "+league)?"women":"men";
   const kickoff=(body.match(/<time[^>]*datetime=["']([^"']+)/i)||[])[1]||null;
   const cls=(attrs.match(/class=["']([^"']+)/i)||[])[1]||"";
   const hs=(body.match(/class=["'][^"']*ticket-hs[^"']*["'][^>]*>(\d+)</i)||[])[1];
