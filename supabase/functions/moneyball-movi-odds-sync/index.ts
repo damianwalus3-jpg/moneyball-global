@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
+import { isEligibleDomesticTopTwoLeague } from "../_shared/domestic-league-scope.ts";
+import { isExcludedSeniorTeam, isWomensTeam } from "../_shared/team-normalization.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -64,8 +65,14 @@ Deno.serve(async(req)=>{
   const now=new Date(),day=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
   const owner=String(body.owner_id||"");
   const ownerFilter=owner?"&owner_id=eq."+encodeURIComponent(owner):"";
-  const rawMatches=await db("matches?select=id,owner_id,user_id,home_team,away_team,competition,league,country,kickoff_at,kickoff_date,status&kickoff_date=eq."+encodeURIComponent(day)+"&order=kickoff_at.asc"+ownerFilter);
-   const matches=(rawMatches||[]).filter((match:any)=>isGeographicEuropeCountry(match.country));
+  const rawMatches=await db("matches?select=id,owner_id,user_id,home_team,away_team,competition,league,country,gender,kickoff_at,kickoff_date,status&kickoff_date=eq."+encodeURIComponent(day)+"&order=kickoff_at.asc"+ownerFilter);
+   const matches=(rawMatches||[]).filter((match:any)=>{
+   const gender=String(match.gender??"").toLowerCase();
+   return isEligibleDomesticTopTwoLeague(match.country,match.competition||match.league)
+    && (!gender||gender==="men")
+    && !isWomensTeam(match.home_team)&&!isWomensTeam(match.away_team)
+    && !isExcludedSeniorTeam(match.home_team)&&!isExcludedSeniorTeam(match.away_team);
+  });
   const catalog=await movi("/catalog?sport=soccer");
   const fixtures=Array.isArray(catalog.fixtures)?catalog.fixtures:[];
   const pairs:any[]=[];

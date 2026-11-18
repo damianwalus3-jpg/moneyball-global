@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
-import { isEligibleDomesticSeniorLeague } from "../_shared/domestic-league-scope.ts";
+import { isEligibleDomesticTopTwoLeague, isEligibleOpenMatchdayTier } from "../_shared/domestic-league-scope.ts";
+import { isExcludedSeniorTeam, isWomensTeam } from "../_shared/team-normalization.ts";
+import { isRealXgObservation } from "../_shared/xg-validation.ts";
 const S="https://gzgeklcukrclgwbsmbsp.supabase.co",K=Deno.env.get("SUPABASE_ANON_KEY")||"",SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"",V="MONEYBALL GLOBAL 3.8";
 let CRON_FALLBACK_TOKEN="";
 const C={"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, x-supabase-api-version, x-requested-with, prefer, cache-control, pragma","Access-Control-Allow-Methods":"POST, GET, OPTIONS","Access-Control-Max-Age":"86400","Vary":"Origin"};
@@ -10,23 +12,35 @@ function isEuropeanFixture(country: unknown, _competition?: unknown, _home?: unk
   return isGeographicEuropeCountry(country);
 }
 
-function isEligibleOpenMatchdayMatch(m:any):boolean {
- const folder=(String(m?.external_id||"").match(/^om:([^:]+):/)||[])[1]||"";
- const tier=folder.match(/^([A-Z]{3})_([1-9][0-9]*)_[A-Za-z0-9-]+$/i);
+function fixtureGender(m:any):"men"|"women"|"excluded" {
  const competition=String(m?.competition||m?.league||"");
- const country=String(m?.country||"").toLowerCase().trim();
- if(String(m?.source||"").toLowerCase()!=="openmatchday"||!tier||["europe","uefa"].includes(country))return false;
- if(!isEuropeanFixture(m?.country,competition,m?.home_team,m?.away_team))return false;
- if(/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|cup|copa|trophy|youth|academy|reserves?)\b/i.test(folder+" "+competition))return false;
- return true;
+ const home=String(m?.home_team||m?.home||"");
+ const away=String(m?.away_team||m?.away||"");
+ if(isWomensTeam(home)||isWomensTeam(away)||/\b(women|womens|woman|female|frauen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f)\b/i.test(competition))return "women";
+ if(isExcludedSeniorTeam(home)||isExcludedSeniorTeam(away)||/\b(u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend|reserves?)\b/i.test(competition))return "excluded";
+ const explicit=String(m?.gender||"").toLowerCase();
+ if(explicit && explicit!=="men")return "excluded";
+ return "men";
+}
+
+function isEligibleOpenMatchdayMatch(m:any):boolean {
+ const folder=(String(m?.external_id||"").match(/^om:([^:]+):/)||[])[1]||String(m?.source_competition_id||"");
+ const competition=String(m?.competition||m?.league||"");
+ const country=String(m?.country||"");
+ return String(m?.source||"").toLowerCase()==="openmatchday"
+  && isEligibleOpenMatchdayTier(folder)
+  && isEligibleDomesticTopTwoLeague(country,competition)
+  && fixtureGender(m)==="men";
 }
 function isEligibleScheduledFixture(f:any):boolean {
  const competition=String(f?.competition||f?.league||"");
  const country=String(f?.country||"");
- const home=f?.home_team||f?.home,away=f?.away_team||f?.away;
- return isEuropeanFixture(country,competition,home,away)
-  && (isEligibleOpenMatchdayMatch(f)||isEligibleDomesticSeniorLeague(country,competition))
-  && fixtureGender(f)==="men";
+ const source=String(f?.source||"").toLowerCase();
+ const competitionEligible=source==="openmatchday"
+  ? isEligibleOpenMatchdayMatch(f)
+  : isEligibleDomesticTopTwoLeague(country,competition);
+ return isEuropeanFixture(country,competition,f?.home_team||f?.home,f?.away_team||f?.away)
+  && competitionEligible && fixtureGender(f)==="men";
 }
 function brusselsFixtureDay(value:any):string {
  const stamp=Date.parse(String(value||""));
@@ -306,7 +320,7 @@ function historyModel(home:string,away:string,kickoff:string,history:any[],footy
  const hLocal=teamRows(normTeam(home)),aLocal=teamRows(normTeam(away)),hf={...(footyForm?.home||{}),...(publicForm?.home||{})},af={...(footyForm?.away||{}),...(publicForm?.away||{})};
  const choose=(local:any[],fallback:any)=>{
   const supplemental=Array.isArray(fallback?.last10)?fallback.last10:(Array.isArray(fallback?.last5)?fallback.last5:[]);
-  const externalRows=supplemental.map((x:any)=>({date:String(x.date||"").slice(0,10),opponent:String(x.opponent||""),gf:Number(x.goals_for||0),ga:Number(x.goals_against||0),xg_for:x.xg_for==null?null:Number(x.xg_for),xg_against:x.xg_against==null?null:Number(x.xg_against),pts:x.result==="W"?3:x.result==="D"?1:0})).filter((x:any)=>{const t=Date.parse(String(x.date||"")+"T00:00:00Z");return Number.isFinite(t)&&t<cutoff&&cutoff-t<=240*24*60*60*1000;});
+  const externalRows=supplemental.map((x:any)=>({date:String(x.date||"").slice(0,10),opponent:String(x.opponent||""),gf:Number(x.goals_for||0),ga:Number(x.goals_against||0),xg_for:x.xg_for==null?null:Number(x.xg_for),xg_against:x.xg_against==null?null:Number(x.xg_against),source:String(x.source||x.xg_source||"").trim(),pts:x.result==="W"?3:x.result==="D"?1:0})).filter((x:any)=>{const t=Date.parse(String(x.date||"")+"T00:00:00Z");return Number.isFinite(t)&&t<cutoff&&cutoff-t<=240*24*60*60*1000;});
   const merged=[...local,...externalRows].filter((x:any)=>Number.isFinite(x.gf)&&Number.isFinite(x.ga)).sort((a:any,b:any)=>String(b.date||"").localeCompare(String(a.date||"")));
   const seen=new Set<string>(),rows=merged.filter((x:any)=>{const k=[x.date,normTeam(x.opponent),x.gf,x.ga].join("|");if(seen.has(k))return false;seen.add(k);return true;}).slice(0,10);
   if(rows.length>=3)return {rows,matches:rows.length,form:fallback||null,source:fallback?.source||"VERIFIED_MATCH_HISTORY"};
@@ -318,7 +332,7 @@ function historyModel(home:string,away:string,kickoff:string,history:any[],footy
  let p1:number,px:number,p2:number,method:string,xgUsed=false,xgHomeMatches=0,xgAwayMatches=0,expectedHomeGoals:number|null=null,expectedAwayGoals:number|null=null,xgHomeSourceCounts:Record<string,number>={},xgAwaySourceCounts:Record<string,number>={};
  if(hs.rows.length>=3&&as.rows.length>=3){
   const xgCutoff=Date.parse(String(kickoff||""));
-  const freshXg=(rows:any[])=>rows.filter((x:any)=>{const stamp=Date.parse(String(x.date||"")+"T00:00:00Z");return Number.isFinite(stamp)&&Number.isFinite(xgCutoff)&&stamp<xgCutoff&&xgCutoff-stamp<=240*24*60*60*1000&&x.xg_for!=null&&x.xg_against!=null&&Number.isFinite(Number(x.xg_for))&&Number.isFinite(Number(x.xg_against));});
+  const freshXg=(rows:any[])=>rows.filter((x:any)=>{const stamp=Date.parse(String(x.date||"")+"T00:00:00Z");return isRealXgObservation(x)&&Number.isFinite(stamp)&&Number.isFinite(xgCutoff)&&stamp<xgCutoff&&xgCutoff-stamp<=240*24*60*60*1000;});
   const externalHomeXg=freshXg(Array.isArray(hf?.xg_last10)?hf.xg_last10:[]);
   const externalAwayXg=freshXg(Array.isArray(af?.xg_last10)?af.xg_last10:[]);
   // Merge public xG feeds with local verified history instead of discarding
@@ -327,14 +341,14 @@ function historyModel(home:string,away:string,kickoff:string,history:any[],footy
   const mergeXg=(...groups:any[][])=>{
    const unique=new Map<string,any>();
    for(const row of groups.flat().sort((a:any,b:any)=>Date.parse(String(b.date||""))-Date.parse(String(a.date||"")))){
-    const key=String(row.date||"").slice(0,10)+"|"+Number(row.xg_for).toFixed(3)+"|"+Number(row.xg_against).toFixed(3);
+    const key=String(row.date||"").slice(0,10)+"|"+String(row.source||row.xg_source||"")+"|"+Number(row.xg_for).toFixed(3)+"|"+Number(row.xg_against).toFixed(3);
     if(!unique.has(key))unique.set(key,row);
    }
    return [...unique.values()].slice(0,10);
   };
   const hxgRows=mergeXg(externalHomeXg,freshXg(hs.rows));
   const axgRows=mergeXg(externalAwayXg,freshXg(as.rows));
-  const hxg=hxgRows.length,axg=axgRows.length,useXg=hxg>=3&&axg>=3; xgUsed=useXg; xgHomeMatches=hxg; xgAwayMatches=axg; const countSources=(rows:any[])=>rows.reduce((acc:Record<string,number>,row:any)=>{const source=String(row.source||"historical_xg").toLowerCase();acc[source]=(acc[source]||0)+1;return acc;},{});xgHomeSourceCounts=countSources(hxgRows);xgAwaySourceCounts=countSources(axgRows); const homeAttack=useXg?0.65*avg(hxgRows,"xg_for")+0.35*avg(hs.rows,"gf"):avg(hs.rows,"gf"),homeDefence=useXg?0.65*avg(hxgRows,"xg_against")+0.35*avg(hs.rows,"ga"):avg(hs.rows,"ga"),awayAttack=useXg?0.65*avg(axgRows,"xg_for")+0.35*avg(as.rows,"gf"):avg(as.rows,"gf"),awayDefence=useXg?0.65*avg(axgRows,"xg_against")+0.35*avg(as.rows,"ga"):avg(as.rows,"ga"),lh=clamp(((homeAttack+awayDefence)/2)*1.06,0.15,3.6),la=clamp(((awayAttack+homeDefence)/2)*0.94,0.15,3.6),hp=Array.from({length:9},(_,i)=>poisson(lh,i)),ap=Array.from({length:9},(_,i)=>poisson(la,i));
+  const hxg=hxgRows.length,axg=axgRows.length,useXg=hxg>=3&&axg>=3; xgUsed=useXg; xgHomeMatches=hxg; xgAwayMatches=axg; const countSources=(rows:any[])=>rows.reduce((acc:Record<string,number>,row:any)=>{const source=String(row.source||row.xg_source||"").trim().toLowerCase();if(source)acc[source]=(acc[source]||0)+1;return acc;},{});xgHomeSourceCounts=countSources(hxgRows);xgAwaySourceCounts=countSources(axgRows); const homeAttack=useXg?0.65*avg(hxgRows,"xg_for")+0.35*avg(hs.rows,"gf"):avg(hs.rows,"gf"),homeDefence=useXg?0.65*avg(hxgRows,"xg_against")+0.35*avg(hs.rows,"ga"):avg(hs.rows,"ga"),awayAttack=useXg?0.65*avg(axgRows,"xg_for")+0.35*avg(as.rows,"gf"):avg(as.rows,"gf"),awayDefence=useXg?0.65*avg(axgRows,"xg_against")+0.35*avg(as.rows,"ga"):avg(as.rows,"ga"),lh=clamp(((homeAttack+awayDefence)/2)*1.06,0.15,3.6),la=clamp(((awayAttack+homeDefence)/2)*0.94,0.15,3.6),hp=Array.from({length:9},(_,i)=>poisson(lh,i)),ap=Array.from({length:9},(_,i)=>poisson(la,i));
   p1=0;px=0;p2=0;for(let i=0;i<9;i++)for(let j=0;j<9;j++){const q=hp[i]*ap[j];if(i>j)p1+=q;else if(i===j)px+=q;else p2+=q;}const sum=p1+px+p2;p1/=sum;px/=sum;p2/=sum;expectedHomeGoals=+lh.toFixed(2);expectedAwayGoals=+la.toFixed(2);
   method=useXg?"Model Poissona: 65% średnie xG i xGA z ostatnich 10 meczów + 35% rzeczywiste gole, z korektą przewagi gospodarzy.":"Model Poissona na podstawie średnich goli strzelonych i straconych z ostatnich maksymalnie 10 spotkań, z niewielką korektą przewagi gospodarzy.";
  }else{
@@ -642,7 +656,7 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  };
  const dateFromExternalId=(m:any)=>/:(\\d{4}-\\d{2}-\\d{2}):/.exec(String(m.external_id||""))?.[1]||null;
  const matchDate=(m:any)=>m.kickoff_at?new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(m.kickoff_at)):(String(m.kickoff_date||"").slice(0,10)||dateFromExternalId(m));
- const rawDateMatches=all.filter((m:any)=>matchDate(m)===date&&fixtureGender(m)==="men"&&isEuropeanFixture(m.country,m.competition||m.league,m.home_team,m.away_team)&&(isEligibleOpenMatchdayMatch(m)||isEligibleDomesticSeniorLeague(m.country,m.competition||m.league)));
+ const rawDateMatches=all.filter((m:any)=>matchDate(m)===date&&isEligibleScheduledFixture(m));
  const deduped=dedupeFixturesByDate(rawDateMatches,matchDate);const matches=deduped.matches;const duplicatesRemoved=deduped.duplicatesRemoved;
  const historyFields="select=id,home_team,away_team,kickoff_at,gender,match_results(home_score,away_score,verified)";
  const historySince=new Date(Date.parse(date+"T00:00:00Z")-240*24*60*60*1000).toISOString();

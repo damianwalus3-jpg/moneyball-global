@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
-import { isEligibleDomesticSeniorLeague } from "../_shared/domestic-league-scope.ts";
+import { isEligibleDomesticTopTwoLeague, isEligibleOpenMatchdayTier } from "../_shared/domestic-league-scope.ts";
+import { isWomensTeam } from "../_shared/team-normalization.ts";
 import { isExcludedSeniorTeam, normalizeTeamName, teamHistoryKey } from "../_shared/team-normalization.ts";
 
 const cors = {
@@ -164,11 +165,12 @@ async function openMatchday(date: string) {
   const leagueNameByFolder = new Map(indexRows.map(m => [m[1], m[2].trim()]));
   const countryNameByFolder = new Map(indexRows.map(m => [m[1], m[3].trim()]));
   const eligibleIndexRows = indexRows.filter(m => {
-    const folder = m[1], tier = folder.match(/^([A-Z]{3})_([1-9][0-9]*)_[A-Za-z0-9-]+$/i);
-    const country = m[3].trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const folder = m[1];
+    const country = m[3].trim();
     const league = m[2].trim();
-    return !!tier && isGeographicEuropeCountry(country)
-      && !/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series|cup|copa|trophy|youth|academy|reserves?)\b/i.test(folder + " " + league);
+    return isEligibleOpenMatchdayTier(folder)
+      && isGeographicEuropeCountry(country)
+      && isEligibleDomesticTopTwoLeague(country, league);
   });
   const folders = eligibleIndexRows.map(m => m[1]);
   const unique = [...new Set(folders)];
@@ -286,20 +288,16 @@ async function openMatchday(date: string) {
 }
 const ESPN_LEAGUES = [
   "eng.1","eng.2","esp.1","esp.2","ita.1","ita.2","ger.1","ger.2","fra.1","fra.2",
-  "bel.1","ned.1","por.1","sco.1","uefa.nations","uefa.champions","uefa.europa","uefa.europa.conf",
-  "swe.1","nor.1","den.1","aut.1","sui.1","tur.1","gre.1",
-  "eng.w.1","eng.w.promotion.relegation","eng.w.fa","eng.w.league_cup",
-  "esp.w.1","fra.w.1","ned.w.1","ned.w.knvb_cup",
-  "uefa.w.nations","uefa.w.europa"
+  "bel.1","ned.1","por.1","sco.1","swe.1","nor.1","den.1","aut.1","sui.1","gre.1"
 ];
 const ESPN_COUNTRY: Record<string,string> = {
   eng:"England", esp:"Spain", ita:"Italy", ger:"Germany", fra:"France",
   bel:"Belgium", ned:"Netherlands", por:"Portugal", sco:"Scotland",
-  uefa:"Europe", swe:"Sweden", nor:"Norway", den:"Denmark",
-  aut:"Austria", sui:"Switzerland", tur:"Turkey", gre:"Greece"
+  swe:"Sweden", nor:"Norway", den:"Denmark", aut:"Austria", sui:"Switzerland",
+  gre:"Greece"
 };
 
-const ESPN_WOMEN_HISTORY_LEAGUES = ["eng.w.1","esp.w.1","fra.w.1","ned.w.1"];
+const ESPN_WOMEN_HISTORY_LEAGUES: string[] = [];
 function previousSundayDates(targetDate:string,count=10):string[] {
   const target=new Date(targetDate+"T12:00:00Z");
   const weekday=target.getUTCDay();
@@ -379,7 +377,7 @@ async function espn(date: string) {
         league_code: leagueCode,
         competition: leagueName || norm(c?.notes?.[0]?.headline || e?.name),
         country: norm(c?.venue?.address?.country) || country,
-        gender: isWomen ? "women" : leagueCode === "uefa.nations" ? "men" : "unknown",
+        gender: isWomen ? "women" : "men",
         home_team: norm(home?.team?.displayName),
         away_team: norm(away?.team?.displayName),
         home_team_id: String(home?.team?.id || home?.id || ""),
@@ -398,7 +396,7 @@ async function espn(date: string) {
   // ESPN exposes the men's UEFA Nations League as a dedicated public league.
   // Pull each participating national team's completed season schedule so national
   // teams are not left without form merely because club-history datasets do not cover them.
-  const nationsFixtures=fixtures.filter((x:any)=>x.league_code==="uefa.nations");
+  const nationsFixtures:any[]=[];
   if(nationsFixtures.length){
     const teams=new Map<string,string>();
     for(const fixture of nationsFixtures){
@@ -817,10 +815,13 @@ Deno.serve(async (req: Request) => {
       mergedByFixture.set(k,merged);
     }
     const deduped=[...mergedByFixture.values()];
-    const europeanFixtures = deduped.filter((f:any) => isEuropeanFixture(f.country,f.competition,f.home_team,f.away_team)
-      && isEligibleDomesticSeniorLeague(f.country,f.competition||f.league)
-      && (!f.gender || String(f.gender).toLowerCase()==="men")
-      && !isExcludedSeniorTeam(f.home_team) && !isExcludedSeniorTeam(f.away_team));
+    const europeanFixtures = deduped.filter((f:any) => {
+      const gender = String(f.gender ?? "").toLowerCase();
+      return isEligibleDomesticTopTwoLeague(f.country, f.competition || f.league)
+        && (!gender || gender === "men")
+        && !isWomensTeam(f.home_team) && !isWomensTeam(f.away_team)
+        && !isExcludedSeniorTeam(f.home_team) && !isExcludedSeniorTeam(f.away_team);
+    });
     const sportsDbHistory=await sportsDbTeamHistory(europeanFixtures,date);
     for(const fixture of europeanFixtures){
       const homeForm=sportsDbHistory.forms.get(sportsDbTeamKey(fixture.home_team));

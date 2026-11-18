@@ -1,6 +1,7 @@
 import { footyNomadSectionAt } from "../_shared/footynomad-section.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 import { isEligibleDomesticSeniorLeague } from "../_shared/domestic-league-scope.ts";
+import { isWomensTeam } from "../_shared/team-normalization.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const PROJECT_URL = Deno.env.get("SUPABASE_URL") || "https://gzgeklcukrclgwbsmbsp.supabase.co";
@@ -80,7 +81,7 @@ async function readFixtures(date: string) {
       ? textOf(countryHtml).replace(/\s+\d+$/, "").trim() || null
       : null;
     if (!isEuropeanFixture(country,competition,home,away) || !isEligibleDomesticSeniorLeague(country,competition)) continue;
-    if (isExcludedSeniorTeam(home) || isExcludedSeniorTeam(away)) continue;
+    if (isExcludedSeniorTeam(home) || isExcludedSeniorTeam(away) || isWomensTeam(home) || isWomensTeam(away)) continue;
     const cls = (attrs.match(/class=["']([^"']+)/i) || [])[1] || "";
     const status = cls.includes("ticket-live") ? "live"
       : cls.includes("ticket-ft") ? "finished"
