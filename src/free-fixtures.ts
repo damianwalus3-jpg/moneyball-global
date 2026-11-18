@@ -255,7 +255,7 @@ export function mergeFixtureSource(existing: FreeFixture, incoming: FreeFixture)
   return existing;
 }
 
-export function parsePitchApiLeagueFixtures(league: PitchApiLeague, matches: PitchApiLeagueMatch[], targetDate: string, updatedAt: string): FreeFixture[] {
+export function parsePitchApiLeagueFixtures(league: PitchApiLeague, matches: PitchApiLeagueMatch[], targetDate: string, updatedAt: string, selectedSeason?: string): FreeFixture[] {
   if (!isPitchApiCountryEligible(league.country_code)) return [];
   return matches.flatMap(item => {
     if (item.status !== "not_started" || !item.time_utc || !item.home_team?.name || !item.away_team?.name) return [];
@@ -271,7 +271,7 @@ export function parsePitchApiLeagueFixtures(league: PitchApiLeague, matches: Pit
       home: item.home_team.name, away: item.away_team.name, source: "PitchAPI catalogue",
       sourceUpdatedAt: updatedAt, pitchApiMatchId: item.id,
       pitchApiHomeTeamId: item.home_team.id, pitchApiAwayTeamId: item.away_team.id,
-      pitchApiLeagueId: league.id, pitchApiSeason: league.seasons?.[0] ?? league.season ?? undefined,
+      pitchApiLeagueId: league.id, pitchApiSeason: selectedSeason ?? selectPitchApiSeason(league, targetDate),
     }];
   });
 }
@@ -657,7 +657,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
         continue;
       }
       pitchApiCatalogueUpcomingFixtures += result.fixtures.length;
-      const parsedFixtures = parsePitchApiLeagueFixtures(result.league, result.fixtures, date, new Date().toISOString());
+      const parsedFixtures = parsePitchApiLeagueFixtures(result.league, result.fixtures, date, new Date().toISOString(), result.season);
       pitchApiCatalogueDateFixtures += parsedFixtures.length;
       for (const fixture of parsedFixtures) {
         const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
