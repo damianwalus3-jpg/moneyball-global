@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildPitchApiXgForm, fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiAdvancedStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
+import { buildPitchApiXgForm, fetchPitchApiLeagueCatalog, fetchPitchApiLeagueMatches, fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiAdvancedStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
 
 const match: PitchApiLeagueMatch = {
   id: "m_Ab12Cd", time_utc: "2026-11-17T19:00:00Z", status: "finished",
@@ -74,6 +74,25 @@ describe("PitchAPI xG history parsing", () => {
   });
 });
 
+describe("PitchAPI league catalogue", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("reads country codes and current seasons from the league catalogue", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { leagues: [
+      { id: "l_Bel123", name: "Belgian Pro League", country_code: "BEL", seasons: ["2026/2027", "2025/2026"] },
+      { id: "l_Den123", name: "1. Division", country_code: "DEN", seasons: ["2026/2027"] },
+    ] } }), { status: 200 })));
+    const leagues = await fetchPitchApiLeagueCatalog();
+    expect(leagues).toHaveLength(2);
+    expect(leagues[0]).toMatchObject({ id: "l_Bel123", country_code: "BEL", seasons: ["2026/2027", "2025/2026"] });
+  });
+  it("allows upcoming league fixtures to be requested without mixing them into played history", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { league: { id: "l_Bel123" }, matches: [] } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await fetchPitchApiLeagueMatches("l_Bel123", "2026/2027", "upcoming");
+    expect(String(fetchMock.mock.calls[0][0])).toContain("status=upcoming");
+    expect(String(fetchMock.mock.calls[0][0])).toContain("season=2026%2F2027");
+  });
+});
 describe("PitchAPI historical xG fetch", () => {
   afterEach(() => vi.unstubAllGlobals());
   it("reads the documented league envelope and aggregates only prior finished matches", async () => {
