@@ -77,6 +77,7 @@ export function parsePitchApiXgStats(data: PitchApiTeamMatchStats, teamId: strin
     const value = Number.parseFloat(raw.replace(",", "."));
     return Number.isFinite(value) && value >= 0 ? value : null;
   };
+  if (match.status !== "finished" || !Number.isInteger(match.score_home) || !Number.isInteger(match.score_away)) return null;
   const homeSide = data.home_team?.id === teamId || match.home.id === teamId;
   const awaySide = data.away_team?.id === teamId || match.away.id === teamId;
   if (homeSide === awaySide) return null;
@@ -90,8 +91,8 @@ export function parsePitchApiXgStats(data: PitchApiTeamMatchStats, teamId: strin
     matchId: match.id, date, isHome: homeSide,
     xgFor: homeSide ? homeXg : awayXg,
     xgAgainst: homeSide ? awayXg : homeXg,
-    goalsFor: (homeSide ? match.score_home : match.score_away) ?? 0,
-    goalsAgainst: (homeSide ? match.score_away : match.score_home) ?? 0,
+    goalsFor: (homeSide ? match.score_home : match.score_away) as number,
+    goalsAgainst: (homeSide ? match.score_away : match.score_home) as number,
     shotsFor: homeSide ? homeShots : awayShots,
     shotsAgainst: homeSide ? awayShots : homeShots,
   };
