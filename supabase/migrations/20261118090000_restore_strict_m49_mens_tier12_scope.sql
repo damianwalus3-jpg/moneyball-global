@@ -531,3 +531,21 @@ BEGIN
   END IF;
 END;
 $test_coupon_guard$;
+
+-- Keep the existing owner-only provider cache policies but evaluate auth.uid()
+-- once per statement (Supabase auth_rls_initplan advisor).
+DROP POLICY IF EXISTS moneyball_provider_cache_select_own ON public.moneyball_provider_cache;
+CREATE POLICY moneyball_provider_cache_select_own
+  ON public.moneyball_provider_cache FOR SELECT TO authenticated
+  USING ((SELECT auth.uid()) = owner_id);
+
+DROP POLICY IF EXISTS moneyball_provider_cache_insert_own ON public.moneyball_provider_cache;
+CREATE POLICY moneyball_provider_cache_insert_own
+  ON public.moneyball_provider_cache FOR INSERT TO authenticated
+  WITH CHECK ((SELECT auth.uid()) = owner_id);
+
+DROP POLICY IF EXISTS moneyball_provider_cache_update_own ON public.moneyball_provider_cache;
+CREATE POLICY moneyball_provider_cache_update_own
+  ON public.moneyball_provider_cache FOR UPDATE TO authenticated
+  USING ((SELECT auth.uid()) = owner_id)
+  WITH CHECK ((SELECT auth.uid()) = owner_id);
