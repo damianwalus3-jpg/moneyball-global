@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildPitchApiXgForm, fetchPitchApiXgFormsForFixture, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiAdvancedStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
+import { buildPitchApiXgForm, fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiAdvancedStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
 
 const match: PitchApiLeagueMatch = {
   id: "m_Ab12Cd", time_utc: "2026-11-17T19:00:00Z", status: "finished",
@@ -114,5 +114,21 @@ describe("PitchAPI historical xG fetch", () => {
     expect(forms.away.xgForPerMatch).toBeCloseTo(1.4, 8);
     expect(forms.home.shotsOnTargetForPerMatch).toBe(5);
     expect(forms.away.bigChancesForPerMatch).toBe(1);
+  });
+});
+
+describe("PitchAPI lineup evidence", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("preserves provider confirmation flags and never upgrades predicted XIs", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: {
+      match_id: "m_Ab12Cd",
+      home: { formation: "4-3-3", confirmed: false, lineup_type: "lastStarting11", starters: [{ player_id: "p_123456", name: "Player One" }] },
+      away: { formation: "4-4-2", confirmed: true, starters: Array.from({ length: 11 }, (_,i) => ({ player_id: "p_" + i, name: "Player " + i })) },
+    } }), { status: 200 })));
+    const lineups = await fetchPitchApiMatchLineups("m_Ab12Cd");
+    expect(lineups.home.confirmed).toBe(false);
+    expect(lineups.home.lineup_type).toBe("lastStarting11");
+    expect(lineups.away.confirmed).toBe(true);
+    expect(lineups.away.starters).toHaveLength(11);
   });
 });
