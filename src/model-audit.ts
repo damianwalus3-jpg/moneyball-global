@@ -54,7 +54,8 @@ export function auditTrackerPredictions(records: TrackerRecord[], minimumSampleS
     const key = [d.fixtureId, model, market].join("|");
     if (!latest.has(key)) latest.set(key, r);
   }
-  const explicitDC = new Set([...latest.values()].filter(r => r.details.market === "DOUBLE_CHANCE")
+  // A malformed explicit DC row must not suppress valid DC values retained on its 1X2 row.
+  const explicitDC = new Set([...latest.values()].filter(r => r.details.market === "DOUBLE_CHANCE" && validDC(r.details))
     .map(r => String(r.details.fixtureId) + "|" + String(r.details.model ?? "legacy")));
   const grouped1 = new Map<string, Array<{ fixtureId: string; probabilities: { home: number; draw: number; away: number }; actual: "1" | "X" | "2" }>>();
   const groupedDC = new Map<string, Array<{ fixtureId: string; probability: number; actual: boolean }>>();
