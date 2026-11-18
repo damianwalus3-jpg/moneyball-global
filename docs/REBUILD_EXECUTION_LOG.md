@@ -912,3 +912,16 @@
 - Non-European groups on the same page (Algeria, Argentina, Bolivia, Brazil, Cameroon, Colombia, Congo DR, India, Japan, Jordan, Liberia, Mexico, Nigeria, Panama, Paraguay, Peru, Qatar, Saudi Arabia, South Korea, Suriname, Tunisia, Uganda, Uruguay, Venezuela and Zambia) are correctly excluded from the Europe-only feed.
 - This validates FootyNomad country-group parsing for the 18 Nov snapshot only; it does not establish complete coverage of every European competition or prove that all fixtures listed by every federation are present.
 - No code or user data changed; no additional provider calls beyond the public page read were made. Next: complete the in-app five-source merged scan and compare provider overlaps/unique additions.
+
+
+## Stage 74 — UEFA Nations League fixture and prediction support (2026-11-18)
+- User requested that UEFA Nations League fixtures be included in the European scan and receive the same pre-match prediction workflow as other fixtures.
+- Verified the 2026/27 UEFA league phase schedule against UEFA's official fixture/results pages: matchday 6 concluded on 17 November 2026; no league-phase fixtures are scheduled on 18 November. Knockout/play-off draw is 20 November; quarter-finals and promotion/relegation play-offs are scheduled for 25–30 March 2027. No artificial same-day matches are inserted.
+- Confirmed existing source paths recognize UEFA/Nations League as a European competition (FootyNomad's World-group allowlist and OpenLigaDB's `nla` catalogue shortcut), but ESPN/FootyNomad-only records did not carry the OpenLigaDB history key. Such fixtures could appear without a usable team-history path for the prediction engine.
+- Updated ESPN and FootyNomad fixture normalization so Nations League fixtures are explicitly classified as UEFA and carry `leagueShortcut=nla` plus the season year. Added timezone.football slug aliases `nations-league` and `uefa-nations-league` with the same history metadata.
+- This routes Nations League fixtures through the existing OpenLigaDB national-team match-history loader and preserves the current Poisson prediction workflow. If the provider has fewer than three prior matches for a team, the model marks the prediction unavailable/rejected rather than inventing form.
+- Bumped fixture scan cache to v12 to prevent older cached metadata from hiding the tournament mapping.
+- Added regression coverage for ESPN and timezone.football Nations League classification, UEFA grouping, and the `nla` history key.
+- Research sources: UEFA official 2026/27 fixture/results schedule; OpenLigaDB public API docs (no API key; 60 requests/minute fair-use limit); openfootball/martj42 international results data (CC0) reviewed as a potential independent historical fallback, but not substituted into live prediction history because the accessible snapshot ends 30 September 2026 and is stale for November pre-match form.
+- Changes are limited to the isolated `moneyball-rebuild` branch and `moneyball-global-rebuild` Worker. No MAIN, Tracker history, coupons, settlements, bankroll or paid odds credits were touched.
+- Verification/deployment status: pending CI and isolated REBUILD deploy after this commit.
