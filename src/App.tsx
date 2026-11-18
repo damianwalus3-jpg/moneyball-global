@@ -259,7 +259,7 @@ export default function App() {
   };
   const analyzeAllFixtures = async (fixtures?: FreeFixture[]) => {
     const sourceMatches = fixtures ?? fixtureScan?.fixtures;
-    if (!sourceMatches || bulkAnalysisLock.current || scanLoading) return;
+    if (!sourceMatches || bulkAnalysisLock.current || (!fixtures && scanLoading)) return;
     const latestByFixture = new Map<string, TrackerRecord>();
     for (const row of readRecords()) {
       if (row.kind === "prediction" && typeof row.details.fixtureId === "string" && !latestByFixture.has(row.details.fixtureId)) latestByFixture.set(row.details.fixtureId, row);
