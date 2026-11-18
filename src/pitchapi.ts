@@ -39,6 +39,9 @@ export interface PitchApiAdvancedTeam {
   tempo?: { direct_speed?: number | null };
 }
 export interface PitchApiAdvancedStats { match_id: string; teams?: PitchApiAdvancedTeam[] }
+export interface PitchApiLineupPlayer { player_id: string; name: string; shirt_number?: string; position_id?: number; is_captain?: boolean }
+export interface PitchApiLineupSide { formation?: string; confirmed: boolean; lineup_type?: string; coach?: { name?: string }; starters?: PitchApiLineupPlayer[]; subs?: PitchApiLineupPlayer[] }
+export interface PitchApiLineups { match_id: string; home_team?: PitchApiTeamRef; away_team?: PitchApiTeamRef; home: PitchApiLineupSide; away: PitchApiLineupSide }
 export interface PitchApiXgObservation {
   matchId: string;
   date: string;
@@ -201,6 +204,9 @@ export async function fetchPitchApiMatchStats(matchId: string): Promise<PitchApi
 }
 export async function fetchPitchApiMatchAdvanced(matchId: string): Promise<PitchApiAdvancedStats> {
   return getData<PitchApiAdvancedStats>(`/api/pitchapi/matches/${encodeURIComponent(matchId)}/advanced`);
+}
+export async function fetchPitchApiMatchLineups(matchId: string): Promise<PitchApiLineups> {
+  return getData<PitchApiLineups>(`/api/pitchapi/matches/${encodeURIComponent(matchId)}/lineups`);
 }
 
 function brusselsDate(utc: string): string {
