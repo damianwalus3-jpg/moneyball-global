@@ -1292,3 +1292,12 @@
 - Commits: country-wide history implementation `9fb993359ea953c7d96707ff919f6bb4c68a4bac`; cup fixture integration `dbbe00f718fd95d4f0e0ce0d9623377fe887906a`; regression test `a0a37c48954b68bd779b00a161455bc56c797939`; folder/date validation correction `133af0af65b6feacac6b7d9c61ffe1aae5d9d1a3`; App folder guard correction `12df961104bde3fc510ab7c3237355c2d98a6cad`.
 - Final validated HEAD: `3c1d632b723588e672f13d9add4074c99fe56ab3`. MONEYBALL rebuild CI run `44280775114`, Rebuild Checks run `44280775142`, and Cloudflare deploy run `44280775129` all completed SUCCESS on this exact HEAD. TypeScript check, unit tests and production build passed; test summary: 21 files and 161 tests passed. Cloudflare Free Worker deploy completed successfully to `https://moneyball-global-rebuild.damianwalus3.workers.dev/`.
 - No existing Tracker rows, historical predictions, coupons, settlement records or bankroll values were modified. No paid API, key, hosting or database was added.
+
+
+## Stage 107 — evidence gate validation and release (2026-11-18)
+- Commit `3be3474183cfa89eac77480bb4a3f7c3a4891e52` adds the eight-area evidence audit, explicit goals-lambda-not-xG labelling, strict coupon evidence gate, 15-minute odds freshness and the source/licensing decision matrix in `docs/REBUILD_ANALYSIS_EVIDENCE_POLICY.md`.
+- CI run `44286224630`: SUCCESS; 22 test files and 164 tests passed, including TypeScript and production build.
+- Rebuild Checks run `44286224684`: SUCCESS.
+- Cloudflare Free Worker deploy run `44286224601`: SUCCESS for the same code commit.
+- The eight-factor evidence feed itself remains incomplete: no verified no-key/free source was found for all eight areas across all European clubs. The app now reports those areas as missing and blocks strong-candidate/coupon eligibility rather than claiming unsupported certainty. No paid provider or API key was introduced.
+- Historical Tracker records, predictions, coupons, settlements and bankroll were not rewritten.

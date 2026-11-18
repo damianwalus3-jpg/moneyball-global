@@ -115,4 +115,8 @@ describe("three-leg coupon candidates", () => {
     expect(buildThreeLegCandidates([wrongSelection, validB, validC], "2026-11-17")).toHaveLength(0);
   });
 
+  it("blocks old probability-only records that lack verified factor evidence", () => {
+    const legacy = { ...prediction("legacy", 0.95), details: { ...prediction("legacy", 0.95).details, evidenceComplete: false } };
+    expect(buildThreeLegCandidates([legacy, prediction("b", 0.9), prediction("c", 0.9)], "2026-11-17")).toHaveLength(0);
+  });
 });
