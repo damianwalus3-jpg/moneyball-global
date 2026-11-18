@@ -127,6 +127,51 @@ export function isEuropeanOpenLiga(league: OpenLigaLeague): boolean {
   if (startsWithCountryCode && !countryCodeFeed && !namedFeed) return false;
   return countryCodeFeed || namedFeed;
 }
+const OPENLIGA_COUNTRY_NAME_CODES: Array<[string, string]> = [
+  ["northern ireland", "NIR"], ["bosnia and herzegovina", "BIH"], ["north macedonia", "MKD"],
+  ["faroe islands", "FRO"], ["san marino", "SMR"], ["liechtenstein", "LIE"],
+  ["netherlands", "NED"], ["england", "ENG"], ["scotland", "SCO"], ["wales", "WAL"],
+  ["ireland", "IRE"], ["france", "FRA"], ["germany", "GER"], ["italy", "ITA"],
+  ["spain", "ESP"], ["portugal", "POR"], ["belgium", "BEL"], ["austria", "AUT"],
+  ["switzerland", "SUI"], ["turkey", "TUR"], ["greece", "GRE"], ["denmark", "DEN"],
+  ["sweden", "SWE"], ["norway", "NOR"], ["romania", "ROU"], ["poland", "POL"],
+  ["croatia", "CRO"], ["czech republic", "CZE"], ["czechia", "CZE"], ["ukraine", "UKR"],
+  ["cyprus", "CYP"], ["slovakia", "SVK"], ["slovenia", "SVN"], ["finland", "FIN"],
+  ["kazakhstan", "KAZ"], ["albania", "ALB"], ["serbia", "SRB"], ["bosnia", "BIH"],
+  ["bulgaria", "BUL"], ["hungary", "HUN"], ["iceland", "ISL"], ["luxembourg", "LUX"],
+  ["malta", "MLT"], ["estonia", "EST"], ["latvia", "LVA"], ["lithuania", "LTU"],
+  ["moldova", "MDA"], ["georgia", "GEO"], ["armenia", "ARM"], ["azerbaijan", "AZE"],
+  ["montenegro", "MNE"], ["andorra", "AND"], ["gibraltar", "GIB"], ["israel", "ISR"],
+  ["kosovo", "KOS"], ["belarus", "BLR"], ["monaco", "MCO"], ["vatican", "VAT"],
+  ["russia", "RUS"], ["macedonia", "MKD"],
+];
+const OPENLIGA_SHORTCUT_COUNTRY_CODES: Record<string, string> = {
+  eng: "ENG", esp: "ESP", ger: "GER", ita: "ITA", fra: "FRA", ned: "NED", por: "POR",
+  bel: "BEL", sco: "SCO", aut: "AUT", sui: "SUI", tur: "TUR", gre: "GRE", den: "DEN",
+  swe: "SWE", nor: "NOR", rou: "ROU", rus: "RUS", irl: "IRE", pol1: "POL", cro: "CRO",
+  cze: "CZE", ukr: "UKR", cyp: "CYP", svk: "SVK", svn: "SVN", fin: "FIN", kaz: "KAZ",
+  alb: "ALB", srb: "SRB", bih: "BIH", bul: "BUL", hun: "HUN", isl: "ISL", lux: "LUX",
+  mlt: "MLT", est: "EST", lva: "LVA", ltu: "LTU", mda: "MDA", geo: "GEO", arm: "ARM",
+  aze: "AZE", mkd: "MKD", mne: "MNE", and: "AND", fro: "FRO", gib: "GIB", isr: "ISR",
+  kos: "KOS", blr: "BLR", lie: "LIE", smr: "SMR", fr: "FRA", nl: "NED", pt: "POR",
+  gr: "GRE", ch: "SUI", cz: "CZE", tr: "TUR", at: "AUT", dk: "DEN", se: "SWE",
+  no: "NOR", ro: "ROU", ie: "IRE", hr: "CRO", ua: "UKR", cy: "CYP", sk: "SVK",
+  si: "SVN", fi: "FIN", hu: "HUN", bg: "BUL", rs: "SRB", ba: "BIH", is: "ISL",
+  lu: "LUX", mt: "MLT", ee: "EST", lv: "LVA", lt: "LTU", md: "MDA", ge: "GEO",
+  am: "ARM", az: "AZE", mk: "MKD", me: "MNE", ad: "AND", fo: "FRO", gi: "GIB",
+  il: "ISR", ko: "KOS", by: "BLR", li: "LIE", sm: "SMR", pl1: "POL",
+  bl: "GER", la1: "ESP", ere: "NED", "öbl": "AUT", wcl: "UEFA", ucl: "UEFA",
+  uel: "UEFA", uecl: "UEFA", nla: "UEFA", pl: "ENG",
+};
+export function openLigaCountryCode(league: OpenLigaLeague): string {
+  const name = (league.leagueName ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  for (const [country, code] of OPENLIGA_COUNTRY_NAME_CODES) if (name.includes(country)) return code;
+  const shortcut = (league.leagueShortcut ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (OPENLIGA_SHORTCUT_COUNTRY_CODES[shortcut]) return OPENLIGA_SHORTCUT_COUNTRY_CODES[shortcut];
+  const prefix = shortcut.match(/^([a-z]{2,3})(?=\d|[-_])/i)?.[1];
+  return prefix ? OPENLIGA_SHORTCUT_COUNTRY_CODES[prefix] ?? "EU" : "EU";
+}
+
 export function fixtureKey(date: string, home: string, away: string, competition = ""): string {
   const genderText = `${competition} ${home} ${away}`.toLowerCase();
   const gender = /\b(women|woman|womens|frauen|femmes|femenina|feminine|ladies|girls|wsl|wcl|w)\b/.test(genderText) ? "women" : "open";
@@ -302,7 +347,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
           return [{
             id: `openligadb|${match.matchID ?? shortcut + "|" + kickoff + "|" + home + "|" + away}`,
             competition: match.leagueName || league.leagueName || shortcut,
-            countryCode: "EU",
+            countryCode: openLigaCountryCode(league),
             leagueFolder: "",
             leagueShortcut: shortcut,
             leagueSeason: season,
