@@ -271,7 +271,18 @@ describe("odds provider pilot proxy", () => {
   it("rejects a pilot request without provider fixture identifiers", async () => {
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot", { headers: { Authorization: "Bearer test-pilot-token-0123456789-abcdef" } }), { ASSETS: { fetch: vi.fn() }, ODDS_PILOT_TOKEN: "test-pilot-token-0123456789-abcdef" }, { waitUntil: vi.fn() });
     expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "fixtureId, strikerGameId or strikerDate is required" });
+    expect(await response.json()).toEqual({ error: "fixtureId, apiFootballFixtureId, strikerGameId or strikerDate is required" });
+  });
+
+  it("rejects malformed API-Football fixture identifiers before provider access", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?apiFootballFixtureId=../../etc", {
+      headers: { Authorization: "Bearer test-pilot-token-0123456789-abcdef" },
+    }), { ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "private-key-value", ODDS_PILOT_TOKEN: "test-pilot-token-0123456789-abcdef" }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "invalid_fixture_identifier" });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("requests OddsPapi odds only from the Worker and returns provider data without the key", async () => {
