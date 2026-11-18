@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TrackerRecord } from "./tracker-store";
-import { listOddsBookmakers, valueSelectionFromOdds } from "./odds-value";
+import { listOddsBookmakers, shouldAutoFetchDailyOdds, valueSelectionFromOdds } from "./odds-value";
 
 const now = "2026-11-17T20:00:00.000Z";
 function odds(overrides: Partial<TrackerRecord["details"]> = {}, status = "COMPLETE_1X2"): TrackerRecord {
@@ -52,5 +52,23 @@ describe("verified odds valuation", () => {
       odds({ bookmaker: "Incomplete", complete1X2: false }, "INCOMPLETE_1X2"),
     ];
     expect(listOddsBookmakers(records, ["fixture-1"], now)).toEqual(["Book A"]);
+  });
+});
+
+describe("automatic daily odds fetch guard", () => {
+  const base = { fixtureDate: "2026-11-18", tokenSaved: true, lastSuccessfulDate: "", lastAttemptedDate: "" };
+  it("allows one automatic fetch when the owner token is saved", () => {
+    expect(shouldAutoFetchDailyOdds(base)).toBe(true);
+  });
+  it("does not fetch without the owner token or after a successful fetch", () => {
+    expect(shouldAutoFetchDailyOdds({ ...base, tokenSaved: false })).toBe(false);
+    expect(shouldAutoFetchDailyOdds({ ...base, lastSuccessfulDate: "2026-11-18" })).toBe(false);
+  });
+  it("does not repeat an attempted fetch after reloads or 15-minute scans", () => {
+    expect(shouldAutoFetchDailyOdds({ ...base, lastAttemptedDate: "2026-11-18" })).toBe(false);
+  });
+  it("rejects malformed calendar dates", () => {
+    expect(shouldAutoFetchDailyOdds({ ...base, fixtureDate: "2026-02-30" })).toBe(false);
+    expect(shouldAutoFetchDailyOdds({ ...base, fixtureDate: "not-a-date" })).toBe(false);
   });
 });
