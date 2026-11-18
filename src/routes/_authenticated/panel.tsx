@@ -170,6 +170,7 @@ function Panel() {
         actions={
           <>
             <Button onClick={() => void runManualScan()} disabled={scanRunning}>{scanRunning ? <Loader2 className="animate-spin" /> : <ScanLine />}{scanRunning ? "Analizuję…" : "Skanuj dzisiejsze mecze"}</Button>
+            <Button variant="outline" asChild><a href="#wybrane-typy"><Trophy /> Mecze wytypowane przez aplikację</a></Button>
             <Button variant="outline" asChild><Link to="/mecze"><CalendarDays /> Terminarz</Link></Button>
             <Button variant="outline" asChild><Link to="/kupony"><Ticket /> Kupony</Link></Button>
           </>
@@ -190,11 +191,11 @@ function Panel() {
         </div>
       )}
       <FinanceDashboard finance={financeQuery.data} loading={financeQuery.isLoading} error={financeQuery.isError} retry={() => void financeQuery.refetch()} />
-      <section className="mb-5 rounded-xl border border-primary/25 bg-card p-3 sm:p-4">
+      <section id="wybrane-typy" aria-label="Mecze wytypowane i wybrane przez aplikację" className="mb-5 scroll-mt-24 rounded-xl border border-primary/25 bg-card p-3 sm:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="font-display text-lg font-bold uppercase">Dzisiejsze wybrane typy</h2>
-            <p className="text-xs text-muted-foreground">Zatwierdzone typy aktywnego modelu · stawka analityczna 4 € na singiel</p>
+            <h2 className="font-display text-lg font-bold uppercase">Mecze wytypowane i wybrane przez aplikację</h2>
+            <p className="text-xs text-muted-foreground">Dokładny typ modelu, prawdopodobieństwo i uzasadnienie · stawka analityczna 4 € na singiel</p>
           </div>
           <Badge variant="success">{selectedPicks.length} wybranych</Badge>
         </div>
