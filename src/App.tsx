@@ -13,7 +13,7 @@ import { describeHistoryProvenance, shouldAppendPrediction } from "./prediction-
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import { auditOddsFixtureMatches } from "./odds-matching";
 import { buildBetSettlementRows } from "./bet-settlement";
-import { listOddsBookmakers } from "./odds-value";
+import { listOddsBookmakers, shouldAutoFetchDailyOdds } from "./odds-value";
 import { valueThreeLegCoupon } from "./coupon-value";
 import { buildBaselineEvidenceAudit, getEvidenceGaps, isEvidenceAuditComplete } from "./analysis-evidence";
 import {
@@ -24,6 +24,7 @@ import {
 
 const ODDS_PILOT_TOKEN_KEY = "moneyball.oddsPilotToken";
 const STRIKER_DAILY_FETCH_KEY = "moneyball.strikerDailyFetchDate";
+const STRIKER_DAILY_ATTEMPT_KEY = "moneyball.strikerDailyOddsAttemptDate";
 
 type Tab = "dashboard" | "matches" | "pick" | "coupons" | "intelligence" | "bets" | "tracker";
 
@@ -164,6 +165,7 @@ export default function App() {
   const [oddsPilotToken, setOddsPilotToken] = useState(() => { try { return localStorage.getItem(ODDS_PILOT_TOKEN_KEY) ?? ""; } catch { return ""; } });
   const [oddsTokenSaved, setOddsTokenSaved] = useState(() => { try { return Boolean(localStorage.getItem(ODDS_PILOT_TOKEN_KEY)); } catch { return false; } });
   const [lastOddsFetchDate, setLastOddsFetchDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_FETCH_KEY) ?? ""; } catch { return ""; } });
+  const [lastOddsAttemptDate, setLastOddsAttemptDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
   const [oddsLoading, setOddsLoading] = useState(false);
   const [oddsNotice, setOddsNotice] = useState("");
   const [oddsAudit, setOddsAudit] = useState<{ matched: number; unmatched: number; ambiguous: number; snapshots: number; utcDate: string } | null>(null);
@@ -374,11 +376,6 @@ export default function App() {
       setOddsNotice("Przeglądarka nie pozwoliła zapisać tokenu lokalnie.");
     }
   };
-  const unlockDailyOddsRefresh = () => {
-    try { localStorage.removeItem(STRIKER_DAILY_FETCH_KEY); } catch { /* storage may be unavailable */ }
-    setLastOddsFetchDate("");
-    setOddsNotice("Ponowne pobranie odblokowane. Następne kliknięcie wykona kolejne zapytanie za 10 kredytów.");
-  };
   const clearOddsPilotToken = () => {
     try { localStorage.removeItem(ODDS_PILOT_TOKEN_KEY); } catch { /* storage may be unavailable */ }
     setOddsPilotToken("");
@@ -399,6 +396,13 @@ export default function App() {
       setOddsNotice("Najpierw zapisz token dostępu. Musi być identyczny z sekretem ODDS_PILOT_TOKEN w Cloudflare.");
       return;
     }
+    // Persist the attempt before making a paid-credit call. This is a synchronous
+    // guard against React StrictMode, page reloads and repeated 15-minute scans.
+    let attemptedDate = "";
+    try { attemptedDate = localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { /* storage may be unavailable */ }
+    if (attemptedDate === fixtureScan.date || lastOddsAttemptDate === fixtureScan.date) return;
+    try { localStorage.setItem(STRIKER_DAILY_ATTEMPT_KEY, fixtureScan.date); } catch { /* best-effort persistence */ }
+    setLastOddsAttemptDate(fixtureScan.date);
     setOddsLoading(true);
     setOddsNotice("");
     try {
@@ -501,6 +505,15 @@ export default function App() {
     }, 15 * 60 * 1000);
     return () => window.clearInterval(refreshId);
   }, []);
+  useEffect(() => {
+    if (!fixtureScan) return;
+    if (shouldAutoFetchDailyOdds({
+      fixtureDate: fixtureScan.date,
+      tokenSaved: oddsTokenSaved,
+      lastSuccessfulDate: lastOddsFetchDate,
+      lastAttemptedDate: lastOddsAttemptDate,
+    })) void fetchDailyOdds();
+  }, [fixtureScan, oddsTokenSaved, lastOddsFetchDate, lastOddsAttemptDate]);
   useEffect(() => {
     const syncTracker = () => setRecords(readRecords());
     window.addEventListener("storage", syncTracker);
@@ -625,15 +638,14 @@ export default function App() {
         {active === "bets" && <section className="module-panel bets-module">
           <div className="module-icon"><Ticket/></div><h2>Bilans wybranych zakładów</h2>
           <article className="panel">
-            <div className="panel-heading"><div><h3>Automatyczne kursy · StrikerAPI</h3><p>Dzienny odczyt zbiorczy UTC · 10 kredytów za zapytanie</p></div><ShieldCheck size={18}/></div>
+            <div className="panel-heading"><div><h3>Automatyczne kursy · StrikerAPI</h3><p>Uruchomienie po skanie · maksymalnie 1 odczyt dziennie · 10 kredytów</p></div><ShieldCheck size={18}/></div>
             <div className="tracker-form">
-              <input type="password" autoComplete="off" value={oddsPilotToken} onChange={event => { setOddsPilotToken(event.target.value); setOddsTokenSaved(false); }} placeholder="ODDS_PILOT_TOKEN · min. 32 znaki" aria-label="Token dostępu do pilota kursów"/>
+              <input type="password" autoComplete="off" value={oddsPilotToken} onChange={event => { setOddsPilotToken(event.target.value); setOddsTokenSaved(false); }} placeholder="ODDS_PILOT_TOKEN · min. 32 znaki" aria-label="Token dostępu do automatycznych kursów"/>
               <button onClick={saveOddsPilotToken}>Zapisz token</button>
               <button onClick={clearOddsPilotToken} disabled={!oddsTokenSaved && !oddsPilotToken}>Usuń</button>
-              <button className="primary-button" onClick={() => void fetchDailyOdds()} disabled={!fixtureScan || oddsLoading || !oddsTokenSaved || lastOddsFetchDate === fixtureScan?.date}>{oddsLoading ? "Pobieranie kursów…" : lastOddsFetchDate === fixtureScan?.date ? "Pobrano dzisiaj" : "Pobierz kursy dnia"}</button>
-              {lastOddsFetchDate === fixtureScan?.date && <button onClick={unlockDailyOddsRefresh} disabled={oddsLoading}>Odblokuj ponowne pobranie · 10 kredytów</button>}
+              <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsFetchDate === fixtureScan?.date ? "Kursy pobrane dzisiaj" : lastOddsAttemptDate === fixtureScan?.date ? "Dzisiejsza próba wykonana — bez ponownego obciążania limitu" : oddsTokenSaved ? "Oczekiwanie na skan — pobieranie automatyczne" : "Wymagane jednorazowe zapisanie tokenu"}</span>
             </div>
-            <p className="source-note">Najpierw ustaw identyczny sekret <b>ODDS_PILOT_TOKEN</b> w Cloudflare Workerze <b>moneyball-global-rebuild</b>. Token pozostaje w lokalnej pamięci tej przeglądarki; nie wklejaj go do czatu. Data StrikerAPI jest w UTC, a dopasowanie odbywa się po dacie i godzinie Europe/Brussels. Zapytanie uruchamia się wyłącznie po kliknięciu.</p>
+            <p className="source-note">Ustaw identyczny sekret <b>ODDS_PILOT_TOKEN</b> w Cloudflare Workerze <b>moneyball-global-rebuild</b> i zapisz go tutaj tylko raz. Token pozostaje lokalnie w tej przeglądarce; nie wklejaj go do czatu. Po skanie dzisiejszych meczów aplikacja automatycznie pobierze dzienny pakiet kursów. Limit aplikacji to jedna próba na datę, aby chronić darmowe kredyty. Daty dostawcy są UTC; dopasowanie meczu odbywa się po nazwach drużyn, dacie i godzinie Europe/Brussels.</p>
             {oddsNotice && <div className="tracker-notice">{oddsNotice}</div>}
             {oddsAudit && <p className="source-note">Ostatni audyt · UTC {oddsAudit.utcDate} · dopasowane {oddsAudit.matched} · niejednoznaczne {oddsAudit.ambiguous} · bez dopasowania {oddsAudit.unmatched} · nowe snapshoty {oddsAudit.snapshots}.</p>}
             <h3>Ostatnie snapshoty kursów</h3>
@@ -649,7 +661,7 @@ export default function App() {
                   <span>{price(row.details.odds2)}</span>
                 </div>;
               })}
-              {!records.some(row => row.kind === "odds") && <div className="tracker-empty">Brak zapisanych kursów. Po skonfigurowaniu tokenu uruchom ręczne pobieranie kursów dnia.</div>}
+              {!records.some(row => row.kind === "odds") && <div className="tracker-empty">Brak zapisanych kursów. Po jednorazowym zapisaniu tokenu aplikacja pobierze je automatycznie po skanie.</div>}
             </div>
           </article>
           {(() => {
