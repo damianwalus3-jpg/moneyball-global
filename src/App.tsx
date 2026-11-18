@@ -9,7 +9,7 @@ import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from ".
 import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
-import { describeHistoryProvenance, hasMissingPredictionMarket, shouldAppendPrediction } from "./prediction-record";
+import { describeHistoryProvenance, hasMissingPredictionMarket, hasValidPredictionMarket, shouldAppendPrediction } from "./prediction-record";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import { auditOddsFixtureMatches } from "./odds-matching";
 import { auditMarketCoverage } from "./market-coverage";
@@ -59,18 +59,24 @@ function shouldRetryMissingXg(fixtureId: string): boolean {
 }
 
 
-function shouldRetryIncompletePrediction(fixtureId: string, prior?: TrackerRecord): boolean {
+function shouldRetryIncompletePrediction(fixtureId: string, prior: TrackerRecord | undefined, market: "1X2" | "DOUBLE_CHANCE"): boolean {
   if (!prior) return true;
-  const probabilities = [prior.details.p1, prior.details.px, prior.details.p2];
-  if (probabilities.every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)) return false;
+  const probabilities = market === "DOUBLE_CHANCE"
+    ? [prior.details.p1x, prior.details.px2, prior.details.p12]
+    : [prior.details.p1, prior.details.px, prior.details.p2];
+  const expectedTotal = market === "DOUBLE_CHANCE" ? 2 : 1;
+  const valid = probabilities.every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
+    && Math.abs((probabilities as number[]).reduce((sum, value) => sum + value, 0) - expectedTotal) <= 0.0001;
+  if (valid) return false;
   try {
     const key = "moneyball.incompletePredictionRetryAt";
     const raw = localStorage.getItem(key);
     const parsed: unknown = raw ? JSON.parse(raw) : {};
     const attempts = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
-    const lastAttempt = attempts[fixtureId];
+    const attemptKey = fixtureId + "|" + market;
+    const lastAttempt = attempts[attemptKey];
     if (typeof lastAttempt === "number" && Number.isFinite(lastAttempt) && Date.now() - lastAttempt < FALLBACK_RETRY_INTERVAL_MS) return false;
-    localStorage.setItem(key, JSON.stringify({ ...attempts, [fixtureId]: Date.now() }));
+    localStorage.setItem(key, JSON.stringify({ ...attempts, [attemptKey]: Date.now() }));
     return true;
   } catch { return false; }
 }
@@ -199,7 +205,10 @@ function savePredictionRecord(
       p1: probabilities?.home ?? null, px: probabilities?.draw ?? null, p2: probabilities?.away ?? null,
       dc1x: dc?.oneX ?? null, dcx2: dc?.xTwo ?? null, dc12: dc?.oneTwo ?? null,
       topProbability, strongCandidate, source: match.source };
-    if (shouldAppendPrediction(current, match.id, model, !!probabilities, method, "1X2")) {
+    const hasOneXTwoProbabilities = !!probabilities
+      && [probabilities.home, probabilities.draw, probabilities.away].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
+      && Math.abs(probabilities.home + probabilities.draw + probabilities.away - 1) <= 0.0001;
+    if (shouldAppendPrediction(current, match.id, model, hasOneXTwoProbabilities, method, "1X2")) {
       addRecord({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · 1X2 · " + method,
         status: strongCandidate ? "KANDYDAT" : "ODRZUCONY", details: oneXTwoDetails });
       current = readRecords();
@@ -208,7 +217,9 @@ function savePredictionRecord(
       p1x: dc?.oneX ?? null, px2: dc?.xTwo ?? null, p12: dc?.oneTwo ?? null,
       strongCandidate: false, strongDoubleChance, source: match.source,
       reason: reason ?? (!couponEligible ? "ODRZUCONY: brak minimalnej próbki lub wiarygodnej godziny meczu." : dcProbability === null ? "Brak prawidłowych prawdopodobieństw Double Chance." : dcProbability < 0.75 ? "Najwyższe prawdopodobieństwo Double Chance poniżej 75%." : null) };
-    const hasDcProbabilities = !!dc && [dc.oneX, dc.xTwo, dc.oneTwo].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1);
+    const hasDcProbabilities = !!dc
+      && [dc.oneX, dc.xTwo, dc.oneTwo].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
+      && Math.abs(dc.oneX + dc.xTwo + dc.oneTwo - 2) <= 0.0001;
     if (shouldAppendPrediction(current, match.id, model, hasDcProbabilities, method, "DOUBLE_CHANCE")) {
       addRecord({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · DOUBLE CHANCE · " + method,
         status: strongDoubleChance ? "KANDYDAT" : "ODRZUCONY", details: dcDetails });
@@ -327,22 +338,27 @@ export default function App() {
     const sourceMatches = fixtures ?? fixtureScan?.fixtures;
     if (!sourceMatches || bulkAnalysisLock.current || (!fixtures && scanLoading)) return;
     const currentRecords = readRecords();
-    const latestByFixture = new Map<string, TrackerRecord>();
-    for (const row of currentRecords) {
-      if (row.kind === "prediction" && row.details.market !== "DOUBLE_CHANCE" && typeof row.details.fixtureId === "string" && !latestByFixture.has(row.details.fixtureId)) latestByFixture.set(row.details.fixtureId, row);
+    const latestByFixtureMarket = new Map<string, TrackerRecord>();
+    for (const row of [...currentRecords].filter(item => item.kind === "prediction" && typeof item.details.fixtureId === "string")
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
+      const market = row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2";
+      const key = String(row.details.fixtureId) + "|" + market;
+      if (!latestByFixtureMarket.has(key)) latestByFixtureMarket.set(key, row);
     }
-    const xgModelFixtures = new Set(currentRecords.filter(row => row.kind === "prediction" && row.details.market !== "DOUBLE_CHANCE"
-      && row.details.model === "moneyball:pitchapi-recent-xg-poisson" && typeof row.details.fixtureId === "string")
-      .map(row => String(row.details.fixtureId)));
     const matches = [...new Map(sourceMatches.map(match => [match.id, match])).values()].filter(match => {
       if (hasKickoffPassed(match.date, match.time)) return false;
-      const prior = latestByFixture.get(match.id);
-      const missingProbabilities = shouldRetryIncompletePrediction(match.id, prior);
+      const prior = latestByFixtureMarket.get(match.id + "|1X2");
+      const priorDc = latestByFixtureMarket.get(match.id + "|DOUBLE_CHANCE");
+      const missingProbabilities = shouldRetryIncompletePrediction(match.id, prior, "1X2")
+        || shouldRetryIncompletePrediction(match.id, priorDc, "DOUBLE_CHANCE");
       const missingMarket = hasMissingPredictionMarket(currentRecords, match.id);
+      const xgModel = "moneyball:pitchapi-recent-xg-poisson";
+      const xgModelComplete = hasValidPredictionMarket(currentRecords, match.id, "1X2", xgModel)
+        && hasValidPredictionMarket(currentRecords, match.id, "DOUBLE_CHANCE", xgModel);
       const missingXgModel = !!(match.pitchApiLeagueId && match.pitchApiHomeTeamId && match.pitchApiAwayTeamId)
-        && !xgModelFixtures.has(match.id) && shouldRetryMissingXg(match.id);
-      // Repair a missing 1X2/DC row immediately; retry failed probability lookups and neutral/xG
-      // fallbacks at most every six hours so the 15-minute scan cannot hammer free sources.
+        && !xgModelComplete && shouldRetryMissingXg(match.id);
+      // Each market is checked independently, including its probability normalization.
+      // Failed lookups are retried at most every six hours, not on every 15-minute refresh.
       return missingProbabilities || missingMarket || shouldRetryNeutralFallback(match.id, prior) || missingXgModel;
     });
     if (!matches.length) { setRecords(readRecords()); return; }
