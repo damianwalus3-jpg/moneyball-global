@@ -1699,3 +1699,23 @@
 - Rebuild Checks [44412089162](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44412089162): PASS.
 - Cloudflare deployment for this exact code SHA was still pending at the time of this entry; do not claim it deployed until the deployment workflow and production smoke/reconciliation finish successfully.
 - No MAIN, TEST, Vercel, Lovable or destructive Tracker/database work.
+
+
+## 2026-11-18 — Stage 144–145: trustworthy scan timestamps and truthful source health
+
+### Stage 144 — separate live scan time from upstream catalogue time
+- Corrected `src/free-fixtures.ts`: `generatedAt` now records the actual completion time of the current scan; the OpenMatchday index timestamp is preserved separately as `catalogueGeneratedAt`.
+- This prevents a several-hour-old source index timestamp from being mistaken for the time at which the current fixture scan ran.
+- Code commit: `970dd0ba8b2cd0f6772ec2dfe06e6318ff7d0700`.
+- CI [44413393870](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44413393870) PASS; Rebuild Checks [44413393751](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44413393751) PASS; Cloudflare REBUILT deployment and live reconciliation [44413393735](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44413393735) PASS.
+- Live Europe/Brussels snapshot (2026-11-18 22:39 UTC): 168 unique fixtures, 20 countries, 63 competitions; 0 duplicate canonical keys, 0 wrong-date fixtures, 0 non-European fixtures. Current scan timestamp age 0 seconds; OpenMatchday catalogue age 15.9 hours; timezone.football feed age 0.9 hours.
+- The same live audit exposed an important reporting defect: OpenFootball was marked healthy because its feed counter was non-zero even though its dynamic catalogue reported HTTP 403 across seven GitHub repositories (Europe, England, Germany, Italy, Spain, Belgium and Austria). Its error was present in diagnostics but not reflected in the source-health boolean.
+
+### Stage 145 — source health now reflects actual errors and feed freshness
+- Updated `scripts/audit-live-fixtures.ts`: a source is healthy only when it was checked and has no source-specific errors; failed sources are listed in `degradedSources`, and the report now includes `sourceErrorCount` and `requiredSourcesHealthy`.
+- Added explicit 24-hour freshness gates for the OpenMatchday catalogue and timezone.football feed, alongside the existing 5-minute live-scan timestamp gate.
+- The audit now requires fresh scan/catalogue/feed timestamps, both critical live fixture feeds (Flashscore and FootyNomad), at least 6 of 8 healthy source entry points, and zero duplicate, wrong-date or non-European fixtures. A supplemental source can be visibly degraded without falsely presenting it as healthy or automatically blocking the whole scan when the remaining coverage is healthy.
+- Code commit: `2dcd9a94c058cbbead5684e78ce122a4f011c7a7`. CI, Rebuild Checks and Cloudflare deployment/reconciliation are triggered for this commit; final results must be appended after the runs complete.
+- Source investigation: reviewed the public `openfootball/football.json` current-season directory as a possible replacement. Verified eight 2026/27 files (Germany 1, England 1–2, Spain 1, France 1, Italy 1, Netherlands 1, Portugal 1); all eight contained zero fixtures dated 2026-11-18, and this set is top-division/selected-league coverage rather than a broad European replacement. It was therefore not inserted as a claimed fix for OpenFootball's dynamic catalogue failure.
+- Outstanding: restore reliable OpenFootball dynamic discovery or replace it with a verified public European competition index; inspect and remediate its HTTP 403 without weakening the country/date filters. Keep European completeness explicitly unproven until independent source reconciliation demonstrates it.
+- Scope preserved: only `moneyball-rebuild` and Cloudflare REBUILT. No MAIN/TEST/Vercel/Lovable changes; no Tracker history, coupons, settlements, results or bankroll were edited; no paid API usage.
