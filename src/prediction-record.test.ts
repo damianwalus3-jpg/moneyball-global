@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeHistoryProvenance, hasMissingPredictionMarket, hasValidPredictionMarket, parseHistoryProvenance, shouldAppendPrediction } from "./prediction-record";
+import { describeHistoryProvenance, hasMissingPredictionMarket, hasValidPredictionMarket, parseHistoryProvenance, shouldAppendPrediction, shouldRetryPredictionAttempt } from "./prediction-record";
 import type { TrackerRecord } from "./tracker-store";
 
 function row(id: string, probabilities: [number | null, number | null, number | null]): TrackerRecord {
@@ -40,6 +40,21 @@ describe("prediction record refresh policy", () => {
 });
 
 
+
+describe("incomplete market retry cooldown", () => {
+  it("allows the first attempt when no previous timestamp exists", () => {
+    expect(shouldRetryPredictionAttempt(undefined, 1000, 6000)).toBe(true);
+  });
+  it("blocks a repeated failed attempt inside the cooldown", () => {
+    expect(shouldRetryPredictionAttempt(1000, 5999, 5000)).toBe(false);
+  });
+  it("allows a retry exactly when the cooldown expires", () => {
+    expect(shouldRetryPredictionAttempt(1000, 6000, 5000)).toBe(true);
+  });
+  it("treats malformed timestamps as an eligible first attempt", () => {
+    expect(shouldRetryPredictionAttempt("invalid", 1000, 5000)).toBe(true);
+  });
+});
 
 describe("fixture market repair detection", () => {
   it("requests analysis when a fixture has only a 1X2 record", () => {
