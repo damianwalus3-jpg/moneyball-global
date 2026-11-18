@@ -1597,3 +1597,8 @@
 - Detailed evidence and limitations: `docs/STAGE_134_TRACKER_DEVICE_AND_SOURCE_RESEARCH_2026-11-18.md`.
 - Validation and deployment for the Stage 134 application commit are pending GitHub Actions; do not mark this stage deployed until CI, rebuild checks, and isolated Cloudflare REBUILT deployment pass.
 - Remaining user-device action: open Tracker on Android, inspect the integrity panel and share the JSON export. Server-side automation cannot access browser localStorage.
+
+
+### Stage 134 — canonical REBUILT project addresses
+- Saved the current application, health-check, repository/branch, deployment workflow, execution-log and live feed endpoint addresses in `docs/PROJECT_ENDPOINTS_REBUILT.md`.
+- Explicitly distinguished the active REBUILT Worker from the older MAIN Worker to prevent accidental deployment or testing against the wrong environment.
