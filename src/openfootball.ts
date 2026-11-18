@@ -174,8 +174,24 @@ async function discoverEuropeanOpenFootballFeeds(date: string): Promise<OpenFoot
   if (discoveredCatalogueCache?.season === season && Date.now() - discoveredCatalogueCache.cachedAt < CACHE_MS) return discoveredCatalogueCache.feeds;
   const repositories = ["europe", ...Object.keys(NATIONAL_OPENFOOTBALL_REPOSITORIES)];
   const settled = await Promise.allSettled(repositories.map(async repository => {
-    const response = await fetch("https://api.github.com/repos/openfootball/" + repository + "/git/trees/master?recursive=1", { headers: { Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
-    if (!response.ok) throw new Error("HTTP " + response.status);
+    const response = await fetch("https://api.github.com/repos/openfootball/" + repository + "/git/trees/master?recursive=1", {
+      headers: {
+        Accept: "application/vnd.github+json",
+        "User-Agent": "MONEYBALL-REBUILT/1.0 (+https://moneyball-global-rebuild.damianwalus3.workers.dev)",
+      },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      let detail = "";
+      try {
+        const payload = await response.json() as { message?: string };
+        detail = typeof payload.message === "string" ? payload.message.slice(0, 240) : "";
+      } catch { /* response body is diagnostic only */ }
+      const remaining = response.headers.get("x-ratelimit-remaining");
+      const reset = response.headers.get("x-ratelimit-reset");
+      const resetHint = remaining === "0" && reset ? " (rate limit reset " + new Date(Number(reset) * 1000).toISOString() + ")" : "";
+      throw new Error("HTTP " + response.status + (detail ? ": " + detail : "") + resetHint);
+    }
     const tree = await response.json() as OpenFootballTree;
     if (!Array.isArray(tree.tree) || tree.truncated) throw new Error("catalogue is incomplete");
     const paths = tree.tree.filter(entry => entry.type === "blob").map(entry => entry.path);
