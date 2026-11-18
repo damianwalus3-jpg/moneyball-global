@@ -1,7 +1,7 @@
 import { scanOpenFootball } from "./openfootball";
 import { cacheOpenLigaTeamForms } from "./team-form";
 import { seasonCode } from "./season";
-import { fetchPitchApiDate, fetchPitchApiLeague, fetchPitchApiLeagueCatalog, fetchPitchApiLeagueMatches, isPitchApiCountryEligible, selectPitchApiSeason, type PitchApiLeague, type PitchApiLeagueMatch } from "./pitchapi";
+import { fetchPitchApiDate, fetchPitchApiLeague, fetchPitchApiLeagueCatalog, fetchPitchApiLeagueMatches, isPitchApiCountryEligible, isPitchApiFreeEuropeanLeague, selectPitchApiSeason, type PitchApiLeague, type PitchApiLeagueMatch } from "./pitchapi";
 import { EUROPEAN_COUNTRY_CODES } from "./european-countries";
 export interface FreeFixture {
   id: string;
@@ -639,7 +639,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     pitchApiCatalogueLeagues = catalogue.length;
     const europeanLeagues = catalogue.filter(league => isPitchApiCountryEligible(league.country_code));
     pitchApiEuropeanCatalogueLeagues = europeanLeagues.length;
-    const freeEuropeanLeagues = europeanLeagues.filter(league => league.is_free === true);
+    const freeEuropeanLeagues = europeanLeagues.filter(isPitchApiFreeEuropeanLeague);
     pitchApiFreeEuropeanCatalogueLeagues = freeEuropeanLeagues.length;
     pitchApiSkippedNonFreeCatalogueLeagues = europeanLeagues.length - freeEuropeanLeagues.length;
     const leagueSchedules = await pooled(freeEuropeanLeagues, 4, async league => {
