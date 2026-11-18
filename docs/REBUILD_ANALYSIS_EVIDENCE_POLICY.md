@@ -61,6 +61,7 @@ The engine tracks eight separate areas. Every item must have a provider, an obse
 - A per-prediction evidence audit records all eight areas and explicit missing states.
 - Default odds freshness is tightened from six hours to 15 minutes for EV valuation. Complete 1X2 snapshot, bookmaker identity, timestamp and valid decimal prices remain mandatory.
 - EV remains unavailable until current timestamped odds are captured and the probability model is calibrated out of sample. The EV formula cannot prove the model probability is reliable.
+- The first PitchAPI xG backtest (66 eligible predictions in Denmark 1. Division 2026/2027) is exploratory only: xG modestly outperformed the goals-only baseline, but 50–70% confidence buckets were materially overconfident. This is not sufficient calibration evidence. Require multi-league, multi-season out-of-sample validation and reliability analysis before allowing the 75% threshold to qualify a coupon.
 
 ## Hard limitations
 - No reviewed source provides complete, current, verified xG, confirmed lineups, injuries, suspensions, tactical data and odds for every European league and team while satisfying no-key/no-paid constraints.
@@ -87,7 +88,7 @@ The engine tracks eight separate areas. Every item must have a provider, an obse
 - No dedicated injuries/suspensions endpoint was found in the reviewed official API reference. Do not claim these two evidence areas are supplied by PitchAPI. They remain missing until an independent verified source is added.
 - Added a Cloudflare Worker server-side proxy. It accepts only allowlisted GET routes for date fixtures and match resources, validates dates/status and PitchAPI match IDs, rejects non-app browser origins, never returns the API key, caches ordinary reads, and never caches live snapshots. The secret name is `PITCHAPI_API_KEY`; it is a Cloudflare Worker secret, not a Vite variable, GitHub file, or browser setting.
 - The user approved using a free key and configured it directly in the Cloudflare Worker settings. Authenticated live endpoint checks subsequently succeeded. Never ask the user to paste the key into ChatGPT or commit it.
-- The proxy exposes `/api/pitchapi/date/{YYYY-MM-DD}?status=upcoming|played|all`, `/api/pitchapi/leagues/{l_XXXXXX}`, `/api/pitchapi/leagues/{l_XXXXXX}/matches?season=YYYY/YYYY&status=played`, and `/api/pitchapi/matches/{m_XXXXXX}[/{lineups|shots|events|momentum|stats|players|advanced|advanced/network|advanced/players|live}]`.
+- The proxy exposes `/api/pitchapi/date/{YYYY-MM-DD}?status=upcoming|played|all`, `/api/pitchapi/leagues` (catalogue), `/api/pitchapi/leagues/{l_XXXXXX}`, `/api/pitchapi/leagues/{l_XXXXXX}/matches?season=YYYY/YYYY&status=played`, and `/api/pitchapi/matches/{m_XXXXXX}[/{lineups|shots|events|momentum|stats|players|advanced|advanced/network|advanced/players|live}]`.
 - Key provisioning is complete and the authenticated live endpoint smoke test passed on 2026-11-18. The secret remains server-side in the REBUILT Cloudflare Worker; never print or expose its value. See Stage 113 in the execution log for real-feed and xG coverage evidence.
 
 
