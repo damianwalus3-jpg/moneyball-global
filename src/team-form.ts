@@ -174,7 +174,7 @@ export function mapOpenLigaTeamForm(matches: OpenLigaHistoryMatch[], team: strin
   const updated = matches.map(match => match.lastUpdateDateTime).filter((value): value is string => Boolean(value)).sort().at(-1) ?? sourceUpdatedAt;
   return {
     team,
-    matches: mapped.slice(0, 5),
+    matches: mapped.slice(0, 15),
     home: mapped.filter(match => match.venue === "H").slice(0, 5),
     away: mapped.filter(match => match.venue === "A").slice(0, 5),
     source: "OpenLigaDB",
