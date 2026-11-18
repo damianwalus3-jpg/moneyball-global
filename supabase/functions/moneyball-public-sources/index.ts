@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 import { isEligibleDomesticTopTwoLeague } from "../_shared/domestic-league-scope.ts";
+import { isWomensTeam } from "../_shared/team-normalization.ts";
 import { openMatchdayCET1ToIso } from "../_shared/openmatchday-time.ts";
 import { isExcludedSeniorTeam, normalizeTeamName, teamHistoryKey } from "../_shared/team-normalization.ts";
 
@@ -725,7 +726,8 @@ Deno.serve(async (req: Request) => {
     const europeanFixtures = deduped.filter((f:any) => isEuropeanFixture(f.country,f.competition,f.home_team,f.away_team)
       && isEligibleDomesticTopTwoLeague(f.country,f.competition||f.league)
       && (!f.gender || String(f.gender).toLowerCase()==="men")
-      && !isExcludedSeniorTeam(f.home_team) && !isExcludedSeniorTeam(f.away_team));
+      && !isExcludedSeniorTeam(f.home_team) && !isExcludedSeniorTeam(f.away_team)
+      && !isWomensTeam(f.home_team) && !isWomensTeam(f.away_team));
     const sportsDbHistory=await sportsDbTeamHistory(europeanFixtures,date);
     for(const fixture of europeanFixtures){
       const homeForm=sportsDbHistory.forms.get(sportsDbTeamKey(fixture.home_team));
