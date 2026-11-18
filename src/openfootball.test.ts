@@ -104,17 +104,24 @@ describe("dynamic European OpenFootball catalogue", () => {
     expect(feeds[0].urlForSeason("ignored")).toContain("france/2026-27_fr1.txt");
   });
 
-  it("discovers feeds for England, Germany, Italy, Spain and Belgium", async () => {
-    const { buildEuropeanOpenFootballFeeds } = await import("./openfootball");
-    const feeds = buildEuropeanOpenFootballFeeds([
-      "england/2026-27_1-premierleague.txt",
-      "germany/2026-27_1-bundesliga.txt",
-      "italy/2026-27_1-seriea.txt",
-      "spain/2026-27_1-liga.txt",
-      "belgium/2026-27_be1.txt",
-    ], "2026-11-18");
-    expect(feeds.map(feed => feed.countryCode)).toEqual(["ENG", "GER", "ITA", "ESP", "BEL"]);
-    expect(feeds).toHaveLength(5);
+  it("discovers all current-season feeds in separate national repositories", async () => {
+    const { buildNationalOpenFootballFeeds } = await import("./openfootball");
+    const cases = [
+      ["england", ["2026-27/1-premierleague.txt", "2026-27/2-championship.txt", "2025-26/3-league1.txt", "rsssf/eng2025.txt"], "ENG"],
+      ["deutschland", ["2026-27/1-bundesliga.txt", "2026-27/4-regionalliga-west.txt", "2025-26/2-bundesliga2.txt"], "GER"],
+      ["italy", ["2026-27/1-seriea.txt", "2026-27/2-serieb.txt", "2026-27/3-seriec_a.txt"], "ITA"],
+      ["espana", ["2026-27/1-liga.txt", "2026-27/2-liga2.txt"], "ESP"],
+      ["belgium", ["2026-27/be1.txt", "2026-27/hainaut/1_Prov.txt", "2026-27/liege/III_Provinciale_A.txt"], "BEL"],
+      ["austria", ["2026-27/1-bundesliga.txt", "2026-27/2-liga2.txt"], "AUT"],
+    ] as const;
+    for (const [repository, paths, countryCode] of cases) {
+      const feeds = buildNationalOpenFootballFeeds(repository, [...paths], "2026-11-18");
+      expect(feeds.length).toBeGreaterThan(0);
+      expect(feeds.every(feed => feed.countryCode === countryCode)).toBe(true);
+      expect(feeds.every(feed => feed.urlForSeason("").includes("/" + repository + "/master/2026-27/"))).toBe(true);
+    }
+    const belgium = buildNationalOpenFootballFeeds("belgium", ["2026-27/hainaut/1_Prov.txt"], "2026-11-18");
+    expect(belgium[0].competition).toContain("Hainaut");
   });
 
   it("discovers calendar-year seasons for Nordic leagues", async () => {
