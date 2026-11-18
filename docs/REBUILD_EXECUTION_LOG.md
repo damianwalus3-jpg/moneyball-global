@@ -1021,3 +1021,11 @@
 - The no-key `worldcup26.ir` API was not integrated: although its metadata advertised 35 active competitions / 3,296 stored matches, date-scoped scoreboards for checked lower divisions returned no events, and its date-range fixture endpoints exposed past events but no tested future schedule. It therefore did not meet the requirement for dependable upcoming fixtures; its reuse/data licence also remains unclear.
 - User's DC rule is now the same as 1X2 at 75%; the coupon engine still requires `strongCandidate === true`, preventing DC-only qualification from leaking into 1X2 coupon construction.
 - No changes to production MAIN; all changes remain on `moneyball-rebuild` and the isolated `moneyball-global-rebuild` Worker.
+
+
+## Stage 83 — 75% Double Chance change deployed and verified (2026-11-18)
+- The first CI attempt exposed one stale test that still treated 79% DC as below the old 80% cutoff. Updated the weak-pick test values to 74%, 73%, and 74.9%, preserving its purpose under the new rule. No production logic rollback was needed.
+- Final workflow run #489 / GitHub run `44262090421` succeeded on commit `d4796c3828a438b0e9e51fa04040bc00ae7129e5`. TypeScript check passed; **20/20 test files and 148/148 tests passed**; production build passed; Cloudflare upload/deploy passed.
+- Deployed to isolated `moneyball-global-rebuild` Worker. Cloudflare reported version `53e713d5-873e-4d35-9e83-6f4a28084f28`. This confirms deployment of the 75% threshold change to REBUILD only.
+- Additional API audit: although the `worldcup26.ir` catalogue advertises 35 competitions, live fixtures-range requests confirmed actual stored match history for National League and Spanish Segunda. The Worker already returns 10 recent matches for Gateshead, AFC Hornchurch and Real Valladolid through its existing ESPN team-form endpoint. This means the candidate API may duplicate existing team-form coverage; it did not demonstrate usable future fixtures on checked dates, so it remains excluded from fixture ingestion until future schedule delivery and reuse permission are verified.
+- No MAIN changes.
