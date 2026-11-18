@@ -53,6 +53,9 @@ Scope: repository `damianwalus3-jpg/moneyball-global`, branch `moneyball-rebuild
 - `src/App.tsx`: per-match attribution links, feed diagnostics and corrected wording for the mixed source-unit counter.
 - Fixture scan cache bumped to v11.
 
+- Attribution is now mandatory for imported timezone.football rows: entries without a valid `https://timezone.football/` match URL are rejected. The regression test covers this rule and the Brussels UTC rollover (Nov 17 23:30 UTC → Nov 18 00:30 Brussels).
+- The first CI run exposed the test's incorrect expectation (it overlooked that a prior-UTC-day kickoff correctly belongs to the Brussels target date). The parser behavior was correct; the test was corrected and the missing-link row is now explicitly excluded.
+
 ## Validation gate
 - The branch has automatic `rebuild-ci.yml`, `rebuild-check.yml` and `deploy-rebuild-cloudflare.yml` workflows on pushes to `moneyball-rebuild`.
 - A change is not considered deployed until TypeScript checks, unit tests, production build and the isolated Cloudflare REBUILD deployment succeed, followed by a live Worker smoke test.
