@@ -319,6 +319,7 @@ export interface FixtureScan {
     espn: { scoreboardsChecked: number; fixtures: number; errors: number };
     footyNomad: { pagesChecked: number; pageMatches: number; fixtures: number; skippedNoTimestamp: number; errors: number };
     timezoneFootball: { feedMatches: number; fixtures: number; generatedAt: string; errors: number };
+    flashscore: { competitionsChecked: number; rawMatches: number; fixtures: number; skippedNonEuropean: number; skippedWrongDate: number; timestampMissing: number; errors: number };
   };
 }
 export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureScan> {
@@ -351,6 +352,12 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   let timezoneFootballFeedMatches = 0;
   let timezoneFootballFixturesFound = 0;
   let timezoneFootballGeneratedAt = "";
+  let flashscoreCompetitionsChecked = 0;
+  let flashscoreRawMatches = 0;
+  let flashscoreFixturesFound = 0;
+  let flashscoreSkippedNonEuropean = 0;
+  let flashscoreSkippedWrongDate = 0;
+  let flashscoreTimestampMissing = 0;
 
   // Source 1: every European folder in open-matchday, including cups and youth competitions.
   try {
@@ -541,12 +548,39 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     errors.push("timezone.football · " + (error instanceof Error ? error.message : "źródło niedostępne"));
   }
 
+  // Source 7: Flashscore public daily feed, filtered server-side to the Brussels day and European competitions.
+  try {
+    const flashscore = await fetchJson<{
+      fixtures?: FreeFixture[];
+      competitionsChecked?: number;
+      rawMatches?: number;
+      skippedNonEuropean?: number;
+      skippedWrongDate?: number;
+      timestampMissing?: number;
+    }>("/api/flashscore/fixtures/" + date);
+    flashscoreCompetitionsChecked = Number(flashscore.competitionsChecked ?? 0);
+    flashscoreRawMatches = Number(flashscore.rawMatches ?? 0);
+    flashscoreSkippedNonEuropean = Number(flashscore.skippedNonEuropean ?? 0);
+    flashscoreSkippedWrongDate = Number(flashscore.skippedWrongDate ?? 0);
+    flashscoreTimestampMissing = Number(flashscore.timestampMissing ?? 0);
+    const fixtures = Array.isArray(flashscore.fixtures) ? flashscore.fixtures : [];
+    flashscoreFixturesFound = fixtures.length;
+    for (const fixture of fixtures) {
+      const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
+      const existing = byKey.get(key);
+      if (existing) mergeFixtureSource(existing, fixture);
+      else byKey.set(key, fixture);
+    }
+  } catch (error) {
+    errors.push("Flashscore · " + (error instanceof Error ? error.message : "źródło niedostępne"));
+  }
+
   const fixtures = [...byKey.values()].sort((a,b) => a.time.localeCompare(b.time) || a.competition.localeCompare(b.competition));
   const result: FixtureScan = {
     date,
     generatedAt,
     fixtures,
-    leaguesChecked: openMatchdayChecked + openLigaChecked + openFootballChecked + espnChecked + footyNomadPagesChecked + (timezoneFootballGeneratedAt ? 1 : 0),
+    leaguesChecked: openMatchdayChecked + openLigaChecked + openFootballChecked + espnChecked + footyNomadPagesChecked + (timezoneFootballGeneratedAt ? 1 : 0) + (flashscoreCompetitionsChecked ? 1 : 0),
     leaguesFailed: errors,
     source: SOURCE,
     cache: false,
@@ -557,6 +591,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       espn: { scoreboardsChecked: espnChecked, fixtures: espnFixturesFound, errors: errors.filter(error => error.startsWith("ESPN ·")).length },
       footyNomad: { pagesChecked: footyNomadPagesChecked, pageMatches: footyNomadPageMatches, fixtures: footyNomadFixturesFound, skippedNoTimestamp: footyNomadSkippedNoTimestamp, errors: errors.filter(error => error.startsWith("FootyNomad ·")).length },
       timezoneFootball: { feedMatches: timezoneFootballFeedMatches, fixtures: timezoneFootballFixturesFound, generatedAt: timezoneFootballGeneratedAt, errors: errors.filter(error => error.startsWith("timezone.football ·")).length },
+      flashscore: { competitionsChecked: flashscoreCompetitionsChecked, rawMatches: flashscoreRawMatches, fixtures: flashscoreFixturesFound, skippedNonEuropean: flashscoreSkippedNonEuropean, skippedWrongDate: flashscoreSkippedWrongDate, timestampMissing: flashscoreTimestampMissing, errors: errors.filter(error => error.startsWith("Flashscore ·")).length },
     },
   };
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ...result, cachedAt: Date.now() })); } catch { /* storage may be full */ }
