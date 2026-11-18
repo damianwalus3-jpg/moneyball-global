@@ -140,7 +140,7 @@ describe("Cloudflare OpenLigaDB proxy", () => {
     expect(upstream).toHaveBeenCalledWith("https://api.openligadb.de/getmatchdata/bl1/2026", expect.any(Object));
     expect(response.status).toBe(200);
     expect(response.headers.get("X-MONEYBALL-SOURCE")).toBe("OpenLigaDB");
-    expect(response.headers.get("Cache-Control")).toBe("public, max-age=900");
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=3600");
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://moneyball-global-rebuild.damianwalus3.workers.dev");
     expect(cache.put).toHaveBeenCalledTimes(1);
     expect(waitUntil).toHaveBeenCalledTimes(1);
