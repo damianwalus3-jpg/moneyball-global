@@ -1517,3 +1517,14 @@
 - Extended the isolated REBUILT deployment smoke test to query the live PitchAPI date feed for the Europe/Brussels current date and the FootyNomad date endpoint, checking their response shapes rather than only the PitchAPI league catalogue.
 - Code commit: `d1e480e7e2adaa0f700edb7dc5d2d3195e174946`.
 - Validation/deployment: pending CI, rebuild checks and Cloudflare deployment for the documentation-triggered branch head. Do not mark Stage 128 deployed until the new live endpoint smoke checks pass.
+
+ 
+## Stage 129 — live European fixture reconciliation and visible source coverage (2026-11-18)
+- Added a CI live audit that runs the same `scanTodayEuropeanFixtures(true)` pipeline as the application against the deployed REBUILT Worker and all integrated public sources.
+- Live snapshot for Europe/Brussels date 2026-11-18: **171 unique fixtures**, **20 countries/federations**, **63 competitions**.
+- Source results: Flashscore 113; FootyNomad 77; ESPN 18; open-matchday 6; OpenLigaDB 4; OpenFootball 0; timezone.football 0; PitchAPI 0 verified European fixtures for that local date (the date endpoint itself returned 6 non-European fixtures; catalogue contained 39 free European leagues and 6,609 upcoming season fixtures).
+- All eight integrated source checks responded without recorded fetch errors. The reconciliation found 0 duplicate canonical fixtures, 0 wrong-date fixtures and 0 non-European fixtures.
+- Important limitation: a healthy source response and 171 deduplicated fixtures do not prove that every national, regional, women's, youth or amateur competition is covered. OpenFootball and timezone.football returned no fixtures for this date; PitchAPI's daily response had no European fixtures. The current total is a verified multi-source snapshot, not a completeness guarantee.
+- Updated the Matches tab to display Flashscore diagnostics and the countries/competition count alongside other source metrics.
+- Live audit script: `scripts/audit-live-fixtures.ts`; deployment workflow runs it after Worker smoke checks.
+- Validation/deployment: Stage 129 code/docs commit pending CI and Cloudflare verification.
