@@ -204,7 +204,7 @@ export function parseFlashscoreFixtures(feed: string, targetDate: string): { fix
       status: FLASH_SCORE_STATUS[String(record.AB)] || "unknown",
       source: "Flashscore",
       sourceUpdatedAt: new Date().toISOString(),
-      sourceUrl: "https://www.flashscore.com" + (competition?.url || "") + (record.AA ? "match/" + record.AA + "/" : ""),
+      sourceUrl: "https://www.flashscore.com/match/" + String(record.AA) + "/",
     });
   }
   return { fixtures, competitionsChecked, rawMatches, skippedNonEuropean, skippedWrongDate, timestampMissing };
@@ -225,6 +225,50 @@ export default {
         return new Response(null, { status: 403, headers: corsHeaders(null) });
       }
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
+    }
+
+    const flashscoreFixtures = url.pathname.match(/^\\/api\\/flashscore\\/fixtures\\/(\\d{4}-\\d{2}-\\d{2})$/);
+    if (flashscoreFixtures) {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      const date = flashscoreFixtures[1];
+      const year = Number(date.slice(0,4)), month = Number(date.slice(5,7)), day = Number(date.slice(8,10));
+      const parsedDate = new Date(Date.UTC(year, month - 1, day));
+      if (parsedDate.getUTCFullYear() !== year || parsedDate.getUTCMonth() !== month - 1 || parsedDate.getUTCDate() !== day) return json({ error: "invalid_date" }, 400, origin);
+      const dateParts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+      const currentDate = ["year", "month", "day"].map(key => dateParts.find(part => part.type === key)?.value ?? "").join("-");
+      if (date !== currentDate) return json({ error: "flashscore_feed_supports_brussels_today_only", currentDate }, 400, origin);
+      const cacheKey = new Request(url.toString(), { method: "GET" });
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+      try {
+        const zoneName = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Brussels", timeZoneName: "shortOffset" }).formatToParts(new Date()).find(part => part.type === "timeZoneName")?.value ?? "GMT+1";
+        const timezoneOffset = Number(zoneName.replace(/^GMT/, "")) || 0;
+        const feedUrl = "https://global.flashscore.ninja/2/x/feed/f_1_0_" + timezoneOffset + "_en_1";
+        const upstream = await fetch(feedUrl, {
+          headers: {
+            Accept: "*/*",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            Referer: "https://www.flashscore.com/",
+            Origin: "https://www.flashscore.com",
+            "x-fsign": "SW9D1eZo",
+          },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        });
+        const feed = await upstream.text();
+        if (!upstream.ok) return json({ error: "flashscore_upstream_http_" + upstream.status }, 502, origin);
+        const result = parseFlashscoreFixtures(feed, date);
+        const headers = corsHeaders(origin);
+        headers.set("Content-Type", "application/json; charset=utf-8");
+        headers.set("Cache-Control", "public, max-age=900");
+        headers.set("X-MONEYBALL-SOURCE", "Flashscore");
+        const response = new Response(JSON.stringify({ date, ...result, source: "Flashscore", timezoneOffset }), { status: 200, headers });
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "flashscore_upstream_error" }, 502, origin);
+      }
     }
 
     // Temporary read-only probe for testing whether the free Flashscore public feed
