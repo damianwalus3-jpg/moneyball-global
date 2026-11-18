@@ -138,7 +138,6 @@ export default function App() {
     setTeamForms(current => ({ ...current, [match.id]: { ...current[match.id], loading: true, error: undefined } }));
     try {
       const load = async (team: string): Promise<TeamForm> => {
-        const providers: Array<Promise<TeamForm>> = [];
         const failures: string[] = [];
         const attempts: Array<{ name: string; run: () => Promise<TeamForm> }> = [];
         if (match.leagueFolder) attempts.push({ name: "open-matchday", run: () => loadRecentTeamForm(match.leagueFolder, team, match.date) });
