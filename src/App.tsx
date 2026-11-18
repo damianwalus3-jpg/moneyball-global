@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
 import { addRecord, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, loadRecentTeamFormAcrossCountry, mergeVerifiedTeamForms, type TeamForm } from "./team-form";
-import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
+import { predictFromRecentForm, predictFromPitchApiXgForm, type FormPrediction } from "./form-prediction";
+import { fetchPitchApiXgFormsForFixture, type PitchApiXgForm } from "./pitchapi";
 import { buildThreeLegCandidates } from "./coupon-engine";
 import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from "./openfootball";
 import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
@@ -54,9 +55,12 @@ function DetailMetric({ label, value, detail, valueClass }: { label: string; val
   return <article className="detail-metric"><small>{label}</small><b className={valueClass}>{value}</b><details><summary>Szczegóły</summary><p>{detail}</p></details></article>;
 }
 
-function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, reason?: string, homeForm?: TeamForm, awayForm?: TeamForm): TrackerRecord[] {
+function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, reason?: string, homeForm?: TeamForm, awayForm?: TeamForm, pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm }): TrackerRecord[] {
   const model = "recent-form-goals-poisson-v2-evidence-gated";
   const evidenceAudit = buildBaselineEvidenceAudit();
+  if (pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3) {
+    evidenceAudit.areas.xg_xga = { status: "VERIFIED", source: "PitchAPI", observedAt: new Date().toISOString(), note: "Średnie xG/xGA z co najmniej 3 zakończonych, wcześniejszych meczów każdej drużyny; wartości pobrane z oficjalnego endpointu statystyk meczowych." };
+  }
   const evidenceComplete = evidenceAudit.complete;
   const probabilities = prediction?.prediction.probabilities;
   const hasProbabilities = !!probabilities;
@@ -78,7 +82,7 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
       leagueSeason: match.leagueSeason ?? null,
       openFootballFeedId: match.openFootballFeedId ?? null,
       competition: match.competition,
-      model,
+      model: prediction?.method ?? model,
       market: "1X2",
       selection: prediction?.pick ?? null,
       p1: probabilities?.home ?? null,
@@ -95,6 +99,12 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
       evidenceAudit: JSON.stringify(evidenceAudit),
       strongDoubleChance: evidenceComplete && prediction ? Math.max(dc?.oneX ?? 0, dc?.xTwo ?? 0, dc?.oneTwo ?? 0) >= 0.75 : false,
       source: match.source,
+      pitchApiXgHome: pitchApiXgForms?.home.xgForPerMatch ?? null,
+      pitchApiXgHomeAgainst: pitchApiXgForms?.home.xgAgainstPerMatch ?? null,
+      pitchApiXgAway: pitchApiXgForms?.away.xgForPerMatch ?? null,
+      pitchApiXgAwayAgainst: pitchApiXgForms?.away.xgAgainstPerMatch ?? null,
+      pitchApiXgSamples: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.sampleSize, away: pitchApiXgForms.away.sampleSize, source: "PitchAPI" }) : null,
+      pitchApiXgHistory: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.matches, away: pitchApiXgForms.away.matches }) : null,
       historyProvenance: homeForm && awayForm ? JSON.stringify({
         home: { source: homeForm.source, sourceUpdatedAt: homeForm.sourceUpdatedAt, matches: homeForm.matches.length, homeMatches: homeForm.home.length, awayMatches: homeForm.away.length },
         away: { source: awayForm.source, sourceUpdatedAt: awayForm.sourceUpdatedAt, matches: awayForm.matches.length, homeMatches: awayForm.home.length, awayMatches: awayForm.away.length },
@@ -148,49 +158,59 @@ export default function App() {
       return;
     }
     setTeamForms(current => ({ ...current, [match.id]: { ...current[match.id], loading: true, error: undefined } }));
-    try {
-      const load = async (team: string): Promise<TeamForm> => {
-        const failures: string[] = [];
-        const attempts: Array<{ name: string; run: () => Promise<TeamForm> }> = [];
-        // Never send a malformed provider folder ID; fixtures from cups/other feeds may not
-        // carry a valid open-matchday history folder.
-        if (match.leagueFolder && /^[A-Z]{3}_[0-9]+_[a-z0-9-]+$/.test(match.leagueFolder)) {
-          attempts.push({ name: "open-matchday · liga meczu", run: () => loadRecentTeamForm(match.leagueFolder, team, match.date) });
-        }
-        if (match.leagueShortcut && match.leagueSeason) attempts.push({ name: "OpenLigaDB", run: () => loadOpenLigaRecentTeamForm(match.leagueShortcut!, match.leagueSeason!, team, match.date) });
-        if (match.openFootballFeedId) attempts.push({ name: "OpenFootball", run: () => loadOpenFootballRecentTeamForm(match.openFootballFeedId!, team, match.date) });
-        // Club form is league form, not cup form: search every published league file
-        // in the club's country. This is the permanent fallback for cup fixtures.
-        if (/^[A-Z]{3}$/.test(match.countryCode) && match.countryCode !== "UEFA") {
-          attempts.push({ name: "open-matchday · historia krajowa", run: () => loadRecentTeamFormAcrossCountry(match.countryCode, team, match.date) });
-        }
-        attempts.push({ name: "ESPN", run: () => loadEspnRecentTeamForm(team, match.date) });
-        const settled = await Promise.allSettled(attempts.map(item => item.run()));
-        const accepted: TeamForm[] = [];
-        settled.forEach((result, index) => {
-          if (result.status === "fulfilled") {
-            const form = result.value;
-            const valid = form.matches.filter(row => row.date < match.date && Number.isInteger(row.goalsFor) && Number.isInteger(row.goalsAgainst) && row.goalsFor >= 0 && row.goalsAgainst >= 0);
-            accepted.push({ ...form, matches: valid });
-            if (!valid.length) failures.push(attempts[index].name + ": brak poprawnych wcześniejszych wyników");
-          } else failures.push(attempts[index].name + ": " + (result.reason instanceof Error ? result.reason.message : "błąd źródła"));
-        });
-        const merged = mergeVerifiedTeamForms(accepted, team);
-        if (merged.matches.length < 3) throw new Error(failures.concat("Po scaleniu źródeł tylko " + merged.matches.length + "/3 unikalnych, zgodnych wyników").join(" · "));
-        return merged;
-      };
-      const [home, away] = await Promise.all([load(match.home), load(match.away)]);
-      let prediction: FormPrediction | undefined;
-      let predictionError: string | undefined;
-      try { prediction = predictFromRecentForm(home, away); }
-      catch (error) { predictionError = error instanceof Error ? error.message : "Za mało danych do prognozy."; }
-      setTeamForms(current => ({ ...current, [match.id]: { home, away, prediction, predictionError, loading: false } }));
-      setRecords(savePredictionRecord(match, prediction, predictionError, home, away));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Nie udało się pobrać formy.";
-      setTeamForms(current => ({ ...current, [match.id]: { loading: false, error: message } }));
-      setRecords(savePredictionRecord(match, undefined, message));
+    const load = async (team: string): Promise<TeamForm> => {
+      const failures: string[] = [];
+      const attempts: Array<{ name: string; run: () => Promise<TeamForm> }> = [];
+      if (match.leagueFolder && /^[A-Z]{3}_[0-9]+_[a-z0-9-]+$/.test(match.leagueFolder)) {
+        attempts.push({ name: "open-matchday · liga meczu", run: () => loadRecentTeamForm(match.leagueFolder, team, match.date) });
+      }
+      if (match.leagueShortcut && match.leagueSeason) attempts.push({ name: "OpenLigaDB", run: () => loadOpenLigaRecentTeamForm(match.leagueShortcut!, match.leagueSeason!, team, match.date) });
+      if (match.openFootballFeedId) attempts.push({ name: "OpenFootball", run: () => loadOpenFootballRecentTeamForm(match.openFootballFeedId!, team, match.date) });
+      if (/^[A-Z]{3}$/.test(match.countryCode) && match.countryCode !== "UEFA") {
+        attempts.push({ name: "open-matchday · historia krajowa", run: () => loadRecentTeamFormAcrossCountry(match.countryCode, team, match.date) });
+      }
+      attempts.push({ name: "ESPN", run: () => loadEspnRecentTeamForm(team, match.date) });
+      const settled = await Promise.allSettled(attempts.map(item => item.run()));
+      const accepted: TeamForm[] = [];
+      settled.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          const form = result.value;
+          const valid = form.matches.filter(row => row.date < match.date && Number.isInteger(row.goalsFor) && Number.isInteger(row.goalsAgainst) && row.goalsFor >= 0 && row.goalsAgainst >= 0);
+          accepted.push({ ...form, matches: valid });
+          if (!valid.length) failures.push(attempts[index].name + ": brak poprawnych wcześniejszych wyników");
+        } else failures.push(attempts[index].name + ": " + (result.reason instanceof Error ? result.reason.message : "błąd źródła"));
+      });
+      const merged = mergeVerifiedTeamForms(accepted, team);
+      if (merged.matches.length < 3) throw new Error(failures.concat("Po scaleniu źródeł tylko " + merged.matches.length + "/3 unikalnych, zgodnych wyników").join(" · "));
+      return merged;
+    };
+    const [historyResult, xgResult] = await Promise.allSettled([
+      Promise.all([load(match.home), load(match.away)]),
+      match.pitchApiLeagueId && match.pitchApiHomeTeamId && match.pitchApiAwayTeamId
+        ? fetchPitchApiXgFormsForFixture({ leagueId: match.pitchApiLeagueId, season: match.pitchApiSeason, homeTeamId: match.pitchApiHomeTeamId, awayTeamId: match.pitchApiAwayTeamId, beforeDate: match.date })
+        : Promise.reject(new Error("Brak identyfikatorów meczu PitchAPI — analiza xG niedostępna dla tego spotkania.")),
+    ]);
+    const homeForm = historyResult.status === "fulfilled" ? historyResult.value[0] : undefined;
+    const awayForm = historyResult.status === "fulfilled" ? historyResult.value[1] : undefined;
+    const pitchApiXgForms = xgResult.status === "fulfilled" ? xgResult.value : undefined;
+    let prediction: FormPrediction | undefined;
+    const errors: string[] = [];
+    if (pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3) {
+      try { prediction = predictFromPitchApiXgForm(pitchApiXgForms.home, pitchApiXgForms.away); }
+      catch (error) { errors.push(error instanceof Error ? error.message : "Błąd modelu xG"); }
+    } else if (xgResult.status === "rejected") {
+      errors.push(xgResult.reason instanceof Error ? xgResult.reason.message : "PitchAPI xG niedostępne");
+    } else if (pitchApiXgForms) {
+      errors.push("PitchAPI xG: za mało wcześniejszych meczów z kompletnymi statystykami (home " + pitchApiXgForms.home.sampleSize + "/3, away " + pitchApiXgForms.away.sampleSize + "/3).");
     }
+    if (!prediction && homeForm && awayForm) {
+      try { prediction = predictFromRecentForm(homeForm, awayForm); }
+      catch (error) { errors.push(error instanceof Error ? error.message : "Błąd bazowego modelu goli"); }
+    }
+    if (historyResult.status === "rejected") errors.push(historyResult.reason instanceof Error ? historyResult.reason.message : "Historia wyników niedostępna");
+    const predictionError = prediction ? undefined : errors.join(" · ") || "Brak wystarczających danych do prognozy.";
+    setTeamForms(current => ({ ...current, [match.id]: { home: homeForm, away: awayForm, pitchApiXgForms, prediction, predictionError, loading: false } }));
+    setRecords(savePredictionRecord(match, prediction, predictionError, homeForm, awayForm, pitchApiXgForms));
   };
   const analyzeAllFixtures = async () => {
     if (!fixtureScan || bulkLoading || scanLoading) return;
