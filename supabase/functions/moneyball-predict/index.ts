@@ -49,7 +49,7 @@ function fixtureGender(m:any):"men"|"women"|"excluded" {
  if(explicit && explicit!=="men")return "excluded";
  return "men";
 }
-function fixtureTeamKeyfunction fixtureTeamKey(v:any){const key=normTeam(v);const aliases:Record<string,string>={"turkiye":"turkey","republic of ireland":"ireland","czech republic":"czechia","north macedonia":"north macedonia","korea republic":"south korea","united states of america":"united states","usa":"united states","ivory coast":"cote d ivoire","cote d ivoire":"cote d ivoire"};return aliases[key]||key;}
+function fixtureTeamKey(v:any){const key=normTeam(v);const aliases:Record<string,string>={"turkiye":"turkey","republic of ireland":"ireland","czech republic":"czechia","north macedonia":"north macedonia","korea republic":"south korea","united states of america":"united states","usa":"united states","ivory coast":"cote d ivoire","cote d ivoire":"cote d ivoire"};return aliases[key]||key;}
 function dedupeFixturesByDate(fixtures:any[],getDate:(m:any)=>string|null){
  const kept:any[]=[];
  const identity=(m:any)=>{const d=getDate(m),h=fixtureTeamKey(m.home_team),a=fixtureTeamKey(m.away_team);return d&&h&&a?d+"|"+h+">"+a:null;};
