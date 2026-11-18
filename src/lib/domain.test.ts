@@ -280,10 +280,16 @@ describe("European domestic league scope", () => {
     })).toBe(true);
     expect(isEligibleEuropeanMatch({
       ...openMatchdayBase,
+      external_id: "om:ENG_2_championship:2026-11-17:club-a:club-b",
+      competition: "Championship",
+      country: "England",
+    })).toBe(true);
+    expect(isEligibleEuropeanMatch({
+      ...openMatchdayBase,
       external_id: "om:ENG_3_league-one:2026-11-17:club-a:club-b",
       competition: "League One",
       country: "England",
-    })).toBe(true);
+    })).toBe(false);
     expect(isEligibleEuropeanMatch({
       ...openMatchdayBase,
       external_id: "om:UEFA_1_champions-league:2026-11-17:club-a:club-b",
