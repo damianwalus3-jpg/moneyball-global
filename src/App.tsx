@@ -12,6 +12,7 @@ import { auditTrackerPredictions } from "./model-audit";
 import { describeHistoryProvenance, shouldAppendPrediction } from "./prediction-record";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import { auditOddsFixtureMatches } from "./odds-matching";
+import { auditMarketCoverage } from "./market-coverage";
 import { buildBetSettlementRows } from "./bet-settlement";
 import { listOddsBookmakers, shouldAutoFetchDailyOdds } from "./odds-value";
 import { valueThreeLegCoupon } from "./coupon-value";
@@ -652,11 +653,7 @@ export default function App() {
     const latestRows = [...latestByFixtureMarketModel.values()];
     const oneXTwo = latestRows.filter(row => row.details.market !== "DOUBLE_CHANCE");
     const doubleChance = latestRows.filter(row => row.details.market === "DOUBLE_CHANCE");
-    const oneXTwoFixtures = new Set(oneXTwo.map(row => String(row.details.fixtureId)));
-    const dcFixtures = new Set(doubleChance.map(row => String(row.details.fixtureId)));
-    const expectedFixtures = new Set(records.filter(row => row.kind === "match" && row.details.date === fixtureScan?.date
-      && typeof row.details.fixtureId === "string").map(row => String(row.details.fixtureId)));
-    const total = expectedFixtures.size || oneXTwoFixtures.size;
+    const coverage = auditMarketCoverage(records, fixtureScan?.date);
     const candidates = new Set(oneXTwo.filter(row => row.details.strongCandidate === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
     const dcCandidates = new Set(doubleChance.filter(row => row.details.strongDoubleChance === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
     const withProbabilities = new Set(oneXTwo.filter(row => [row.details.p1, row.details.px, row.details.p2]
@@ -668,9 +665,12 @@ export default function App() {
     const rejected = [...latestPerFixture.values()].filter(row => !candidates.has(String(row.details.fixtureId)));
     const reasons = new Map<string, number>();
     for (const row of rejected) { const reason = String(row.details.reason ?? "Nie zapisano konkretnego powodu"); reasons.set(reason, (reasons.get(reason) ?? 0) + 1); }
-    return { total, rejected: Math.max(rejected.length, total - candidates.size), candidates: candidates.size, dcCandidates: dcCandidates.size,
-      withoutProbabilities: total - withProbabilities.size, missing1X2: total - oneXTwoFixtures.size, missingDC: total - dcFixtures.size,
-      reasons: [...reasons.entries()].sort((a, b) => b[1] - a[1]), oneXTwoRecords: oneXTwo.length, doubleChanceRecords: doubleChance.length };
+    return { total: coverage.fixtureCount, rejected: Math.max(rejected.length, coverage.fixtureCount - candidates.size),
+      candidates: candidates.size, dcCandidates: dcCandidates.size,
+      withoutProbabilities: coverage.fixtureCount - withProbabilities.size,
+      missing1X2: coverage.missingOneXTwo.length, missingDC: coverage.missingDoubleChance.length,
+      reasons: [...reasons.entries()].sort((a, b) => b[1] - a[1]),
+      oneXTwoRecords: oneXTwo.length, doubleChanceRecords: doubleChance.length };
   }, [records, fixtureScan?.date]);
   const safestPick = useMemo(() => getSafestPick(records), [records]);
   const visibleRecords = useMemo(() => records.filter(row => (active === "tracker" ? true : row.kind === (active === "matches" ? "match" : active === "coupons" ? "coupon" : active === "pick" ? "prediction" : "scan")) && (row.title.toLowerCase().includes(query.toLowerCase()) || row.status.toLowerCase().includes(query.toLowerCase()))), [records, active, query]);

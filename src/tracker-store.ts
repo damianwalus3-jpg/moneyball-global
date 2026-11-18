@@ -35,7 +35,7 @@ export function readRecords(): TrackerRecord[] {
     return Array.isArray(parsed) ? parsed.filter(isRecord) : [];
   } catch { return []; }
 }
-export function writeRecords(records: TrackerRecord[]): void {
+function writeRecords(records: TrackerRecord[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
   if (typeof window !== "undefined") window.dispatchEvent(new Event("moneyball:tracker-updated"));
 }
@@ -70,9 +70,6 @@ export function addRecordsIfMissing(inputs: NewTrackerRecord[], uniqueDetailFiel
   }
   if (added.length) writeRecords([...added, ...existing]);
   return added.length;
-}
-export function removeRecord(id: string): void {
-  writeRecords(readRecords().filter(row => row.id !== id));
 }
 export function exportBackup(): MoneyballBackup {
   return { format: "moneyball-local-backup", version: 1, exportedAt: new Date().toISOString(), records: readRecords() };
