@@ -430,6 +430,14 @@ export default function App() {
               odds1: number | null;
               oddsX: number | null;
               odds2: number | null;
+              homeHandicapOpen?: number | null;
+              homeHandicapClose?: number | null;
+              handicapHomeOdds?: number | null;
+              handicapAwayOdds?: number | null;
+              totalOpen?: number | null;
+              totalClose?: number | null;
+              overOdds?: number | null;
+              underOdds?: number | null;
               complete1X2: boolean;
             }>;
           }>;
@@ -470,6 +478,14 @@ export default function App() {
               odds1: book.odds1,
               oddsX: book.oddsX,
               odds2: book.odds2,
+              homeHandicapOpen: book.homeHandicapOpen ?? null,
+              homeHandicapClose: book.homeHandicapClose ?? null,
+              handicapHomeOdds: book.handicapHomeOdds ?? null,
+              handicapAwayOdds: book.handicapAwayOdds ?? null,
+              totalOpen: book.totalOpen ?? null,
+              totalClose: book.totalClose ?? null,
+              overOdds: book.overOdds ?? null,
+              underOdds: book.underOdds ?? null,
               complete1X2: book.complete1X2,
               capturedAt,
               providerSource: book.source,
