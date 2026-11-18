@@ -989,3 +989,13 @@
 - Confirmed latest successful Worker version after the ESPN fallback and request-header fix: `120bf59b-a166-4074-9b6a-93c40ffe31a7`, run #479, commit `d17a53b`. CI: TypeScript passed, 20 test files passed, 147 tests passed, production build and Cloudflare deployment succeeded.
 - Dashboard's source attribution list had omitted FootyNomad despite counting six sources. Added the FootyNomad link so the visible list now names all six: open-matchday, OpenLigaDB, OpenFootball, ESPN, FootyNomad and timezone.football.
 - The source-list correction is a subsequent UI-only commit and needs its own push-triggered workflow confirmation. Continue to preserve the distinction between deployed code and the newest branch commit.
+
+
+## Stage 81 — final source-list deployment and further source research (2026-11-18)
+- Latest source attribution and history-log commit `5b8fa4226d076db4bf3e2eb2244b7eb2c6c8558a` completed Cloudflare workflow run #482 successfully. TypeScript, production build, 20 test files / 147 tests all passed. Cloudflare Worker version `88833341-3df7-4031-b37b-4dea80abdcb0` deployed.
+- Live dashboard shell extraction confirms the visible source list now contains all six providers: open-matchday, OpenLigaDB, OpenFootball, ESPN, FootyNomad and timezone.football.
+- Additional public source research: Sports Data Campus 2026-10-14 roundup points to FBref, Sofascore, FotMob, FootyStats, Futbolme, StatsBomb Open Data, Football-Data.co.uk, API-Football and 5DollarFootballAPI. These are not equivalent open APIs; several are web platforms, key-gated APIs or only cover selected top leagues. Do not treat a free website as permission to scrape.
+- Checked Futbolme robots.txt: general site paths are not disallowed, but `/json/` and several internal paths are explicitly disallowed; no public supported API was established. Do not call its disallowed JSON paths.
+- Checked Football-Data.co.uk notes: CSV results/odds and some match stats are available; source notes identify XScores for results and several providers for stats. This is a useful historical-data candidate for supported leagues, but it is not a complete current European lower-division fixture source and a redistribution licence still needs to be established before integration.
+- ESPN team-history fallback remains live and verified for France / UEFA Nations League. Lower-division test confirmed Adana Demirspor has no ESPN history results and Kastamonuspor is not indexed. Keep those matches visible with explicit no-history diagnostics; do not manufacture predictions.
+- Full interactive mobile UI test is still not completed because TinyFish wallet balance is $0.00; static shell and API route tests are available. No top-up or paid browser run was initiated.
