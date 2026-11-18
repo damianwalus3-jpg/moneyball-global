@@ -106,3 +106,34 @@ No new provider was enabled, no API key was added, and no provider credits were 
 - Rechecked the production function registry: v103 ACTIVE. Rechecked cache table: RLS enabled, three owner-only policies, no production cache rows yet (expected until authenticated owner scan).
 - The earlier v102 deployment is superseded; v103 is the current target for the first authenticated scan.
 - Still pending: owner-authenticated POST scan and real cache write/read proof, then authenticated UI click-through. No user match, prediction, coupon, settlement or bankroll data changed.
+
+
+## Expanded tracker search — 2026-11-18
+
+### Candidates tested against the all-tier European domestic scope
+
+| Candidate | Verified facts | Decision |
+|---|---|---|
+| API-Football (API-Sports) | Official coverage lists 1,251 leagues/cups, all competitions included in every plan, with data depth varying by competition/season. Official fixtures endpoint supports a date-wide query with a timezone parameter; one daily date request can be the broad daily candidate feed, with paging checked from the response. Free plan is $0 and 100 requests/day, but requires a private API key and is limited by available seasons. | **Best broad-coverage candidate for a second automated source.** Implement as an optional server-side adapter only after explicit approval for a free API key. Never expose the key to the browser. Preserve FootyNomad as the existing independent source and reconcile IDs/fixtures before import. |
+| PitchAPI | Official docs describe 77 leagues, including second tiers, cups and UEFA competitions, unlimited requests on the free plan, but all requests require an API key. | Useful independent cross-check / stats source, but its 77-league catalogue is narrower than API-Football's published 1,251 competitions. Keep as a later optional adapter if a key is approved. |
+| Football API (footballapi.org) | 60 leagues across 30 countries; free key reads Premier League only; full catalogue and live fixtures require $29/month. | Not selected for all-Europe coverage. |
+| FootyCheck | Public country index advertises a rolling 7-day fixture index, 149 countries and 776 leagues. Its robots.txt sets `Content-Signal: search=yes,ai-train=no,use=reference`; that grants reference use, not full data ingestion. No stable public API contract or automated-ingestion permission verified. | Use only as a manual coverage-reconciliation reference. Do not scrape or import its match database. |
+| Flashscore | Its public Terms of Use prohibit automated requests that burden the service and prohibit scraping/aggregating/recreating site content without express consent; its database is protected. No public fixtures API is offered. | Reject third-party scraping as a production dependency unless Livesport grants written permission. |
+| SofaScore | Official terms prohibit automated scraping/aggregation and protect database content; its FAQ says it cannot provide API endpoints because of provider agreements. Direct API requests from our test environment returned HTTP 403. | Reject scraping or bypassing its access controls. |
+| TheSportsDB | Free daily schedule endpoint has a three-event limit; premium limit is 1,500. | Not suitable as the all-Europe primary source. |
+| Sportmonks | Free plan only exposes Danish Superliga and Scottish Premiership; broader coverage requires paid league access. | Not suitable for free all-Europe ingestion. |
+
+### Recommended implementation path
+
+1. Keep the current no-key sources active: FootyNomad, OpenMatchday/OpenFootball, OpenLigaDB and ESPN; retain the existing tightly rate-limited FootballCharts private fallback.
+2. Add API-Football as a separate, optional fixture adapter, querying `/fixtures?date=YYYY-MM-DD&timezone=Europe/Brussels` once per target day (and any additional pages only when the provider's paging metadata requires them). The provider's published coverage is broad, but per-league fixture coverage must be read from its league coverage metadata and validated against observed fixtures; never equate 1,251 listed competitions with 1,251 active/complete fixture feeds.
+3. Normalize all provider fixtures into the existing canonical all-tier geographic-Europe scope. Preserve provider IDs and source provenance. Do not create predictions or alter historical/settlement data from unverified fixtures.
+4. Before accepting the source, compare daily fixture IDs and country/competition counts against FootyNomad and official federation calendars, log missing/extra fixtures and stale timestamps, and run a second scan to prove stable deduplication.
+5. Keep the new adapter disabled until a free API-Football key is explicitly approved and stored only as a Supabase Edge Function secret. No paid plan is required by the published free tier; its 100 requests/day quota is sufficient for one date-wide request plus pagination and limited diagnostics, but not for frequent per-league polling.
+
+### Status and constraints
+
+- This is a source-research checkpoint, not an integration or completeness claim.
+- No API keys were created, requested, or stored. No provider credits/requests were consumed. No Supabase function, database row, match, prediction, coupon, settlement or bankroll data was changed.
+- Existing project constraint against introducing API keys remains in force until the owner explicitly approves the free API-Football key.
+- Official references checked 2026-11-18: API-Football coverage/pricing/docs (https://www.api-football.com/coverage, https://www.api-football.com/pricing, https://www.api-football.com/documentation-v3); PitchAPI (https://pitchapi.dev/); Football API (https://footballapi.org/); FootyCheck robots and country index (https://footycheck.com/robots.txt, https://footycheck.com/football/countries/); Livesport Terms (https://www.livesport.eu/terms-of-use/en); SofaScore Terms/FAQ (https://www.sofascore.com/terms-and-conditions, https://sofascore.helpscoutdocs.com/article/129-does-sofascore-offer-sports-data-api).
