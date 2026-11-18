@@ -521,10 +521,16 @@ describe("prediction evidence and payout quote gates", () => {
 
 describe("manual odds promotion", () => {
   const now = Date.parse("2026-11-10T12:00:00.000Z");
+  const manualQuote = {
+    odds: 1.8,
+    bookmaker: "Bwin Belgium",
+    captured_at: "2026-11-10T11:30:00.000Z",
+    source_url: "https://www.bwin.be/",
+  };
   const eligible = prediction("p", "m1", 82, {
     verdict: "ODRZUCONY",
     rejection_reason: "Brak aktualnego, potwierdzonego kursu dla tego rynku i typu.",
-    odds: 1.8,
+    odds: null,
     data_source: "MONEYBALL_VERIFIED_HISTORY",
     rationale: "Model oparty na historii obu drużyn.",
     data_coverage: {
@@ -532,14 +538,7 @@ describe("manual odds promotion", () => {
       model_source_type: "PARTIAL_VERIFIED_HISTORY",
       home_history_matches: 4,
       away_history_matches: 5,
-      market_odds: true,
-      odds_source: "manual",
-      odds_bookmaker: "Bwin Belgium",
-      odds_captured_at: "2026-11-10T11:30:00.000Z",
-      odds_phase: "prematch",
-      odds_status: "CONFIRMED",
-      odds_suspended: false,
-      odds_source_url: "https://www.bwin.be/",
+      market_odds: false,
     },
   });
 
@@ -549,27 +548,34 @@ describe("manual odds promotion", () => {
     expect(isMissingOddsRejectionReason("Prawdopodobieństwo poniżej progu.")).toBe(false);
   });
 
-  it("promotes only a qualified, upcoming model pick rejected solely for missing odds", () => {
-    expect(canPromoteManualOdds(eligible, match("m1"), now)).toBe(true);
+  it("promotes only a qualified, upcoming model pick when the new manual quote is passed into the gate", () => {
+    expect(canPromoteManualOdds(eligible, match("m1"), now, manualQuote)).toBe(true);
+    expect(canPromoteManualOdds(eligible, match("m1"), now)).toBe(false);
   });
 
   it("does not use the uncalibrated confidence field as a gate", () => {
-    expect(canPromoteManualOdds({ ...eligible, confidence: null }, match("m1"), now)).toBe(true);
+    expect(canPromoteManualOdds({ ...eligible, confidence: null }, match("m1"), now, manualQuote)).toBe(true);
   });
 
-  it("rejects weak coverage, baseline-only, insufficient history and other rejection reasons", () => {
-    expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_coverage: 45 } }, match("m1"), now)).toBe(false);
-    expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_source_type: "BASELINE_ONLY" } }, match("m1"), now)).toBe(false);
-    expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, market_odds: false, home_history_matches: 2 } }, match("m1"), now)).toBe(false);
-    expect(canPromoteManualOdds({ ...eligible, data_coverage: { model_coverage: 60, model_source_type: "PARTIAL_VERIFIED_HISTORY" } }, match("m1"), now)).toBe(false);
-    expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_coverage: 75, model_source_type: "PARTIAL_VERIFIED_HISTORY", market_odds: true, odds_source: "TipsAudit fair market", odds_bookmaker: "TipsAudit" } }, match("m1"), now)).toBe(false);
-    expect(canPromoteManualOdds({ ...eligible, rejection_reason: "Prawdopodobieństwo poniżej progu." }, match("m1"), now)).toBe(false);
+  it("allows confirmed market odds as the alternative to three-match history", () => {
+    const shortHistory = { ...eligible, data_coverage: { ...eligible.data_coverage, home_history_matches: 2, away_history_matches: 2 } };
+    expect(canPromoteManualOdds(shortHistory, match("m1"), now, manualQuote)).toBe(true);
+    expect(canPromoteManualOdds(shortHistory, match("m1"), now)).toBe(false);
+  });
+
+  it("rejects weak coverage, baseline-only, unapproved or stale quotes and other rejection reasons", () => {
+    expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_coverage: 45 } }, match("m1"), now, manualQuote)).toBe(false);
+    expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_source_type: "BASELINE_ONLY" } }, match("m1"), now, manualQuote)).toBe(false);
+    expect(canPromoteManualOdds({ ...eligible, rejection_reason: "Prawdopodobieństwo poniżej progu." }, match("m1"), now, manualQuote)).toBe(false);
+    expect(canPromoteManualOdds(eligible, match("m1"), now, { ...manualQuote, bookmaker: "bet365" })).toBe(false);
+    expect(canPromoteManualOdds(eligible, match("m1"), now, { ...manualQuote, captured_at: "2026-11-10T04:00:00.000Z" })).toBe(false);
+    expect(canPromoteManualOdds(eligible, match("m1"), now, { ...manualQuote, source_url: "javascript:alert(1)" })).toBe(false);
   });
 
   it("rejects out-of-scope, live and already-started fixtures", () => {
-    expect(canPromoteManualOdds(eligible, { ...match("m1"), competition: "UEFA Nations League", country: "World" }, now)).toBe(false);
-    expect(canPromoteManualOdds(eligible, { ...match("m1"), status: "live" }, now)).toBe(false);
-    expect(canPromoteManualOdds(eligible, { ...match("m1"), kickoff_at: "2026-11-10T11:59:00.000Z" }, now)).toBe(false);
+    expect(canPromoteManualOdds(eligible, { ...match("m1"), competition: "UEFA Nations League", country: "World" }, now, manualQuote)).toBe(false);
+    expect(canPromoteManualOdds(eligible, { ...match("m1"), status: "live" }, now, manualQuote)).toBe(false);
+    expect(canPromoteManualOdds(eligible, { ...match("m1"), kickoff_at: "2026-11-10T11:59:00.000Z" }, now, manualQuote)).toBe(false);
   });
 });
 
