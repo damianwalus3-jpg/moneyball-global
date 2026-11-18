@@ -1659,3 +1659,43 @@
 - Commits on `moneyball-rebuild`: App view `1cb0bac2f6c4a8140028a57853d171a24359c7ea`; responsive styles `96a515dcb5607fd3e65453a80c5b01f8dc196ef8`; status distinction fix `5e1192d2da9c4202ed9bb983f7467d11e57a7803`.
 - Verification status at log time: GitHub combined status exposed only a Vercel rate-limit failure; no passing REBUILT CI/build or Cloudflare deployment was confirmed for these commits. Do not treat the feature as deployed until the branch checks and Cloudflare REBUILT health are verified.
 - Next: run typecheck, tests and production build; deploy only to Cloudflare REBUILT; visually verify the new button and list on Android. Then obtain a fresh Android Tracker export for the separate Stage 138 persistence audit.
+
+
+## 2026-11-18 — Stage 140–143: selected matches, evidence gate, odds freshness and evidence retries
+
+### Stage 140 — current-day selected matches and sorting
+- Audited Stage 139 and found that the selected-matches view grouped every prediction in local Tracker history, so older and future-day records could appear beside today's fixtures.
+- Added src/selected-matches.ts: it scopes the view to the current Europe/Brussels scan date, keeps the highest-priority model (xG history, then recent-goals, then neutral prior) per fixture/market, and sorts by kickoff time ascending.
+- Dashboard's safest pick is now scoped to the same Brussels date. It no longer selects a future-day fixture as today's pick.
+- Tests cover Brussels date rollover, historical/future exclusion, market separation, model priority and kickoff ordering.
+
+### Stage 141 — one consistent evidence qualification rule
+- Found an inconsistency: the selected-matches card masked incomplete evidence, but the stored prediction status and dashboard candidate counter could still say KANDYDAT based only on model probability and sample size.
+- Candidate status now requires both the model's market-specific >=75% flag and evidenceComplete=true across all eight required areas. Probability-only threshold results are retained separately as modelStrongCandidate / modelStrongDoubleChance for analysis, while the official candidate flags stay false until the evidence gate passes.
+- Rejection reasons now include the actual missing evidence areas.
+- Added src/prediction-eligibility.ts and tests; dashboard metrics and selected-matches UI use the same market-specific eligibility helper.
+- Hardened src/coupon-engine.ts: a coupon leg now requires BOTH couponEligible=true AND evidenceComplete=true. This closes a legacy-record edge case where one true flag could previously let an incomplete-evidence record through. Added regression test.
+
+### Stage 142 — odds freshness and history labeling
+- Found that the fixture list displayed the newest odds snapshots even when they were stale, and the history table did not show the capture time or freshness status.
+- Added listFreshOddsSnapshots; the current fixture view now displays only complete 1X2 snapshots captured within 60 minutes, rejects future-dated/incomplete quotes, and explicitly says StrikerAPI data does not itself confirm a Belgian bookmaker's local offer.
+- Older snapshots remain in the local history, but are visibly marked ARCHIWALNY with their capture timestamp. They are not presented as current prices.
+- Aligned default odds valuation/bookmaker freshness checks to the provider's documented hourly refresh interval and added tests for stale, future, incomplete and wrong-fixture snapshots.
+
+### Stage 143 — re-analysis when evidence improves
+- Found that valid probability vectors prevented a later analysis from being saved even when the evidence audit had improved; valid-but-incomplete records also did not enter the six-hour retry path.
+- Prediction retries now respect the existing six-hour cooldown when evidence is incomplete, even if probabilities are mathematically valid.
+- New prediction rows are appended (never overwritten) when the evidence-complete flag or missing-evidence list changes. Existing history, coupons, results and Tracker IDs remain intact.
+- Added tests for evidence-change append behavior and retry cooldowns.
+
+### Provider pricing review (2026-11-18)
+- Refreshed docs/ODDS_PROVIDER_RESEARCH_2026-11-17.md: official API-Football pages showed differing Pro prices ($16 on the homepage vs $19 on the pricing page), with 7,500 requests/day and odds/lineup/injury endpoints; StrikerAPI Starter is $19/month for 10,000 credits. VAT and final EUR checkout totals are not confirmed.
+- No paid plan was activated, no key was copied between MAIN/Supabase and REBUILT/Cloudflare, and no provider credits were spent as part of this code work.
+- REBUILT still has only the optional owner-controlled StrikerAPI pilot; broad odds coverage and Belgian-bookmaker confirmation remain unproven.
+
+### Validation checkpoint
+- Code HEAD before this log update: 3a188008297457171bc12cab3c6dfc6664df8cbc.
+- CI [44412089269](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44412089269): PASS — TypeScript, 26 test files / 244 tests, production build.
+- Rebuild Checks [44412089162](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44412089162): PASS.
+- Cloudflare deployment for this exact code SHA was still pending at the time of this entry; do not claim it deployed until the deployment workflow and production smoke/reconciliation finish successfully.
+- No MAIN, TEST, Vercel, Lovable or destructive Tracker/database work.
