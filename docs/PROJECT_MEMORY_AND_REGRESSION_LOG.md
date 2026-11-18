@@ -1639,3 +1639,13 @@ Regression check:
 - No paid API keys, Vercel, TEST branch, Lovable or alternate hosting were used. No existing match, prediction, coupon, settlement, bankroll or historical row was deleted or rewritten; no coupon was created automatically.
 - Live UI visual verification remains outstanding because the free browser-fetch allowance was exhausted. Source code is in main and the Cloudflare deploy succeeded, but do not claim an Android visual check. The next daily scan at 08:00 Europe/Brussels is the first scheduled run that can verify all-tier ingestion on a fresh match date; the 08:15 audit remains active.
 - Project is NOT complete. Next steps: verify the 08:00 all-tier scan and 08:15 audit; inspect lower-tier history coverage and ensure missing evidence stays ODRZUCONY; verify the selected-picks panel on authenticated production MAIN.
+
+
+## 2026-11-18 — final CI and production confirmation
+
+- Final code commit 54108b1de8e9b4fa26d9eea0772d4656e5ca04ec passed Moneyball CI run 44387245269 and Cloudflare production deploy run 44387245325.
+- Final documentation/migration commit 196fac28006357d88a4259ec1639212b09d1af49 also passed Moneyball CI run 44387521839 and Cloudflare production deploy run 44387521687; the deploy job's Deploy to Cloudflare Workers step is SUCCESS.
+- Verified OpenMatchday remains limited to its source catalogue tiers (ENG_1=true, ENG_2=true, ENG_3=false) while FootyNomad lower-tier fixtures pass the all-tier predicate.
+- Verified all 32 fixtures in the 2026-11-18 FootyNomad feed pass the production senior-men European scope. There were zero future-eligible fixtures at verification time, so no selected pick or coupon was expected.
+- All six production migrations listed in the preceding section are committed on MAIN and recorded as applied in Supabase. The app code, DB predicates, scan-page RPCs, result sync, odds sync and frontend eligibility now agree on all senior European domestic tiers.
+- Remaining verification is operational, not a known code failure: the next 08:00 Europe/Brussels daily scan and 08:15 audit must confirm the widened scope against a fresh future match date. Authenticated visual confirmation of the selected-picks panel is still pending; no claim of Android visual verification is made.
