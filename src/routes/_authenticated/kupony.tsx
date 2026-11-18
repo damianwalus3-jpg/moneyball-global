@@ -3,6 +3,7 @@ import { Sparkles, Ticket } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -56,6 +57,7 @@ function Kupony() {
   const [excludeActive, setExcludeActive] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"all" | CouponStatus>("all");
   const [generated, setGenerated] = useState<Prediction[][]>([]);
+  const [detailsCouponId, setDetailsCouponId] = useState<string | null>(null);
 
   const activeCouponIds = useMemo(
     () => new Set(coupons.filter((coupon) => coupon.status === "pending").map((coupon) => coupon.id)),
@@ -78,6 +80,14 @@ function Kupony() {
     .filter((prediction) => !excludeActive || !activeMatchIds.has(prediction.match_id))
     .sort((a, b) => Number(b.probability) - Number(a.probability));
 
+  const detailsCoupon = coupons.find((coupon) => coupon.id === detailsCouponId) ?? null;
+  const detailsLegs = detailsCoupon ? legs.filter((leg) => leg.coupon_id === detailsCoupon.id) : [];
+  const displayDetail = (value: unknown) => {
+    if (value == null || value === "") return "—";
+    if (Array.isArray(value)) return value.map((item) => String(item)).join(", ");
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+  };
   const requestedCount = Math.max(1, Math.min(20, Math.floor(Number(couponCount) || 1)));
   const stakeValue = 4;
   const preview = generated;
@@ -354,6 +364,7 @@ function Kupony() {
                   </div>
                 </div>
                 <div className="mt-3 flex flex-wrap justify-end gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setDetailsCouponId(coupon.id)}>Szczegóły</Button>
                   {coupon.status === "pending" && (
                     <Button size="sm" variant="ghost" onClick={() => removeCoupon.mutate(coupon)} disabled={removeCoupon.isPending}>Anuluj kupon</Button>
                   )}
@@ -363,6 +374,76 @@ function Kupony() {
           })}
         </div>
       )}
+      <Dialog open={!!detailsCoupon} onOpenChange={(open) => { if (!open) setDetailsCouponId(null); }}>
+        <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{detailsCoupon?.name ?? "Szczegóły kuponu"}</DialogTitle>
+            <DialogDescription>Pełne dane kuponu, każdego zdarzenia, uzasadnienia modelu i źródła kursu. Dane historyczne pozostają bez zmian.</DialogDescription>
+          </DialogHeader>
+          {detailsCoupon && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-secondary/20 p-3 sm:grid-cols-4">
+                <div><div className="eyebrow">Typ / status</div><div className="font-semibold">{detailsCoupon.coupon_type} · {statusLabel(detailsCoupon.status)}</div></div>
+                <div><div className="eyebrow">Zdarzenia</div><div className="font-semibold">{detailsLegs.length}/{detailsCoupon.target_legs}</div></div>
+                <div><div className="eyebrow">Stawka</div><div className="num font-semibold">{fmtMoney(detailsCoupon.stake)}</div></div>
+                <div><div className="eyebrow">Kurs łączny</div><div className="num font-semibold">{fmtOdds(detailsCoupon.combined_odds)}</div></div>
+                <div><div className="eyebrow">Możliwy / zapisany zwrot</div><div className="num font-semibold">{fmtMoney(detailsCoupon.potential_return)}</div></div>
+                <div><div className="eyebrow">Utworzono</div><div className="text-sm font-semibold">{fmtDateTime(detailsCoupon.created_at)}</div></div>
+                <div><div className="eyebrow">Rozliczono</div><div className="text-sm font-semibold">{fmtDateTime(detailsCoupon.settled_at)}</div></div>
+                <div><div className="eyebrow">Notatka</div><div className="break-words text-sm">{detailsCoupon.notes || "—"}</div></div>
+              </div>
+              {detailsLegs.map((leg, index) => {
+                const prediction = predictionById.get(leg.prediction_id);
+                const match = prediction ? matchById.get(prediction.match_id) : matches.find((item) => item.id === leg.match_id);
+                const coverage = (prediction?.data_coverage ?? {}) as Record<string, unknown>;
+                const result = match ? resultByMatch.get(match.id) : undefined;
+                const sourceUrl = coverage["odds_source_url"];
+                return (
+                  <section key={leg.id} className="rounded-lg border border-border p-3">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="font-semibold">{index + 1}. {matchLabel(match)}</h3>
+                      <SettlementBadge status={leg.status} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                      <div><div className="eyebrow">Rynek / typ</div><div className="font-semibold">{prediction ? MARKET_LABELS[prediction.market] + " · " + prediction.selection : "Brak prognozy"}</div></div>
+                      <div><div className="eyebrow">Prawdopodobieństwo</div><div className="num font-semibold">{prediction?.probability == null ? "—" : fmtPct(prediction.probability)}</div></div>
+                      <div><div className="eyebrow">Kurs nogi</div><div className="num font-semibold">{fmtOdds(leg.odds ?? prediction?.odds ?? null)}</div></div>
+                      <div><div className="eyebrow">Wynik</div><div className="num font-semibold">{result?.home_score != null && result?.away_score != null ? result.home_score + " : " + result.away_score : "—"}</div></div>
+                    </div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-md bg-secondary/25 p-3">
+                        <div className="eyebrow">Dane modelu</div>
+                        <dl className="mt-2 grid gap-2 text-sm">
+                          <div><dt className="text-muted-foreground">Źródło danych</dt><dd className="break-words font-medium">{prediction?.data_source || "—"}</dd></div>
+                          <div><dt className="text-muted-foreground">Typ źródła modelu / pokrycie</dt><dd className="break-words font-medium">{displayDetail(coverage["model_source_type"])} · {displayDetail(coverage["model_coverage"])}</dd></div>
+                          <div><dt className="text-muted-foreground">Historia gospodarzy / gości</dt><dd className="font-medium">{displayDetail(coverage["home_history_matches"])} / {displayDetail(coverage["away_history_matches"])} meczów</dd></div>
+                          <div><dt className="text-muted-foreground">xG rzeczywiście użyte</dt><dd className="font-medium">{displayDetail(coverage["historical_xg_used"] ?? coverage["xg_used"])}</dd></div>
+                          <div><dt className="text-muted-foreground">Źródła / próbka xG</dt><dd className="break-words font-medium">{displayDetail(coverage["historical_xg_sources"] ?? coverage["xg_sources"])} · {displayDetail(coverage["historical_xg_home_matches"])} / {displayDetail(coverage["historical_xg_away_matches"])}</dd></div>
+                          <div><dt className="text-muted-foreground">Decyzja / powód odrzucenia</dt><dd className="break-words font-medium">{displayDetail(prediction?.verdict)} · {displayDetail(prediction?.rejection_reason)}</dd></div>
+                        </dl>
+                      </div>
+                      <div className="rounded-md bg-secondary/25 p-3">
+                        <div className="eyebrow">Źródło kursu</div>
+                        <dl className="mt-2 grid gap-2 text-sm">
+                          <div><dt className="text-muted-foreground">Bukmacher / źródło</dt><dd className="break-words font-medium">{displayDetail(coverage["odds_bookmaker"])} · {displayDetail(coverage["odds_source"])}</dd></div>
+                          <div><dt className="text-muted-foreground">Status / faza / zawieszenie</dt><dd className="break-words font-medium">{displayDetail(coverage["odds_status"])} · {displayDetail(coverage["odds_phase"])} · {displayDetail(coverage["odds_suspended"])}</dd></div>
+                          <div><dt className="text-muted-foreground">Czas pobrania</dt><dd className="font-medium">{displayDetail(coverage["odds_captured_at"])}</dd></div>
+                          <div><dt className="text-muted-foreground">Rynek potwierdzony</dt><dd className="font-medium">{displayDetail(coverage["market_odds"])}</dd></div>
+                          <div><dt className="text-muted-foreground">URL źródła</dt><dd className="break-all font-medium">{typeof sourceUrl === "string" && /^https?:\/\//i.test(sourceUrl) ? <a className="text-primary underline" href={sourceUrl} target="_blank" rel="noreferrer">Otwórz źródło</a> : "—"}</dd></div>
+                        </dl>
+                      </div>
+                    </div>
+                    <div className="mt-3 rounded-md border border-border p-3">
+                      <div className="eyebrow">Uzasadnienie prognozy</div>
+                      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">{prediction?.rationale || "Brak zapisanego uzasadnienia."}</p>
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <NoGuarantee className="mt-6" />
     </div>
   );
