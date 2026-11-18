@@ -12,7 +12,7 @@ function prediction(id: string, probability: number, date = "2026-11-17"): Track
     details: {
       fixtureId: id === "a-duplicate" ? "a" : id, fixtureDate: date, competition: "Test league", model: "test-v1",
       selection: "1", p1: probability, px: 0.1, p2: Math.max(0, 1 - probability - 0.1),
-      strongCandidate: true, evidenceComplete: true, source: "test",
+      strongCandidate: true, couponEligible: true, evidenceComplete: true, source: "test",
     },
   };
 }
