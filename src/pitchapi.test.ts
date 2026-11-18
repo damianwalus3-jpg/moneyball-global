@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { buildPitchApiXgForm, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildPitchApiXgForm, fetchPitchApiXgFormsForFixture, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
 
 const match: PitchApiLeagueMatch = {
   id: "m_Ab12Cd", time_utc: "2026-11-17T19:00:00Z", status: "finished",
@@ -60,5 +60,53 @@ describe("PitchAPI xG history parsing", () => {
     expect(isPitchApiCountryEligible("SAU")).toBe(false);
     expect(isPitchApiCountryEligible("UAE")).toBe(false);
     expect(isPitchApiCountryEligible(null)).toBe(false);
+  });
+});
+
+describe("PitchAPI historical xG fetch", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it("reads the documented league envelope and aggregates only prior finished matches", async () => {
+    const homeId = "t_Home01", awayId = "t_Away01";
+    const rows: PitchApiLeagueMatch[] = [
+      ...[17,15,13].map((day,index) => ({
+        id: "m_Home" + index, time_utc: `2026-11-${day}T18:00:00Z`, status: "finished",
+        home_team: { id: homeId, name: "Home FC" }, away_team: { id: "t_OppH" + index, name: "Opponent H" },
+        score_home: 2, score_away: 0,
+      })),
+      ...[16,14,12].map((day,index) => ({
+        id: "m_Away" + index, time_utc: `2026-11-${day}T18:00:00Z`, status: "finished",
+        home_team: { id: "t_OppA" + index, name: "Opponent A" }, away_team: { id: awayId, name: "Away FC" },
+        score_home: 0, score_away: 1,
+      })),
+      { id: "m_Future", time_utc: "2026-11-19T18:00:00Z", status: "finished",
+        home_team: { id: homeId, name: "Home FC" }, away_team: { id: awayId, name: "Away FC" }, score_home: 9, score_away: 9 },
+      { id: "m_Unsettled", time_utc: "2026-11-11T18:00:00Z", status: "not_started",
+        home_team: { id: homeId, name: "Home FC" }, away_team: { id: awayId, name: "Away FC" }, score_home: null, score_away: null },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/leagues/")) return new Response(JSON.stringify({ data: { league: { id: "l_Ab12Cd", season: "2026/2027" }, matches: rows } }), { status: 200 });
+      const id = url.split("/").pop() ?? "";
+      const isHome = id.startsWith("m_Home");
+      const h = isHome ? homeId : "t_Opp";
+      const a = isHome ? "t_Opp" : awayId;
+      return new Response(JSON.stringify({ data: {
+        match_id: id, home_team: { id: h, name: "Home" }, away_team: { id: a, name: "Away" },
+        periods: [{ period: "All", groups: [{ items: [
+          { key: "expected_goals", home: isHome ? "1.8" : "0.6", away: isHome ? "0.4" : "1.4" },
+          { key: "total_shots", home: "12", away: "8" },
+          { key: "ShotsOnTarget", home: "5", away: "3" },
+          { key: "big_chance", home: "2", away: "1" },
+          { key: "expected_goals_on_target", home: "1.2", away: "0.5" },
+        ] }] }],
+      } }), { status: 200 });
+    }));
+    const forms = await fetchPitchApiXgFormsForFixture({ leagueId: "l_Ab12Cd", season: "2026/2027", homeTeamId: homeId, awayTeamId: awayId, beforeDate: "2026-11-18" });
+    expect(forms.home.sampleSize).toBe(3);
+    expect(forms.away.sampleSize).toBe(3);
+    expect(forms.home.xgForPerMatch).toBeCloseTo(1.8, 8);
+    expect(forms.away.xgForPerMatch).toBeCloseTo(1.4, 8);
+    expect(forms.home.shotsOnTargetForPerMatch).toBe(5);
+    expect(forms.away.bigChancesForPerMatch).toBe(1);
   });
 });
