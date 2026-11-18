@@ -12,7 +12,7 @@ export interface ThreeLegCandidate {
 function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCandidate | null {
   const d = record.details;
   if (record.kind !== "prediction" || record.status !== "KANDYDAT" || d.fixtureDate !== date || typeof d.fixtureId !== "string" || !d.fixtureId) return null;
-  if (d.couponEligible !== true && d.evidenceComplete !== true) return null;
+  if (d.couponEligible !== true || d.evidenceComplete !== true) return null;
   if (typeof d.fixtureTime === "string" && hasKickoffPassed(date, d.fixtureTime)) return null;
   const base = { fixtureId: d.fixtureId, title: record.title,
     competition: typeof d.competition === "string" ? d.competition : "Rozgrywki nieznane",
