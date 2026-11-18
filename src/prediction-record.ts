@@ -5,6 +5,11 @@ function hasValidProbabilities(details: TrackerRecord["details"], market: string
   const total = (values[0] as number) + (values[1] as number) + (values[2] as number);
   return Math.abs(total - (market === "DOUBLE_CHANCE" ? 2 : 1)) <= 0.0001;
 }
+/** Six-hour retry policy for a missing or invalid market record. */
+export function shouldRetryPredictionAttempt(lastAttempt: unknown, now: number, intervalMs: number): boolean {
+  return typeof lastAttempt !== "number" || !Number.isFinite(lastAttempt) || now - lastAttempt >= intervalMs;
+}
+
 export function shouldAppendPrediction(records: TrackerRecord[], fixtureId: string, model: string,
   nextProbabilitiesAvailable: boolean, nextMethod?: string, market = "1X2"): boolean {
   const existing = records.filter(row => row.kind === "prediction" && row.details.fixtureId === fixtureId
