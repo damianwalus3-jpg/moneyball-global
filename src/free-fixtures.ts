@@ -1,6 +1,7 @@
 import { scanOpenFootball } from "./openfootball";
 import { cacheOpenLigaTeamForms } from "./team-form";
 import { seasonCode } from "./season";
+import { fetchPitchApiDate, fetchPitchApiLeague, isPitchApiCountryEligible } from "./pitchapi";
 export interface FreeFixture {
   id: string;
   competition: string;
@@ -16,6 +17,9 @@ export interface FreeFixture {
   source: string;
   sourceUpdatedAt: string;
   sourceUrl?: string;
+  pitchApiMatchId?: string;
+  pitchApiLeagueId?: string;
+  pitchApiSeason?: string;
 }
 interface LeagueIndex {
   generated_utc: string;
@@ -238,6 +242,9 @@ export function mergeFixtureSource(existing: FreeFixture, incoming: FreeFixture)
   if (!existing.leagueShortcut && incoming.leagueShortcut) existing.leagueShortcut = incoming.leagueShortcut;
   if (!existing.leagueSeason && incoming.leagueSeason) existing.leagueSeason = incoming.leagueSeason;
   if (!existing.openFootballFeedId && incoming.openFootballFeedId) existing.openFootballFeedId = incoming.openFootballFeedId;
+  if (!existing.pitchApiMatchId && incoming.pitchApiMatchId) existing.pitchApiMatchId = incoming.pitchApiMatchId;
+  if (!existing.pitchApiLeagueId && incoming.pitchApiLeagueId) existing.pitchApiLeagueId = incoming.pitchApiLeagueId;
+  if (!existing.pitchApiSeason && incoming.pitchApiSeason) existing.pitchApiSeason = incoming.pitchApiSeason;
   if (!existing.sourceUrl && incoming.sourceUrl) existing.sourceUrl = incoming.sourceUrl;
   if ((!existing.sourceUpdatedAt || existing.sourceUpdatedAt === "not provided by OpenLigaDB") && incoming.sourceUpdatedAt) existing.sourceUpdatedAt = incoming.sourceUpdatedAt;
   return existing;
@@ -320,6 +327,7 @@ export interface FixtureScan {
     footyNomad: { pagesChecked: number; pageMatches: number; fixtures: number; skippedNoTimestamp: number; errors: number };
     timezoneFootball: { feedMatches: number; fixtures: number; generatedAt: string; errors: number };
     flashscore: { competitionsChecked: number; rawMatches: number; fixtures: number; skippedNonEuropean: number; skippedWrongDate: number; timestampMissing: number; errors: number };
+    pitchApi?: { fixtures: number; europeanFixtures: number; leaguesResolved: number; errors: number };
   };
 }
 export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureScan> {
@@ -548,6 +556,48 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     errors.push("timezone.football · " + (error instanceof Error ? error.message : "źródło niedostępne"));
   }
 
+  // Source 8: PitchAPI date feed. Resolve each league's official country code before
+  // admitting fixtures; never infer Europe from a league display name or a global feed.
+  let pitchApiFixturesFound = 0;
+  let pitchApiEuropeanFixturesFound = 0;
+  let pitchApiLeaguesResolved = 0;
+  try {
+    const providerFixtures = await fetchPitchApiDate(date);
+    pitchApiFixturesFound = providerFixtures.length;
+    const leagueIds = [...new Set(providerFixtures.map(item => item.league?.id).filter((id): id is string => Boolean(id)))];
+    const leagueResults = await pooled(leagueIds, 4, async leagueId => {
+      try { return { leagueId, league: await fetchPitchApiLeague(leagueId), error: "" }; }
+      catch (error) { return { leagueId, league: null, error: error instanceof Error ? error.message : "błąd katalogu ligi" }; }
+    });
+    const leagueMap = new Map(leagueResults.flatMap(item => item.league ? [[item.leagueId, item.league] as const] : []));
+    pitchApiLeaguesResolved = leagueMap.size;
+    errors.push(...leagueResults.filter(item => item.error).map(item => "PitchAPI league · " + item.leagueId + ": " + item.error));
+    for (const item of providerFixtures) {
+      const league = leagueMap.get(item.league.id);
+      if (!league || !isPitchApiCountryEligible(league.country_code)) continue;
+      const kickoff = new Date(item.time_utc);
+      if (!Number.isFinite(kickoff.getTime())) continue;
+      const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(kickoff);
+      const get = (key: string) => parts.find(part => part.type === key)?.value ?? "";
+      const localDate = get("year") + "-" + get("month") + "-" + get("day");
+      if (localDate !== date || !item.home_team?.name || !item.away_team?.name) continue;
+      const fixture: FreeFixture = {
+        id: "pitchapi|" + item.id, competition: item.league.name, countryCode: (league.country_code ?? "").toUpperCase(),
+        leagueFolder: "", date: localDate, time: get("hour") + ":" + get("minute"),
+        home: item.home_team.name, away: item.away_team.name, source: "PitchAPI",
+        sourceUpdatedAt: new Date().toISOString(), pitchApiMatchId: item.id,
+        pitchApiLeagueId: item.league.id, pitchApiSeason: league.season ?? undefined,
+      };
+      pitchApiEuropeanFixturesFound++;
+      const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
+      const existing = byKey.get(key);
+      if (existing) mergeFixtureSource(existing, fixture);
+      else byKey.set(key, fixture);
+    }
+  } catch (error) {
+    errors.push("PitchAPI · " + (error instanceof Error ? error.message : "feed niedostępny"));
+  }
+
   // Source 7: Flashscore public daily feed, filtered server-side to the Brussels day and European competitions.
   try {
     const flashscore = await fetchJson<{
@@ -592,6 +642,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       footyNomad: { pagesChecked: footyNomadPagesChecked, pageMatches: footyNomadPageMatches, fixtures: footyNomadFixturesFound, skippedNoTimestamp: footyNomadSkippedNoTimestamp, errors: errors.filter(error => error.startsWith("FootyNomad ·")).length },
       timezoneFootball: { feedMatches: timezoneFootballFeedMatches, fixtures: timezoneFootballFixturesFound, generatedAt: timezoneFootballGeneratedAt, errors: errors.filter(error => error.startsWith("timezone.football ·")).length },
       flashscore: { competitionsChecked: flashscoreCompetitionsChecked, rawMatches: flashscoreRawMatches, fixtures: flashscoreFixturesFound, skippedNonEuropean: flashscoreSkippedNonEuropean, skippedWrongDate: flashscoreSkippedWrongDate, timestampMissing: flashscoreTimestampMissing, errors: errors.filter(error => error.startsWith("Flashscore ·")).length },
+      pitchApi: { fixtures: pitchApiFixturesFound, europeanFixtures: pitchApiEuropeanFixturesFound, leaguesResolved: pitchApiLeaguesResolved, errors: errors.filter(error => error.startsWith("PitchAPI")).length },
     },
   };
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ...result, cachedAt: Date.now() })); } catch { /* storage may be full */ }
