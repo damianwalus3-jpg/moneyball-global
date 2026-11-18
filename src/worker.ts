@@ -265,7 +265,7 @@ export default {
       try {
         const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
         const searchUrl = "https://site.api.espn.com/apis/common/v3/search?query=" + encodeURIComponent(teamQuery) + "&limit=10&type=team";
-        const searchResponse = await fetch(searchUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+        const searchResponse = await fetch(searchUrl, { headers: { Accept: "application/json, text/plain, */*", "Accept-Language": "en-US,en;q=0.9", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", Referer: "https://www.espn.com/soccer/scoreboard", Origin: "https://www.espn.com" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
         if (!searchResponse.ok) throw new Error("espn_team_search_http_" + searchResponse.status);
         const searchPayload = await searchResponse.json() as { items?: Array<{ id?: string; displayName?: string; name?: string; sport?: string; defaultLeagueSlug?: string }> };
         const allowedLeaguePrefixes = ["uefa.", "eng.", "esp.", "ger.", "ita.", "fra.", "ned.", "por.", "bel.", "sco.", "aut.", "sui.", "gre.", "tur.", "pol.", "ukr.", "cro.", "srb.", "den.", "nor.", "swe.", "fin.", "cze.", "rou.", "bul.", "hun.", "irl.", "wal.", "isl.", "lux.", "mlt.", "cyp.", "kaz.", "aze.", "arm.", "geo.", "alb.", "mkd.", "mda.", "est.", "lat.", "ltu.", "blr.", "bih.", "svn.", "svk.", "and.", "lie.", "faro.", "nirl.", "uefa"];
@@ -274,7 +274,7 @@ export default {
         const selected = exact[0];
         if (!selected?.id || !selected.defaultLeagueSlug) return json({ error: "espn_team_not_found", team: teamQuery }, 404, origin);
         const scheduleUrl = "https://site.api.espn.com/apis/site/v2/sports/soccer/" + encodeURIComponent(selected.defaultLeagueSlug) + "/teams/" + encodeURIComponent(selected.id) + "/schedule";
-        const scheduleResponse = await fetch(scheduleUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+        const scheduleResponse = await fetch(scheduleUrl, { headers: { Accept: "application/json, text/plain, */*", "Accept-Language": "en-US,en;q=0.9", "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36", Referer: "https://www.espn.com/soccer/scoreboard", Origin: "https://www.espn.com" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
         if (!scheduleResponse.ok) throw new Error("espn_team_schedule_http_" + scheduleResponse.status);
         type EspnScheduleCompetitor = { homeAway?: string; team?: { displayName?: string; name?: string }; score?: { value?: number; displayValue?: string } | string };
         type EspnScheduleEvent = { id?: string; date?: string; competitions?: Array<{ competitors?: EspnScheduleCompetitor[]; status?: { type?: { completed?: boolean } } }> };
