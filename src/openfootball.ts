@@ -269,9 +269,9 @@ export async function loadOpenFootballRecentTeamForm(feedId: string, team: strin
   }).sort((a,b)=>b.date.localeCompare(a.date));
   const form:OpenFootballTeamForm={
     team,
-    matches:matches.slice(0,5),
-    home:matches.filter(match=>match.venue==="H").slice(0,5),
-    away:matches.filter(match=>match.venue==="A").slice(0,5),
+    matches:matches.slice(0,15),
+    home:matches.filter(match=>match.venue==="H").slice(0,15),
+    away:matches.filter(match=>match.venue==="A").slice(0,15),
     source:`OpenFootball · ${feed.competition}`,
     sourceUpdatedAt:"dataset does not expose a per-file update timestamp",
   };
