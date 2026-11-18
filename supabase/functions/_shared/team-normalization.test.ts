@@ -1,4 +1,4 @@
-import { isExcludedSeniorTeam, normalizeTeamName, teamHistoryKey } from "./team-normalization.ts";
+import { isExcludedSeniorTeam, isWomensTeam, normalizeTeamName, teamHistoryKey } from "./team-normalization.ts";
 
 Deno.test("normalizes accents, punctuation and whitespace consistently", () => {
   if (normalizeTeamName("  Atlético   de   Madrid ") !== "atletico de madrid") throw new Error("Unexpected canonical team name");
@@ -14,4 +14,11 @@ Deno.test("excludes reserve, academy and youth teams but keeps senior teams", ()
 Deno.test("team history keys remove club prefixes and retain women's identity", () => {
   if (teamHistoryKey("FC Atlético Madrid") !== "atletico madrid") throw new Error("Club-prefix normalization failed");
   if (teamHistoryKey("W FC Barcelona") !== "women barcelona") throw new Error("Women's identity marker failed");
+});
+
+Deno.test("detects women's W suffix without false positives on lowercase club-name endings", () => {
+  const women = ["Häcken W", "Manchester City Women", "Frauen Bundesliga", "WSL"];
+  for (const team of women) if (!isWomensTeam(team)) throw new Error("Expected women's marker: " + team);
+  const men = ["Barycz Sułów", "Wolves", "Standard Liege", "Manchester City"];
+  for (const team of men) if (isWomensTeam(team)) throw new Error("False women's marker: " + team);
 });
