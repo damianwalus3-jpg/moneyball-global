@@ -47,6 +47,11 @@ jobs:
           curl --fail --location --silent --show-error "$BASE/api/pitchapi/date/$TODAY?status=all" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);if(!Array.isArray(p.data?.matches)){console.error("PitchAPI date feed missing data.matches:",p);process.exit(1)}console.log("PitchAPI live date feed OK:",p.data.matches.length,"matches for",p.data.date)})'
           curl --fail --location --silent --show-error "$BASE/api/footynomad/fixtures/$TODAY" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);if(!Array.isArray(p.fixtures)||!Number.isInteger(p.pagesChecked)||p.pagesChecked<1){console.error("FootyNomad live date feed invalid:",p);process.exit(1)}console.log("FootyNomad live date feed OK:",p.fixtures.length,"European fixtures from",p.pagesChecked,"UTC pages")})'
           API_FOOTBALL_CONFIGURED="$(echo "$HEALTH" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).apiFootballConfigured?"yes":"no"))')"
+          if [ "$API_FOOTBALL_CONFIGURED" = "yes" ]; then
+            API_FOOTBALL_ACCOUNT_STATUS="$(curl --silent --show-error -o /tmp/api-football-status.json -w "%{http_code}" "$BASE/api/api-football/status")"
+            test "$API_FOOTBALL_ACCOUNT_STATUS" = "200" || { cat /tmp/api-football-status.json; echo "API-Football status endpoint failed"; exit 1; }
+            node -e 'const p=require("/tmp/api-football-status.json");if(p.provider!=="API-Football Pro"||typeof p.requests!=="object"||typeof p.subscription!=="object"||JSON.stringify(p).includes("email")||JSON.stringify(p).includes("server-only-test-secret")){console.error("API-Football status response invalid or unsafe");process.exit(1)}console.log("API-Football subscription diagnostics OK:",p.subscription.plan,"active:",p.subscription.active,"per-minute remaining:",p.requests.perMinuteRemaining,"daily remaining:",p.requests.dailyRemaining)'
+          fi
           API_FOOTBALL_STATUS="$(curl --silent --show-error -o /tmp/api-football.json -w "%{http_code}" "$BASE/api/api-football/fixtures/$TODAY")"
           if [ "$API_FOOTBALL_CONFIGURED" = "yes" ]; then
             test "$API_FOOTBALL_STATUS" = "200" || { cat /tmp/api-football.json; echo "API-Football configured but gateway did not return HTTP 200"; exit 1; }
