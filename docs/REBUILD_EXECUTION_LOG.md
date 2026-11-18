@@ -1105,3 +1105,9 @@
 - Implementation commit: 396a633a217df067ceb0544dc3e53d33521d48f1.
 - CI and Cloudflare deployment are pending verification on the newest HEAD.
 - Zero-cost constraint reaffirmed: no paid fixture/history/xG service, subscription, paid API key or paid database may be required. A paid source may only be mentioned as a rejected alternative, never silently enabled.
+
+
+### Stage 88 — Tracker schema compatibility correction
+- Initial CI caught that TrackerRecord.details intentionally accepts primitive JSON values only, not nested objects. The app change was corrected to serialize the provenance and sample-count structures as JSON strings, preserving the existing storage schema and backward compatibility.
+- Corrective commit: 3ee68109d11ed5de256869be200c5b3205df18ee.
+- No Tracker data was migrated or rewritten. Fresh CI and deploy must pass before release confirmation.
