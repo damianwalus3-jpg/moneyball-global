@@ -43,7 +43,7 @@ Deno.test("production scope includes only geographic-Europe domestic men's tiers
     ["France","National 2 - Group C"],["Czech Republic","3. liga - CFL B"],
     ["England","National League - North"],["Scotland","Lowland League"],
     ["Germany","Oberliga - Hessen"],["Bulgaria","Third League - Northeast"],
-    ["Poland","III Liga - Group 3"],["England","EFL Trophy"],["Sweden","Damallsvenskan"],
+    ["Poland","III Liga - Group 3"],["England","EFL Trophy"],["England","Premier League 2"],["Sweden","Damallsvenskan"],
     ["World","UEFA Nations League"],["Turkey","Super Lig"]
   ];
   for (const [country,competition] of rejected) {
