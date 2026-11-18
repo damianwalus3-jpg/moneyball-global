@@ -272,6 +272,32 @@ export default {
       }
     }
 
+    const calcioSerieD = url.pathname.match(/^\/api\/calcio\/serie-d\/([a-i])\/(teams|results)(?:\/(\d{1,2}))?$/);
+    if (calcioSerieD) {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      const [, group, resource, round] = calcioSerieD;
+      if ((resource === "teams" && round) || (resource === "results" && round && (Number(round) < 1 || Number(round) > 34))) {
+        return json({ error: "invalid_calcio_serie_d_path" }, 400, origin);
+      }
+      const upstreamPath = resource === "teams" ? `serie-d-girone-${group}/squadre`
+        : `serie-d-girone-${group}/risultati${round ? `/giornata-${Number(round)}` : ""}`;
+      try {
+        const upstream = await fetch(`https://calcio.it/${upstreamPath}`, {
+          headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "Mozilla/5.0 (compatible; MoneyballGlobal/1.0)" },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        });
+        const html = await upstream.text();
+        if (!upstream.ok) return json({ error: `calcio_it_http_${upstream.status}` }, 502, origin);
+        const headers = corsHeaders(origin);
+        headers.set("Content-Type", "text/html; charset=utf-8");
+        headers.set("Cache-Control", "public, max-age=21600");
+        headers.set("X-MONEYBALL-SOURCE", "calcio.it Serie D");
+        return new Response(html, { status: 200, headers });
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "calcio_it_upstream_error" }, 502, origin);
+      }
+    }
+
     const oddsHealth = url.pathname === "/api/odds/status";
     const oddsPilot = url.pathname === "/api/odds/pilot";
     if (oddsHealth || oddsPilot) {
