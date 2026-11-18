@@ -1029,3 +1029,13 @@
 - Deployed to isolated `moneyball-global-rebuild` Worker. Cloudflare reported version `53e713d5-873e-4d35-9e83-6f4a28084f28`. This confirms deployment of the 75% threshold change to REBUILD only.
 - Additional API audit: although the `worldcup26.ir` catalogue advertises 35 competitions, live fixtures-range requests confirmed actual stored match history for National League and Spanish Segunda. The Worker already returns 10 recent matches for Gateshead, AFC Hornchurch and Real Valladolid through its existing ESPN team-form endpoint. This means the candidate API may duplicate existing team-form coverage; it did not demonstrate usable future fixtures on checked dates, so it remains excluded from fixture ingestion until future schedule delivery and reuse permission are verified.
 - No MAIN changes.
+
+
+## Stage 84 — Double Chance independently admitted to three-leg coupons (2026-11-18)
+- Extended `CouponLegCandidate` to distinguish `1X2` from `DOUBLE_CHANCE` and to represent DC selections `1X`, `X2`, `12`.
+- Coupon candidate selection now accepts a record with `strongDoubleChance === true` and its highest valid DC probability >=75%, even when `strongCandidate === false`. 1X2 remains independently qualified using `strongCandidate === true` and its own normalized 1X2 probabilities >=75%. The existing latest-record-per-fixture guard, date filter, three distinct fixture rule and exact three-leg coupon construction remain in place.
+- Added regression coverage for a coupon made entirely of DC-only candidates at exactly 75% or above. Existing 1X2 valuation fixtures now explicitly declare their market.
+- Safety of odds handling: bookmaker snapshots currently contain only 1X2 prices. DC coupon legs are therefore deliberately not priced using 1X2 odds; the valuation helper fails closed for a coupon containing DC legs until genuine Double Chance odds are available. This prevents misleading EV/return figures.
+- Final CI run #496 / run `44262768894` succeeded on commit `85102e26bb3430b65e5a8bfe785ebf5b91cc51c1`. TypeScript passed; **20/20 test files and 149/149 tests passed**; production build passed; isolated Cloudflare REBUILD deploy succeeded.
+- Cloudflare Worker `moneyball-global-rebuild` version: `2dc2e008-295e-4f71-9944-2a35118c3497`.
+- No MAIN changes.
