@@ -185,6 +185,36 @@ export default {
       }
     }
 
+    const footyNomadInspect = url.pathname.match(/^\/_internal\/footynomad-inspect\/(\d{4}-\d{2}-\d{2})$/);
+    if (footyNomadInspect) {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      const date = footyNomadInspect[1];
+      const year = Number(date.slice(0,4)), month = Number(date.slice(5,7)), day = Number(date.slice(8,10));
+      const parsed = new Date(Date.UTC(year, month - 1, day));
+      if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return json({ error: "invalid_date" }, 400, origin);
+      const cacheKey = new Request(url.toString(), { method: "GET" });
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+      try {
+        const upstream = await fetch("https://footynomad.com/fixtures/" + date, {
+          headers: { Accept: "text/html,application/xhtml+xml", "User-Agent": "Mozilla/5.0 (compatible; MONEYBALL-REBUILD/1.0; +https://moneyball-global-rebuild.damianwalus3.workers.dev)" },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        });
+        const html = await upstream.text();
+        if (!upstream.ok) return json({ error: "footynomad_upstream_http_" + upstream.status }, upstream.status, origin);
+        if (!html.includes("fixtures/") || !html.includes("<h1")) return json({ error: "footynomad_invalid_html" }, 502, origin);
+        const headers = corsHeaders(origin);
+        headers.set("Content-Type", "application/json; charset=utf-8");
+        headers.set("Cache-Control", "public, max-age=900");
+        headers.set("X-MONEYBALL-SOURCE", "FootyNomad");
+        const response = new Response(JSON.stringify({ date, html }), { status: 200, headers });
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "footynomad_upstream_error" }, 502, origin);
+      }
+    }
     const leagues = url.pathname.match(/^\/api\/openligadb\/leagues\/(\d{4})$/);
     const matches = url.pathname.match(/^\/api\/openligadb\/matches\/((?:[a-z0-9._-]|%[0-9a-f]{2})+)\/(\d{4})$/i);
     const teamMatches = url.pathname.match(/^\/api\/openligadb\/team-matches\/((?:[a-z0-9._-]|%[0-9a-f]{2})+)\/(\d{4})\/([^/]+)$/i);
