@@ -11,7 +11,7 @@ import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
 import { describeHistoryProvenance, hasValidPredictionMarket, shouldAppendPrediction, shouldRetryPredictionWithEvidence } from "./prediction-record";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
-import { isEvidenceQualifiedCandidate } from "./prediction-eligibility";
+import { getPredictionDisplayStatus, isEvidenceQualifiedCandidate } from "./prediction-eligibility";
 import { auditOddsFixtureMatches } from "./odds-matching";
 import { brusselsDateToday, getSelectedFixturePredictions } from "./selected-matches";
 import { auditMarketCoverage } from "./market-coverage";
@@ -1036,8 +1036,9 @@ export default function App() {
               const eligible = isEvidenceQualifiedCandidate(row, market);
               const pick = typeof row.details.selection === "string" ? row.details.selection : "Brak typu";
               return <div className="selected-market">
-                <div className="selected-market-head"><b>{market === "1X2" ? "1X2" : "DOUBLE CHANCE"}</b><span className={eligible ? "selected-status eligible" : "selected-status rejected"}>{eligible ? "KANDYDAT ≥75%" : row.details.evidenceComplete !== true ? "ODRZUCONY · BRAK DANYCH" : probability === null ? "BRAK POPRAWNEGO TYPU" : "PONIŻEJ PROGU 75%"}</span></div>
+                <div className="selected-market-head"><b>{market === "1X2" ? "1X2" : "DOUBLE CHANCE"}</b><span className={eligible ? "selected-status eligible" : "selected-status rejected"}>{getPredictionDisplayStatus(row, market, probability)}</span></div>
                 <div className="selected-pick">{pick}<strong>{probability === null ? "Brak %" : (probability * 100).toFixed(1) + "%"}</strong></div>
+                {!eligible && probability !== null && <small className="prediction-probability-note">To surowe prawdopodobieństwo modelu, a nie potwierdzona wiarygodność ani kwalifikacja do kuponu.</small>}
                 <p>{reasonFor(row)}</p>
                 <small>Model: {String(row.details.predictionMethod ?? row.details.modelName ?? "nieznany")} · próbka: {String(row.details.historySampleCounts ?? "brak danych")}</small>
               </div>;
