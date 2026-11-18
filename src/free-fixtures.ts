@@ -106,12 +106,14 @@ export function parseTimezoneFootballFixtures(payload: unknown, targetDate: stri
     if (!mapped || !match.kickoff || !Number.isFinite(Date.parse(match.kickoff)) || !match.home?.trim() || !match.away?.trim()) return [];
     const kickoff = brusselsParts(new Date(match.kickoff));
     if (kickoff.date !== targetDate) return [];
+    const sourceUrl = match.url?.trim();
+    if (!sourceUrl || !/^https:\/\/timezone\.football\//.test(sourceUrl)) return [];
     return [{
       id: "timezone-football|" + [match.competition, match.kickoff, match.home, match.away].join("|"),
       competition: mapped.label, countryCode: mapped.countryCode, leagueFolder: "", date: kickoff.date, time: kickoff.time,
       home: match.home.trim(), away: match.away.trim(), source: "timezone.football",
       sourceUpdatedAt: (payload as TimezoneFootballFeed).generated ?? "not provided by timezone.football",
-      sourceUrl: match.url && /^https:\/\/timezone\.football\//.test(match.url) ? match.url : undefined,
+      sourceUrl,
     } satisfies FreeFixture];
   });
 }
