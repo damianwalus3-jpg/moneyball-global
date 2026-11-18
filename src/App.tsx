@@ -90,13 +90,13 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
       strongCandidate: prediction?.strongCandidate ?? false,
       strongDoubleChance: prediction ? Math.max(dc?.oneX ?? 0, dc?.xTwo ?? 0, dc?.oneTwo ?? 0) >= 0.75 : false,
       source: match.source,
-      history: homeForm && awayForm ? {
+      historyProvenance: homeForm && awayForm ? JSON.stringify({
         home: { source: homeForm.source, sourceUpdatedAt: homeForm.sourceUpdatedAt, matches: homeForm.matches.length, homeMatches: homeForm.home.length, awayMatches: homeForm.away.length },
         away: { source: awayForm.source, sourceUpdatedAt: awayForm.sourceUpdatedAt, matches: awayForm.matches.length, homeMatches: awayForm.home.length, awayMatches: awayForm.away.length },
         cutoffDateExclusive: match.date,
-      } : null,
+      }) : null,
       modelMethod: prediction?.method ?? null,
-      sampleCounts: prediction?.samples ?? null,
+      sampleCounts: prediction ? JSON.stringify(prediction.samples) : null,
       reason: reason ?? (prediction && !prediction.strongCandidate && Math.max(dc?.oneX ?? 0, dc?.xTwo ?? 0, dc?.oneTwo ?? 0) < 0.75 ? "Najwyższe prawdopodobieństwo 1X2 i Double Chance poniżej progu 75%." : null),
     },
   });
