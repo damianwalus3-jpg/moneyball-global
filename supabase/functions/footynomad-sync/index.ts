@@ -2,7 +2,7 @@ import { footyNomadSectionAt } from "../_shared/footynomad-section.ts";
 import { extractBearerToken } from "../_shared/bearer-token.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 import { isEligibleDomesticSeniorLeague } from "../_shared/domestic-league-scope.ts";
-import { isExcludedSeniorTeam } from "../_shared/team-normalization.ts";
+import { isExcludedSeniorTeam, isWomensTeam } from "../_shared/team-normalization.ts";
 function isTopTwoTierLeague(competition: unknown, country?: unknown): boolean {
   const scopeCountry = String(country ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
   const scopeLabel = String(competition ?? "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -62,7 +62,7 @@ async function readFixtures(date:string){
     if (isExcludedSeniorTeam(home) || isExcludedSeniorTeam(away)) continue;
   const cls=(attrs.match(/class=["']([^"']+)/i)||[])[1]||"",status=cls.includes("ticket-live")?"live":cls.includes("ticket-ft")?"finished":cls.includes("ticket-pst")?"postponed":cls.includes("ticket-canc")?"cancelled":"scheduled";
   const hs=(body.match(/class=["'][^"']*ticket-hs[^"']*["'][^>]*>([0-9]+)</i)||[])[1],as=(body.match(/class=["'][^"']*ticket-as[^"']*["'][^>]*>([0-9]+)</i)||[])[1];
-  const gender=/\bW\b|Women|female|girls|damallsvenskan|wsl|liga f/i.test(home+" "+away+" "+league)?"women":"men";
+  const gender=isWomensTeam(home+" "+away+" "+league)?"women":"men";
   if(gender!=='men')continue;
   fixtures.push({external_id:id,source:"FootyNomad",date,competition:league||null,country,gender,home_team:home,away_team:away,kickoff_at:time?new Date(time).toISOString():null,status,home_score:hs==null?null:Number(hs),away_score:as==null?null:Number(as)});
  }
