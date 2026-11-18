@@ -166,9 +166,12 @@ CREATE TRIGGER trg_moneyball_scope_guard_predictions BEFORE INSERT ON public.pre
 CREATE OR REPLACE FUNCTION public.moneyball_block_new_test_coupon()
 RETURNS trigger LANGUAGE plpgsql SET search_path TO '' AS $function$
 BEGIN
-  IF upper(btrim(coalesce(NEW.coupon_type,'')))='TEST'
-     AND (TG_OP='INSERT' OR upper(btrim(coalesce(OLD.coupon_type,''))) IS DISTINCT FROM upper(btrim(coalesce(NEW.coupon_type,'')))) THEN
-    RAISE EXCEPTION 'New TEST coupons are disabled in production MONEYBALL MAIN.';
+  IF upper(btrim(coalesce(NEW.coupon_type,'')))='TEST' THEN
+    IF TG_OP='INSERT' THEN
+      RAISE EXCEPTION 'New TEST coupons are disabled in production MONEYBALL MAIN.';
+    ELSIF upper(btrim(coalesce(OLD.coupon_type,''))) IS DISTINCT FROM upper(btrim(coalesce(NEW.coupon_type,''))) THEN
+      RAISE EXCEPTION 'New TEST coupons are disabled in production MONEYBALL MAIN.';
+    END IF;
   END IF;
   RETURN NEW;
 END;
