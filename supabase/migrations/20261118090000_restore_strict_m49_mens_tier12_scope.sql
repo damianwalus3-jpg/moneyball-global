@@ -166,7 +166,10 @@ CREATE TRIGGER trg_moneyball_scope_guard_predictions BEFORE INSERT ON public.pre
 CREATE OR REPLACE FUNCTION public.moneyball_block_new_test_coupon()
 RETURNS trigger LANGUAGE plpgsql SET search_path TO '' AS $function$
 BEGIN
-  IF upper(btrim(coalesce(NEW.coupon_type,'')))='TEST' THEN RAISE EXCEPTION 'New TEST coupons are disabled in production MONEYBALL MAIN.'; END IF;
+  IF upper(btrim(coalesce(NEW.coupon_type,'')))='TEST'
+     AND (TG_OP='INSERT' OR upper(btrim(coalesce(OLD.coupon_type,''))) IS DISTINCT FROM upper(btrim(coalesce(NEW.coupon_type,'')))) THEN
+    RAISE EXCEPTION 'New TEST coupons are disabled in production MONEYBALL MAIN.';
+  END IF;
   RETURN NEW;
 END;
 $function$;
@@ -518,7 +521,7 @@ END;
 $scope_assertions$;
 
 DO $test_coupon_guard$
-DECLARE v_error text := '';
+DECLARE v_error text := ''; v_existing_test uuid;
 BEGIN
   BEGIN
     INSERT INTO public.coupons(owner_id,name,coupon_type,target_legs,stake,source_class)
@@ -528,6 +531,19 @@ BEGIN
   END;
   IF v_error NOT LIKE '%New TEST coupons are disabled%' THEN
     RAISE EXCEPTION 'New TEST coupon guard failed: %',v_error;
+  END IF;
+
+  SELECT id INTO v_existing_test FROM public.coupons
+  WHERE upper(coupon_type)='TEST' ORDER BY created_at LIMIT 1;
+  IF v_existing_test IS NOT NULL THEN
+    BEGIN
+      UPDATE public.coupons SET coupon_type='TEST' WHERE id=v_existing_test;
+      RAISE EXCEPTION 'ROLLBACK_EXISTING_TEST_COUPON_UPDATE';
+    EXCEPTION WHEN others THEN
+      IF SQLERRM <> 'ROLLBACK_EXISTING_TEST_COUPON_UPDATE' THEN
+        RAISE EXCEPTION 'Historical TEST coupon update was blocked: %',SQLERRM;
+      END IF;
+    END;
   END IF;
 END;
 $test_coupon_guard$;
