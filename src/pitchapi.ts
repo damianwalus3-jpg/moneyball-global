@@ -216,7 +216,9 @@ export function selectPitchApiSeason(league: PitchApiLeague, targetDate: string)
   if (calendarYear) return calendarYear;
   const notFuture = options.filter(value => startYear(value) <= expectedStartYear)
     .sort((a, b) => startYear(b) - startYear(a) || Number(b.split("/")[1] ?? b.slice(0, 4)) - Number(a.split("/")[1] ?? a.slice(0, 4)));
-  return notFuture[0] ?? league.season ?? options.sort((a, b) => startYear(b) - startYear(a))[0];
+  // Fail closed when the catalogue only contains future seasons; never silently
+  // request a season that cannot cover the target date.
+  return notFuture[0];
 }
 
 export async function fetchPitchApiLeagueCatalog(): Promise<PitchApiLeague[]> {
