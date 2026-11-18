@@ -227,6 +227,20 @@ export function openLigaCountryCode(league: OpenLigaLeague): string {
   return prefix ? OPENLIGA_SHORTCUT_COUNTRY_CODES[prefix] ?? "EU" : "EU";
 }
 
+
+/** Merge provider provenance and all available history identifiers onto one canonical fixture. */
+export function mergeFixtureSource(existing: FreeFixture, incoming: FreeFixture): FreeFixture {
+  const sources = new Set([...existing.source.split(" + "), ...incoming.source.split(" + ")].map(value => value.trim()).filter(Boolean));
+  existing.source = [...sources].join(" + ");
+  if (!existing.leagueFolder && incoming.leagueFolder) existing.leagueFolder = incoming.leagueFolder;
+  if (!existing.leagueShortcut && incoming.leagueShortcut) existing.leagueShortcut = incoming.leagueShortcut;
+  if (!existing.leagueSeason && incoming.leagueSeason) existing.leagueSeason = incoming.leagueSeason;
+  if (!existing.openFootballFeedId && incoming.openFootballFeedId) existing.openFootballFeedId = incoming.openFootballFeedId;
+  if (!existing.sourceUrl && incoming.sourceUrl) existing.sourceUrl = incoming.sourceUrl;
+  if ((!existing.sourceUpdatedAt || existing.sourceUpdatedAt === "not provided by OpenLigaDB") && incoming.sourceUpdatedAt) existing.sourceUpdatedAt = incoming.sourceUpdatedAt;
+  return existing;
+}
+
 export function fixtureKey(date: string, home: string, away: string, competition = ""): string {
   const genderText = `${competition} ${home} ${away}`.toLowerCase();
   const gender = /\b(women|woman|womens|frauen|femmes|femenina|feminine|ladies|girls|wsl|wcl|w)\b/.test(genderText) ? "women" : "open";
@@ -432,7 +446,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       for (const fixture of response.fixtures) {
         const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
         const existing = byKey.get(key);
-        if (existing) existing.source = `${existing.source} + OpenLigaDB`;
+        if (existing) mergeFixtureSource(existing, fixture);
         else byKey.set(key, fixture);
       }
     }
@@ -449,10 +463,8 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     for (const fixture of openFootball.fixtures) {
       const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
       const existing = byKey.get(key);
-      if (existing) {
-        existing.source = `${existing.source} + openfootball`;
-        existing.openFootballFeedId = fixture.feedId;
-      } else byKey.set(key, { ...fixture, leagueFolder: "", openFootballFeedId: fixture.feedId });
+      if (existing) mergeFixtureSource(existing, { ...fixture, leagueFolder: "", openFootballFeedId: fixture.feedId });
+      else byKey.set(key, { ...fixture, leagueFolder: "", openFootballFeedId: fixture.feedId });
     }
   } catch (error) {
     errors.push(`openfootball · ${error instanceof Error ? error.message : "katalog niedostępny"}`);
@@ -480,7 +492,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     for (const fixture of espnFixtures) {
       const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
       const existing = byKey.get(key);
-      if (existing) existing.source = `${existing.source} + ESPN`;
+      if (existing) mergeFixtureSource(existing, fixture);
       else byKey.set(key, fixture);
     }
   } catch (error) {
@@ -500,7 +512,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     for (const fixture of fixtures) {
       const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
       const existing = byKey.get(key);
-      if (existing) existing.source = existing.source + " + FootyNomad";
+      if (existing) mergeFixtureSource(existing, fixture);
       else byKey.set(key, fixture);
     }
   } catch (error) {
@@ -517,8 +529,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
       const key = fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition);
       const existing = byKey.get(key);
       if (existing) {
-        existing.source = existing.source + " + timezone.football";
-        existing.sourceUrl = fixture.sourceUrl ?? existing.sourceUrl;
+        mergeFixtureSource(existing, fixture);
       } else byKey.set(key, fixture);
     }
   } catch (error) {
