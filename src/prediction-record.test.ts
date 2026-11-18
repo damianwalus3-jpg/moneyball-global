@@ -16,8 +16,17 @@ describe("prediction record refresh policy", () => {
   it("allows a later successful analysis to supersede an earlier failed lookup", () => {
     expect(shouldAppendPrediction([row("failed", [null, null, null])], "fixture-1", "model-v1", true)).toBe(true);
   });
-  it("does not append another prediction once a valid one exists", () => {
-    expect(shouldAppendPrediction([row("valid", [0.6, 0.2, 0.2])], "fixture-1", "model-v1", true)).toBe(false);
+  it("does not append another prediction once an evidence-backed valid one exists", () => {
+    const valid = { ...row("valid", [0.6, 0.2, 0.2]), details: { ...row("valid", [0.6, 0.2, 0.2]).details, predictionMethod: "recent-form-goals-poisson" } };
+    expect(shouldAppendPrediction([valid], "fixture-1", "model-v1", true, "recent-form-goals-poisson")).toBe(false);
+  });
+  it("allows an evidence-backed forecast to supersede a neutral-prior placeholder", () => {
+    const fallback = { ...row("fallback", [0.34, 0.32, 0.34]), details: { ...row("fallback", [0.34, 0.32, 0.34]).details, predictionMethod: "neutral-prior-poisson" } };
+    expect(shouldAppendPrediction([fallback], "fixture-1", "model-v1", true, "recent-form-goals-poisson")).toBe(true);
+  });
+  it("does not duplicate a neutral-prior placeholder when a retry still has no better data", () => {
+    const fallback = { ...row("fallback", [0.34, 0.32, 0.34]), details: { ...row("fallback", [0.34, 0.32, 0.34]).details, predictionMethod: "neutral-prior-poisson" } };
+    expect(shouldAppendPrediction([fallback], "fixture-1", "model-v1", true, "neutral-prior-poisson")).toBe(false);
   });
   it("ignores records from another model or fixture", () => {
     expect(shouldAppendPrediction([row("other", [0.6, 0.2, 0.2])], "fixture-2", "model-v1", true)).toBe(true);
