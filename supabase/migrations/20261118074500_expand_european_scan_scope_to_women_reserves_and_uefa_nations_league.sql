@@ -81,7 +81,7 @@ BEGIN
   IF public.moneyball_is_eligible_european_match('World','UEFA Womens Nations League','women','Team A','Team B') IS DISTINCT FROM true THEN RAISE EXCEPTION 'UEFA Womens Nations League must be eligible'; END IF;
   IF public.moneyball_is_eligible_european_match('World','CONCACAF Nations League','men','Team A','Team B') IS DISTINCT FROM false THEN RAISE EXCEPTION 'CONCACAF Nations League must remain excluded'; END IF;
   IF public.moneyball_is_eligible_european_match('Turkey','2. Lig','men','Team A','Team B') IS DISTINCT FROM true THEN RAISE EXCEPTION 'Turkish domestic leagues must be eligible'; END IF;
-  IF public.moneyball_is_eligible_european_match('Poland','Ekstraliga Women','women','Team A','Team B') IS DISTINCT FROM true THEN RAISE EXCEPTION 'European women's domestic leagues must be eligible'; END IF;
+  IF public.moneyball_is_eligible_european_match('Poland','Ekstraliga Women','women','Team A','Team B') IS DISTINCT FROM true THEN RAISE EXCEPTION 'European women''s domestic leagues must be eligible'; END IF;
   IF public.moneyball_is_eligible_european_match('Spain','Tercera División RFEF - Group 13','men','Cartagena LU II','Santomera') IS DISTINCT FROM true THEN RAISE EXCEPTION 'Spanish lower-tier reserve sides must be eligible'; END IF;
   IF public.moneyball_is_eligible_european_match('Italy','Coppa Italia Serie D','men','Team A','Team B') IS DISTINCT FROM false THEN RAISE EXCEPTION 'Domestic cups must remain excluded'; END IF;
   IF public.moneyball_is_eligible_european_match('World','UEFA Womens Champions League','women','Team A','Team B') IS DISTINCT FROM false THEN RAISE EXCEPTION 'UEFA club cups must remain excluded'; END IF;
