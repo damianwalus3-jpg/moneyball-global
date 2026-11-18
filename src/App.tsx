@@ -6,6 +6,7 @@ import { predictFromRecentForm, predictFromPitchApiXgForm, type FormPrediction }
 import { fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, type PitchApiLineups, type PitchApiXgForm } from "./pitchapi";
 import { buildThreeLegCandidates } from "./coupon-engine";
 import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from "./openfootball";
+import { loadCalcioItSerieDTeamForm } from "./team-form";
 import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
@@ -203,6 +204,7 @@ export default function App() {
       }
       if (match.leagueShortcut && match.leagueSeason) attempts.push({ name: "OpenLigaDB", run: () => loadOpenLigaRecentTeamForm(match.leagueShortcut!, match.leagueSeason!, team, match.date) });
       if (match.openFootballFeedId) attempts.push({ name: "OpenFootball", run: () => loadOpenFootballRecentTeamForm(match.openFootballFeedId!, team, match.date) });
+      if (match.countryCode === "ITA" && /Serie D|Coppa Italia Serie D/i.test(match.competition)) attempts.push({ name: "calcio.it · włoska Serie D (grupy A–I)", run: () => loadCalcioItSerieDTeamForm(team, match.date) });
       if (/^[A-Z]{3}$/.test(match.countryCode) && match.countryCode !== "UEFA") {
         attempts.push({ name: "open-matchday · historia krajowa", run: () => loadRecentTeamFormAcrossCountry(match.countryCode, team, match.date) });
       }
