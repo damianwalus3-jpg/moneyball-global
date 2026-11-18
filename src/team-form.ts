@@ -154,7 +154,11 @@ export async function loadRecentTeamFormAcrossCountry(countryCode: string, team:
     }
   }));
   const matches = [...rowsByFixture.values()].sort((a,b) => b.date.localeCompare(a.date)).slice(0,15);
-  if (!matches.length) throw new Error(errors.length ? errors.slice(0,3).join(" · ") : "Brak zgodnych wyników tej drużyny w krajowych plikach historii");
+  if (!matches.length) {
+    const coverage = `Przeskanowano ${folders.length} plików ligowych kraju ${countryCode}; indeks danych: ${index.generated_utc ?? "brak daty"}.`;
+    const detail = errors.length ? errors.slice(0, 3).join(" · ") : "Żaden opublikowany plik nie zawiera wcześniejszych, zgodnych wyników tej drużyny.";
+    throw new Error(`Brak historii drużyny w Open-Matchday. ${coverage} ${detail} Źródło nie obejmuje wszystkich poziomów rozgrywek.`);
+  }
   return {
     team,
     matches,
