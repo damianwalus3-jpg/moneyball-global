@@ -75,8 +75,8 @@ function mapMatch(row: CsvRow, team: string): FormMatch | null {
   if (row.ft_home?.trim() === "" || row.ft_away?.trim() === "") return null;
   const homeScore = Number(row.ft_home), awayScore = Number(row.ft_away);
   if (!row.date || !Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) return null;
-  const isHome = row.home.toLocaleLowerCase() === team.toLocaleLowerCase();
-  const isAway = row.away.toLocaleLowerCase() === team.toLocaleLowerCase();
+  const isHome = normalizeTeam(row.home ?? "") === normalizeTeam(team);
+  const isAway = normalizeTeam(row.away ?? "") === normalizeTeam(team);
   if (!isHome && !isAway) return null;
   const goalsFor = isHome ? homeScore : awayScore;
   const goalsAgainst = isHome ? awayScore : homeScore;
@@ -106,6 +106,61 @@ export async function loadRecentTeamForm(folder: string, team: string, beforeDat
     away: matches.filter(row => row.venue === "A").slice(0, 5),
     source: `open-matchday results_${seasonCode(beforeDate)}.csv`,
     sourceUpdatedAt: generatedAt,
+  };
+}
+
+/**
+ * Cup and cross-provider fixtures often have no usable competition-folder ID.
+ * Resolve club form from every published results feed for the same country instead
+ * of treating the cup's folder as the club's historical league.
+ */
+export async function loadRecentTeamFormAcrossCountry(countryCode: string, team: string, beforeDate: string): Promise<TeamForm> {
+  if (!/^[A-Z]{3}$/.test(countryCode) || countryCode === "UEFA" || !team.trim() || !/^\\d{4}-\\d{2}-\\d{2}$/.test(beforeDate)) {
+    throw new Error("Nieprawidłowe parametry krajowej historii drużyny");
+  }
+  const indexResponse = await fetch(`${ROOT}/build_summary.json`);
+  if (!indexResponse.ok) throw new Error(`Indeks historii niedostępny (HTTP ${indexResponse.status})`);
+  const index = await indexResponse.json() as { generated_utc?: string; leagues?: Array<{ league?: string; folder?: string; fixtures?: number }> };
+  const folders = (index.leagues ?? []).flatMap(league => {
+    const folder = (league.folder ?? "").replace(/^data\\//, "");
+    return new RegExp("^" + countryCode + "_\\d+_[a-z0-9-]+$").test(folder) && Number(league.fixtures) > 0
+      ? [{ folder, league: league.league ?? folder }] : [];
+  });
+  if (!folders.length) throw new Error(`Brak opublikowanych lig ${countryCode} w indeksie historii`);
+  const rowsByFixture = new Map<string, FormMatch>();
+  const errors: string[] = [];
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(6, folders.length) }, async () => {
+    while (cursor < folders.length) {
+      const item = folders[cursor++];
+      try {
+        const loaded = await loadLeagueResults(item.folder, beforeDate);
+        for (const row of loaded.rows) {
+          if (row.date >= beforeDate) continue;
+          const mapped = mapMatch(row, team);
+          if (!mapped) continue;
+          const key = [mapped.date, normalizeTeam(mapped.opponent), mapped.venue].join("|");
+          const previous = rowsByFixture.get(key);
+          if (previous && (previous.goalsFor !== mapped.goalsFor || previous.goalsAgainst !== mapped.goalsAgainst)) {
+            rowsByFixture.delete(key);
+            continue;
+          }
+          if (!previous) rowsByFixture.set(key, mapped);
+        }
+      } catch (error) {
+        errors.push(item.league + ": " + (error instanceof Error ? error.message : "błąd źródła"));
+      }
+    }
+  }));
+  const matches = [...rowsByFixture.values()].sort((a,b) => b.date.localeCompare(a.date)).slice(0,15);
+  if (!matches.length) throw new Error(errors.length ? errors.slice(0,3).join(" · ") : "Brak zgodnych wyników tej drużyny w krajowych plikach historii");
+  return {
+    team,
+    matches,
+    home: matches.filter(row => row.venue === "H").slice(0,5),
+    away: matches.filter(row => row.venue === "A").slice(0,5),
+    source: `open-matchday · wszystkie opublikowane ligi ${countryCode}`,
+    sourceUpdatedAt: index.generated_utc ?? "brak daty aktualizacji",
   };
 }
 
