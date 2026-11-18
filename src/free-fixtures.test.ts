@@ -22,9 +22,17 @@ describe("API-Football Pro European fixture integration", () => {
     expect(parseApiFootballEuropeanFixtures(response, "2026-11-18", "2026-11-18T22:48:00.000Z")).toHaveLength(1);
     expect(parseApiFootballEuropeanFixtures({ results: 0, fixtures: [] }, "2026-11-18", "now")).toEqual([]);
   });
-  it("rejects HTTP-200 provider payloads that contain API-Football errors", () => {
-    expect(() => parseApiFootballEuropeanFixtures({ results: 0, fixtures: [], errors: { token: "invalid" } }, "2026-11-18", "now")).toThrow(/błędy/);
-    expect(() => parseApiFootballEuropeanFixtures({ results: 0, fixtures: [], errors: ["rate limit"] }, "2026-11-18", "now")).toThrow(/błędy/);
+  it("preserves sanitized diagnostics for HTTP-200 provider errors", () => {
+    expect(() => parseApiFootballEuropeanFixtures({ results: 0, fixtures: [], errors: { plan: "Free plan does not include this endpoint" } }, "2026-11-18", "now")).toThrow(/Free plan does not include this endpoint/);
+    expect(() => parseApiFootballEuropeanFixtures({ results: 0, fixtures: [], errors: ["rate limit"] }, "2026-11-18", "now")).toThrow(/rate limit/);
+  });
+  it("redacts credentials in provider diagnostics", () => {
+    let message = "";
+    try {
+      parseApiFootballEuropeanFixtures({ results: 0, fixtures: [], errors: { apiKey: "super-secret-value" } }, "2026-11-18", "now");
+    } catch (error) { message = error instanceof Error ? error.message : ""; }
+    expect(message).toContain("[REDACTED]");
+    expect(message).not.toContain("super-secret-value");
   });
   it("rejects malformed provider payloads", () => {
     expect(() => parseApiFootballEuropeanFixtures({ response: [] }, "2026-11-18", "now")).toThrow(/API-Football/);
