@@ -223,7 +223,7 @@ export default {
         return json({
           homepageStatus: homepage.status,
           homepageUrl: homepage.url,
-          signatureFound: /feed_sign\\s*[:=]/i.test(html),
+          signatureFound: /feed_sign\s*[:=]/i.test(html),
           feedStatus: feed.status,
           feedLength: body.length,
           recordCount: records.length,
