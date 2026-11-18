@@ -240,7 +240,7 @@ export default function App() {
         status: "SCHEDULED",
         details: { fixtureId: match.id, date: match.date, time: match.time, competition: match.competition, source: match.source, sourceUpdatedAt: match.sourceUpdatedAt ?? null },
       })), "fixtureId");
-      const scanKey = [scan.date, scan.source, scan.fixtures.length, scan.leaguesChecked, scan.leaguesFailed.join("|")].join("::");
+      const scanKey = [scan.date, scan.source, scan.fixtures.length, scan.leaguesChecked, JSON.stringify(scan.coverage), scan.leaguesFailed.join("|")].join("::");
       addRecordsIfMissing([{
         kind: "scan",
         title: `Skan europejski ${scan.date}`,
@@ -255,6 +255,12 @@ export default function App() {
           openLigaDBFixtures: scan.coverage.openLigaDB.fixtures,
           openFootballFixtures: scan.coverage.openFootball.fixtures,
           espnFixtures: scan.coverage.espn.fixtures,
+          footyNomadPagesChecked: scan.coverage.footyNomad.pagesChecked,
+          footyNomadPageMatches: scan.coverage.footyNomad.pageMatches,
+          footyNomadFixtures: scan.coverage.footyNomad.fixtures,
+          footyNomadSkippedNoTimestamp: scan.coverage.footyNomad.skippedNoTimestamp,
+          footyNomadErrors: scan.coverage.footyNomad.errors,
+          sourceCoverageJson: JSON.stringify(scan.coverage),
           source: scan.source,
         },
       }], "scanKey");
