@@ -16,6 +16,15 @@ describe("PitchAPI catalogue fixture discovery", () => {
       pitchApiLeagueId: "l_Den123", pitchApiSeason: "2026/2027", sourceUpdatedAt: "2026-11-18T12:00:00.000Z",
     });
   });
+  it("records the selected current season, not the first historical season in the catalogue", () => {
+    const fixtures = parsePitchApiLeagueFixtures({
+      id: "l_Den123", name: "Denmark 1. Division", country_code: "DEN",
+      seasons: ["2024/2025", "2026/2027", "2025/2026"],
+    }, [
+      { id: "m_123460", time_utc: "2026-11-19T18:00:00Z", status: "not_started", home_team: { id: "t_Home05", name: "Home FC" }, away_team: { id: "t_Away05", name: "Away FC" }, score_home: null, score_away: null },
+    ], "2026-11-19", "2026-11-18T12:00:00.000Z", "2026/2027");
+    expect(fixtures[0].pitchApiSeason).toBe("2026/2027");
+  });
   it("rejects non-European leagues even when their match is on the requested date", () => {
     const fixtures = parsePitchApiLeagueFixtures({ id: "l_Sau123", name: "Saudi First Division", country_code: "SAU" }, [
       { id: "m_123459", time_utc: "2026-11-19T12:00:00Z", status: "not_started", home_team: { id: "t_Home04", name: "Home FC" }, away_team: { id: "t_Away04", name: "Away FC" }, score_home: null, score_away: null },
