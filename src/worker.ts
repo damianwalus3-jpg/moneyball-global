@@ -169,7 +169,7 @@ export default {
         };
         const homepage = await fetch("https://www.flashscore.com/football/", { headers, redirect: "follow", signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
         const html = await homepage.text();
-        const signature = html.match(/feed_sign\\s*[:=]\\s*["']([^"']+)["']/i)?.[1] || "SW9D1eZo";
+        const signature = html.match(/feed_sign\s*[:=]\s*["']([^"']+)["']/i)?.[1] || "SW9D1eZo";
         const feed = await fetch("https://global.flashscore.ninja/2/x/feed/f_1_0_1_en_1", {
           headers: {
             Accept: "*/*",
@@ -185,7 +185,7 @@ export default {
         return json({
           homepageStatus: homepage.status,
           homepageUrl: homepage.url,
-          signatureFound: /feed_sign\\s*[:=]/i.test(html),
+          signatureFound: /feed_sign\s*[:=]/i.test(html),
           feedStatus: feed.status,
           feedLength: body.length,
           feedLooksStructured: body.includes("~") && body.includes("÷"),
