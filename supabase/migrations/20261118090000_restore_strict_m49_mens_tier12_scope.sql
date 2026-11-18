@@ -28,22 +28,24 @@ DECLARE
   v_label text := regexp_replace(normalize(lower(btrim(coalesce(p_competition,''))),NFD),'[^a-z0-9]+',' ','g');
 BEGIN
   IF v_label='' OR NOT public.moneyball_is_geographic_europe_country(p_country) THEN RETURN false; END IF;
-  IF v_label ~* '(^| )(uefa|fifa|nations league|champions league|europa league|conference league|world cup|international|friendly|qualifying|qualifier|cup|copa|coppa|coupe|pokal|trophy|shield|super cup|ta ca|kupa|kup|puchar|cupa|women|womens|woman|female|frauen|feminine|femminile|femenina|femenino|ladies|girls|youth|academy|juniors|reserve|reserves|development league|professional development league|elite league|premier league 2|u[ ]*[0-9]{1,2}|under[ -]*[0-9]{1,2})( |$)' THEN RETURN false; END IF;
-  IF v_country='england' AND v_label ~* '(^| )(league one|league two|national league|national league north|national league south|non league|istmian|southern league|northern premier)( |$)' THEN RETURN false; END IF;
-  IF v_country='scotland' AND v_label ~* '(^| )(league one|league two|lowland league|highland league|lowland|highland)( |$)' THEN RETURN false; END IF;
-  IF v_country='germany' AND v_label ~* '(^| )(regionalliga|oberliga|landesliga|verbandsliga)( |$)' THEN RETURN false; END IF;
-  IF v_country='spain' AND v_label ~* '(^| )(primera federacion|segunda federacion|tercera federacion|tercera rfef|segunda rfef|tercera division)( |$)' THEN RETURN false; END IF;
-  IF v_country='france' AND v_label ~* '(^| )(national 2|national 3|regional 1|regional 2)( |$)' THEN RETURN false; END IF;
-  IF v_country='italy' AND v_label ~* '(^| )(serie c|serie d)( |$)' THEN RETURN false; END IF;
-  IF v_country='sweden' AND v_label ~* '(^| )(division 1|division 2|division 3)( |$)' THEN RETURN false; END IF;
-  IF v_country='denmark' AND v_label ~* '(^| )(2nd division|2 division|3 division)( |$)' THEN RETURN false; END IF;
-  IF v_country='switzerland' AND v_label ~* '(^| )(1 liga|2 liga|2 liga interregional)( |$)' THEN RETURN false; END IF;
-  IF v_country='poland' AND v_label ~* '(^| )(2 liga|iii liga|iv liga)( |$)' THEN RETURN false; END IF;
-  IF v_country='croatia' AND v_label ~* '(^| )(second nl|third nl)( |$)' THEN RETURN false; END IF;
-  IF v_country='estonia' AND v_label ~* '(^| )esiliiga b( |$)' THEN RETURN false; END IF;
-  IF v_country='greece' AND v_label ~* '(^| )football league( |$)' THEN RETURN false; END IF;
-  IF v_country='albania' AND v_label ~* '(^| )second division( |$)' THEN RETURN false; END IF;
-  RETURN v_label ~* '(^| )(premier league|premiership|championship|super league|superliga|super lig|bundesliga|2 bundesliga|ligue 1|ligue 2|serie a|serie b|la liga|laliga|primera division|segunda division|primera divisio|segunda divisio|eredivisie|eerste divisie|keuken kampioen divisie|primeira liga|liga portugal|liga portugal 2|segunda liga|segunda divisao|ekstraklasa|i liga|1 liga|2 liga|a lyga|i lyga|1 lyga|2 lyga|veikkausliiga|ykkosliiga|allsvenskan|superettan|eliteserien|obos ligaen|1 divisjon|premier division|league of ireland premier|league of ireland first|scottish championship|challenge league|first division|second division|first league|second league|first professional league|second professional league|first professional football league|second professional football league|national football league|nb i|nb ii|nemzeti bajnoksag i|nemzeti bajnoksag ii|kategoria superiore|kategoria e pare|prva liga|prva nl|first nl|2 snl|1 snl|cymru premier|cymru north|cymru south|persha liga|divizia nationala|liga i|liga ii|liga 1|liga 2|super league 2|super liga|super liga 2|meistaradeildin|besta deild|urvalsdeild|lengjudeild|national division|abissnet superiore|bgl ligue|efbet league|toplyga|liga 7777|meridianbet 1 cfl|prva mfl|wwin liga)( |$)';
+  IF (v_country='croatia' AND v_label='hnl') OR (v_country='sanmarino' AND v_label='campionato') THEN RETURN true; END IF;
+  IF v_country IN ('scotland','sco') AND v_label ~* '\m(lowland league|highland league)\M' THEN RETURN false; END IF;
+  IF v_country IN ('denmark','dnk','norway','nor','belarus','blr') AND v_label ~* '\m2 division\M' THEN RETURN false; END IF;
+  IF v_country IN ('denmark','dnk') AND v_label ~* '\m2nd division\M' THEN RETURN false; END IF;
+  IF v_country IN ('russia','rus') AND v_label ~* '\msecond league\M' THEN RETURN false; END IF;
+  IF v_country IN ('spain','esp') AND v_label ~* '\m(primera division rfef|segunda division rfef)\M' THEN RETURN false; END IF;
+  IF v_country IN ('switzerland','sui','che') AND v_label ~* '\m1 liga (promotion|classic)\M' THEN RETURN false; END IF;
+  IF v_country IN ('sweden','swe') AND v_label ~* '\mdivision [12]\M' THEN RETURN false; END IF;
+  IF v_country IN ('albania','alb') AND v_label ~* '\m2nd division\M' THEN RETURN false; END IF;
+  IF v_country IN ('croatia','cro') AND v_label ~* '\msecond nl\M' THEN RETURN false; END IF;
+  IF v_country IN ('estonia','est') AND v_label ~* '\mesiliiga b\M' THEN RETURN false; END IF;
+  IF v_country IN ('greece','gre','grc') AND v_label ~* '\mfootball league\M' THEN RETURN false; END IF;
+  IF v_country IN ('poland','pol') AND v_label ~* '\m(ii|2) liga\M' THEN RETURN false; END IF;
+  IF v_label ~* '\m(serie c|serie d|lega pro|serie c1|serie c2|league one|league two|league three)\M' THEN RETURN false; END IF;
+  IF v_label ~* '\m(uefa|nations league|champions league|europa league|conference league|world cup|international|national [2-5]|cup|copa|trophy|play ?offs?)\M' THEN RETURN false; END IF;
+  IF v_label ~* '\m(premier league 2|pl2|professional development league|u(17|18|19|20|21|23)|under ?(17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend|reserves?|b team|women|woman|female|frauen|damen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series)\M' THEN RETURN false; END IF;
+  IF v_label ~* '\m(druha liga|(3|4|5|6|7|8|9|iii|iv|v|vi)\s*\.?\s*(liga|league|division|div|bundesliga|serie|snl|hnl|federal|federation)|third|fourth|fifth|regional|regionalliga|oberliga|national league north|national league south|non league|non-league)\M' THEN RETURN false; END IF;
+  RETURN v_label ~* '\m(premier league|premiership|championship|super league 2|super league|superliga|super lig|pro league|jupiler pro league|challenger pro league|bundesliga|austrian 2 liga|2 liga|ligue 1|ligue 2|serie a|serie b|la liga|laliga|primera division|segunda division|segunda liga|segunda divisao|liga portugal 2|liga portugal|eredivisie|eerste divisie|keuken kampioen divisie|primeira liga|ekstraklasa|i liga|1 lig|2 lig|1 liga|2 liga|liga i|liga ii|liga 1|liga 2|liga e pare|prva liga|first league|second league|fnl|first division|second division|division 1|division 2|div 1|div 2|1st division|2nd division|1st league|2nd league|a lyga|1 lyga|i lyga|1 snl|virsliga|meistriliiga|esiliiga|veikkausliiga|ykkosliiga|allsvenskan|superettan|eliteserien|obos ligaen|1 divisjon|premier division|league of ireland premier|league of ireland first|scottish championship|challenge league|tff first league|national football league|football league|nb i|nb ii|nemzeti bajnoksag i|nemzeti bajnoksag ii|kategoria superiore|kategoria e pare|premyer liqa|i liqa|1 deild|cymru premier|cymru north|cymru south|erovnuli liga|e rovnuli liga|erovnuli liga 2|first nl|prva nl|2 snl|persha liga|first professional football league|second professional football league|bulgarian second league|first division a|first division b|1 division|2 division|divizia nationala|divizia a|1a divisio|2a divisio|primera divisio|segunda divisio|albanian superliga|armenian premier league|belarusian premier league|belarusian first league|premijer liga|first professional league|meistaradeildin|besta deild|urvalsdeild|national division|super liga|super liga 2|super liga Srbije|superliga kosovo|campionato sammarinese|2 mfl|vtora mfl|prva makedonska|super league greece|super liga romania|liga 1 romania|liga 2 romania|montenegro first league|azerbaijan premier league|premyer liqasi|super league albania|lliga multisegur assegurances|lliga grup pirineu|abissnet superiore|bgl ligue|promotion d honneur|albi mall superliga|vbet malta premier league|malta premier league|czech liga|vysshaya liga|pervaya liga|birinci dasta|birinci liqa|azerbaijan first division|azerbaijan first league|liga leumit|ligat haal|ligat ha al|israeli national league|kazakhstan first division|kazakhstan first league|qazaqstan first league|division d honneur|luxembourg division of honour|division of honour|moldovan super liga|moldova liga 1|liga 1 moldova|liga 7777|ligat winner|winner league|meistaradeildin|meistara deildin|lengjudeild karla|1 deild menn|montenegrin second league|second league montenegro|meridianbet 1 cfl|prva mfl|first mfl|wwin liga bih|wwin liga bosne i hercegovine|first league federation of bih|first league of the federation of bih|first league of republika srpska|prva liga federacije bih|prva liga republike srpska|prva liga republike srpske|efbet liga|efbet league|toplyga|cyprus second division|cypriot second division|cyprus league b|league b cyprus|1 deild karla|league of ireland first division|league of ireland premier division|nifl championship|nifl premiership|gibraltar football league|gibraltar second division|malta challenge league|challenge league malta|premier league malta|superliga e shqiperise|armenian first league|bosnian premier league|premijer liga bih|croatian first football league|first football league croatia|prva nogometna liga|czech first league|chance liga|dansk superliga|superligaen|danish 1st division|danish first division|finnish first division|greek super league|premier division ireland|island premier league|israeli premier league|lithuanian a lyga|lithuanian i lyga|latvian higher league|latvian first league|maltese premier league|maltese challenge league|norwegian first division|serbian super liga|slovak first football league|nike liga|prva slovenska nogometna liga|druga slovenska nogometna liga|swiss super league|swiss challenge league|turkish first league|ukrainian premier league|welsh premier league)\M';
 END;
 $function$;
 
@@ -109,22 +111,35 @@ BEGIN
 END;
 $function$;
 
+CREATE OR REPLACE FUNCTION public.moneyball_is_openmatchday_tier(p_source text,p_external_id text)
+RETURNS boolean LANGUAGE sql IMMUTABLE SET search_path TO '' AS $function$
+  SELECT lower(coalesce(p_source,'')) <> 'openmatchday'
+    OR (
+      coalesce(p_external_id,'') ~ '^om:[A-Z]{3}_[12]_[A-Za-z0-9-]+:'
+      AND coalesce(p_external_id,'') !~* '(cup|women|womens|female|youth|academy|reserve|u[0-9]{1,2})'
+    );
+$function$;
+
 CREATE OR REPLACE FUNCTION public.moneyball_guard_european_top_two_insert_scope()
 RETURNS trigger LANGUAGE plpgsql SET search_path TO 'public','pg_temp' AS $function$
-DECLARE fixture record; v_country text; v_competition text; v_gender text; v_home text; v_away text;
+DECLARE fixture record; v_country text; v_competition text; v_gender text; v_home text; v_away text; v_source text; v_external_id text;
 BEGIN
   IF tg_table_name='matches' THEN
     v_country:=coalesce(new.country,''); v_competition:=coalesce(new.competition,new.league,'');
     v_gender:=coalesce(nullif(lower(new.gender),''),'men'); v_home:=coalesce(new.home_team,''); v_away:=coalesce(new.away_team,'');
+    v_source:=coalesce(new.source,''); v_external_id:=coalesce(new.external_id,'');
   ELSIF tg_table_name='predictions' THEN
-    SELECT m.country,coalesce(m.competition,m.league,'') competition,coalesce(nullif(lower(m.gender),''),'men') gender,m.home_team,m.away_team
+    SELECT m.country,coalesce(m.competition,m.league,'') competition,coalesce(nullif(lower(m.gender),''),'men') gender,
+           m.home_team,m.away_team,m.source,m.external_id
       INTO fixture FROM public.matches m WHERE m.id=new.match_id AND m.owner_id=coalesce(new.owner_id,new.user_id);
     IF NOT found THEN RETURN null; END IF;
     v_country:=coalesce(fixture.country,''); v_competition:=coalesce(fixture.competition,''); v_gender:=fixture.gender;
     v_home:=coalesce(fixture.home_team,''); v_away:=coalesce(fixture.away_team,'');
+    v_source:=coalesce(fixture.source,''); v_external_id:=coalesce(fixture.external_id,'');
   ELSE RETURN new;
   END IF;
-  IF NOT public.moneyball_is_eligible_european_match(v_country,v_competition,v_gender,v_home,v_away) THEN RETURN null; END IF;
+  IF NOT public.moneyball_is_eligible_european_match(v_country,v_competition,v_gender,v_home,v_away)
+     OR NOT public.moneyball_is_openmatchday_tier(v_source,v_external_id) THEN RETURN null; END IF;
   RETURN new;
 END;
 $function$;
@@ -157,10 +172,11 @@ BEGIN
   IF (v_coupon.target_legs=1 AND v_coupon.coupon_type<>'MAIN') OR (v_coupon.target_legs=3 AND v_coupon.coupon_type NOT IN ('MEGA','EXTRA')) OR v_coupon.target_legs NOT IN (1,3) THEN
     RAISE EXCEPTION 'Coupon type and target leg count are inconsistent.';
   END IF;
-  SELECT m.id,m.owner_id,m.country,m.competition,m.league,m.gender,m.home_team,m.away_team,m.kickoff_at,m.status
+  SELECT m.id,m.owner_id,m.country,m.competition,m.league,m.gender,m.home_team,m.away_team,m.source,m.external_id,m.kickoff_at,m.status
     INTO v_match FROM public.matches m WHERE m.id=NEW.match_id AND m.owner_id=v_coupon.owner_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Coupon leg match is missing or owned by another user.'; END IF;
-  IF NOT public.moneyball_is_eligible_european_match(v_match.country,coalesce(v_match.competition,v_match.league),v_match.gender,v_match.home_team,v_match.away_team) THEN
+  IF NOT public.moneyball_is_eligible_european_match(v_match.country,coalesce(v_match.competition,v_match.league),v_match.gender,v_match.home_team,v_match.away_team)
+     OR NOT public.moneyball_is_openmatchday_tier(v_match.source,v_match.external_id) THEN
     RAISE EXCEPTION 'Coupon leg is outside the European men's domestic tier 1-2 scope.';
   END IF;
   IF v_match.kickoff_at IS NULL OR v_match.kickoff_at<=now() OR (v_match.kickoff_at AT TIME ZONE 'Europe/Brussels')::date<>(now() AT TIME ZONE 'Europe/Brussels')::date
@@ -214,7 +230,7 @@ active_predictions as (
   join public.matches m on m.id = p.match_id and m.owner_id = p.owner_id
   join owner_scope o on p.owner_id = o.owner_id
   where (p.model_version = 'MONEYBALL GLOBAL 3.8' or p.model_version like 'MANUAL%')
-    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
+    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
     and public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
 ),
 market_stats as (
@@ -237,7 +253,7 @@ candidate_count as (
     and m.kickoff_at < ((((now() at time zone 'Europe/Brussels')::date + 1)::timestamp) at time zone 'Europe/Brussels')
     and m.status not in ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
     and m.kickoff_at > now()
-    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
+    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
 ),
 bankroll as (
   select case when count(*) = 0 then null
@@ -257,7 +273,7 @@ select jsonb_build_object(
     join owner_scope o on m.owner_id = o.owner_id
     where m.kickoff_at >= (((now() at time zone 'Europe/Brussels')::date)::timestamp at time zone 'Europe/Brussels')
       and m.kickoff_at < ((((now() at time zone 'Europe/Brussels')::date + 1)::timestamp) at time zone 'Europe/Brussels')
-      and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
+      and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
   ),
   'bankroll', (select balance from bankroll),
   'coupons_in_play', (
@@ -273,7 +289,7 @@ select jsonb_build_object(
         join public.matches m on m.id=l.match_id and m.owner_id=l.owner_id
         where l.owner_id=c.owner_id and l.coupon_id=c.id
           and (
-            not public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
+            not public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
             or m.kickoff_at is null or m.kickoff_at <= now()
             or (m.kickoff_at at time zone 'Europe/Brussels')::date <> (now() at time zone 'Europe/Brussels')::date
             or lower(m.status) in ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
@@ -285,7 +301,7 @@ select jsonb_build_object(
     select count(*)::integer from public.matches m
     join owner_scope o on m.owner_id = o.owner_id
     where m.kickoff_at < now() and m.status not in ('finished','postponed','cancelled')
-      and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
+      and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
       and not exists (
         select 1 from public.match_results r
         where r.match_id = m.id and r.owner_id = m.owner_id and r.verified
@@ -320,7 +336,7 @@ AS $function$
     and p.verdict = 'WYBRANY'
     and p.settlement_status = 'pending'
     and p.probability > 75 and p.selection <> '—'
-    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
+    and coalesce(m.gender, 'men') = 'men' and public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
     and public.moneyball_prediction_has_sufficient_evidence(p.model_version,p.data_source,p.rationale,p.data_coverage)
     and public.moneyball_prediction_has_fresh_confirmed_odds(p.odds,p.data_coverage,now())
     and m.kickoff_at > now()
@@ -361,7 +377,7 @@ begin
       where m.owner_id = v_owner
         and public.moneyball_is_eligible_european_match(
           m.country, coalesce(m.competition, m.league), m.gender, m.home_team, m.away_team
-        )
+        ) AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
     ),
     active_predictions as (
       select
