@@ -43,6 +43,21 @@ describe("historical team form", () => {
 });
 
 
+describe("OpenLigaDB historical team form", () => {
+  it("retains up to fifteen rows for cross-source merging", () => {
+    const matches = Array.from({ length: 9 }, (_, index) => ({
+      matchDateTimeUTC: `2026-09-${String(9 - index).padStart(2, "0")}T15:00:00Z`,
+      matchIsFinished: true,
+      team1: { teamName: "Club A" },
+      team2: { teamName: `Opponent ${index}` },
+      matchResults: [{ resultTypeID: 2, pointsTeam1: 1, pointsTeam2: 0 }],
+    }));
+    const form = mapOpenLigaTeamForm(matches, "Club A", "2026-09-10");
+    expect(form.matches).toHaveLength(9);
+    expect(form.matches[0].date).toBe("2026-09-09");
+  });
+});
+
 describe("ESPN team history fallback", () => {
   it("maps only finished matches before the target date and calculates form", () => {
     const form = mapEspnTeamForm({ team: "France", generatedAt: "2026-11-18T07:19:13Z", matches: [
