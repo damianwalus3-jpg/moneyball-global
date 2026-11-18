@@ -1,4 +1,4 @@
-import { isExcludedSeniorTeam, isWomensTeam, normalizeTeamName, teamHistoryKey } from "./team-normalization.ts";
+import { isExcludedSeniorTeam, isMenGender, isWomensTeam, normalizeTeamName, teamHistoryKey } from "./team-normalization.ts";
 
 Deno.test("normalizes accents, punctuation and whitespace consistently", () => {
   if (normalizeTeamName("  Atlético   de   Madrid ") !== "atletico de madrid") throw new Error("Unexpected canonical team name");
@@ -21,4 +21,13 @@ Deno.test("detects women's W suffix without false positives on lowercase club-na
   for (const team of women) if (!isWomensTeam(team)) throw new Error("Expected women's marker: " + team);
   const men = ["Barycz Sułów", "Wolves", "Standard Liege", "Manchester City"];
   for (const team of men) if (isWomensTeam(team)) throw new Error("False women's marker: " + team);
+});
+
+Deno.test("requires an explicit men's gender marker and rejects unknown gender", () => {
+  for (const value of ["men", "male", "M", "mens", "men senior"]) {
+    if (!isMenGender(value)) throw new Error("Expected men's gender marker: " + value);
+  }
+  for (const value of [null, undefined, "", "unknown", "women", "female", "mixed"]) {
+    if (isMenGender(value)) throw new Error("Unexpectedly accepted non-men/unknown gender: " + String(value));
+  }
 });

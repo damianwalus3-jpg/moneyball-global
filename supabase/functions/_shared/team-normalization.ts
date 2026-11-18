@@ -36,3 +36,8 @@ export function isWomensTeam(value: unknown): boolean {
   return /(?:^|\s)W(?:\s|$)/u.test(raw)
     || /\b(women|female|girls|damallsvenskan|wsl|liga f|frauen|femenina|femenino|feminin|damen|ladies)\b/i.test(raw);
 }
+
+/** Accept only an explicit men's-gender marker; missing/unknown gender is not a safe default. */
+export function isMenGender(value: unknown): boolean {
+  return ["men", "male", "m", "mens", "men senior"].includes(String(value ?? "").trim().toLowerCase());
+}

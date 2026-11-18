@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 import { isEligibleDomesticTopTwoLeague, isEligibleOpenMatchdayTier } from "../_shared/domestic-league-scope.ts";
-import { isExcludedSeniorTeam, isWomensTeam } from "../_shared/team-normalization.ts";
+import { isExcludedSeniorTeam, isMenGender, isWomensTeam } from "../_shared/team-normalization.ts";
 import { isRealXgObservation } from "../_shared/xg-validation.ts";
 import { compareBelgianProviderQuotes, isFreshConfirmedBelgianProviderQuote, isFreshConfirmedManualBelgianQuote } from "../_shared/provider-odds-validation.ts";
 import { selectPublicSourceApiKey } from "../_shared/public-source-auth.ts";
@@ -46,8 +46,7 @@ function fixtureGender(m:any):"men"|"women"|"excluded" {
  const away=String(m?.away_team||m?.away||"");
  if(isWomensTeam(home)||isWomensTeam(away)||/\b(women|womens|woman|female|frauen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f)\b/i.test(competition))return "women";
  if(isExcludedSeniorTeam(home)||isExcludedSeniorTeam(away)||/\b(u(?:15|16|17|18|19|20|21|23)|under ?(?:15|16|17|18|19|20|21|23)|youth|juniors?|academy|juvenil|jugend|reserves?)\b/i.test(competition))return "excluded";
- const explicit=String(m?.gender||"").toLowerCase();
- if(explicit && explicit!=="men")return "excluded";
+ if(!isMenGender(m?.gender))return "excluded";
  return "men";
 }
 function fixtureTeamKey(v:any){const key=normTeam(v);const aliases:Record<string,string>={"turkiye":"turkey","republic of ireland":"ireland","czech republic":"czechia","north macedonia":"north macedonia","korea republic":"south korea","united states of america":"united states","usa":"united states","ivory coast":"cote d ivoire","cote d ivoire":"cote d ivoire"};return aliases[key]||key;}
