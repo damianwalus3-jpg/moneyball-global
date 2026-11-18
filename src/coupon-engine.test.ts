@@ -30,6 +30,26 @@ describe("three-leg coupon candidates", () => {
     expect(candidates[0].oddsAvailable).toBe(false);
   });
 
+  it("qualifies Double Chance-only coupon legs at 75% without requiring the 1X2 gate", () => {
+    const dc = (id: string, probability: number): TrackerRecord => ({
+      ...prediction(id, 0.60),
+      details: {
+        ...prediction(id, 0.60).details,
+        strongCandidate: false,
+        strongDoubleChance: true,
+        dc1x: probability,
+        dcx2: probability - 0.01,
+        dc12: probability - 0.02,
+      },
+    });
+    const candidates = buildThreeLegCandidates([
+      dc("dc-a", 0.75), dc("dc-b", 0.82), dc("dc-c", 0.79),
+    ], "2026-11-17");
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].legs.map(leg => leg.selection).sort()).toEqual(["1X", "1X", "1X"]);
+    expect(candidates[0].legs.every(leg => leg.market === "DOUBLE_CHANCE" && leg.probability >= 0.75)).toBe(true);
+  });
+
   it("does not mix different dates or duplicate fixtures", () => {
     const candidates = buildThreeLegCandidates([
       prediction("a", 0.9), prediction("b", 0.9), prediction("c", 0.9, "2026-11-18"),
