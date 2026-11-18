@@ -648,7 +648,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
         const fixtures = await fetchPitchApiLeagueMatches(league.id, season, "upcoming");
         return { league, season, fixtures, error: "" };
       } catch (error) {
-        return { league, season: league.seasons?.[0] ?? league.season ?? undefined, fixtures: [], error: error instanceof Error ? error.message : "błąd terminarza ligi" };
+        return { league, season: selectPitchApiSeason(league, date), fixtures: [], error: error instanceof Error ? error.message : "błąd terminarza ligi" };
       }
     });
     for (const result of leagueSchedules) {
