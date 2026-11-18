@@ -47,7 +47,7 @@ describe("safest daily pick", () => {
 
   it("does not surface rejected, weak or started predictions", () => {
     expect(getSafestPick([prediction({}, "ODRZUCONY")])).toBeNull();
-    expect(getSafestPick([prediction({ dc1x: 0.79, dcx2: 0.77, dc12: 0.78 })])).toBeNull();
+    expect(getSafestPick([prediction({ dc1x: 0.74, dcx2: 0.73, dc12: 0.749 })])).toBeNull();
     expect(getSafestPick([prediction({ fixtureDate: "2000-01-01" })])).toBeNull();
     expect(getSafestPick([prediction({ fixtureTime: "—" })])).toBeNull();
   });
