@@ -80,7 +80,7 @@ const match = (id: string, kickoff_at = "2026-11-11T20:00:00.000Z") =>
 
 describe("European domestic league all-tier scope",()=>{it("includes lower senior league tiers",()=>{for(const [country,competition] of [["France","National 2 - Group C"],["Czech Republic","3. liga - CFL B"],["England","National League - North"],["Scotland","Football League - Lowland League"],["Lithuania","TOPLYGA"],["San Marino","Campionato Sammarinese"],["Finland","Kakkonen"]])expect(isEuropeanDomesticLeague(country,competition)).toBe(true);});it("excludes cups, internationals, youth and non-European countries",()=>{for(const [country,competition] of [["England","EFL Trophy"],["Serbia","Kupa Srbije"],["Poland","Puchar Polski"],["Portugal","Taça de Portugal"],["World","UEFA Nations League"],["Portugal","Liga Revelacao U23"],["Israel","Premier League"]])expect(isEuropeanDomesticLeague(country,competition)).toBe(false);});});
 describe("European domestic league scope", () => {
-  it("keeps first and second tiers while excluding cups, youth and lower divisions", () => {
+  it("keeps the OpenMatchday tier 1/2 aliases separate from all-tier app eligibility", () => {
     expect(isEuropeanTopTwoLeague("England", "Premier League")).toBe(true);
     expect(isEuropeanTopTwoLeague("ENG", "ENG_1_premier-league")).toBe(true);
     expect(isEuropeanTopTwoLeague("ENG", "ENG_2_championship")).toBe(true);
@@ -164,7 +164,7 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Macedonia", "Second League")).toBe(true);
     expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga")).toBe(false);
     expect(isEuropeanTopTwoLeague("Georgia", "Erovnuli Liga 2")).toBe(false);
-    // Domestic tier-one/two only: reject international competitions and French National divisions.
+    // OpenMatchday's legacy tier helper stays tier 1/2; app eligibility below includes all senior tiers.
     expect(isEuropeanTopTwoLeague("World", "UEFA Nations League")).toBe(false);
     expect(isEuropeanTopTwoLeague("World", "UEFA Champions League")).toBe(false);
     expect(isEuropeanTopTwoLeague("France", "National 2 - Group C")).toBe(false);

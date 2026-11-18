@@ -42,7 +42,7 @@ export function isEligibleDomesticTopTwoLeague(country: unknown, competition: un
   return TOP_TWO_COMPETITION.test(label);
 }/** OpenMatchday folders encode the competition tier explicitly (COUNTRY_TIER_NAME). */
 export function isEligibleOpenMatchdayTier(value: unknown): boolean {
-  const folder = String(value ?? "").replace(/^om:/i, "").split(":")[0].trim();
+  const folder = String(value ?? "").replace(/^om:/i, "").split(":")[0]?.trim() ?? "";
   const match = folder.match(/^[A-Z]{3}_([1-9][0-9]*)_[A-Z0-9-]+$/i);
   if (!match) return false;
   const tier = Number(match[1]);

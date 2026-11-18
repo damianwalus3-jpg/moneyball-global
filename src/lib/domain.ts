@@ -166,7 +166,7 @@ const EUROPEAN_COUNTRIES = new Set([
   "por","rou","rus","smr","sco","srb","svk","svn","esp","swe","che","sui","ukr","wal","gbr"
 ]);
 
-/** True only for European domestic first- or second-tier leagues (no cups, youth or lower divisions). */
+/** OpenMatchday catalogue filter: tiers 1/2 only. Other sources use isEuropeanDomesticLeague. */
 export function isEuropeanTopTwoLeague(country: string | null | undefined, competition: string | null | undefined): boolean {
   const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
   const c = normalize(String(country ?? ""));

@@ -1606,3 +1606,12 @@ The new `moneyball_manual_prediction_scan_page` RPC uses the strict helper. The 
 - Production SQL migration applied: 20261118200217_align_all_tier_scope_aliases_and_localized_cup_exclusions. Regression checks cover TOPLYGA, Kakkonen, Campionato Sammarinese and localized cup exclusions.
 - Latest main code commit 362b3cb0e846f86b6efbdc2347b11c11601cf941 still had a CI failure because TOPLYGA alias fallback was added immediately afterward; final CI and Cloudflare deploy must be verified on the follow-up commit before calling this stage deployed.
 - No historical data, predictions, coupons, settlements or bankroll records were deleted or rewritten. Project remains NOT complete; after CI/deploy pass, verify the next scheduled scan and authenticated MAIN panel for all senior European tiers.
+
+
+## 2026-11-18 — final all-tier UI parity and type-check follow-up
+
+- The frontend eligibility filter now uses the shared all-tier senior-European predicate for non-OpenMatchday sources; OpenMatchday stays restricted to its published tier 1/2 folder metadata. The shared women's/reserve-team helpers are reused in the UI so the lowercase final w in Barycz Sułów is not mistaken for a standalone uppercase W.
+- The Deno/Vitest test suite passed 99/99 after the all-tier UI change. Strict TypeScript then caught a pre-existing unsafe array access in the imported shared helper (OpenMatchday folder split index); changed it to a null-safe optional access before final verification.
+- All-tier source helper recognizes existing top-tier aliases as well as lower tiers; exclusions include localized cup labels (Kupa, Puchar, Cupa, Taça/Taca) and exhibition Premier League Summer Series.
+- Production SQL migration applied: 20261118200355_exclude_premier_league_summer_series_from_senior_scope. The migration source is being committed alongside the TypeScript follow-up.
+- No match, prediction, coupon, settlement, bankroll or historical row was modified by these eligibility-only changes. No auto-coupon was created. Final CI, TypeScript, build and Cloudflare MAIN deployment must pass on the follow-up commit before this stage is marked deployed.
