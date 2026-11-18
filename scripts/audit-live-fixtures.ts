@@ -42,6 +42,7 @@ const sourceHealth = {
   timezoneFootball: Boolean(scan.coverage.timezoneFootball.generatedAt) && !sourceHasErrors("timezone.football ·"),
   Flashscore: scan.coverage.flashscore.competitionsChecked > 0 && !sourceHasErrors("Flashscore ·"),
   PitchAPI: (scan.coverage.pitchApi?.catalogueLeagues ?? 0) > 0 && !sourceHasErrors("PitchAPI"),
+  "API-Football Pro": scan.coverage.apiFootball.errors === 0,
 };
 const canonicalKeys = scan.fixtures.map(fixture => fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition));
 const duplicateKeys = canonicalKeys.filter((key, index) => canonicalKeys.indexOf(key) !== index);
