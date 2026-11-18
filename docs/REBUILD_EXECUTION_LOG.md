@@ -1086,3 +1086,13 @@
 - First CI run on the test commit failed at TypeScript because the regression-test import had been added but the test body was not inserted at the intended marker. No application logic failure was reported; tests/build were skipped by the typecheck gate.
 - Inserted the missing OpenLigaDB regression test in the correct test suite in commit 90476c25c8347d7a222a7e1c50f39672363fd0b2.
 - The follow-up CI and deployment results must be checked on the newest branch head before this stage is marked complete.
+
+
+## Stage 87 — external historical and xG provider evaluation (2026-11-18)
+- Reviewed the current provider documentation and dataset licences before adding another dependency.
+- schochastics/football-data: ODC-BY dataset with 1,237,935 match results across 207 top-tier domestic leagues and 20 international tournaments, 1888–2023. The repository states the results update was in November 2024 and notes historical errors/team identity changes; it is suitable only as a historical baseline, not current fixtures/results. A provenance/semantics clarification issue is open (#5), so no automatic ingestion is enabled yet.
+- StatsBomb Open Data: selected competition/season match files, events, lineups and selected 360 data are available for research/genuine interest, with source attribution and logo required when publishing analysis. Coverage is selective, so it cannot be the default xG source for every European match.
+- Football Soccer API: current terms allow display of API-derived results in an app but prohibit bulk republication/redistribution of the data. Its free key is restricted to a recent time window and low daily call allowance; the broader historical archive, statistics/xG and upcoming fixtures require paid plans according to current docs. Not integrated because it does not satisfy the no-paid, no-key requirement for full app coverage.
+- Football API (footballapi.org): free tier is restricted to Premier League and 50 calls/day; broader 68-competition coverage is paid. Not integrated.
+- Decision: keep existing public feeds for fixtures and recent results; do not fabricate xG. Only add historical datasets after verifying exact provenance, usable fields, attribution and a real evaluation split. A broad historical dataset ending 2023 cannot be used to claim current-season form.
+- Sources reviewed: schochastics/football-data README and issue #5; StatsBomb Open Data terms/README; Football Soccer API terms, acceptable-use policy, matches documentation, changelog and pricing; footballapi.org documentation and terms.
