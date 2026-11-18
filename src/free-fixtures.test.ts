@@ -70,6 +70,10 @@ describe("OpenLigaDB country attribution", () => {
     expect(openLigaCountryCode({ leagueId: 4, leagueName: "UEFA Conference League", leagueShortcut: "uecl" })).toBe("UEFA");
     expect(openLigaCountryCode({ leagueId: 8, leagueName: "Admiral Bundesliga Österreich", leagueShortcut: "öbl" })).toBe("AUT");
     expect(openLigaCountryCode({ leagueId: 9, leagueName: "Deutschland 2. Bundesliga", leagueShortcut: "de2" })).toBe("GER");
+    expect(openLigaCountryCode({ leagueId: 10, leagueName: "NOFV Oberliga Nord", leagueShortcut: "nofvon" })).toBe("GER");
+    expect(openLigaCountryCode({ leagueId: 11, leagueName: "DFB-Pokal Frauen", leagueShortcut: "dfbf" })).toBe("GER");
+    expect(openLigaCountryCode({ leagueId: 12, leagueName: "Admiral Bundesliga", leagueShortcut: "BLÖ" })).toBe("AUT");
+    expect(openLigaCountryCode({ leagueId: 13, leagueName: "Franz-Beckenbauer-Supercup", leagueShortcut: "BLSupercup" })).toBe("GER");
   });
 
   it("recognizes Israel and smaller European countries by league name", () => {
