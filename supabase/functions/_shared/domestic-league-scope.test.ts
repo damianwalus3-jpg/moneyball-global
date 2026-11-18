@@ -33,7 +33,7 @@ Deno.test("production scope includes only geographic-Europe domestic men's tiers
     ["Italy","Serie A"],["Italy","Serie B"],["Ukraine","Persha Liga"],
     ["Northern Ireland","Championship"],["Scotland","Championship"],["Wales","Cymru North"],
     ["Iceland","Lengjudeild karla"],["Faroe Islands","Meistaradeildin"],
-    ["Albania","Abissnet Superiore"],["Bosnia and Herzegovina","WWIN Liga Bosne i Hercegovine"],
+    ["Albania","Abissnet Superiore"],["Bosnia and Herzegovina","WWIN Liga Bosne i Hercegovine"],["Bosnia","1st League - RS"],
     ["Bulgaria","efbet League"],["Lithuania","TOPLYGA"],["Luxembourg","BGL Ligue"],["Latvia","Virsliga"],["Estonia","Meistriliiga"],["Estonia","Esiliiga"],["Belgium","Jupiler Pro League"],["Belgium","Challenger Pro League"],["Switzerland","Challenge League"],["Northern Ireland","NIFL Championship"],["Malta","Maltese Challenge League"]
   ];
   for (const [country,competition] of accepted) {
@@ -43,7 +43,7 @@ Deno.test("production scope includes only geographic-Europe domestic men's tiers
     ["France","National 2 - Group C"],["Czech Republic","3. liga - CFL B"],
     ["England","National League - North"],["Scotland","Lowland League"],
     ["Germany","Oberliga - Hessen"],["Bulgaria","Third League - Northeast"],
-    ["Poland","III Liga - Group 3"],["England","EFL Trophy"],["England","Premier League 2"],["Sweden","Damallsvenskan"],
+    ["Poland","III Liga - Group 3"],["Spain","Tercera División RFEF - Group 13"],["Spain","Segunda División RFEF - Group 1"],["England","Non League Premier - Southern South"],["Germany","Regionalliga - Nord"],["Germany","Oberliga - Rheinland-Pfalz / Saar"],["Bulgaria","Third League - Southwest"],["Belarus","Second League - Group A"],["England","EFL Trophy"],["England","Premier League 2"],["Sweden","Damallsvenskan"],
     ["World","UEFA Nations League"],["Turkey","Super Lig"]
   ];
   for (const [country,competition] of rejected) {

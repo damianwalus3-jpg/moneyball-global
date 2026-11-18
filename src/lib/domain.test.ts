@@ -124,6 +124,7 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("Andorra", "2a Divisió")).toBe(true);
     expect(isEuropeanTopTwoLeague("Azerbaijan", "Birinci Dasta")).toBe(false);
     expect(isEuropeanTopTwoLeague("Belarus", "1. Division")).toBe(true);
+    expect(isEuropeanTopTwoLeague("Belarus", "Second League - Group A")).toBe(false);
     // Country-specific third-tier labels must not pass broad generic aliases.
     expect(isEuropeanTopTwoLeague("Scotland", "Football League - Lowland League")).toBe(false);
     expect(isEuropeanTopTwoLeague("Scotland", "Football League - Highland League")).toBe(false);
@@ -196,6 +197,9 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("World", "UEFA U21 Championship - Qualification")).toBe(false);
     const eligibleBase = { country: "Ukraine", competition: "Persha Liga", league: null, gender: "men" as const, home_team: "UCSA", away_team: "Polissya" };
     expect(isEligibleEuropeanMatch(eligibleBase)).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, gender: null })).toBe(false);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bosnia", competition: "1st League - RS" })).toBe(true);
+    expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Bulgaria", competition: "Third League - Northeast" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "France", competition: "National 2 - Group C", home_team: "Andrezieux", away_team: "Chateauroux" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "Czech Republic", competition: "3. liga - CFL B", home_team: "Pardubice", away_team: "Horni Redice" })).toBe(false);
     expect(isEligibleEuropeanMatch({ ...eligibleBase, country: "England", competition: "National League - North", home_team: "Oxford City", away_team: "Macclesfield" })).toBe(false);
@@ -363,6 +367,12 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("England", "League One")).toBe(false);
     expect(isEuropeanTopTwoLeague("England", "Premier League 2")).toBe(false);
     expect(isEuropeanTopTwoLeague("Germany", "3. Liga")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Spain", "Tercera División RFEF - Group 13")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Bulgaria", "Third League - Southwest")).toBe(false);
+    expect(isEuropeanTopTwoLeague("England", "Non League Premier - Southern South")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Germany", "Oberliga - Rheinland-Pfalz / Saar")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Germany", "Regionalliga - Nord")).toBe(false);
+    expect(isEuropeanTopTwoLeague("Poland", "III Liga - Group 3")).toBe(false);
     expect(isEuropeanTopTwoLeague("Italy", "Serie C")).toBe(false);
     expect(isEuropeanTopTwoLeague("Ukraine", "Druha Liga")).toBe(false);
   });
