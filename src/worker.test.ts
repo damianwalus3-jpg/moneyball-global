@@ -393,9 +393,11 @@ describe("PitchAPI secure Worker proxy", () => {
   it("rejects unknown routes and external origins without leaking the key", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const invalid = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/matches/m_Ab12Cd/admin"), env("pk_live_12345678901234567890"), { waitUntil: vi.fn() });
+    const assetsFetch = vi.fn().mockResolvedValue(new Response("app asset", { status: 200 }));
+    const invalid = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/matches/m_Ab12Cd/admin"), { ASSETS: { fetch: assetsFetch }, PITCHAPI_API_KEY: "pk_live_12345678901234567890" }, { waitUntil: vi.fn() });
     const forbidden = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/date/2026-11-18", { headers: { Origin: "https://attacker.example" } }), env("pk_live_12345678901234567890"), { waitUntil: vi.fn() });
-    expect(invalid.status).not.toBe(200);
+    expect(invalid.status).toBe(200);
+    expect(assetsFetch).toHaveBeenCalledTimes(1);
     expect(forbidden.status).toBe(403);
     expect(JSON.stringify(await forbidden.json())).not.toContain("pk_live_");
     expect(fetchMock).not.toHaveBeenCalled();
