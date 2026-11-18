@@ -341,11 +341,12 @@ SELECT jsonb_build_object(
 );
 $function$;
 
-CREATE OR REPLACE FUNCTION public.moneyball_dashboard_selected_picks()
+DROP FUNCTION IF EXISTS public.moneyball_dashboard_selected_picks();
+CREATE FUNCTION public.moneyball_dashboard_selected_picks()
 RETURNS TABLE(
   prediction_id uuid,market text,selection text,probability numeric,odds numeric,settlement_status text,
   match_id uuid,home_team text,away_team text,competition text,league text,kickoff_at timestamptz,
-  kickoff_date date,match_status text,home_score integer,away_score integer,rationale text,confidence text,data_coverage jsonb
+  kickoff_date date,match_status text,home_score integer,away_score integer,data_source text,rationale text,confidence text,data_coverage jsonb
 )
 LANGUAGE sql STABLE SET search_path TO 'public' AS $function$
 WITH eligible_matches AS (
@@ -373,7 +374,7 @@ ranked_picks AS (
   SELECT DISTINCT ON (m.brussels_day,m.home_key,m.away_key,p.market,p.selection)
     p.id AS prediction_id,p.market,p.selection,p.probability,p.odds,p.settlement_status,
     m.id AS match_id,m.home_team,m.away_team,m.competition,m.league,m.kickoff_at,m.kickoff_date,m.status AS match_status,
-    r.home_score,r.away_score,p.rationale,p.confidence,p.data_coverage,p.created_at,
+    r.home_score,r.away_score,p.data_source,p.rationale,p.confidence,p.data_coverage,p.created_at,
     m.brussels_day,m.home_key,m.away_key
   FROM public.predictions p
   JOIN eligible_matches m ON m.id=p.match_id AND m.owner_id=p.owner_id
@@ -392,11 +393,12 @@ ranked_picks AS (
     AND lower(m.status) NOT IN ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
   ORDER BY m.brussels_day,m.home_key,m.away_key,p.market,p.selection,p.created_at DESC,p.id DESC
 )
-SELECT prediction_id,market,selection,probability,odds,settlement_status,match_id,home_team,away_team,competition,league,kickoff_at,kickoff_date,match_status,home_score,away_score,rationale,confidence,data_coverage
+SELECT prediction_id,market,selection,probability,odds,settlement_status,match_id,home_team,away_team,competition,league,kickoff_at,kickoff_date,match_status,home_score,away_score,data_source,rationale,confidence,data_coverage
 FROM ranked_picks
 ORDER BY kickoff_at ASC NULLS LAST,market,selection
 LIMIT 100;
 $function$;
+GRANT EXECUTE ON FUNCTION public.moneyball_dashboard_selected_picks() TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.moneyball_statistics_page_data()
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER

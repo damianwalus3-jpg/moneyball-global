@@ -623,7 +623,7 @@ export type StatisticsMatch = Pick<
 export type StatisticsPrediction = Pick<
   TableRows["predictions"],
   "id" | "match_id" | "model_version" | "market" | "selection" | "probability" | "verdict" | "rationale" |
-  "odds" | "settlement_status" | "verified" | "stake" | "potential_return" | "profit_loss"
+  "odds" | "settlement_status" | "verified" | "stake" | "potential_return" | "profit_loss" | "data_source" | "data_coverage" | "xg_used"
 >;
 
 export type StatisticsCoupon = Pick<TableRows["coupons"], "id" | "status" | "stake">;
@@ -762,6 +762,7 @@ export interface DashboardSelectedPick {
   match_status: string;
   home_score: number | null;
   away_score: number | null;
+  data_source: string | null;
   rationale: string | null;
   confidence: string | null;
   data_coverage: Record<string, unknown> | null;
