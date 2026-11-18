@@ -110,6 +110,26 @@ describe("PitchAPI league catalogue", () => {
     expect(leagues).toHaveLength(2);
     expect(leagues[0]).toMatchObject({ id: "l_Bel123", country_code: "BEL", seasons: ["2026/2027", "2025/2026"] });
   });
+  it("retries one transient network failure and then returns the provider payload", async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { leagues: [{ id: "l_Bel123", name: "Belgium", country_code: "BEL" }] } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const leagues = await fetchPitchApiLeagueCatalog();
+    expect(leagues).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  it("retries one transient 503 response but does not retry permanent 4xx errors", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("upstream unavailable", { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ data: { leagues: [] } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchPitchApiLeagueCatalog()).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    fetchMock.mockReset().mockResolvedValueOnce(new Response("not found", { status: 404 }));
+    await expect(fetchPitchApiLeagueCatalog()).rejects.toThrow("PitchAPI HTTP 404");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it("allows upcoming league fixtures to be requested without mixing them into played history", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { league: { id: "l_Bel123" }, matches: [] } }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
