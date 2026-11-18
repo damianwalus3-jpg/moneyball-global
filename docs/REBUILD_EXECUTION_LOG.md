@@ -1801,3 +1801,11 @@
 - Wdrożenie i testy CI są wymagane przed uznaniem pilota za aktywny produkcyjnie. Nie wykonywano jeszcze zapytań live o kursy na konkretnych meczach.
 
 - Walidacja pierwszego commitu Stage 153 wykryła nieaktualny tekst oczekiwanej odpowiedzi w istniejącym teście 400 (kod produkcyjny poprawnie rozszerzył listę parametrów, test nadal oczekiwał starej listy). Zaktualizowano asercję i dodano test odrzucający niepoprawne API-Football fixture ID przed wywołaniem dostawcy. Typecheck przechodził; test suite miała 247/248 zaliczonych przed korektą. Ponowna walidacja i wdrożenie są uruchamiane po poprawce.
+
+
+## Stage 154 — diagnostyka błędów API-Football (2026-11-19)
+- Produkcyjny deploy Stage 153 zakończył się sukcesem: CI, Rebuild Checks i Cloudflare Deploy SUCCESS. Weryfikacja produkcyjna wykazała 45 unikalnych meczów na 2026-11-19, 15 krajów, 25 rozgrywek; źródła główne zdrowe, ale API-Football Pro zwróciło 0 fixture i zostało oznaczone jako zdegradowane.
+- Pierwotny komunikat parsera ukrywał rzeczywisty szczegół błędu dostawcy, przez co nie dało się rozróżnić ograniczenia planu, autoryzacji, limitu zapytań ani innego problemu.
+- Parser zmieniono tak, aby raportował ograniczony do 300 znaków szczegół błędu dostawcy, z redakcją wartości token/apiKey/authorization/password. Dodano testy diagnostyki i redakcji sekretów.
+- To jest poprawa obserwowalności, nie naprawa przyczyny upstream. API-Football pozostaje zdegradowane do czasu ponownego sprawdzenia szczegółu błędu po wdrożeniu.
+- Stage 153 deployment jest aktywny; Stage 154 wymaga pełnego CI, testów, builda, wdrożenia i ponownego live audit. Nie zmieniono historii trackerów, kuponów ani bankrolla.
