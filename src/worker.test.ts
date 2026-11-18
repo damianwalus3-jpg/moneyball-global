@@ -288,6 +288,22 @@ describe("odds provider pilot proxy", () => {
     expect(body).not.toContain("private-key-value");
   });
 
+  it("returns a sanitized StrikerAPI 4xx diagnostic without exposing secrets", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: "Invalid date parameter" }), { status: 400 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?strikerDate=2026-11-18", {
+      headers: { Authorization: "Bearer test-pilot-token-0123456789-abcdef" },
+    }), {
+      ASSETS: { fetch: vi.fn() }, STRIKERAPI_API_KEY: "private-provider-key",
+      ODDS_PILOT_TOKEN: "test-pilot-token-0123456789-abcdef",
+    }, { waitUntil: vi.fn() });
+    const body = await response.text();
+    expect(body).toContain("upstream_http_400: Invalid date parameter");
+    expect(body).not.toContain("private-provider-key");
+    expect(body).not.toContain("test-pilot-token");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("normalizes StrikerAPI moneyline prices to decimal odds", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { games: [{
       game_id: "game-1", starts_at: "2026-11-18T18:00:00Z",
