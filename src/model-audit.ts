@@ -43,8 +43,14 @@ function validDC(d: TrackerRecord["details"]): boolean {
 }
 export function auditTrackerPredictions(records: TrackerRecord[], minimumSampleSize = 30): ModelAudit {
   const results = new Map<string, "1" | "X" | "2">();
-  for (const r of records) if (r.kind === "result" && typeof r.details.fixtureId === "string" && !results.has(r.details.fixtureId)
-    && ["1", "X", "2"].includes(String(r.details.actual))) results.set(r.details.fixtureId, r.details.actual as "1" | "X" | "2");
+  // Resolve duplicate/corrected settlements by timestamp, not by Tracker array order.
+  const orderedResults = records.filter(r => r.kind === "result" && typeof r.details.fixtureId === "string"
+    && ["1", "X", "2"].includes(String(r.details.actual)))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || b.id.localeCompare(a.id));
+  for (const r of orderedResults) {
+    const fixtureId = r.details.fixtureId as string;
+    if (!results.has(fixtureId)) results.set(fixtureId, r.details.actual as "1" | "X" | "2");
+  }
   const ordered = records.filter(r => r.kind === "prediction" && typeof r.details.fixtureId === "string")
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   const latest = new Map<string, TrackerRecord>();
