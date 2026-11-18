@@ -405,7 +405,7 @@ describe("PitchAPI secure Worker proxy", () => {
   it("proxies PitchAPI league metadata and historical match lists with validated query parameters", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { id: "l_Ab12Cd", country_code: "BEL" } }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ data: { id: "l_Ab12Cd", country_code: "BEL" } }), { status: 200, headers: { "Content-Type": "application/json" } })));
     vi.stubGlobal("fetch", fetchMock);
     const waitUntil = vi.fn();
     const metadata = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/leagues/l_Ab12Cd"), env("pk_test_12345678901234567890"), { waitUntil });
