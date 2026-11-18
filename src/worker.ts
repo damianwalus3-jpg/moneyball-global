@@ -140,6 +140,76 @@ export function parseFootyNomadFixtures(html: string, targetDate: string): { fix
   }
   return { fixtures, pageMatches, skippedNoTimestamp };
 }
+const FLASH_SCORE_STATUS: Record<string, string> = { "1": "scheduled", "2": "live", "3": "finished" };
+function flashscoreBrusselsParts(date: Date): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (key: string) => parts.find(part => part.type === key)?.value ?? "";
+  return { date: get("year") + "-" + get("month") + "-" + get("day"), time: get("hour") + ":" + get("minute") };
+}
+export function parseFlashscoreFixtures(feed: string, targetDate: string): { fixtures: Array<Record<string, unknown>>; competitionsChecked: number; rawMatches: number; skippedNonEuropean: number; skippedWrongDate: number; timestampMissing: number } {
+  if (!feed || !feed.includes("÷") || !feed.includes("~")) throw new Error("Flashscore: nieprawidłowy lub pusty feed");
+  const records = feed.split("~").filter(Boolean).map(record => Object.fromEntries(
+    record.split("¬").map(pair => {
+      const separator = pair.indexOf("÷");
+      return separator < 0 ? [pair, ""] : [pair.slice(0, separator), pair.slice(separator + 1)];
+    }),
+  ));
+  let competition: { name: string; country: string; url: string } | null = null;
+  const fixtures: Array<Record<string, unknown>> = [];
+  const countryCodes = FOOTYNOMAD_COUNTRIES;
+  let competitionsChecked = 0, rawMatches = 0, skippedNonEuropean = 0, skippedWrongDate = 0, timestampMissing = 0;
+  for (const record of records) {
+    if (record.ZA) {
+      const display = String(record.ZA);
+      const separator = display.indexOf(":");
+      competition = {
+        name: separator >= 0 ? display.slice(separator + 1).trim() : display,
+        country: String(record.ZY || record.ZAF || (separator >= 0 ? display.slice(0, separator).trim() : "")),
+        url: String(record.ZL || ""),
+      };
+      competitionsChecked++;
+      continue;
+    }
+    if (!record.AA) continue;
+    rawMatches++;
+    const country = (competition?.country || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    const name = competition?.name || "";
+    if (/\b(?:CONCACAF|CONMEBOL|AFC|CAF|OFC)\b/i.test(name)) { skippedNonEuropean++; continue; }
+    const countryCode = countryCodes[country];
+    const worldCompetition = (country === "europe" || country === "world")
+      && (/\bUEFA\b|European Championship|European Qualifiers/i.test(name)
+        || (country === "europe" && /\b(?:Champions League|Europa League|Conference League)\b/i.test(name)));
+    if (!countryCode && !worldCompetition) { skippedNonEuropean++; continue; }
+    if (!record.AD || !Number.isFinite(Number(record.AD))) { timestampMissing++; continue; }
+    const kickoff = flashscoreBrusselsParts(new Date(Number(record.AD) * 1000));
+    if (kickoff.date !== targetDate) { skippedWrongDate++; continue; }
+    const home = String(record.AE || "").trim();
+    const away = String(record.AF || "").trim();
+    if (!home || !away) continue;
+    const isNationsLeague = /\bUEFA\s+Nations League\b/i.test(name);
+    fixtures.push({
+      id: "flashscore|" + String(record.AA),
+      competition: name || "Flashscore",
+      countryCode: countryCode || "UEFA",
+      leagueFolder: "",
+      leagueShortcut: isNationsLeague ? "nla" : undefined,
+      leagueSeason: isNationsLeague ? targetDate.slice(0, 4) : undefined,
+      date: kickoff.date,
+      time: kickoff.time,
+      home,
+      away,
+      status: FLASH_SCORE_STATUS[String(record.AB)] || "unknown",
+      source: "Flashscore",
+      sourceUpdatedAt: new Date().toISOString(),
+      sourceUrl: "https://www.flashscore.com" + (competition?.url || "") + (record.AA ? "match/" + record.AA + "/" : ""),
+    });
+  }
+  return { fixtures, competitionsChecked, rawMatches, skippedNonEuropean, skippedWrongDate, timestampMissing };
+}
+
 function previousUtcDate(date: string): string {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day) - 86400000).toISOString().slice(0, 10);
