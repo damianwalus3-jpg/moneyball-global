@@ -1777,3 +1777,14 @@
 - Dodano testy dla błędów providera ukrytych za HTTP 200.
 - Audyt źródeł rozszerzono w Stage 150 o status API-Football; po tej poprawce nieprawidłowa odpowiedź zwiększy liczbę błędów źródła i oznaczy je jako zdegradowane.
 - Oczekiwana walidacja: typecheck, pełny zestaw testów, build, wdrożenie REBUILT i porównanie surowej odpowiedzi z dziennym feedem. Nie zakładamy, że 0 fixtures oznacza brak meczów.
+
+
+## Stage 152 — API-Football Pro: potwierdzony przyrost europejskiego pokrycia (2026-11-18)
+- Wdrożenie commita `ef17890` na Cloudflare REBUILT zakończone sukcesem; CI, Rebuild Checks i deploy zakończone SUCCESS.
+- Smoke test produkcyjny: API-Football Pro HTTP 200, 183 mecze dostawcy dla 2026-11-18.
+- Główny skaner: 103 mecze API-Football przeszły filtr europejski i datę Europe/Brussels.
+- Wynik uzgodnienia wieloźródłowego: 189 unikalnych meczów, 20 krajów, 65 rozgrywek. Poprzedni audyt przed integracją: 168 unikalnych meczów i 63 rozgrywki. Przyrost netto: +21 meczów i +2 rozgrywki.
+- Jakość: 0 duplikatów, 0 błędnych dat, 0 meczów spoza Europy, 0 błędów źródeł. Wszystkie 9 monitorowanych źródeł zdrowe; API-Football Pro: providerFixtures=183, europeanDateFixtures=103, errors=0.
+- Odpowiedź API-Football z HTTP 200 i pustą listą z wcześniejszego przebiegu nie powtórzyła się. Wprowadzona walidacja pola `errors` pozostaje aktywna, aby błędy providera nie były mylone z prawidłowym pustym dniem.
+- Ograniczenie: snapshot potwierdza bieżące pokrycie, ale nie dowodzi kompletności wszystkich federacji, lig kobiecych, młodzieżowych i amatorskich w Europie. Kontynuować porównanie brakujących rozgrywek.
+- Bez zmian w historycznych rekordach, kuponach, rozliczeniach i bankrollu.
