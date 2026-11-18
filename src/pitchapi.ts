@@ -96,7 +96,20 @@ export interface PitchApiXgForm {
   source: "PitchAPI";
 }
 async function getData<T>(path: string): Promise<T> {
-  const response = await fetch(path, { headers: { Accept: "application/json" } });
+  const request = () => fetch(path, { headers: { Accept: "application/json" } });
+  let response: Response;
+  try {
+    response = await request();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/fetch failed|network|timeout|ECONNRESET|socket/i.test(message)) throw error;
+    await new Promise(resolve => setTimeout(resolve, 300));
+    response = await request();
+  }
+  if ([502, 503, 504].includes(response.status)) {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    response = await request();
+  }
   if (!response.ok) throw new Error(`PitchAPI HTTP ${response.status}: ${path}`);
   const payload = await response.json() as { data?: T; error?: { message?: string; code?: string } };
   if (!payload || !("data" in payload) || payload.data == null) {
