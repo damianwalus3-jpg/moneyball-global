@@ -3,23 +3,23 @@ import { fixtureKey, mergeFixtureSource, isEuropeanCompetitionFolder, isEuropean
 
 describe("European fixture source classification", () => {
   it("accepts known European country names and competition prefixes", () => {
-    expect(isEuropeanOpenLiga({ leagueId: 1, leagueName: "Cup of Scotland 2026", leagueShortcut: "cup_scot" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 2, leagueName: "Regional league", leagueShortcut: "bl3" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 3, leagueName: "UEFA Conference League", leagueShortcut: "uecl" })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 1, leagueName: "Cup of Scotland 2026", leagueShortcut: "cup_scot", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 2, leagueName: "Regional league", leagueShortcut: "bl3", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 3, leagueName: "UEFA Conference League", leagueShortcut: "uecl", sport: { sportName: "Fußball" } })).toBe(true);
   });
 
   it("includes German regional, women's and Austrian competitions by verified OpenLigaDB shortcuts", () => {
-    expect(isEuropeanOpenLiga({ leagueId: 10, leagueName: "NOFV Oberliga Nord", leagueShortcut: "nofvon" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 11, leagueName: "Regionalliga Bayern", leagueShortcut: "regio-bayern" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 12, leagueName: "Thüringenliga", leagueShortcut: "thüli-26" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 13, leagueName: "1. Frauen Fußballbundesliga", leagueShortcut: "ffb1" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 14, leagueName: "Eredivisie", leagueShortcut: "ERE" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 15, leagueName: "Admiral Bundesliga Österreich", leagueShortcut: "öbl" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 16, leagueName: "Premier League 2026/2027", leagueShortcut: "pl" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 17, leagueName: "DFB Frauen Supercup", leagueShortcut: "wsc" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 18, leagueName: "LaLiga EA Sports", leagueShortcut: "la1" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 19, leagueName: "Nations League 2026", leagueShortcut: "nla" })).toBe(true);
-    expect(isEuropeanOpenLiga({ leagueId: 20, leagueName: "DFB U21", leagueShortcut: "u21dfb" })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 10, leagueName: "NOFV Oberliga Nord", leagueShortcut: "nofvon", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 11, leagueName: "Regionalliga Bayern", leagueShortcut: "regio-bayern", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 12, leagueName: "Thüringenliga", leagueShortcut: "thüli-26", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 13, leagueName: "1. Frauen Fußballbundesliga", leagueShortcut: "ffb1", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 14, leagueName: "Eredivisie", leagueShortcut: "ERE", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 15, leagueName: "Admiral Bundesliga Österreich", leagueShortcut: "öbl", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 16, leagueName: "Premier League 2026/2027", leagueShortcut: "pl", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 17, leagueName: "DFB Frauen Supercup", leagueShortcut: "wsc", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 18, leagueName: "LaLiga EA Sports", leagueShortcut: "la1", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 19, leagueName: "Nations League 2026", leagueShortcut: "nla", sport: { sportName: "Fußball" } })).toBe(true);
+    expect(isEuropeanOpenLiga({ leagueId: 20, leagueName: "DFB U21", leagueShortcut: "u21dfb", sport: { sportName: "Fußball" } })).toBe(true);
     expect(isEuropeanOpenLiga({ leagueId: 24, leagueName: "UEFA Women's Champions League", leagueShortcut: "WCL", sport: { sportName: "Frauenfußball" } })).toBe(true);
   });
 
@@ -38,6 +38,11 @@ describe("European fixture source classification", () => {
     expect(isEuropeanOpenLiga({ leagueId: 21, leagueName: "Bundesliga", leagueShortcut: "bl1test" })).toBe(false);
     expect(isEuropeanOpenLiga({ leagueId: 22, leagueName: "BLClaude", leagueShortcut: "blclaude" })).toBe(false);
     expect(isEuropeanOpenLiga({ leagueId: 23, leagueName: "BL12026", leagueShortcut: "bl12026" })).toBe(false);
+  });
+
+  it("fails closed when OpenLigaDB omits sport metadata", () => {
+    expect(isEuropeanOpenLiga({ leagueId: 4909, leagueName: "Premier League", leagueShortcut: "pl" })).toBe(false);
+    expect(isEuropeanOpenLiga({ leagueId: 4910, leagueName: "UEFA Champions League", leagueShortcut: "ucl", sport: { sportName: " " } })).toBe(false);
   });
 
   it("rejects non-football sport categories returned by the live OpenLigaDB catalogue", () => {
