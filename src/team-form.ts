@@ -101,7 +101,7 @@ export async function loadRecentTeamForm(folder: string, team: string, beforeDat
     .sort((a, b) => b.date.localeCompare(a.date));
   return {
     team,
-    matches: matches.slice(0, 5),
+    matches: matches.slice(0, 15),
     home: matches.filter(row => row.venue === "H").slice(0, 5),
     away: matches.filter(row => row.venue === "A").slice(0, 5),
     source: `open-matchday results_${seasonCode(beforeDate)}.csv`,
@@ -273,7 +273,7 @@ export function mapEspnTeamForm(payload: unknown, team: string, beforeDate: stri
     const goalsFor = row.goalsFor as number, goalsAgainst = row.goalsAgainst as number;
     const result: FormMatch["result"] = goalsFor > goalsAgainst ? "W" : goalsFor === goalsAgainst ? "D" : "L";
     return [{ date: row.date, opponent: row.opponent.trim(), venue: row.venue, goalsFor, goalsAgainst, result, points: result === "W" ? 3 : result === "D" ? 1 : 0 }];
-  }).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 5);
+  }).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 15);
   return {
     team: data.team?.trim() || team,
     matches,
