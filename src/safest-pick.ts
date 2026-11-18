@@ -16,24 +16,42 @@ export function hasKickoffPassed(date: string, time: string): boolean {
   return date < now.date || (date === now.date && time <= now.time);
 }
 export function getSafestPick(records: TrackerRecord[], minimum = 0.75): SafestPick | null {
-  const now = brusselsNowParts(), latest = new Map<string, TrackerRecord>();
+  const now = brusselsNowParts();
+  const latest = new Map<string, TrackerRecord>();
   for (const row of records) {
-    if (row.kind !== "prediction" || row.details.market !== "DOUBLE_CHANCE" || typeof row.details.fixtureId !== "string") continue;
-    const key = row.details.fixtureId + "|" + String(row.details.model ?? "legacy"), current = latest.get(key);
+    if (row.kind !== "prediction" || typeof row.details.fixtureId !== "string") continue;
+    const model = String(row.details.model ?? "legacy");
+    const market = row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2";
+    const key = row.details.fixtureId + "|" + model + "|" + market;
+    const current = latest.get(key);
     if (!current || Date.parse(row.createdAt) > Date.parse(current.createdAt)) latest.set(key, row);
   }
+  const explicitKeys = new Set([...latest.entries()].filter(([key]) => key.endsWith("|DOUBLE_CHANCE"))
+    .map(([key]) => key.slice(0, key.lastIndexOf("|"))));
   const candidates: SafestPick[] = [];
   for (const row of latest.values()) {
     const d = row.details;
-    if (row.status !== "KANDYDAT" || typeof d.fixtureDate !== "string" || typeof d.fixtureTime !== "string"
-      || !hasKnownKickoff(d.fixtureDate, d.fixtureTime) || d.fixtureDate < now.date
-      || (d.fixtureDate === now.date && d.fixtureTime <= now.time)) continue;
-    const selection = d.selection, probability = d.probability;
+    if (row.status !== "KANDYDAT" && row.status !== "KANDYDAT_DC") continue;
+    if (typeof d.fixtureDate !== "string" || typeof d.fixtureTime !== "string" || !hasKnownKickoff(d.fixtureDate, d.fixtureTime)
+      || d.fixtureDate < now.date || (d.fixtureDate === now.date && d.fixtureTime <= now.time)) continue;
+    let selection: unknown = d.selection, probability: unknown = d.probability;
+    if (d.market !== "DOUBLE_CHANCE") {
+      const key = String(d.fixtureId) + "|" + String(d.model ?? "legacy");
+      if (explicitKeys.has(key)) continue;
+      const legacy = [
+        { selection: "1X", probability: d.dc1x },
+        { selection: "X2", probability: d.dcx2 },
+        { selection: "12", probability: d.dc12 },
+      ].filter(item => typeof item.probability === "number" && Number.isFinite(item.probability))
+        .sort((a, b) => (b.probability as number) - (a.probability as number))[0];
+      selection = legacy?.selection;
+      probability = legacy?.probability;
+    }
     if (!["1X", "X2", "12"].includes(String(selection)) || typeof probability !== "number" || probability < minimum || probability > 1) continue;
     candidates.push({ fixtureId: d.fixtureId as string, title: row.title,
       competition: typeof d.competition === "string" ? d.competition : "Rozgrywki nieustalone",
       market: selection as SafestPick["market"], probability, kickoff: d.fixtureDate + " " + d.fixtureTime,
-      reason: "Najwyższe prawdopodobieństwo Double Chance z osobnego rekordu rynku; próg selekcji 75%." });
+      reason: "Najwyższe prawdopodobieństwo Double Chance; próg selekcji 75%." });
   }
   return candidates.sort((a, b) => b.probability - a.probability)[0] ?? null;
 }
