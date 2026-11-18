@@ -1,34 +1,31 @@
 /**
- * Geographic Europe boundary for football fixture ingestion.
- *
- * Based on UN Statistics Division M49 regional classification. Football
- * associations inside the United Kingdom and Kosovo are explicit provider
- * aliases because feeds publish their domestic leagues separately.
- * Do not infer geography from UEFA membership or competition names.
+ * Football-Europe geography boundary for fixture ingestion.
+ * Includes European countries and UEFA football territories with a European
+ * football identity (including Turkey, Cyprus and the Caucasus). Israel and
+ * Kazakhstan remain outside this geographic domestic-league scope.
  */
 const EUROPEAN_COUNTRY_NAMES = new Set([
-  "albania", "andorra", "austria", "belarus", "belgium",
+  "albania", "andorra", "armenia", "austria", "azerbaijan", "belarus", "belgium",
   "bosnia", "bosnia and herzegovina", "bosnia herzegovina", "bulgaria", "croatia",
-  "czechia", "czech republic", "denmark", "england", "estonia",
-  "faroe islands", "finland", "france", "germany", "gibraltar",
+  "cyprus", "czechia", "czech republic", "denmark", "england", "estonia",
+  "faroe islands", "finland", "france", "georgia", "germany", "gibraltar",
   "greece", "guernsey", "hungary", "iceland", "ireland", "republic of ireland",
-  "isle of man", "italy", "jersey", "kosovo", "latvia",
-  "liechtenstein", "lithuania", "luxembourg", "malta", "moldova",
-  "monaco", "montenegro", "netherlands", "north macedonia", "macedonia",
-  "northern ireland", "norway", "poland", "portugal", "romania",
-  "russia", "san marino", "scotland", "serbia", "slovakia",
-  "slovenia", "spain", "sweden", "switzerland", "ukraine", "wales",
-  "united kingdom", "united kingdom of great britain and northern ireland", "great britain", "uk",
+  "isle of man", "italy", "jersey", "kosovo", "latvia", "liechtenstein",
+  "lithuania", "luxembourg", "malta", "moldova", "monaco", "montenegro",
+  "netherlands", "north macedonia", "macedonia", "northern ireland", "norway",
+  "poland", "portugal", "romania", "russia", "san marino", "scotland", "serbia",
+  "slovakia", "slovenia", "spain", "sweden", "switzerland", "turkey", "türkiye",
+  "ukraine", "wales", "united kingdom",
+  "united kingdom of great britain and northern ireland", "great britain", "uk",
   "aland islands", "svalbard and jan mayen islands", "holy see", "vatican city",
 ]);
 const EUROPEAN_COUNTRY_CODES = new Set([
-  "alb", "and", "aut", "blr", "bel", "bih", "bgr", "bul", "hrv", "cro",
-  "cze", "dnk", "est", "fro", "fin", "fra", "deu", "ger", "gib", "grc",
-  "gre", "ggy", "hun", "isl", "irl", "imn", "ita", "jey", "lva", "lie",
-  "ltu", "lux", "mlt", "mda", "mco", "mne", "nld", "mkd", "nor", "pol",
-  "prt", "por", "rou", "rus", "smr", "srb", "svk", "svn", "esp", "swe",
-  "che", "sui", "ukr", "gbr", "gb", "uk", "eng", "sco", "wal", "nir",
-  "kos", "ala", "sjm", "vat",
+  "alb", "and", "arm", "aut", "aze", "blr", "bel", "bih", "bgr", "bul", "hrv", "cro",
+  "cyp", "cze", "dnk", "est", "fro", "fin", "fra", "geo", "deu", "ger", "gib", "grc",
+  "gre", "ggy", "hun", "isl", "irl", "imn", "ita", "jey", "lva", "lie", "ltu", "lux",
+  "mlt", "mda", "mco", "mne", "nld", "mkd", "nor", "pol", "prt", "por", "rou", "rus",
+  "smr", "srb", "svk", "svn", "esp", "swe", "che", "sui", "tur", "ukr", "gbr", "gb",
+  "uk", "eng", "sco", "wal", "nir", "kos", "ala", "sjm", "vat",
 ]);
 function normalizeCountry(value: unknown): string {
   return String(value ?? "")
