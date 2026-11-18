@@ -89,7 +89,10 @@ export function parseFootyNomadFixtures(html: string, targetDate: string): { fix
     for (const leagueBlock of leagueBlocks) {
       const block = leagueBlock[1];
       const competition = footyHtmlText(block.match(/<a\b[^>]*href="\/league\/[^"]+"[^>]*>([\s\S]*?)<\/a>/i)?.[1] ?? "");
-      const isUefaWorldCompetition = /\bUEFA\b|European Championship|Nations League/i.test(competition);
+      // World is a mixed global section: exclude other confederations before allowing UEFA events.
+      const isNonUefaConfederation = /\b(?:CONCACAF|CONMEBOL|AFC|CAF|OFC)\b/i.test(competition);
+      if (isNonUefaConfederation) continue;
+      const isUefaWorldCompetition = /\bUEFA\b|European Championship|\bUEFA\s+Nations League\b/i.test(competition);
       if (!countryCode && !(country === "world" && isUefaWorldCompetition)) continue;
       const resolvedCountryCode = countryCode ?? "UEFA";
       const matches = [...block.matchAll(/<a\b[^>]*href="\/fixture\/([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi)];
