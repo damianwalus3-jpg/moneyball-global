@@ -78,3 +78,14 @@ The engine tracks eight separate areas. Every item must have a provider, an obse
 - https://pitchapi.dev/
 - https://soccer-data.co/pricing
 - https://github.com/withqwerty/football-docs/blob/main/docs/free-sources/overview.md
+
+
+## PitchAPI integration (approved 2026-11-18)
+- Official docs: https://pitchapi.dev/ and key registration: https://pitchapi.dev/get-api-key
+- Provider docs state one no-charge plan, 77 leagues, all endpoints and history back to 2021; API key required. Key is a bearer credential and must remain server-side.
+- Available documented data includes fixtures, match summaries, shot-level xG, shots, team/player statistics, events, lineups with an explicit `confirmed` flag, and advanced analytics including PPDA/field tilt/possession-value metrics. Some competitions have reduced/selected coverage and analytics may return `ANALYTICS_UNAVAILABLE`; 77 leagues must not be represented as every European competition.
+- No dedicated injuries/suspensions endpoint was found in the reviewed official API reference. Do not claim these two evidence areas are supplied by PitchAPI. They remain missing until an independent verified source is added.
+- Added a Cloudflare Worker server-side proxy. It accepts only allowlisted GET routes for date fixtures and match resources, validates dates/status and PitchAPI match IDs, rejects non-app browser origins, never returns the API key, caches ordinary reads, and never caches live snapshots. The secret name is `PITCHAPI_API_KEY`; it is a Cloudflare Worker secret, not a Vite variable, GitHub file, or browser setting.
+- The user approved using a free key. They must create the key at the official registration page and enter it directly in Cloudflare Worker settings. Never ask the user to paste the key into ChatGPT or commit it.
+- The proxy exposes `/api/pitchapi/date/{YYYY-MM-DD}?status=upcoming|played|all` and `/api/pitchapi/matches/{m_XXXXXX}[/{lineups|shots|events|momentum|stats|players|advanced|advanced/network|advanced/players|live}]`.
+- Key provisioning is pending. Until configured, the proxy returns `pitchapi_not_configured` without calling the upstream provider. No claim of live PitchAPI data ingestion is made until an authenticated smoke test passes.

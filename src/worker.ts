@@ -1,5 +1,6 @@
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
+  PITCHAPI_API_KEY?: string;
   ODDSPAPI_API_KEY?: string;
   STRIKERAPI_API_KEY?: string;
   ODDS_PILOT_TOKEN?: string;
@@ -502,6 +503,61 @@ export default {
         return response;
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "footynomad_upstream_error" }, 502, origin);
+      }
+    }
+
+
+    const pitchDate = url.pathname.match(/^\/api\/pitchapi\/date\/(\d{4}-\d{2}-\d{2})$/);
+    const pitchMatch = url.pathname.match(/^\/api\/pitchapi\/matches\/(m_[A-Za-z0-9]{6})(?:\/(live|shots|lineups|events|momentum|stats|players|advanced(?:\/(?:network|players))?))?$/);
+    if (pitchDate || pitchMatch) {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
+      if (!env.PITCHAPI_API_KEY || !/^pk_live_[A-Za-z0-9_-]{16,}$/.test(env.PITCHAPI_API_KEY)) {
+        return json({ error: "pitchapi_not_configured", message: "PitchAPI key is not configured as a Cloudflare Worker secret." }, 503, origin);
+      }
+      let upstreamPath = "";
+      if (pitchDate) {
+        const date = pitchDate[1];
+        const [year, month, day] = date.split("-").map(Number);
+        const parsed = new Date(Date.UTC(year, month - 1, day));
+        if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+          return json({ error: "invalid_date" }, 400, origin);
+        }
+        const status = url.searchParams.get("status") ?? "upcoming";
+        if (!["upcoming", "played", "all"].includes(status)) return json({ error: "invalid_status" }, 400, origin);
+        upstreamPath = "/v1/date/" + date + "?status=" + status;
+      } else {
+        upstreamPath = "/v1/matches/" + pitchMatch![1] + (pitchMatch![2] ? "/" + pitchMatch![2] : "");
+      }
+      const isLive = pitchMatch?.[2] === "live";
+      const cacheSeconds = isLive ? 0 : pitchDate ? 600 : pitchMatch?.[2] === "lineups" ? 120 : pitchMatch?.[2] === "shots" || pitchMatch?.[2]?.startsWith("advanced") ? 21600 : 1800;
+      const cacheKey = new Request(url.toString(), { method: "GET" });
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      if (cacheSeconds > 0) {
+        const cached = await cache.match(cacheKey);
+        if (cached) return cached;
+      }
+      try {
+        const upstream = await fetch("https://api.pitchapi.dev" + upstreamPath, {
+          headers: { Accept: "application/json", "X-API-KEY": env.PITCHAPI_API_KEY },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        });
+        const raw = await upstream.text();
+        let payload: unknown;
+        try { payload = JSON.parse(raw); } catch {
+          return json({ error: "pitchapi_invalid_json", upstreamStatus: upstream.status }, 502, origin);
+        }
+        if (!upstream.ok) {
+          const errorPayload = payload && typeof payload === "object" ? payload : { error: "pitchapi_upstream_error" };
+          return json({ ...errorPayload as Record<string, unknown>, upstreamStatus: upstream.status }, upstream.status, origin);
+        }
+        const response = json(payload, 200, origin);
+        response.headers.set("X-MONEYBALL-SOURCE", "PitchAPI");
+        response.headers.set("Cache-Control", cacheSeconds > 0 ? "public, max-age=" + cacheSeconds : "no-store");
+        if (cacheSeconds > 0) ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "pitchapi_upstream_error" }, 502, origin);
       }
     }
 

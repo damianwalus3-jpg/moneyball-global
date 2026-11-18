@@ -1301,3 +1301,14 @@
 - Cloudflare Free Worker deploy run `44286224601`: SUCCESS for the same code commit.
 - The eight-factor evidence feed itself remains incomplete: no verified no-key/free source was found for all eight areas across all European clubs. The app now reports those areas as missing and blocks strong-candidate/coupon eligibility rather than claiming unsupported certainty. No paid provider or API key was introduced.
 - Historical Tracker records, predictions, coupons, settlements and bankroll were not rewritten.
+
+
+## Stage 108 — PitchAPI server-side connector approved and deployed (2026-11-18)
+- User approved using PitchAPI's no-charge API key.
+- Reviewed official provider docs and key-registration page. The docs describe 77 leagues, all documented endpoints and history back to 2021; they explicitly require the API key in `X-API-KEY` and say it must remain server-side.
+- Added a strict Cloudflare Worker proxy for date fixtures and allowlisted match resources. Date/status and opaque match IDs are validated; only GET is accepted; unknown paths and external browser origins are rejected. The key is never returned to the client.
+- Cache policy: date feed 10 minutes, predicted/confirmed lineups 2 minutes, match/standard analytics 30 minutes, shots/advanced analytics 6 hours, live snapshots never cached.
+- Added tests for missing secret, invalid date/status, allowlisted upstream calls, CORS/origin protection, and live no-cache behaviour.
+- The API key has NOT been provisioned yet. The user must create a free key and enter it directly into Cloudflare Worker settings as `PITCHAPI_API_KEY`; never paste the secret into chat or commit it.
+- Important source gap: no dedicated injuries/suspensions endpoints were found in the official PitchAPI reference; those two areas remain unverified and must not be filled from absence of a player in a predicted lineup.
+- Key registration: https://pitchapi.dev/get-api-key ; official docs: https://pitchapi.dev/
