@@ -94,11 +94,12 @@ describe("dynamic European OpenFootball catalogue", () => {
       "france/2024-25_fr2.txt",
       "norway/2026_no1.txt",
       "poland/2026-27_pl2.txt",
+      "gibraltar/2026-27_gi1.txt",
       "rsssf/belg2025.txt",
       "brazil/2026_br1.txt",
     ], "2026-11-18");
-    expect(feeds.map(feed => feed.id)).toHaveLength(3);
-    expect(feeds.map(feed => feed.countryCode)).toEqual(["FRA", "NOR", "POL"]);
+    expect(feeds.map(feed => feed.id)).toHaveLength(4);
+    expect(feeds.map(feed => feed.countryCode)).toEqual(["FRA", "NOR", "POL", "GIB"]);
     expect(feeds[0].competition).toContain("FR1");
     expect(feeds[0].urlForSeason("ignored")).toContain("france/2026-27_fr1.txt");
   });
