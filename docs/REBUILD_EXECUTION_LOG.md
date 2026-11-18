@@ -1856,3 +1856,15 @@
 - Workflow change commit: `efb241f50d08cf199f9f973ab2e67ea7445abed2`. Walidacja i wdrożenie tego dodatkowego smoke testu oczekują na CI.
 - Endpoint statusu nie został jeszcze niezależnie odczytany poza workflow; nie deklarujemy potwierdzenia dokładnego planu/licznika konta, dopóki smoke test nie przejdzie.
 - Brak zmian w historycznych rekordach, kuponach, rozliczeniach i bankrollu.
+
+
+## Stage 157 — source health, contribution and coverage made explicit (2026-11-19)
+- Added a dedicated source-diagnostics module for the nine fixture providers.
+- The Matches screen now separates checked requests/catalogues, raw provider records, records accepted after the Europe/Brussels date and European filters, and provider errors.
+- A successful provider response with zero relevant fixtures is no longer visually conflated with a provider failure; provider error, no-data, zero-match response and positive contribution are separate states.
+- The screen reports the unique merged fixture count, distinct countries/federations and distinct competitions. It explicitly warns that provider counts overlap and that the feed union is not proof of exhaustive European coverage.
+- API-Football raw provider volume is kept separate from European/date-qualified fixtures; PitchAPI catalog size, European catalog, free catalog and date-qualified contribution are shown independently.
+- Added unit tests for zero-match success vs failure, raw-vs-accepted counts, and unique country/competition summaries.
+- Historical Tracker records, coupons, settlements and bankroll were not modified.
+- Implementation commits: `48960ce`, `b1b2806`, `d84d682`, `4af8525`.
+- Deployment status: pending CI, production deployment and smoke-test confirmation.
