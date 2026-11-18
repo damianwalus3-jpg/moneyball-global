@@ -64,7 +64,8 @@ export function isFreshConfirmedManualBelgianQuote(
   coverage: Record<string, unknown> | null | undefined,
   nowMs = Date.now(),
 ): boolean {
-  if (!coverage || Number(odds) <= 1) return false;
+  const numericOdds = Number(odds);
+  if (!coverage || !Number.isFinite(numericOdds) || numericOdds <= 1) return false;
   const source = String(coverage["odds_source"] ?? "").trim().toLowerCase();
   const url = String(coverage["odds_source_url"] ?? "").trim();
   const bookmaker = coverage["odds_bookmaker"];
