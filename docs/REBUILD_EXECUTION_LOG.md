@@ -1188,3 +1188,9 @@
 - Live ESPN raw source inventory: 65 events on 2026-11-17 UTC and 28 on 2026-11-18 UTC. Applying the Brussels-date and geography rules showed 24 event candidates on 2026-11-18 before the correction; five were Concacaf Nations League false positives. The corrected rule removes those five.
 - Source commit: 3755a47aaa84c463c9d1faf12d8f827ec17d57c3. Test commit: 28b3f625f1f34c105db7219b86cf0e77966ccb87. Validation and deployment pending.
 - No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
+
+
+### Stage 96 validation correction
+- First CI run exposed a regression in the UEFA key assignment: after narrowing the Nations League regex, a valid Denmark-hosted UEFA Nations League fixture was attributed to DEN instead of UEFA. This was a test failure; that build was not deployed.
+- Corrected assignment to preserve the UEFA key only for explicit UEFA Nations League notes, while leaving the venue-country mapping unchanged for other fixtures. The Concacaf regression case remains in the test.
+- Follow-up source commit: 3cb05202f78da94d9c13ee14bb5147246267426a. Latest test/deploy validation is pending.
