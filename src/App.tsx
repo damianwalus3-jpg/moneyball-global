@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
 import { addRecord, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
-import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, mergeVerifiedTeamForms, type TeamForm } from "./team-form";
+import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, loadRecentTeamFormAcrossCountry, mergeVerifiedTeamForms, type TeamForm } from "./team-form";
 import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
 import { buildThreeLegCandidates } from "./coupon-engine";
 import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from "./openfootball";
@@ -147,9 +147,18 @@ export default function App() {
       const load = async (team: string): Promise<TeamForm> => {
         const failures: string[] = [];
         const attempts: Array<{ name: string; run: () => Promise<TeamForm> }> = [];
-        if (match.leagueFolder) attempts.push({ name: "open-matchday", run: () => loadRecentTeamForm(match.leagueFolder, team, match.date) });
+        // Never send a malformed provider folder ID; fixtures from cups/other feeds may not
+        // carry a valid open-matchday history folder.
+        if (match.leagueFolder && /^[A-Z]{3}_\\d+_[a-z0-9-]+$/.test(match.leagueFolder)) {
+          attempts.push({ name: "open-matchday · liga meczu", run: () => loadRecentTeamForm(match.leagueFolder, team, match.date) });
+        }
         if (match.leagueShortcut && match.leagueSeason) attempts.push({ name: "OpenLigaDB", run: () => loadOpenLigaRecentTeamForm(match.leagueShortcut!, match.leagueSeason!, team, match.date) });
         if (match.openFootballFeedId) attempts.push({ name: "OpenFootball", run: () => loadOpenFootballRecentTeamForm(match.openFootballFeedId!, team, match.date) });
+        // Club form is league form, not cup form: search every published league file
+        // in the club's country. This is the permanent fallback for cup fixtures.
+        if (/^[A-Z]{3}$/.test(match.countryCode) && match.countryCode !== "UEFA") {
+          attempts.push({ name: "open-matchday · historia krajowa", run: () => loadRecentTeamFormAcrossCountry(match.countryCode, team, match.date) });
+        }
         attempts.push({ name: "ESPN", run: () => loadEspnRecentTeamForm(team, match.date) });
         const settled = await Promise.allSettled(attempts.map(item => item.run()));
         const accepted: TeamForm[] = [];
