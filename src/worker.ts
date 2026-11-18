@@ -185,7 +185,7 @@ export default {
       }
     }
 
-    const footyNomadInspect = url.pathname.match(/^\/_internal\/footynomad-inspect\/(\d{4}-\d{2}-\d{2})$/);
+    const footyNomadInspect = url.pathname.match(/^\/api\/footynomad\/inspect\/(\d{4}-\d{2}-\d{2})$/);
     if (footyNomadInspect) {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
       const date = footyNomadInspect[1];
