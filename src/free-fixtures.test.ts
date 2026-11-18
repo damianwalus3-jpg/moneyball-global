@@ -29,10 +29,11 @@ describe("API-Football Pro European fixture integration", () => {
   it("redacts credentials in provider diagnostics", () => {
     let message = "";
     try {
-      parseApiFootballEuropeanFixtures({ results: 0, fixtures: [], errors: { apiKey: "super-secret-value" } }, "2026-11-18", "now");
+      parseApiFootballEuropeanFixtures({ results: 0, fixtures: [], errors: { apiKey: "super-secret-value", nested: { Authorization: "also-secret" } } }, "2026-11-18", "now");
     } catch (error) { message = error instanceof Error ? error.message : ""; }
     expect(message).toContain("[REDACTED]");
     expect(message).not.toContain("super-secret-value");
+    expect(message).not.toContain("also-secret");
   });
   it("rejects malformed provider payloads", () => {
     expect(() => parseApiFootballEuropeanFixtures({ response: [] }, "2026-11-18", "now")).toThrow(/API-Football/);
