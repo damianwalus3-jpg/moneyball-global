@@ -1443,3 +1443,12 @@
 - Added a Worker regression test covering American-to-decimal conversion for home/away handicap and over/under prices, as well as preservation of the handicap and totals lines. Existing 1X2 completeness checks and EV calculations remain unchanged and continue to use only complete 1X2 prices.
 - Official field definitions and sample response: https://strikerapi.com/docs/get-odds . The endpoint describes per-bookmaker three-way moneyline, goal handicap and total, with date-wide batch cost 10 credits.
 - Stage 121 code/test/UI commits are awaiting CI and production deployment confirmation. No historical records or bankroll data were modified.
+
+
+## Stage 122 — odds ingestion release verification (2026-11-18)
+- Confirmed final branch HEAD `39cb8d109261ab9953ad089911b3a48ea75711ef`.
+- MONEYBALL rebuild CI passed: TypeScript check, all unit tests and production build succeeded. MONEYBALL Rebuild Checks passed.
+- Cloudflare Free Worker deployment completed successfully at 2026-11-18 12:46 UTC. Worker version ID: `105dabdd-f7de-4289-ba56-b9a10e79a7dc`.
+- The production build now contains automatic once-per-date odds ingestion (when all owner/provider secrets are configured), per-fixture display of matched 1X2 prices, and optional AH/O-U prices when present in the StrikerAPI response.
+- Important activation check remains in the app's Stawki section: it reads `/api/odds/status` and reports whether `STRIKERAPI_API_KEY` and `ODDS_PILOT_TOKEN` are configured. The app does not expose or return either secret. The browser-local owner token must also be saved once. If either server secret is missing, the automatic fetch stays gated and does not consume provider credits.
+- No live odds request was made during CI/deployment. Live fixture-to-odds match rate, provider configuration state and actual market coverage must be confirmed from the deployed app; this stage does not claim every European match has odds.
