@@ -3,11 +3,11 @@ import { buildPitchApiXgForm, isPitchApiCountryEligible, parsePitchApiXgStats, t
 
 const match: PitchApiLeagueMatch = {
   id: "m_Ab12Cd", time_utc: "2026-11-17T19:00:00Z", status: "finished",
-  home: { id: "t_Home01", name: "Home FC" }, away: { id: "t_Away01", name: "Away FC" },
+  home_team: { id: "t_Home01", name: "Home FC" }, away_team: { id: "t_Away01", name: "Away FC" },
   score_home: 2, score_away: 1,
 };
 const stats: PitchApiTeamMatchStats = {
-  match_id: match.id, home_team: match.home, away_team: match.away,
+  match_id: match.id, home_team: match.home_team, away_team: match.away_team,
   periods: [{ period: "All", groups: [
     { items: [
       { key: "expected_goals", home: "1.82", away: "0.74" },
