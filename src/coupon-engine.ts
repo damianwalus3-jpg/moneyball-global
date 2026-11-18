@@ -21,8 +21,13 @@ function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCand
     const selection = d.selection, probability = d.probability;
     if (d.strongDoubleChance !== true || !["1X", "X2", "12"].includes(String(selection))
       || typeof probability !== "number" || !Number.isFinite(probability) || probability < 0.75 || probability > 1) return null;
+    const values = [d.p1x, d.px2, d.p12];
+    if (values.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)
+      || Math.abs((values[0] as number) + (values[1] as number) + (values[2] as number) - 2) > 0.0001) return null;
+    const ranked = [{ selection: "1X", probability: d.p1x as number }, { selection: "X2", probability: d.px2 as number }, { selection: "12", probability: d.p12 as number }]
+      .sort((a, b) => b.probability - a.probability);
     const selected = selection === "1X" ? d.p1x : selection === "X2" ? d.px2 : d.p12;
-    if (typeof selected !== "number" || Math.abs(selected - probability) > 0.0001) return null;
+    if (selection !== ranked[0].selection || typeof selected !== "number" || Math.abs(selected - probability) > 0.0001) return null;
     return { ...base, selection: selection as "1X" | "X2" | "12", market: "DOUBLE_CHANCE", probability };
   }
   if (d.strongCandidate !== true || typeof d.selection !== "string" || !["1", "X", "2"].includes(d.selection)) return null;

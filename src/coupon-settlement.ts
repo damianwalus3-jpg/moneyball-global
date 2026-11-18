@@ -15,8 +15,14 @@ export function evaluatePaperCoupon(coupon: TrackerRecord, records: TrackerRecor
   let legs: Array<{ fixtureId: string; selection: CouponSelection; market?: "1X2" | "DOUBLE_CHANCE" }>;
   try {
     const parsed: unknown = JSON.parse(coupon.details.legsJson);
-    if (!Array.isArray(parsed) || parsed.length !== 3 || !parsed.every(leg => leg && typeof leg === "object"
-      && typeof leg.fixtureId === "string" && ["1","X","2","1X","X2","12"].includes(leg.selection))) return null;
+    const validLegs = Array.isArray(parsed) && parsed.length === 3 && parsed.every((value: unknown) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+      const leg = value as Record<string, unknown>;
+      if (typeof leg.fixtureId !== "string" || !["1","X","2","1X","X2","12"].includes(String(leg.selection))) return false;
+      const inferred = ["1X","X2","12"].includes(String(leg.selection)) ? "DOUBLE_CHANCE" : "1X2";
+      return leg.market === undefined || leg.market === inferred;
+    });
+    if (!validLegs) return null;
     legs = parsed as typeof legs;
   } catch { return null; }
   if (new Set(legs.map(leg => leg.fixtureId)).size !== 3) return null;

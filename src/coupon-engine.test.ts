@@ -34,7 +34,7 @@ describe("three-leg coupon candidates", () => {
     const dc = (id: string, probability: number): TrackerRecord => ({
       ...prediction(id, 0.60), title: "DC " + id,
       details: { ...prediction(id, 0.60).details, model: "test-v1", market: "DOUBLE_CHANCE", selection: "1X", probability,
-        p1x: probability, px2: probability - 0.01, p12: probability - 0.02,
+        p1x: probability, px2: 0.6, p12: 1.4 - probability,
         strongCandidate: false, strongDoubleChance: true, couponEligible: true, evidenceComplete: true },
     });
     const candidates = buildThreeLegCandidates([
@@ -47,7 +47,7 @@ describe("three-leg coupon candidates", () => {
 
   it("does not allow the same fixture twice when it qualifies in both markets", () => {
     const oneXTwo = prediction("shared", 0.80);
-    const dc = { ...prediction("shared", 0.90), id: "shared-dc", details: { ...prediction("shared", 0.90).details, market: "DOUBLE_CHANCE", selection: "1X", probability: 0.95, p1x: 0.95, px2: 0.8, p12: 0.8, strongCandidate: false, strongDoubleChance: true, couponEligible: true } };
+    const dc = { ...prediction("shared", 0.90), id: "shared-dc", details: { ...prediction("shared", 0.90).details, market: "DOUBLE_CHANCE", selection: "1X", probability: 0.95, p1x: 0.95, px2: 0.55, p12: 0.5, strongCandidate: false, strongDoubleChance: true, couponEligible: true } };
     const candidates = buildThreeLegCandidates([oneXTwo, dc, prediction("b", 0.82), prediction("c", 0.85)], "2026-11-17");
     expect(candidates).toHaveLength(1);
     expect(candidates[0].legs.filter(leg => leg.fixtureId === "shared")).toHaveLength(1);
@@ -121,6 +121,10 @@ describe("three-leg coupon candidates", () => {
     expect(buildThreeLegCandidates([wrongSelection, validB, validC], "2026-11-17")).toHaveLength(0);
   });
 
+  it("rejects Double Chance records whose three probabilities do not sum to two", () => {
+    const invalidDc = { ...prediction("bad-dc", 0.9), details: { ...prediction("bad-dc", 0.9).details, market: "DOUBLE_CHANCE", selection: "1X", probability: 0.9, p1x: 0.9, px2: 0.9, p12: 0.9, strongCandidate: false, strongDoubleChance: true, couponEligible: true } };
+    expect(buildThreeLegCandidates([invalidDc, prediction("b", 0.85), prediction("c", 0.86)], "2026-11-17")).toHaveLength(0);
+  });
   it("blocks old probability-only records that lack verified factor evidence", () => {
     const legacy = { ...prediction("legacy", 0.95), details: { ...prediction("legacy", 0.95).details, evidenceComplete: false } };
     expect(buildThreeLegCandidates([legacy, prediction("b", 0.9), prediction("c", 0.9)], "2026-11-17")).toHaveLength(0);

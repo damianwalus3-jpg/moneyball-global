@@ -81,6 +81,10 @@ describe("paper coupon settlement", () => {
     ]) } };
     expect(evaluatePaperCoupon(duplicate, results)).toBeNull();
   });
+  it("rejects a leg whose declared market conflicts with its selection", () => {
+    const invalid = { ...coupon, details: { legsJson: JSON.stringify([{ fixtureId: "a", selection: "1X", market: "1X2" }, { fixtureId: "b", selection: "X", market: "1X2" }, { fixtureId: "c", selection: "2", market: "1X2" }]) } };
+    expect(evaluatePaperCoupon(invalid, results)).toBeNull();
+  });
   it("marks three correct legs as paper hit", () => {
     const allCorrect = results.map((row, index) => index === 2 ? { ...row, details: { fixtureId: "c", actual: "2" } } : row);
     expect(evaluatePaperCoupon(coupon, allCorrect)?.status).toBe("PAPER_HIT");

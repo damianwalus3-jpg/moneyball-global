@@ -30,7 +30,7 @@ describe("prediction record refresh policy", () => {
   });
   it("keeps 1X2 and Double Chance records independent for the same fixture/model", () => {
     const oneXTwo = row("one-x-two", [0.6, 0.2, 0.2]);
-    const dc = { ...row("dc", [null, null, null]), details: { ...row("dc", [null, null, null]).details, market: "DOUBLE_CHANCE", p1x: 0.8, px2: 0.7, p12: 0.6 } };
+    const dc = { ...row("dc", [null, null, null]), details: { ...row("dc", [null, null, null]).details, market: "DOUBLE_CHANCE", p1x: 0.8, px2: 0.7, p12: 0.5 } };
     expect(shouldAppendPrediction([oneXTwo, dc], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "1X2")).toBe(false);
     expect(shouldAppendPrediction([oneXTwo, dc], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "DOUBLE_CHANCE")).toBe(false);
   });

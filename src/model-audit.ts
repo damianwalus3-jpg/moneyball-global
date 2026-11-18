@@ -37,7 +37,9 @@ function valid1x2(d: TrackerRecord["details"]): boolean {
     && Math.abs((d.p1 as number) + (d.px as number) + (d.p2 as number) - 1) <= 0.0001;
 }
 function validDC(d: TrackerRecord["details"]): boolean {
-  return [d.p1x, d.px2, d.p12].every(v => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1);
+  const values = [d.p1x, d.px2, d.p12];
+  return values.every(v => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1)
+    && Math.abs((values[0] as number) + (values[1] as number) + (values[2] as number) - 2) <= 0.0001;
 }
 export function auditTrackerPredictions(records: TrackerRecord[], minimumSampleSize = 30): ModelAudit {
   const results = new Map<string, "1" | "X" | "2">();
