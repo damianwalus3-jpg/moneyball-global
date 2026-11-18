@@ -677,8 +677,10 @@ export default function App() {
   const fileRef = useRef<HTMLInputElement>(null);
   const modelAudit = useMemo(() => auditTrackerPredictions(records), [records]);
   const predictionDiagnostics = useMemo(() => {
+    const coverageDate = fixtureScan?.date ?? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
     const latestByFixtureMarketModel = new Map<string, TrackerRecord>();
-    for (const row of [...records].filter(item => item.kind === "prediction").sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
+    for (const row of [...records].filter(item => item.kind === "prediction" && item.details.fixtureDate === coverageDate)
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
       const fixtureId = row.details.fixtureId;
       if (typeof fixtureId !== "string") continue;
       const market = row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2";
@@ -689,7 +691,6 @@ export default function App() {
     const latestRows = [...latestByFixtureMarketModel.values()];
     const oneXTwo = latestRows.filter(row => row.details.market !== "DOUBLE_CHANCE");
     const doubleChance = latestRows.filter(row => row.details.market === "DOUBLE_CHANCE");
-    const coverageDate = fixtureScan?.date ?? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
     const coverage = auditMarketCoverage(records, coverageDate);
     const candidates = new Set(oneXTwo.filter(row => row.details.strongCandidate === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
     const dcCandidates = new Set(doubleChance.filter(row => row.details.strongDoubleChance === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
