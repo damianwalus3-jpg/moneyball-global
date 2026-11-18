@@ -1506,3 +1506,14 @@
 - Coupon selection enforces 75% per selected market, exact three legs, three distinct fixture IDs, latest-per-model/market records, and excludes fixtures after kickoff. Paper settlement supports 1X2 and Double Chance selections separately.
 - Tracker UI no longer exposes destructive row deletion; imports remain merge-only and preserve existing history.
 - CI/test history: initial test failures were traced to legacy single-row Double Chance and coupon-value compatibility. Backward-compatible reads were restored; latest commit `d8b20b2` passed the main CI validation.
+
+
+## Stage 128 — independent market repair, Double Chance integrity and live feed smoke checks (2026-11-18)
+- Fixed the bulk-analysis queue so a fixture with an existing 1X2 row but no separate Double Chance row is queued for analysis again. The repair check is fixture-level, so it does not repeatedly requeue a fixture once both market records exist.
+- Failed/incomplete probability lookups now use a six-hour retry window instead of being retried on every 15-minute fixture refresh. Neutral-prior and missing-xG retries retain their existing six-hour controls.
+- Added regression tests for missing 1X2/DC market repair detection.
+- Hardened Double Chance probability validation: the three pairwise probabilities derived from a normalized 1X2 distribution must each be in [0,1] and sum to 2. The coupon engine now also requires the selected DC outcome to be the highest-probability DC option.
+- Hardened paper coupon settlement so a declared market cannot conflict with its selection type (for example, selection 1X cannot be labelled 1X2).
+- Extended the isolated REBUILT deployment smoke test to query the live PitchAPI date feed for the Europe/Brussels current date and the FootyNomad date endpoint, checking their response shapes rather than only the PitchAPI league catalogue.
+- Code commit: `d1e480e7e2adaa0f700edb7dc5d2d3195e174946`.
+- Validation/deployment: pending CI, rebuild checks and Cloudflare deployment for the documentation-triggered branch head. Do not mark Stage 128 deployed until the new live endpoint smoke checks pass.
