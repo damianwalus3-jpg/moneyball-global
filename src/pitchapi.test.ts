@@ -12,6 +12,10 @@ const stats: PitchApiTeamMatchStats = {
     { items: [
       { key: "expected_goals", home: "1.82", away: "0.74" },
       { key: "total_shots", home: "15", away: "7" },
+      { key: "ShotsOnTarget", home: "6", away: "2" },
+      { key: "big_chance", home: "3", away: "1" },
+      { key: "expected_goals_on_target", home: "1.4", away: "0.6" },
+      { key: "expected_goals_non_penalty", home: "1.7", away: "0.7" },
     ] },
   ] }],
 };
@@ -19,10 +23,12 @@ const stats: PitchApiTeamMatchStats = {
 describe("PitchAPI xG history parsing", () => {
   it("extracts team-specific xG and shots from the All period", () => {
     expect(parsePitchApiXgStats(stats, "t_Home01", match)).toMatchObject({
-      matchId: "m_Ab12Cd", isHome: true, xgFor: 1.82, xgAgainst: 0.74, goalsFor: 2, goalsAgainst: 1, shotsFor: 15, shotsAgainst: 7,
+      matchId: "m_Ab12Cd", isHome: true, xgFor: 1.82, xgAgainst: 0.74, goalsFor: 2, goalsAgainst: 1, shotsFor: 15, shotsAgainst: 7, shotsOnTargetFor: 6, shotsOnTargetAgainst: 2,
+      bigChancesFor: 3, bigChancesAgainst: 1, xgOnTargetFor: 1.4, xgOnTargetAgainst: 0.6, xgNonPenaltyFor: 1.7, xgNonPenaltyAgainst: 0.7,
     });
     expect(parsePitchApiXgStats(stats, "t_Away01", match)).toMatchObject({
-      isHome: false, xgFor: 0.74, xgAgainst: 1.82, goalsFor: 1, goalsAgainst: 2, shotsFor: 7, shotsAgainst: 15,
+      isHome: false, xgFor: 0.74, xgAgainst: 1.82, goalsFor: 1, goalsAgainst: 2, shotsFor: 7, shotsAgainst: 15, shotsOnTargetFor: 2, shotsOnTargetAgainst: 6,
+      bigChancesFor: 1, bigChancesAgainst: 3, xgOnTargetFor: 0.6, xgOnTargetAgainst: 1.4, xgNonPenaltyFor: 0.7, xgNonPenaltyAgainst: 1.7,
     });
   });
   it("does not turn missing xG, unknown teams or unplayed scores into zero", () => {
@@ -35,12 +41,17 @@ describe("PitchAPI xG history parsing", () => {
       matchId: "m_" + index, date: `2026-11-${String(17-index).padStart(2,"0")}`, isHome: index % 2 === 0,
       xgFor: 1 + index, xgAgainst: 0.5 + index, goalsFor: 1, goalsAgainst: 0,
       shotsFor: index === 0 ? null : 10 + index, shotsAgainst: 5,
+      shotsOnTargetFor: 4, shotsOnTargetAgainst: 2, bigChancesFor: 2, bigChancesAgainst: 1,
+      xgOnTargetFor: 1.2, xgOnTargetAgainst: 0.4, xgNonPenaltyFor: 0.9, xgNonPenaltyAgainst: 0.3,
     }));
     const form = buildPitchApiXgForm("Home FC", observations);
     expect(form.sampleSize).toBe(5);
     expect(form.matches.map(row => row.matchId)).toEqual(["m_0","m_1","m_2","m_3","m_4"]);
     expect(form.xgForPerMatch).toBe(3);
     expect(form.shotsForPerMatch).toBe(12.5);
+    expect(form.shotsOnTargetForPerMatch).toBe(4);
+    expect(form.bigChancesForPerMatch).toBe(2);
+    expect(form.xgOnTargetForPerMatch).toBeCloseTo(1.2, 8);
     expect(form.source).toBe("PitchAPI");
   });
   it("fails closed for unknown and non-European country codes", () => {
