@@ -271,7 +271,7 @@ export default {
         const allowedLeaguePrefixes = ["uefa.", "eng.", "esp.", "ger.", "ita.", "fra.", "ned.", "por.", "bel.", "sco.", "aut.", "sui.", "gre.", "tur.", "pol.", "ukr.", "cro.", "srb.", "den.", "nor.", "swe.", "fin.", "cze.", "rou.", "bul.", "hun.", "irl.", "wal.", "isl.", "lux.", "mlt.", "cyp.", "kaz.", "aze.", "arm.", "geo.", "alb.", "mkd.", "mda.", "est.", "lat.", "ltu.", "blr.", "bih.", "svn.", "svk.", "and.", "lie.", "faro.", "nirl.", "uefa"];
         const candidates = (searchPayload.items ?? []).filter(item => item.sport === "soccer" && item.id && (item.displayName || item.name) && item.defaultLeagueSlug && allowedLeaguePrefixes.some(prefix => item.defaultLeagueSlug!.startsWith(prefix)));
         const exact = candidates.filter(item => normalize(item.displayName ?? item.name ?? "") === normalize(teamQuery));
-        const selected = exact[0] ?? candidates[0];
+        const selected = exact[0];
         if (!selected?.id || !selected.defaultLeagueSlug) return json({ error: "espn_team_not_found", team: teamQuery }, 404, origin);
         const scheduleUrl = "https://site.api.espn.com/apis/site/v2/sports/soccer/" + encodeURIComponent(selected.defaultLeagueSlug) + "/teams/" + encodeURIComponent(selected.id) + "/schedule";
         const scheduleResponse = await fetch(scheduleUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
