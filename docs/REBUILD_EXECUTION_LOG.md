@@ -903,3 +903,12 @@
 - Browser-level app scan and merged five-source union count remain unverified in this session: the remote browser runner could not start because its separate wallet balance was zero. Do not claim that the app's merged UI count or every source's Europe-filtered count passed.
 - Next implementation gate: obtain the in-app fresh scan's per-source counts and merged fixture IDs; reconcile against the FootyNomad 102 benchmark and identify missing/extra fixtures by country, competition, gender/age category and kickoff. Inspect any mismatch before changing parser or deduplication logic. Keep source provenance and no-fabrication behavior. Do not mark Europe-wide completeness as achieved.
 - Final state: Stage 71 endpoint verification remains valid; Stage 72 adds an independently observed read-only live audit. No code changes or deployment were made in this stage.
+
+
+## Stage 73 — country-heading reconciliation for FootyNomad (2026-11-18)
+- Read-only heading extraction of the complete public FootyNomad page `/fixtures/2026-11-18` returned all 40 country/World groups (the page reports 185 total matches).
+- All European country groups present on this date are covered by the deployed `FOOTYNOMAD_COUNTRIES` parser map: Germany 3, Bulgaria 5, Italy 8, Turkey 17, Albania 8, Bosnia 1, England 9, Northern Ireland 1, Poland 3, Scotland 6, Serbia 3, Slovenia 3, Spain 24, Ukraine 7; World contains 4 UEFA Women's Champions League fixtures plus 3 ASEAN Club Championship fixtures.
+- European domestic total is 98; adding the 4 UEFA fixtures gives exactly 102. This reconciles the live Worker endpoint's 102 unique European fixtures with the independent public page's country/competition headings for this date. The earlier rough 103 benchmark estimate in Stage 70 was an overcount and is superseded by this exact 102 reconciliation.
+- Non-European groups on the same page (Algeria, Argentina, Bolivia, Brazil, Cameroon, Colombia, Congo DR, India, Japan, Jordan, Liberia, Mexico, Nigeria, Panama, Paraguay, Peru, Qatar, Saudi Arabia, South Korea, Suriname, Tunisia, Uganda, Uruguay, Venezuela and Zambia) are correctly excluded from the Europe-only feed.
+- This validates FootyNomad country-group parsing for the 18 Nov snapshot only; it does not establish complete coverage of every European competition or prove that all fixtures listed by every federation are present.
+- No code or user data changed; no additional provider calls beyond the public page read were made. Next: complete the in-app five-source merged scan and compare provider overlaps/unique additions.
