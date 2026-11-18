@@ -43,6 +43,7 @@ describe("PitchAPI xG history parsing", () => {
       shotsFor: index === 0 ? null : 10 + index, shotsAgainst: 5,
       shotsOnTargetFor: 4, shotsOnTargetAgainst: 2, bigChancesFor: 2, bigChancesAgainst: 1,
       xgOnTargetFor: 1.2, xgOnTargetAgainst: 0.4, xgNonPenaltyFor: 0.9, xgNonPenaltyAgainst: 0.3,
+      ppdaFor: 9, fieldTiltFor: 55, boxEntriesFor: 10, xThreatFor: 0.8, xAssistedGoalsFor: 0.6, directSpeedFor: 1.8,
     }));
     const form = buildPitchApiXgForm("Home FC", observations);
     expect(form.sampleSize).toBe(5);
