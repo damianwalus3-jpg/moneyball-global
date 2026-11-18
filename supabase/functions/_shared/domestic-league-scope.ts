@@ -21,7 +21,7 @@ export function isEligibleDomesticSeniorLeague(country: unknown, competition: un
   return DOMESTIC_LEAGUE_MARKER.test(label);
 }
 
-/** Production candidate scope: geographic-Europe domestic men's tiers 1 and 2 only. */
+/** OpenMatchday source scope: its published catalogue currently contains tiers 1 and 2 only. */
 export function isEligibleDomesticTopTwoLeague(country: unknown, competition: unknown): boolean {
   const label = normalizeCompetition(competition);
   const countryKey = normalizeCompetition(country);
