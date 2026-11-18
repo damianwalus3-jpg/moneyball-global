@@ -1610,6 +1610,20 @@
 - Zmieniono kwalifikację osobnego rekordu DC: blokuje fallback wyłącznie wtedy, gdy jego najnowszy rekord ma poprawne, znormalizowane prawdopodobieństwa DC. Nieprawidłowy rekord DC nie może ukrywać poprawnych wartości dc1x/dcx2/dc12 zapisanych w 1X2.
 - Dodano test regresyjny obejmujący uszkodzony osobny rekord DC i poprawne wartości DC w 1X2; test sprawdza także, że próbka DC liczona jest jako jeden odrębny mecz, a nie trzy zdarzenia.
 - Zmiany kodu: c689aa86ef2bf2e78b318647ba1abeb527ca4577; test: acba3caaef38cf014c859988704c219b3325c48c.
-- Walidacja CI na commicie kodu c689aa8: TypeScript PASS, 24 pliki / 230 testów PASS, build PASS. Ponieważ test regresyjny został zapisany w następnym commicie, końcowa walidacja musi objąć aktualny HEAD acba3ca przed oznaczeniem etapu jako wdrożonego.
-- Deployment i live smoke test dla aktualnego HEAD pozostają wymagane. Do czasu ich zakończenia nie oznaczać Stage 135 jako wdrożonego.
+- Walidacja końcowego HEAD 7fec5e8: TypeScript PASS, 24 pliki / 231 testów PASS, build PASS; CI [44371736067](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44371736067) PASS; Rebuild Checks [44371735936](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44371735936) PASS; Cloudflare REBUILT deployment, smoke test i live source reconciliation [44371736017](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44371736017) PASS.
+- Stage 135 jest wdrożony na REBUILT.
 - Zakres wyłącznie moneyball-rebuild / REBUILT. Bez zmian MAIN, TEST, historii lokalnego Trackera, kuponów, rozliczeń i bankrolla; bez płatnych API.
+
+## Stage 136 — newest settlement ordering in model audit (2026-11-18)
+- Audit code review found that duplicate result rows were resolved by first occurrence in Tracker array order. This could select an older score after a correction, because array order is not a reliable settlement timestamp contract.
+- Changed result resolution to sort valid result records by createdAt descending, with deterministic ID tie-break, before selecting the newest result per fixture. Invalid actual values remain excluded.
+- Added regression coverage that submits newer and older valid result rows in both array orders; both must use the newest settlement.
+- Code commit: a4dca821c7bcd104587a4ab7dec4b7c386fd0377. Test commit and final HEAD: a31dd24499329a8897a926be0056089501c2cf6f.
+- CI [44376848091](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44376848091) PASS; Rebuild Checks [44376848385](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44376848385) PASS. TypeScript, 24 test files / 231 tests, and production build PASS.
+- Cloudflare REBUILT deployment, health/PitchAPI/FootyNomad smoke checks and full current-day European source reconciliation [44376848094](https://github.com/damianwalus3-jpg/moneyball-global/actions/runs/44376848094) PASS. Worker version 43345c68-ac22-47e1-8ea6-efc7da41b7ba.
+- Live source snapshot for Europe/Brussels 2026-11-18: 169 unique fixtures, 20 countries, 61 competitions; all 8 source integrations healthy; 0 duplicate canonical keys, 0 wrong-date fixtures, 0 non-European fixtures, 0 source errors. Coverage remains a multi-source snapshot, not proof of every European youth/women/amateur league.
+- Separate audit of the user's 2026-11-18 local Tracker backup (not imported or modified): 232 match records, 818 prediction records, 225 distinct prediction fixture IDs; 56 fixtures have 1X2 but no separate DC row; 7 match records have no prediction rows (including Turkish 2. Lig Red and White fixtures; other rows include cup/UEFA/U19 competitions). 7 coupons are PAPER_NO_ODDS with three legs each; no verified odds or stake. 12 result records. These are backup observations, not a server-side localStorage claim.
+- 461 1X2 rows and 108 DC rows lack numeric probability vectors in the backup, but this includes explicitly unavailable/rejected model rows and must not be interpreted as 569 failed active predictions. No Tracker records were changed or imported.
+- Remaining work: diagnose why the backup lacks DC rows for 56 fixtures and determine the correct eligibility handling for the 7 unpredicted match rows; inspect Android-local Tracker again after the next scan. Model calibration remains unqualified until at least 30 distinct settled matches per model/market.
+- Scope remains only moneyball-rebuild / Cloudflare REBUILT. No MAIN/TEST/Vercel/Lovable, no destructive local Tracker changes, and no paid API calls.
+
