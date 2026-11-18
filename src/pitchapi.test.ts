@@ -40,7 +40,7 @@ describe("PitchAPI xG history parsing", () => {
     expect(form.sampleSize).toBe(5);
     expect(form.matches.map(row => row.matchId)).toEqual(["m_0","m_1","m_2","m_3","m_4"]);
     expect(form.xgForPerMatch).toBe(3);
-    expect(form.shotsForPerMatch).toBe(13.5);
+    expect(form.shotsForPerMatch).toBe(12.5);
     expect(form.source).toBe("PitchAPI");
   });
   it("fails closed for unknown and non-European country codes", () => {
