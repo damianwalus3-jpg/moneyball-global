@@ -14,6 +14,7 @@ function prediction(overrides: Partial<TrackerRecord["details"]> = {}, status = 
       fixtureDate: "2099-06-01",
       fixtureTime: "18:00",
       competition: "Test League",
+      evidenceComplete: true,
       dc1x: 0.86,
       dcx2: 0.72,
       dc12: 0.91,
@@ -43,6 +44,11 @@ describe("safest daily pick", () => {
     expect(getSafestPick([dcAt75])?.market).toBe("1X");
     const below75 = prediction({ dc1x: 0.749, dcx2: 0.74, dc12: 0.70, strongCandidate: false, strongDoubleChance: false }, "ODRZUCONY");
     expect(getSafestPick([below75])).toBeNull();
+  });
+
+  it("does not promote a high-probability pick when required evidence is incomplete", () => {
+    const incomplete = prediction({ evidenceComplete: false, dc1x: 0.99, dcx2: 0.98, dc12: 0.97 });
+    expect(getSafestPick([incomplete])).toBeNull();
   });
 
   it("limits the dashboard safest pick to the requested Brussels scan date", () => {
