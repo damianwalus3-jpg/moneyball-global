@@ -1733,3 +1733,11 @@
 - Final code HEAD: `b14cfcf26851c0a4a1246266c3e74157bc47f25c`; documentation history is being updated in this commit sequence.
 - Scope preserved: only `moneyball-rebuild` and Cloudflare REBUILT. No MAIN/TEST/Vercel/Lovable changes; no Tracker history, coupons, settlements, results or bankroll were edited; no paid API usage.
 - Remaining limitation: a clean 8/8 source-health result means all configured feeds answered correctly for this scan, not that every European federation, division, women's/youth/amateur league is covered. Continue independent competition-level reconciliation and do not claim 100% European completeness.
+
+
+### Stage 147 — dashboard scan-time and source-label accuracy (2026-11-18)
+- Audited the live dashboard and match-list presentation after the source timestamp repair.
+- Fixed a misleading dashboard caption that still called `fixtureScan.generatedAt` an “open-matchday build”. It now labels it correctly as the live scan completion time and separately shows the upstream OpenMatchday catalogue timestamp when available.
+- Removed a stale hard-coded “7 public sources” label from the dashboard stage summary; the active source set is described without a brittle count.
+- No prediction, odds, fixture, coupon, settlement, Tracker or bankroll data was modified.
+- Code commit: `ff2077779c83cd5a4afb59137c4c18a0c1e55667`. CI, Rebuild Checks and production deployment are triggered; record their final status after completion.
