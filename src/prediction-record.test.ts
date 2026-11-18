@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeHistoryProvenance, parseHistoryProvenance, shouldAppendPrediction } from "./prediction-record";
+import { describeHistoryProvenance, hasMissingPredictionMarket, parseHistoryProvenance, shouldAppendPrediction } from "./prediction-record";
 import type { TrackerRecord } from "./tracker-store";
 
 function row(id: string, probabilities: [number | null, number | null, number | null]): TrackerRecord {
@@ -39,6 +39,25 @@ describe("prediction record refresh policy", () => {
   });
 });
 
+
+
+describe("fixture market repair detection", () => {
+  it("requests analysis when a fixture has only a 1X2 record", () => {
+    expect(hasMissingPredictionMarket([row("one", [0.6, 0.2, 0.2])], "fixture-1")).toBe(true);
+  });
+  it("requests analysis when a fixture has only a Double Chance record", () => {
+    const dc = { ...row("dc", [null, null, null]), details: { ...row("dc", [null, null, null]).details, market: "DOUBLE_CHANCE", p1x: 0.8, px2: 0.7, p12: 0.6 } };
+    expect(hasMissingPredictionMarket([dc], "fixture-1")).toBe(true);
+  });
+  it("does not requeue a fixture once both independent market records exist", () => {
+    const one = row("one", [0.6, 0.2, 0.2]);
+    const dc = { ...row("dc", [null, null, null]), details: { ...row("dc", [null, null, null]).details, market: "DOUBLE_CHANCE", p1x: 0.8, px2: 0.7, p12: 0.6 } };
+    expect(hasMissingPredictionMarket([one, dc], "fixture-1")).toBe(false);
+  });
+  it("does not confuse another fixture's market rows", () => {
+    expect(hasMissingPredictionMarket([row("other", [0.6, 0.2, 0.2])], "fixture-2")).toBe(true);
+  });
+});
 
 describe("history provenance metadata", () => {
   it("decodes multi-source history details without losing sample counts", () => {
