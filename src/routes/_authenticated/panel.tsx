@@ -170,12 +170,12 @@ function Panel() {
         actions={
           <>
             <Button onClick={() => void runManualScan()} disabled={scanRunning}>{scanRunning ? <Loader2 className="animate-spin" /> : <ScanLine />}{scanRunning ? "Analizuję…" : "Skanuj dzisiejsze mecze"}</Button>
-            <Button variant="outline" asChild><a href="#wybrane-typy"><Trophy /> Mecze wytypowane przez aplikację</a></Button>
             <Button variant="outline" asChild><Link to="/mecze"><CalendarDays /> Terminarz</Link></Button>
             <Button variant="outline" asChild><Link to="/kupony"><Ticket /> Kupony</Link></Button>
           </>
         }
       />
+      <Button variant="outline" className="mb-4 flex w-full items-center justify-between gap-3 border-primary/40 bg-primary/5 py-6 text-left font-semibold" asChild><a href="#wybrane-typy"><span className="flex items-center gap-2"><Trophy className="size-4 text-primary" /> Mecze wytypowane przez aplikację</span><ChevronRight className="size-4" /></a></Button>
       {(scanRunning || scanError || scanSummary) && <section className="mb-4 rounded-xl border border-primary/30 bg-card p-3 text-sm" aria-live="polite">
         <div className="flex items-center gap-2 font-semibold">{scanRunning && <Loader2 className="size-4 animate-spin" />}{scanRunning ? "Ręczny skan MONEYBALL" : scanError ? "Skan nie został ukończony" : "Skan zakończony"}</div>
         {scanProgress && <p className="mt-1 text-muted-foreground">{scanProgress}</p>}
