@@ -63,6 +63,11 @@ describe("PitchAPI xG history parsing", () => {
   it("fails closed for unknown and non-European country codes", () => {
     expect(isPitchApiCountryEligible("BEL")).toBe(true);
     expect(isPitchApiCountryEligible("UEFA")).toBe(true);
+    expect(isPitchApiCountryEligible("TUR")).toBe(true);
+    expect(isPitchApiCountryEligible("GEO")).toBe(true);
+    expect(isPitchApiCountryEligible("CYP")).toBe(true);
+    expect(isPitchApiCountryEligible("ISR")).toBe(true);
+    expect(isPitchApiCountryEligible("KAZ")).toBe(true);
     expect(isPitchApiCountryEligible("SAU")).toBe(false);
     expect(isPitchApiCountryEligible("UAE")).toBe(false);
     expect(isPitchApiCountryEligible(null)).toBe(false);
