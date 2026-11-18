@@ -140,7 +140,7 @@ export function fixtureKey(date: string, home: string, away: string, competition
       .replace(/\((?:women|woman|womens)\)/g, " ")
       .replace(/\b(?:women|woman|womens|frauen|femmes|femenina|feminine|ladies|girls)\b/g, " ")
       .replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim()
-      .replace(/\b(?:f c|a f c|c f|s c)$/g, "").trim();
+      .replace(/\b(?:fc|f c|afc|a f c|cf|c f|sc|s c)$/g, "").trim();
     return aliases[base] ?? base;
   };
   return `${date}|${gender}|${normalize(home)}|${normalize(away)}`;
