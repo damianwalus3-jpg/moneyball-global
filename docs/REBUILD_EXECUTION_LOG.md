@@ -1206,3 +1206,13 @@
 - Compared those six Spanish cup fixtures with the live FootyNomad date proxy: two of six were also present there (Alcoyano–Mallorca and Badajoz–Tenerife); four were absent from FootyNomad. The live ESPN scoreboard independently contained all six Spanish cup fixtures, so the multi-source design can recover these omissions.
 - The six open-matchday fixtures plus ESPN events show why a single global source is insufficient: provider coverage differs by competition and fixture, even on one date. Keep the source provenance when merging and do not infer missing matches from a competition directory alone.
 - This is a one-day snapshot; it is not a season-wide completeness estimate. No data rows were written into the app's historical Tracker.
+
+
+### Stage 95–97 final validation
+- Latest integrated branch HEAD at validation: 9ffaae970992225cb688316d5b6336e1d2304c0a.
+- Stage 95 strict OpenLigaDB sport metadata guard, Stage 96 ESPN non-UEFA confederation exclusions (including neutral venues in Europe), and Stage 97 source-overlap audit all included in this HEAD.
+- GitHub Actions CI passed typecheck, all unit tests, and production build (run 44272490290).
+- Rebuild Checks passed typecheck, all unit tests, and production build (run 44272490353).
+- Cloudflare Free Worker deployment completed successfully (run 44272490389). The live REBUILD homepage was read-only checked after deployment and returned successfully.
+- The failed intermediate Stage 96 test build was not deployed; the regression was corrected, the full suite passed, and only the corrected HEAD was deployed.
+- MAIN production and its historical data remain untouched.
