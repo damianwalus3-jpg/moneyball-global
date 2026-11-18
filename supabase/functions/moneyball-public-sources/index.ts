@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
-import { isEligibleDomesticSeniorLeague } from "../_shared/domestic-league-scope.ts";
+import { isEligibleDomesticTopTwoLeague } from "../_shared/domestic-league-scope.ts";
 import { isExcludedSeniorTeam, normalizeTeamName, teamHistoryKey } from "../_shared/team-normalization.ts";
 
 const cors = {
@@ -167,8 +167,10 @@ async function openMatchday(date: string) {
     const folder = m[1], tier = folder.match(/^([A-Z]{3})_([1-9][0-9]*)_[A-Za-z0-9-]+$/i);
     const country = m[3].trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const league = m[2].trim();
-    return !!tier && isGeographicEuropeCountry(country)
-      && !/\b(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series|cup|copa|trophy|youth|academy|reserves?)\b/i.test(folder + " " + league);
+    return !!tier && Number(tier[2]) >= 1 && Number(tier[2]) <= 2
+      && isGeographicEuropeCountry(country)
+      && isEligibleDomesticTopTwoLeague(country, league)
+      && !/(women|womens|female|frauen|feminine|femminile|femenina|ladies|girls|damallsvenskan|wsl|liga f|summer series|cup|copa|trophy|youth|academy|reserves?)/i.test(folder + " " + league);
   });
   const folders = eligibleIndexRows.map(m => m[1]);
   const unique = [...new Set(folders)];
@@ -286,79 +288,14 @@ async function openMatchday(date: string) {
 }
 const ESPN_LEAGUES = [
   "eng.1","eng.2","esp.1","esp.2","ita.1","ita.2","ger.1","ger.2","fra.1","fra.2",
-  "bel.1","ned.1","por.1","sco.1","uefa.nations","uefa.champions","uefa.europa","uefa.europa.conf",
-  "swe.1","nor.1","den.1","aut.1","sui.1","tur.1","gre.1",
-  "eng.w.1","eng.w.promotion.relegation","eng.w.fa","eng.w.league_cup",
-  "esp.w.1","fra.w.1","ned.w.1","ned.w.knvb_cup",
-  "uefa.w.nations","uefa.w.europa"
+  "bel.1","ned.1","por.1","sco.1","swe.1","nor.1","den.1","aut.1","sui.1","gre.1"
 ];
 const ESPN_COUNTRY: Record<string,string> = {
   eng:"England", esp:"Spain", ita:"Italy", ger:"Germany", fra:"France",
   bel:"Belgium", ned:"Netherlands", por:"Portugal", sco:"Scotland",
-  uefa:"Europe", swe:"Sweden", nor:"Norway", den:"Denmark",
-  aut:"Austria", sui:"Switzerland", tur:"Turkey", gre:"Greece"
+  swe:"Sweden", nor:"Norway", den:"Denmark",
+  aut:"Austria", sui:"Switzerland", gre:"Greece"
 };
-
-const ESPN_WOMEN_HISTORY_LEAGUES = ["eng.w.1","esp.w.1","fra.w.1","ned.w.1"];
-function previousSundayDates(targetDate:string,count=10):string[] {
-  const target=new Date(targetDate+"T12:00:00Z");
-  const weekday=target.getUTCDay();
-  const daysBack=weekday===0?7:weekday;
-  return Array.from({length:count},(_,i)=>{
-    const d=new Date(target);
-    d.setUTCDate(target.getUTCDate()-daysBack-i*7);
-    return d.toISOString().slice(0,10).replaceAll("-","");
-  });
-}
-async function espnWomenHistory(targetDate:string) {
-  const tasks=ESPN_WOMEN_HISTORY_LEAGUES.flatMap(league=>previousSundayDates(targetDate,10).map(ymd=>({league,ymd})));
-  const results=await mapLimit(tasks,8,async task=>{
-    const data=await safeJson("https://site.api.espn.com/apis/site/v2/sports/soccer/"+task.league+"/scoreboard?dates="+task.ymd);
-    return Array.isArray(data?.events)?data.events:[];
-  });
-  const byTeam=new Map<string,any[]>(),errors=results.filter(x=>x instanceof Error).length;
-  const key=(value:string)=>normalizeTeamName(value);
-  for(const group of results){
-    if(!Array.isArray(group))continue;
-    for(const event of group){
-      const status=event?.status?.type||event?.competitions?.[0]?.status?.type||{};
-      if(status.completed!==true&&status.state!=="post")continue;
-      const competition=event?.competitions?.[0]||{};
-      const competitors=competition.competitors||[];
-      const home=competitors.find((x:any)=>x.homeAway==="home")||competitors[0];
-      const away=competitors.find((x:any)=>x.homeAway==="away")||competitors[1];
-      const homeName=norm(home?.team?.displayName),awayName=norm(away?.team?.displayName);
-      const homeScore=Number(home?.score),awayScore=Number(away?.score);
-      const matchDate=String(event?.date||competition?.date||"").slice(0,10);
-      if(!homeName||!awayName||!matchDate||matchDate>=targetDate||!Number.isInteger(homeScore)||!Number.isInteger(awayScore))continue;
-      const add=(team:string,opponent:string,own:number,opp:number)=>{
-        const teamKey=key(team),rows=byTeam.get(teamKey)||[];
-        rows.push({date:matchDate,opponent,result:own>opp?"W":own<opp?"L":"D",goals_for:own,goals_against:opp});
-        byTeam.set(teamKey,rows);
-      };
-      add(homeName,awayName,homeScore,awayScore);
-      add(awayName,homeName,awayScore,homeScore);
-    }
-  }
-  const forms=new Map<string,any>();
-  for(const [team,rows] of byTeam.entries()){
-    const seen=new Set<string>();
-    const last10=rows.sort((a,b)=>b.date.localeCompare(a.date)).filter(x=>{
-      const id=[x.date,key(x.opponent),x.goals_for,x.goals_against].join("|");
-      if(seen.has(id))return false;seen.add(id);return true;
-    }).slice(0,10);
-    if(!last10.length)continue;
-    const w=last10.filter(x=>x.result==="W").length,d=last10.filter(x=>x.result==="D").length,l=last10.filter(x=>x.result==="L").length;
-    forms.set(team,{matches:last10.length,w,d,l,last10,goals_for:last10.reduce((s,x)=>s+x.goals_for,0),goals_against:last10.reduce((s,x)=>s+x.goals_against,0),source:"ESPN_WOMEN_LAST10"});
-  }
-  return {forms,teams:forms.size,matches:[...forms.values()].reduce((s,x)=>s+x.matches,0),errors,dates:10,leagues:ESPN_WOMEN_HISTORY_LEAGUES.length};
-}
-function espnRecentForm(competitor:any){
-  const sequence=String(competitor?.form||"").toUpperCase().replace(/[^WDL]/g,"").slice(-5);
-  if(sequence.length<3)return null;
-  const w=[...sequence].filter(x=>x==="W").length,d=[...sequence].filter(x=>x==="D").length,l=[...sequence].filter(x=>x==="L").length;
-  return {matches:sequence.length,w,d,l,points:w*3+d,source:"ESPN_FORM_LAST5"};
-}
 
 async function espn(date: string) {
   const ymd = date.replaceAll("-", "");
@@ -520,17 +457,7 @@ async function espn(date: string) {
       fixture.away_form=formByTeam.get(key(fixture.away_team))||fixture.away_form||null;
     }
   }
-  const womenFixtures=fixtures.filter((x:any)=>x.gender==="women");
-  let womenHistory:any={forms:new Map(),teams:0,matches:0,errors:0,dates:0,leagues:0};
-  if(womenFixtures.length){
-    womenHistory=await espnWomenHistory(date);
-    const key=(value:string)=>normalizeTeamName(value);
-    for(const fixture of womenFixtures){
-      fixture.home_form=womenHistory.forms.get(key(fixture.home_team))||fixture.home_form||null;
-      fixture.away_form=womenHistory.forms.get(key(fixture.away_team))||fixture.away_form||null;
-    }
-  }
-  return { fixtures, events_received: fixtures.length, leagues_checked: ESPN_LEAGUES.length, errors: failures.length, error_details: failures.slice(0,5).map(x => String(x)), women_history_teams:womenHistory.teams, women_history_matches:womenHistory.matches, women_history_errors:womenHistory.errors, women_history_leagues:womenHistory.leagues, women_history_matchdays:womenHistory.dates };
+  return { fixtures, events_received: fixtures.length, leagues_checked: ESPN_LEAGUES.length, errors: failures.length, error_details: failures.slice(0,5).map(x => String(x)) };
 }
 const SPORTSDB_COUNTRY_CODE:Record<string,string> = {
  "england":"ENG","scotland":"SCO","wales":"WAL","northern ireland":"NIR","ireland":"IRL",
@@ -572,7 +499,7 @@ async function theSportsDb(date:string) {
    source:"TheSportsDB",
    competition:league||"Soccer",
    country:countryName||"Europe",
-   gender:women?"women":"unknown",
+   gender:women?"women":"men",
    home_team:home,away_team:away,kickoff_at:kickoff,
    status:postponed?"postponed":finished?"finished":live?"live":"scheduled",
    home_score:finished&&Number.isInteger(hs)?hs:null,
@@ -582,7 +509,7 @@ async function theSportsDb(date:string) {
  return {fixtures,events_received:fixtures.length,source:"TheSportsDB public v1 feed",errors:0};
 }
 async function openLiga(date: string) {
-  const shortcuts = ["bl1","bl2","bl3","la1","ucl","uel","dfb","ffb1","ffb2","pl","unl"];
+  const shortcuts = ["bl1","bl2","la1","pl"];
   const results = await mapLimit(shortcuts, 5, async (league) => {
     const data = await safeJson("https://api.openligadb.de/getmatchdata/" + league + "/2026");
     return (Array.isArray(data) ? data : []).filter((m: any) => String(m?.matchDateTime || "").slice(0,10) === date).map((m: any) => {
@@ -595,7 +522,7 @@ async function openLiga(date: string) {
         source: "OpenLigaDB",
         competition: league,
         country: "Germany/Europe",
-        gender: /frauen|women|ffb/i.test(league) ? "women" : "unknown",
+        gender: "men",
         home_team: home, away_team: away,
         kickoff_at: m?.matchDateTime || null,
         status: finished ? "finished" : "scheduled",
@@ -818,7 +745,7 @@ Deno.serve(async (req: Request) => {
     }
     const deduped=[...mergedByFixture.values()];
     const europeanFixtures = deduped.filter((f:any) => isEuropeanFixture(f.country,f.competition,f.home_team,f.away_team)
-      && isEligibleDomesticSeniorLeague(f.country,f.competition||f.league)
+      && isEligibleDomesticTopTwoLeague(f.country,f.competition||f.league)
       && (!f.gender || String(f.gender).toLowerCase()==="men")
       && !isExcludedSeniorTeam(f.home_team) && !isExcludedSeniorTeam(f.away_team));
     const sportsDbHistory=await sportsDbTeamHistory(europeanFixtures,date);
@@ -863,6 +790,9 @@ Deno.serve(async (req: Request) => {
         }
       };
     });
+    const sourceCounts=Object.fromEntries(Object.entries(sources).map(([name,value]:[string,any])=>[name,Number(value?.fixtures?.length??value?.events_received??0)]));
+    const sourceErrors=Object.fromEntries(Object.entries(sources).filter(([,value]:[string,any])=>value?.ok===false).map(([name,value]:[string,any])=>[name,String(value?.error||"source_error")]));
+    console.log("[moneyball-public-sources] daily scope summary",JSON.stringify({date,scope:"EUROPE_MENS_DOMESTIC_TIER_1_2",raw_fixture_count:all.length,eligible_fixture_count:enriched.length,source_counts:sourceCounts,source_errors:sourceErrors}));
     const responseBody=JSON.stringify({
       ok: true, date, api_key_required: false,
       source_count: Object.keys(sources).filter(k => sources[k].ok).length,
