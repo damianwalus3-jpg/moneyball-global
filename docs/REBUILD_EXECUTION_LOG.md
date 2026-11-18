@@ -936,3 +936,6 @@
 - The codebase contains no FV feature or variable. It does contain EV (expected value) as an optional coupon-pricing display; EV is not used by prediction or candidate-rejection logic. No EV removal was made pending clarification that the user meant EV rather than another feature.
 - The 75% 1X2 candidate threshold and 80% DC main-pick threshold are strict and explain why the app can show few/no picks even when it computes many probabilities. No threshold was silently lowered; retain transparency until the user explicitly changes this policy.
 - No local Tracker records, existing predictions, coupons, settlements or bankroll data were deleted. Only isolated moneyball-rebuild source code and documentation were modified. CI and isolated Worker deployment status: pending.
+
+- Follow-up UI refinement: clickable Dashboard metric cards retain the app's dark visual style and inherit typography; the metric-card navigation opens the relevant module.
+- CI/deployment check: the commit-status API currently exposes only a Vercel build-rate-limit failure, which is outside the permitted REBUILD deployment path. No successful Cloudflare REBUILD run is visible yet for this change set, so deployment is not claimed. The isolated branch changes are saved; verify the Cloudflare workflow before treating the UI fixes as live.
