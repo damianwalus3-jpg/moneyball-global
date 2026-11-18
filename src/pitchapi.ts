@@ -102,7 +102,7 @@ export function isPitchApiCountryEligible(countryCode: string | null | undefined
   if (!countryCode) return false;
   // Match the application's strict European scan policy; transcontinental/Asian
   // associations are intentionally not inferred from a league display name.
-  return new Set(["ALB","AND","AUT","BLR","BEL","BIH","BUL","CRO","CZE","DEN","ENG","EST","FRO","FIN","FRA","GER","GIB","GRE","HUN","ISL","IRE","ITA","KOS","LVA","LIE","LTU","LUX","MLT","MDA","MCO","MNE","NED","MKD","NIR","NOR","POL","POR","ROU","RUS","SMR","SCO","SRB","SVK","SVN","ESP","SWE","SUI","UKR","WAL","UEFA"]).has(countryCode.toUpperCase());
+  return new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","ISR","KOS","BLR","LIE","SMR","MCO","VAT","UEFA"]).has(countryCode.toUpperCase());
 }
 export function parsePitchApiXgStats(data: PitchApiTeamMatchStats, teamId: string, match: PitchApiLeagueMatch, advanced?: PitchApiAdvancedStats): PitchApiXgObservation | null {
   const period = data.periods?.find(item => item.period === "All") ?? data.periods?.[0];
