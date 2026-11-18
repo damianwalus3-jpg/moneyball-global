@@ -287,8 +287,8 @@ describe("European domestic league scope", () => {
     })).toBe(true);
     expect(isEligibleEuropeanMatch({
       ...openMatchdayBase,
-      external_id: "om:ENG_3_league-one:2026-11-17:club-a:club-b",
-      competition: "League One",
+      external_id: "om:ENG_3_2026-27:2026-11-17:club-a:club-b",
+      competition: "Premier League",
       country: "England",
     })).toBe(false);
     expect(isEligibleEuropeanMatch({

@@ -263,7 +263,8 @@ export function isEligibleEuropeanMatch(match: Pick<Match, "country" | "competit
   if (match.gender && match.gender !== "men") return false;
   if (isWomensTeamName(match.home_team) || isWomensTeamName(match.away_team)) return false;
   if (isExcludedSeniorTeamName(match.home_team) || isExcludedSeniorTeamName(match.away_team)) return false;
-  return isOpenMatchdayLeagueMatch(match) || isEuropeanTopTwoLeague(match.country, match.competition ?? match.league);
+  if (String(match.source ?? "").trim().toLowerCase() === "openmatchday") return isOpenMatchdayLeagueMatch(match);
+  return isEuropeanTopTwoLeague(match.country, match.competition ?? match.league);
 }
 
 export function isFinishedStatus(status: string | null | undefined) {
