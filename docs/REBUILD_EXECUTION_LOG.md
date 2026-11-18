@@ -1080,3 +1080,9 @@
 - Added a regression test with nine finished pre-fixture OpenLigaDB matches to ensure all nine reach the multi-source merge layer and future-dated records remain excluded by the mapper.
 - Commits: implementation da8a0520aed1abf3e4085231d55ef6cf0a99fc9b; regression test 69ad9cd0b8bd3f7c88ba8b2327ea8f55369fd345.
 - Validation and deployment are pending the latest GitHub Actions runs. No production MAIN resources, Tracker records, coupon history or bankroll values were changed.
+
+
+### Stage 86 — CI correction
+- First CI run on the test commit failed at TypeScript because the regression-test import had been added but the test body was not inserted at the intended marker. No application logic failure was reported; tests/build were skipped by the typecheck gate.
+- Inserted the missing OpenLigaDB regression test in the correct test suite in commit 90476c25c8347d7a222a7e1c50f39672363fd0b2.
+- The follow-up CI and deployment results must be checked on the newest branch head before this stage is marked complete.
