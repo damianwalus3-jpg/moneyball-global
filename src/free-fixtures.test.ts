@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixtureKey, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaCountryCode, openLigaSeasonYears, parseEspnEuropeanFixtures, espnScoreboardDatesForBrusselsDay, parseTimezoneFootballFixtures } from "./free-fixtures";
+import { fixtureKey, mergeFixtureSource, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaCountryCode, openLigaSeasonYears, parseEspnEuropeanFixtures, espnScoreboardDatesForBrusselsDay, parseTimezoneFootballFixtures } from "./free-fixtures";
 
 describe("European fixture source classification", () => {
   it("accepts known European country names and competition prefixes", () => {
@@ -21,6 +21,13 @@ describe("European fixture source classification", () => {
     expect(isEuropeanOpenLiga({ leagueId: 19, leagueName: "Nations League 2026", leagueShortcut: "nla" })).toBe(true);
     expect(isEuropeanOpenLiga({ leagueId: 20, leagueName: "DFB U21", leagueShortcut: "u21dfb" })).toBe(true);
     expect(isEuropeanOpenLiga({ leagueId: 24, leagueName: "UEFA Women's Champions League", leagueShortcut: "WCL", sport: { sportName: "Frauenfußball" } })).toBe(true);
+  });
+
+
+  it("preserves a history provider identifiers when merging a scoreboard fixture", () => {
+    const canonical = { id: "espn|1", competition: "UEFA event", countryCode: "UEFA", leagueFolder: "", date: "2026-11-18", time: "19:45", home: "Denmark", away: "Norway", source: "ESPN", sourceUpdatedAt: "2026-11-18T00:00:00Z" };
+    const enriched = mergeFixtureSource(canonical, { ...canonical, id: "openligadb|1", competition: "Nations League", leagueShortcut: "nla", leagueSeason: "2026", source: "OpenLigaDB", sourceUpdatedAt: "2026-11-17T23:00:00Z" });
+    expect(enriched).toMatchObject({ leagueShortcut: "nla", leagueSeason: "2026", source: "ESPN + OpenLigaDB" });
   });
 
   it("does not treat arbitrary la-prefixed feeds as European", () => {
