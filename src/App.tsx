@@ -90,7 +90,7 @@ function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, r
       strongCandidate: prediction?.strongCandidate ?? false,
       strongDoubleChance: prediction ? Math.max(dc?.oneX ?? 0, dc?.xTwo ?? 0, dc?.oneTwo ?? 0) >= 0.75 : false,
       source: match.source,
-      reason: reason ?? (prediction && !prediction.strongCandidate ? "Najwyższe prawdopodobieństwo poniżej progu 75%." : null),
+      reason: reason ?? (prediction && !prediction.strongCandidate && Math.max(dc?.oneX ?? 0, dc?.xTwo ?? 0, dc?.oneTwo ?? 0) < 0.75 ? "Najwyższe prawdopodobieństwo 1X2 i Double Chance poniżej progu 75%." : null),
     },
   });
   return readRecords();
