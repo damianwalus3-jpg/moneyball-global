@@ -3,7 +3,7 @@ import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 import { isEligibleDomesticTopTwoLeague, isEligibleOpenMatchdayTier } from "../_shared/domestic-league-scope.ts";
 import { isExcludedSeniorTeam, isWomensTeam } from "../_shared/team-normalization.ts";
 import { isRealXgObservation } from "../_shared/xg-validation.ts";
-import { compareBelgianProviderQuotes, isFreshConfirmedBelgianProviderQuote } from "../_shared/provider-odds-validation.ts";
+import { compareBelgianProviderQuotes, isFreshConfirmedBelgianProviderQuote, isFreshConfirmedManualBelgianQuote } from "../_shared/provider-odds-validation.ts";
 import { selectPublicSourceApiKey } from "../_shared/public-source-auth.ts";
 const S="https://gzgeklcukrclgwbsmbsp.supabase.co",K=Deno.env.get("SUPABASE_ANON_KEY")||"",SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"",V="MONEYBALL GLOBAL 3.8";
 let CRON_FALLBACK_TOKEN="";
@@ -905,7 +905,36 @@ const history=historyTimed||[];
   }
  }
  const matchIds=matches.map((m:any)=>String(m.id)).filter(Boolean);
- const old=matchIds.length?await db("predictions?select=id,owner_id,match_id,market,selection,settlement_status,verified,note&owner_id=eq."+encodeURIComponent(ownerId)+"&model_version=eq."+encodeURIComponent(V)+"&match_id=in.("+matchIds.join(",")+")",token):[];
+ const old=matchIds.length?await db("predictions?select=id,owner_id,match_id,market,selection,settlement_status,verified,note,odds,stake,potential_return,verdict,decision_status,selection_status,rejection_reason,data_coverage,data_source,rationale&owner_id=eq."+encodeURIComponent(ownerId)+"&model_version=eq."+encodeURIComponent(V)+"&match_id=in.("+matchIds.join(",")+")",token):[];
+ // Preserve a still-fresh manual Belgian quote when refreshing the same pending model prediction.
+ // The manual quote is re-evaluated against the current model gates; it cannot keep a pick selected
+ // after a baseline-only model, weak coverage, low probability, or a started/out-of-scope fixture.
+ const manualNowMs=Date.now();
+ const oldByPredictionKey=new Map((old||[]).map((item:any)=>[String(item.match_id)+"|"+String(item.market)+"|"+String(item.selection),item]));
+ for(const r of rows){
+  if(r.odds!=null&&r.data_coverage?.market_odds===true)continue;
+  const previous:any=oldByPredictionKey.get(String(r.match_id)+"|"+String(r.market)+"|"+String(r.selection));
+  if(!previous||previous.settlement_status!=="pending"||previous.verified===true)continue;
+  if(!isFreshConfirmedManualBelgianQuote(previous.odds,previous.data_coverage,manualNowMs))continue;
+  const manualCoverage=previous.data_coverage||{};
+  const manualOdds=Number(previous.odds);
+  const match=matches.find((item:any)=>String(item.id)===String(r.match_id));
+  const kickoffMs=match?.kickoff_at?new Date(match.kickoff_at).getTime():NaN;
+  const futureEligible=!!match&&Number.isFinite(kickoffMs)&&kickoffMs>manualNowMs&&["scheduled","unknown"].includes(String(match.status||"").toLowerCase());
+  const modelSource=String(r.data_coverage?.model_source_type||"");
+  const modelCoverage=Number(r.data_coverage?.model_coverage??r.confidence??0);
+  const probability=Number(r.probability);
+  const eligible=futureEligible&&modelSource.length>0&&modelSource!=="BASELINE_ONLY"&&probability>75&&modelCoverage>=55&&manualOdds>1;
+  r.odds=manualOdds;
+  r.data_coverage={...r.data_coverage,...manualCoverage,market_odds:true,odds_source:"manual",odds_bookmaker:manualCoverage.odds_bookmaker,odds_captured_at:manualCoverage.odds_captured_at,odds_status:"CONFIRMED",odds_phase:"prematch",odds_suspended:false,odds_source_url:manualCoverage.odds_source_url};
+  r.verdict=eligible?"WYBRANY":"ODRZUCONY";
+  r.selection_status=r.verdict;
+  r.decision_status=eligible?"FINAL":"REJECTED";
+  r.rejection_reason=eligible?null:!futureEligible?"Mecz nie jest już przyszły lub nie ma aktywnego statusu.":modelSource==="BASELINE_ONLY"?"Dostępny jest wyłącznie model bazowy bez potwierdzonej formy.":probability<=75?"Prawdopodobieństwo nie przekracza wymaganego progu (>75%).":modelCoverage<55?"Pokrycie danych modelu poniżej 55%.":"Nie spełniono pozostałych warunków zatwierdzenia.";
+  r.stake=eligible?4.00:null;
+  r.potential_return=eligible?Math.round(4*manualOdds*100)/100:null;
+  r.note=JSON.stringify({source:r.data_source,odds_source:"manual",coverage:r.data_coverage});
+ }
  // A 1X2 market has exactly one official selection per match. When a later
  // analysis changes that selection (including to a no-data placeholder),
  // void the older pending row so it cannot inflate history or hit rates.
