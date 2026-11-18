@@ -546,7 +546,10 @@ export default {
         upstreamPath = "/v1/matches/" + pitchMatch![1] + (pitchMatch![2] ? "/" + pitchMatch![2] : "");
       }
       const isLive = pitchMatch?.[2] === "live";
-      const cacheSeconds = isLive ? 0 : pitchDate ? 600 : pitchLeagues || pitchLeague || pitchLeagueMatches ? 21600 : pitchMatch?.[2] === "lineups" ? 120 : pitchMatch?.[2] === "shots" || pitchMatch?.[2] === "stats" || pitchMatch?.[2]?.startsWith("advanced") ? 21600 : 1800;
+      const isUpcomingLeagueSchedule = Boolean(pitchLeagueMatches && (url.searchParams.get("status") ?? "played") !== "played");
+      // Upcoming schedules can be rescheduled throughout the day; keep them fresh.
+      // Historical played-match data and the relatively static catalogue can use a longer cache.
+      const cacheSeconds = isLive ? 0 : pitchDate || isUpcomingLeagueSchedule ? 600 : pitchLeagues || pitchLeague || pitchLeagueMatches ? 21600 : pitchMatch?.[2] === "lineups" ? 120 : pitchMatch?.[2] === "shots" || pitchMatch?.[2] === "stats" || pitchMatch?.[2]?.startsWith("advanced") ? 21600 : 1800;
       const cacheKey = new Request(url.toString(), { method: "GET" });
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
       if (cacheSeconds > 0) {
