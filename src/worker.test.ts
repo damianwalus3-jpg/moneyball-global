@@ -8,7 +8,7 @@ describe("FootyNomad public fixture page inspection", () => {
   it("fetches only the public date page and caches its HTML for parser verification", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
-    const html = "<html><h1>Football matches</h1><h2>England 1</h2></html>";
+    const html = "<html><h1>Football matches</h1><a href=\"/fixtures/2026-11-18\">date</a><h2>England 1</h2></html>";
     const upstream = vi.fn().mockResolvedValue(new Response(html, { status: 200, headers: { "Content-Type": "text/html" } }));
     vi.stubGlobal("fetch", upstream);
     const waitUntil = vi.fn();
