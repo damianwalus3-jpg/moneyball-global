@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isEligibleDomesticTopTwoLeague } from "../_shared/domestic-league-scope.ts";
 import { isExcludedSeniorTeam, isWomensTeam } from "../_shared/team-normalization.ts";
+import { shouldSkipMoviOddsSync } from "../_shared/movi-odds-config.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -20,6 +21,7 @@ async function authorized(token:string){
 }
 async function movi(path:string){
  const headers:Record<string,string>={"Accept":"application/json","Accept-Encoding":"gzip"};
+ if(shouldSkipMoviOddsSync(MOVI_KEY))throw new Error("MOVIODDS_API_KEY is not configured; provider requests are disabled.");
  if(MOVI_KEY)headers["X-API-Key"]=MOVI_KEY;
  const r=await fetch(BASE+path,{headers,signal:AbortSignal.timeout(45000)});
  const raw=await r.text();
@@ -60,7 +62,7 @@ Deno.serve(async(req)=>{
  if(req.method!=="POST")return json({error:"POST required"},405);
  try{
   if(!(await authorized(req.headers.get("x-cron-token")||"")))return json({error:"Unauthorized"},401);
-  if(!MOVI_KEY)return json({ok:true,skipped:true,reason:"MOVIODDS_API_KEY is not configured; no provider request was made and no odds were changed.",provider:"MoviOdds",key_configured:false},200);
+  if(shouldSkipMoviOddsSync(MOVI_KEY))return json({ok:true,skipped:true,reason:"MOVIODDS_API_KEY is not configured; no provider request was made and no odds were changed.",provider:"MoviOdds",provider_requests:0,key_configured:false},200);
   const body=await req.json().catch(()=>({}));
   const now=new Date(),day=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
   const owner=String(body.owner_id||"");
