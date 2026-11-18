@@ -935,6 +935,16 @@ const history=historyTimed||[];
   r.potential_return=eligible?Math.round(4*manualOdds*100)/100:null;
   r.note=JSON.stringify({source:r.data_source,odds_source:"manual",coverage:r.data_coverage});
  }
+ const evidenceCoveredMatchIds=new Set<string>();
+ for(const r of rows){
+  const coverage=r.data_coverage||{};
+  const modelSource=String(coverage.model_source_type||"");
+  const historyEvidence=Number(coverage.home_history_matches)>=3&&Number(coverage.away_history_matches)>=3;
+  const marketEvidence=coverage.market_odds===true&&String(coverage.odds_status||"").toUpperCase()==="CONFIRMED"&&String(coverage.odds_phase||"").toLowerCase()==="prematch"&&coverage.odds_suspended!==true;
+  if(modelSource&&modelSource!=="BASELINE_ONLY"&&(historyEvidence||marketEvidence))evidenceCoveredMatchIds.add(String(r.match_id));
+ }
+ covered=evidenceCoveredMatchIds.size;
+ missing=Math.max(0,matches.length-covered);
  // A 1X2 market has exactly one official selection per match. When a later
  // analysis changes that selection (including to a no-data placeholder),
  // void the older pending row so it cannot inflate history or hit rates.
