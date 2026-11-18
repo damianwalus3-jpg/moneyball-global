@@ -335,15 +335,57 @@ export default {
       if (!constantTimeEqual(suppliedToken, env.ODDS_PILOT_TOKEN)) return json({ error: "unauthorized" }, 401, origin);
 
       const fixtureId = url.searchParams.get("fixtureId")?.trim();
+      const apiFootballFixtureId = url.searchParams.get("apiFootballFixtureId")?.trim();
       const strikerGameId = url.searchParams.get("strikerGameId")?.trim();
       const strikerDate = url.searchParams.get("strikerDate")?.trim();
-      if (!fixtureId && !strikerGameId && !strikerDate) return json({ error: "fixtureId, strikerGameId or strikerDate is required" }, 400, origin);
+      if (!fixtureId && !apiFootballFixtureId && !strikerGameId && !strikerDate) return json({ error: "fixtureId, apiFootballFixtureId, strikerGameId or strikerDate is required" }, 400, origin);
       if (strikerGameId && strikerDate) return json({ error: "use either strikerGameId or strikerDate, not both" }, 400, origin);
-      if ((fixtureId && !/^[a-zA-Z0-9_-]{3,100}$/.test(fixtureId)) || (strikerGameId && !/^[a-zA-Z0-9_-]{1,40}$/.test(strikerGameId)) || (strikerDate && (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(strikerDate) || !Number.isFinite(Date.parse(`${strikerDate}T00:00:00Z`)) || new Date(`${strikerDate}T00:00:00Z`).toISOString().slice(0,10) !== strikerDate))) {
+      if ((fixtureId && !/^[a-zA-Z0-9_-]{3,100}$/.test(fixtureId)) || (apiFootballFixtureId && !/^\\d{1,12}$/.test(apiFootballFixtureId)) || (strikerGameId && !/^[a-zA-Z0-9_-]{1,40}$/.test(strikerGameId)) || (strikerDate && (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(strikerDate) || !Number.isFinite(Date.parse(`${strikerDate}T00:00:00Z`)) || new Date(`${strikerDate}T00:00:00Z`).toISOString().slice(0,10) !== strikerDate))) {
         return json({ error: "invalid_fixture_identifier" }, 400, origin);
       }
 
       const results: Record<string, unknown> = {};
+      if (apiFootballFixtureId) {
+        if (!env.API_FOOTBALL_KEY) results.apiFootball = { status: "not_configured" };
+        else {
+          try {
+            const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+            const cacheKey = new Request(`${APP_ORIGIN}/api/api-football/odds/${apiFootballFixtureId}`, { method: "GET" });
+            const cached = await cache.match(cacheKey);
+            if (cached) {
+              results.apiFootball = await cached.json();
+            } else {
+              const apiUrl = new URL("https://v3.football.api-sports.io/odds");
+              apiUrl.searchParams.set("fixture", apiFootballFixtureId);
+              const upstream = await fetch(apiUrl, {
+                headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
+                signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+              });
+              const raw = await upstream.text();
+              let payload: { response?: unknown[]; results?: number; errors?: unknown; paging?: unknown };
+              try { payload = JSON.parse(raw) as typeof payload; }
+              catch { throw new Error("api_football_odds_invalid_json"); }
+              if (!upstream.ok) throw new Error(`api_football_odds_http_${upstream.status}`);
+              const result = {
+                status: payload.errors && Object.keys(payload.errors as object).length > 0 ? "provider_error" : "ok",
+                provider: "API-Football Pro",
+                fixtureId: apiFootballFixtureId,
+                capturedAt: new Date().toISOString(),
+                results: payload.results ?? payload.response?.length ?? 0,
+                paging: payload.paging ?? null,
+                errors: payload.errors ?? null,
+                data: Array.isArray(payload.response) ? payload.response : [],
+              };
+              const cacheResponse = json(result, 200, origin);
+              cacheResponse.headers.set("Cache-Control", "public, max-age=900");
+              ctx.waitUntil(cache.put(cacheKey, cacheResponse.clone()));
+              results.apiFootball = result;
+            }
+          } catch (error) {
+            results.apiFootball = { status: "error", error: error instanceof Error ? error.message : "upstream_error" };
+          }
+        }
+      }
       if (fixtureId) {
         if (!env.ODDSPAPI_API_KEY) results.oddspapi = { status: "not_configured" };
         else {
