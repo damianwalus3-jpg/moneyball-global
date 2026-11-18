@@ -252,20 +252,20 @@ RETURNS jsonb LANGUAGE sql STABLE SET search_path TO 'public' AS $function$
 WITH owner_scope AS (SELECT auth.uid() AS owner_id),
 eligible_matches AS (
   SELECT DISTINCT ON (
-    m.owner_id,(m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,
+    m.owner_id,coalesce((m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,m.kickoff_date),
     regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g'),
     regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g')
   )
     m.id,m.owner_id,m.country,m.competition,m.league,m.gender,m.home_team,m.away_team,
     m.kickoff_at,m.kickoff_date,m.status,m.source,m.external_id,
-    (m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date AS brussels_day,
+    coalesce((m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,m.kickoff_date) AS brussels_day,
     regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g') AS home_key,
     regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g') AS away_key
   FROM public.matches m JOIN owner_scope o ON m.owner_id=o.owner_id
-  WHERE m.kickoff_at IS NOT NULL
+  WHERE (m.kickoff_at IS NOT NULL OR m.kickoff_date IS NOT NULL)
     AND public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
     AND public.moneyball_is_openmatchday_tier(m.source,m.external_id)
-  ORDER BY m.owner_id,(m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,
+  ORDER BY m.owner_id,coalesce((m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,m.kickoff_date),
     regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g'),
     regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g'),
     (lower(coalesce(m.source,''))='footynomad') DESC,coalesce(m.updated_at,m.created_at) DESC,m.id
@@ -331,7 +331,7 @@ SELECT jsonb_build_object(
   'candidates',coalesce((SELECT total FROM candidate_count),0),
   'to_settle',(
     SELECT count(*)::integer FROM eligible_matches m
-    WHERE m.kickoff_at<now() AND lower(m.status) NOT IN ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
+    WHERE m.kickoff_at IS NOT NULL AND m.kickoff_at<now() AND lower(m.status) NOT IN ('finished','ft','aet','pen','postponed','cancelled','abandoned','live')
       AND NOT EXISTS (SELECT 1 FROM public.match_results r WHERE r.match_id=m.id AND r.owner_id=m.owner_id AND r.verified)
   ),
   'hit_rates',coalesce((SELECT jsonb_object_agg(market,jsonb_build_object(
