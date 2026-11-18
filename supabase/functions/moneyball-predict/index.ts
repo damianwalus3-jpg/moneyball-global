@@ -3,6 +3,7 @@ import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 import { isEligibleDomesticTopTwoLeague, isEligibleOpenMatchdayTier } from "../_shared/domestic-league-scope.ts";
 import { isExcludedSeniorTeam, isWomensTeam } from "../_shared/team-normalization.ts";
 import { isRealXgObservation } from "../_shared/xg-validation.ts";
+import { compareBelgianProviderQuotes, isFreshConfirmedBelgianProviderQuote } from "../_shared/provider-odds-validation.ts";
 import { selectPublicSourceApiKey } from "../_shared/public-source-auth.ts";
 const S="https://gzgeklcukrclgwbsmbsp.supabase.co",K=Deno.env.get("SUPABASE_ANON_KEY")||"",SERVICE_KEY=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"",V="MONEYBALL GLOBAL 3.8";
 let CRON_FALLBACK_TOKEN="";
@@ -650,7 +651,8 @@ Deno.serve(async req=>{if(req.method==="OPTIONS")return new Response("ok",{heade
  const pageMatchFilter=pageMatchIds.length?"&match_id=in.("+pageMatchIds.join(",")+")":"";
  // These reads do not depend on one another. Run them together to avoid paying
  // the sum of several network round-trips for every analysis batch.
- const providerOddsQuery=matches.length?db("provider_odds?select=match_id,mapped_market,mapped_selection,odds,bookmaker,provider,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&suspended=eq.false&phase=eq.prematch&captured_at=gte."+encodeURIComponent(new Date(Date.now()-6*60*60*1000).toISOString())+"&mapped_market=not.is.null&mapped_selection=not.is.null&match_id=in.("+matches.map((x:any)=>x.id).join(",")+")&order=captured_at.desc",token).catch(()=>[]):Promise.resolve([]);
+ const oddsNowMs=Date.now(),oddsNowIso=new Date(oddsNowMs).toISOString(),oddsSixHoursAgo=new Date(oddsNowMs-6*60*60*1000).toISOString();
+ const providerOddsQuery=matches.length?db("provider_odds?select=match_id,mapped_market,mapped_selection,odds,bookmaker,provider,captured_at,price_timestamp,provider_polled_at,phase,suspended&owner_id=eq."+encodeURIComponent(ownerId)+"&suspended=eq.false&phase=eq.prematch&captured_at=gte."+encodeURIComponent(oddsSixHoursAgo)+"&captured_at=lte."+encodeURIComponent(oddsNowIso)+"&mapped_market=not.is.null&mapped_selection=not.is.null&match_id=in.("+matches.map((x:any)=>x.id).join(",")+")&order=captured_at.desc",token).catch(()=>[]):Promise.resolve([]);
  const [historyTimed,footyCacheRows,fotbalCacheRows,xgoalsCacheRows,publicForms,marketRows,providerOddsRows,tipsAudit]=await Promise.all([
   db("matches?"+historyFields+"&owner_id=eq."+encodeURIComponent(ownerId)+"&kickoff_at=gte."+encodeURIComponent(historySince)+"&kickoff_at=lt."+encodeURIComponent(date+"T23:59:59Z")+"&order=kickoff_at.desc&limit=1500",token).catch((e:any)=>{console.error("Timed history query unavailable:",String(e));return [];}),
   pageMatchIds.length?db("match_market_data?select=match_id,provider_data,captured_at&owner_id=eq."+encodeURIComponent(ownerId)+"&source=eq.FootyNomad"+pageMatchFilter,token).catch(()=>[]):Promise.resolve([]),
@@ -681,9 +683,10 @@ const history=historyTimed||[];
  const marketMap=new Map((marketRows||[]).map((x:any)=>[x.match_id,x.provider_data]));
  const providerOddsMap=new Map<string,any>();
  for(const quote of (providerOddsRows||[])){
-  const key=String(quote.match_id)+"|"+String(quote.mapped_market)+"|"+String(quote.mapped_selection);
+  if(!isFreshConfirmedBelgianProviderQuote(quote,oddsNowMs))continue;
+  const key=String(quote.match_id)+"|"+String(quote.mapped_market).toUpperCase()+"|"+String(quote.mapped_selection).toUpperCase();
   const previous=providerOddsMap.get(key);
-  if(!previous||Date.parse(String(quote.captured_at||""))>Date.parse(String(previous.captured_at||"")))providerOddsMap.set(key,quote);
+  if(!previous||compareBelgianProviderQuotes(quote,previous)<0)providerOddsMap.set(key,quote);
  }
  const americanToDecimal=(value:any)=>{const n=Number(value);if(!Number.isFinite(n)||n===0)return null;return +(n>0?1+n/100:1+100/Math.abs(n)).toFixed(3);};
 
@@ -818,7 +821,9 @@ const history=historyTimed||[];
    away_injury_count:displayPublicForm?.away_injury_count??null,
    squad_note:displayPublicForm?.squad_note||"Brak potwierdzonej informacji o składzie meczowym."
   };
-  const bothTeamsCovered=!!(model.market||(model.history&&model.home_matches>=3&&model.away_matches>=3));const dataCovered=bothTeamsCovered;if(dataCovered)covered++;else missing++;
+  const historyEvidence=!!(model.history&&Number(model.home_matches)>=3&&Number(model.away_matches)>=3);
+  const hasAnyFreshProviderQuote=[...providerOddsMap.keys()].some((key)=>key.startsWith(String(m.id)+"|"));
+  const dataCovered=historyEvidence||hasAnyFreshProviderQuote;if(dataCovered)covered++;else missing++;
   const preds:any[]=[];
   if(hasModel){const opts=[["1",model.p1],["X",model.px],["2",model.p2]];const best=opts.sort((x:any,y:any)=>y[1]-x[1])[0];preds.push({market:"1X2",selection:best[0],probability:best[1]});for(const [sel,val] of [["1X",model.p1+model.px],["X2",model.px+model.p2],["12",model.p1+model.p2]])preds.push({market:"DOUBLE_CHANCE",selection:sel,probability:+val.toFixed(1)});}
   else{preds.push({market:"1X2",selection:"—",probability:null},{market:"DOUBLE_CHANCE",selection:"1X",probability:null},{market:"DOUBLE_CHANCE",selection:"X2",probability:null},{market:"DOUBLE_CHANCE",selection:"12",probability:null});}
@@ -831,15 +836,16 @@ const history=historyTimed||[];
    const marketPriceFresh=Number.isFinite(marketPriceStamp)&&Date.now()-marketPriceStamp>=0&&Date.now()-marketPriceStamp<=48*60*60*1000;
    const strikerAmerican=marketPriceFresh&&market?.odds?(p.selection==="1"?market.odds.home:p.selection==="X"?market.odds.draw:p.selection==="2"?market.odds.away:null):null;
    const strikerOdds=p.market==="1X2"?americanToDecimal(strikerAmerican):null;
-   const referenceOdds=providerQuote?Number(providerQuote.odds):tipsOdds??strikerOdds;
-   const oddsSource=providerQuote?String(providerQuote.provider||"MoviOdds")+"/"+String(providerQuote.bookmaker||"bookmaker"):tipsOdds?String(coverage.market_reference_bookmaker||"TipsAudit best soft"):strikerOdds?("StrikerAPI median · "+String(market?.books||"multi")+" books"):null;
-   const verdictBase=futureEligible&&bothTeamsCovered&&model.source!=="BASELINE_ONLY"&&p.probability>75&&model.coverage>=55;
+   const referenceOdds=providerQuote?Number(providerQuote.odds):null;
+   const oddsSource=providerQuote?String(providerQuote.provider||"")+"/"+String(providerQuote.bookmaker||""):null;
+   const evidenceCovered=historyEvidence||!!providerQuote;
+   const verdictBase=futureEligible&&evidenceCovered&&model.source!=="BASELINE_ONLY"&&p.probability>75&&model.coverage>=55;
    const verdict=verdictBase&&referenceOdds!=null&&referenceOdds>1?"WYBRANY":"ODRZUCONY";
-   const rejectionReason=verdict==="WYBRANY"?null:!m.kickoff_at?"Brak potwierdzonej godziny rozpoczęcia meczu.":!["scheduled","unknown"].includes(String(m.status||""))?"Mecz jest w trakcie, zakończony lub ma nieaktywny status.":new Date(m.kickoff_at).getTime()<=Date.now()?"Mecz już się rozpoczął.":!hasModel?"Brak modelu i potwierdzonych danych wejściowych; prawdopodobieństwo pozostawiono puste.":!bothTeamsCovered?"Brak minimalnego pokrycia historii obu drużyn; potrzebne co najmniej 3 mecze każdej drużyny albo wiarygodne dane rynkowe.":model.source==="BASELINE_ONLY"?"Dostępny jest wyłącznie model bazowy bez potwierdzonej formy.":p.probability==null?"Model nie wyliczył prawdopodobieństwa dla tego typu.":p.probability<=75?"Prawdopodobieństwo nie przekracza wymaganego progu (>75%).":Number(model.coverage||0)<55?"Pokrycie danych modelu poniżej 55%.":referenceOdds==null?"Brak aktualnego, potwierdzonego kursu dla tego rynku i typu.":Number(referenceOdds)<=1?"Nieprawidłowy kurs (musi być większy niż 1,00).":"Nie spełniono warunków zatwierdzenia.";
-   if(referenceOdds!=null){coverage.odds_source=providerQuote?.provider|| (tipsOdds?"TipsAudit":"StrikerAPI");coverage.odds_bookmaker=providerQuote?.bookmaker|| (tipsOdds?coverage.market_reference_bookmaker:"Mediana z "+String(market?.books||"wielu")+" bukmacherów");coverage.odds_captured_at=providerQuote?.captured_at||coverage.market_captured_at||market?.captured_at||null;}
+   const rejectionReason=verdict==="WYBRANY"?null:!m.kickoff_at?"Brak potwierdzonej godziny rozpoczęcia meczu.":!["scheduled","unknown"].includes(String(m.status||""))?"Mecz jest w trakcie, zakończony lub ma nieaktywny status.":new Date(m.kickoff_at).getTime()<=Date.now()?"Mecz już się rozpoczął.":!hasModel?"Brak modelu i potwierdzonych danych wejściowych; prawdopodobieństwo pozostawiono puste.":!evidenceCovered?"Brak minimum 3 meczów historii każdej drużyny lub świeżego, potwierdzonego kursu z belgijskiego bukmachera.":model.source==="BASELINE_ONLY"?"Dostępny jest wyłącznie model bazowy bez potwierdzonej formy.":p.probability==null?"Model nie wyliczył prawdopodobieństwa dla tego typu.":p.probability<=75?"Prawdopodobieństwo nie przekracza wymaganego progu (>75%).":Number(model.coverage||0)<55?"Pokrycie danych modelu poniżej 55%.":referenceOdds==null?"Brak aktualnego, potwierdzonego kursu wypłaty z dozwolonego belgijskiego bukmachera.":Number(referenceOdds)<=1?"Nieprawidłowy kurs (musi być większy niż 1,00).":"Nie spełniono warunków zatwierdzenia.";
+   const predictionCoverage={...coverage,market_odds:!!providerQuote,odds_source:providerQuote?.provider??null,odds_bookmaker:providerQuote?.bookmaker??null,odds_captured_at:providerQuote?.captured_at??null,odds_status:providerQuote?"CONFIRMED":null,odds_phase:providerQuote?.phase??null,odds_suspended:providerQuote?.suspended??null,model_source_type:model.source,model_coverage:Number(model.coverage||0)};
    const type=p.market==="DOUBLE_CHANCE"?"DC":"1X2";
     const baseSource=model.market?(model.source==="TIPSAUDIT_FAIR_MARKET"?"TIPSAUDIT_FAIR_MARKET":"VERIFIED_MARKET_DATA"):model.source==="BASELINE_ONLY"?"NO_VERIFIED_SOURCE":model.source==="BEYONDELO_ONLY"?"BEYONDELO_ELO_ONLY":model.source==="KEYLESS_GITHUB_LAST10"?"KEYLESS_GITHUB_LAST10_FORM":model.source==="STATSBOMB_OPEN_DATA"?"STATSBOMB_OPEN_DATA_FORM":model.source==="AMERICAN_SOCCER_ANALYSIS"?"AMERICAN_SOCCER_ANALYSIS_FORM":model.source==="ESPN_WOMEN_LAST10"?"ESPN_WOMEN_LAST10_FORM":model.publicForm?"OPENMATCHDAY_LAST10_FORM":model.footyForm?"FOOTYNOMAD_LAST5_FORM":"MONEYBALL_VERIFIED_HISTORY";const xgSources=model.xg_sources||[];const xgSuffix=model.xg_used?"+HISTORICAL_XG"+(xgSources.some((x:string)=>x.toLowerCase().includes("openplay"))?"+OPENPLAY_XG":"")+(xgSources.some((x:string)=>x.toLowerCase().includes("statsbomb"))?"+STATSBOMB_XG":"")+(xgSources.some((x:string)=>x.toLowerCase().includes("american_soccer_analysis"))?"+ASA_XG":""):"";const dataSource=(model.elo_used&&model.source!=="BEYONDELO_ONLY"?baseSource+"+BEYONDELO_ELO":baseSource)+xgSuffix;
-    rows.push({owner_id:ownerId,decision_status:verdict==="WYBRANY"?"FINAL":"REJECTED",source_class:"MODEL",match_id:m.id,scan_run_id:m.scan_run_id||null,model_version:V,market:p.market,selection:p.selection,pick:p.selection,prediction_type:type,selection_status:verdict,rejection_reason:rejectionReason,probability:p.probability,odds:referenceOdds,confidence:null /* coverage is data completeness, not calibrated confidence */,verdict,rationale:reason,group_name:p.market==="1X2"?"MAIN":"MEGA",data_source:oddsSource||dataSource,data_coverage:{...coverage,model_source:dataSource,model_source_type:model.source,model_coverage:Number(model.coverage||0)},note:JSON.stringify({source:dataSource,odds_source:oddsSource,coverage}),settlement_status:"pending",result_status:"pending",verified:false});
+    rows.push({owner_id:ownerId,decision_status:verdict==="WYBRANY"?"FINAL":"REJECTED",source_class:"MODEL",match_id:m.id,scan_run_id:m.scan_run_id||null,model_version:V,market:p.market,selection:p.selection,pick:p.selection,prediction_type:type,selection_status:verdict,rejection_reason:rejectionReason,probability:p.probability,odds:referenceOdds,confidence:null /* coverage is data completeness, not calibrated confidence */,verdict,rationale:reason,group_name:p.market==="1X2"?"MAIN":"MEGA",data_source:dataSource,data_coverage:{...predictionCoverage,model_source:dataSource},note:JSON.stringify({source:dataSource,odds_source:oddsSource,coverage:predictionCoverage}),settlement_status:"pending",result_status:"pending",verified:false});
   }
   // Goals are modelled independently from 1X2 market odds. Market-only records do not contain expected goals.
   const goalKickoff=String(m.kickoff_at||`${matchDate(m)}T00:00:00.000Z`);
