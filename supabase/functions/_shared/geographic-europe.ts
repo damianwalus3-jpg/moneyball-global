@@ -14,7 +14,7 @@ const EUROPEAN_COUNTRY_NAMES = new Set([
   "lithuania", "luxembourg", "malta", "moldova", "monaco", "montenegro",
   "netherlands", "north macedonia", "macedonia", "northern ireland", "norway",
   "poland", "portugal", "romania", "russia", "san marino", "scotland", "serbia",
-  "slovakia", "slovenia", "spain", "sweden", "switzerland", "turkey", "türkiye",
+  "slovakia", "slovenia", "spain", "sweden", "switzerland", "turkey", "turkiye",
   "ukraine", "wales", "united kingdom",
   "united kingdom of great britain and northern ireland", "great britain", "uk",
   "aland islands", "svalbard and jan mayen islands", "holy see", "vatican city",

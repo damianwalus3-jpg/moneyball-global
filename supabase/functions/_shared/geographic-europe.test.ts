@@ -12,7 +12,7 @@ Deno.test("football Europe includes European countries and UEFA football aliases
     "Montenegro", "Netherlands", "North Macedonia", "Northern Ireland", "Norway",
     "Poland", "Portugal", "Romania", "Russia", "San Marino", "Scotland", "Serbia",
     "Slovakia", "Slovenia", "Spain", "Sweden", "Switzerland", "Turkey", "Türkiye",
-    "TUR", "Ukraine", "Wales", "United Kingdom", "GBR", "ENG", "SCO", "WAL", "NIR",
+    "Turkiye", "TUR", "Ukraine", "Wales", "United Kingdom", "GBR", "ENG", "SCO", "WAL", "NIR",
     "Albania / Europe", "Kosovo", "KOS",
   ]) {
     if (!isGeographicEuropeCountry(country)) throw new Error(`Expected football Europe: ${country}`);
