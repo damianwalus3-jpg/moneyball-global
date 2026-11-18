@@ -32,7 +32,7 @@ describe("Flashscore European daily fixture parser", () => {
       "AA÷world-1¬AD÷1795021200¬AB÷1¬AE÷Team A¬AF÷Team B¬~",
       "ZA÷NORTH & CENTRAL AMERICA: CONCACAF Nations League¬ZY÷North & Central America¬ZL÷/football/north-central-america/concacaf-nations-league/¬~",
       "AA÷concacaf-1¬AD÷1795021200¬AB÷1¬AE÷Team C¬AF÷Team D¬~",
-      "AA÷next-day¬AD÷1795044600¬AB÷1¬AE÷Home 2¬AF÷Away 2¬~",
+      "ZA÷ENGLAND: Premier League¬ZY÷England¬ZL÷/football/england/premier-league/¬~AA÷next-day¬AD÷1795044600¬AB÷1¬AE÷Home 2¬AF÷Away 2¬~",
     ].join("");
     const result = parseFlashscoreFixtures(feed, "2026-11-18");
     expect(result.rawMatches).toBe(5);
