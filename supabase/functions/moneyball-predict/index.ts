@@ -926,7 +926,7 @@ const history=historyTimed||[];
   const probability=Number(r.probability);
   const eligible=futureEligible&&modelSource.length>0&&modelSource!=="BASELINE_ONLY"&&probability>75&&modelCoverage>=55&&manualOdds>1;
   r.odds=manualOdds;
-  r.data_coverage={...r.data_coverage,...manualCoverage,market_odds:true,odds_source:"manual",odds_bookmaker:manualCoverage.odds_bookmaker,odds_captured_at:manualCoverage.odds_captured_at,odds_status:"CONFIRMED",odds_phase:"prematch",odds_suspended:false,odds_source_url:manualCoverage.odds_source_url};
+  r.data_coverage={...r.data_coverage,market_odds:true,odds_source:"manual",odds_bookmaker:manualCoverage.odds_bookmaker,odds_captured_at:manualCoverage.odds_captured_at,odds_status:"CONFIRMED",odds_phase:"prematch",odds_suspended:false,odds_source_url:manualCoverage.odds_source_url};
   r.verdict=eligible?"WYBRANY":"ODRZUCONY";
   r.selection_status=r.verdict;
   r.decision_status=eligible?"FINAL":"REJECTED";
