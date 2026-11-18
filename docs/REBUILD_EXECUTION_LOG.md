@@ -1818,3 +1818,13 @@
 - Poprawka kodu: `727b77603c0162e657b624fd839e60ac83443cee`; test: `c5ee9c4d3bb5eb24ca4aadde6ca1d2a92c80c234`.
 - Wdrożenie Stage 154 nadal oczekuje na zielone CI, Rebuild Checks, build i produkcyjny deploy. Nie uznajemy API-Football za naprawione upstream do czasu odczytania bezpiecznego komunikatu po wdrożeniu.
 - Bez zmian w danych historycznych, kuponach, rozliczeniach i bankrollu.
+
+
+### Stage 155 — rozdzielenie prawdopodobieństwa modelu od kwalifikacji kuponowej (2026-11-19)
+- Analiza zrzutu ekranu „Wytypowane mecze” wykazała mylący komunikat: wynik 75,5% dla 1X2 i 90,9% dla Double Chance był wyświetlany obok etykiety „ODRZUCONY · BRAK DANYCH”.
+- Przyczyna: liczby są surowymi prawdopodobieństwami modelu recent-form-goals-poisson, wyliczonymi z historycznych goli (nie xG); Double Chance jest pochodną tego samego rozkładu. Nie są one automatycznie dowodem wiarygodności. Audyt wymaganych obszarów nadal wykazuje braki (xG/xGA, składy, absencje, strzały/jakość sytuacji, taktyka, terminarz, aktualne kursy i EV).
+- Nie obniżono bramki bezpieczeństwa ani progu dowodowego. Rekordy bez kompletnego, zweryfikowanego materiału nadal nie mogą wejść do puli kuponowej.
+- Poprawiono warstwę prezentacji: takie liczby otrzymują status „WSTĘPNA PROGNOZA · NIEKWALIFIKOWANA” oraz ostrzeżenie, że to surowe prawdopodobieństwo modelu, nie potwierdzona wiarygodność ani kwalifikacja do kuponu. Status KANDYDAT ≥75% pojawia się tylko po przejściu pełnej kontroli dowodów i flagi rynku.
+- Dodano testy rozdzielające status prezentacji od kwalifikacji; 1X2 i DC sprawdzane niezależnie.
+- Commity: `a5c43bc8` (logika statusu), `98d66ade` (testy), `363c841d` (UI).
+- Bez zmian w historycznych predykcjach, kuponach, rozliczeniach i bankrollu.
