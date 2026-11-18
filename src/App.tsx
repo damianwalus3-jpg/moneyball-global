@@ -178,6 +178,7 @@ export default function App() {
   const [bulkProgress, setBulkProgress] = useState(0);
   const [settling, setSettling] = useState(false);
   const settlementLock = useRef(false);
+  const bulkAnalysisLock = useRef(false);
   const [settleProgress, setSettleProgress] = useState(0);
   const [scanError, setScanError] = useState("");
   const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm }; pitchApiLineups?: PitchApiLineups; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
@@ -256,11 +257,22 @@ export default function App() {
     setTeamForms(current => ({ ...current, [match.id]: { home: homeForm, away: awayForm, pitchApiXgForms, pitchApiLineups, prediction, predictionError, loading: false } }));
     setRecords(savePredictionRecord(match, prediction, predictionError, homeForm, awayForm, pitchApiXgForms, pitchApiLineups));
   };
-  const analyzeAllFixtures = async () => {
-    if (!fixtureScan || bulkLoading || scanLoading) return;
+  const analyzeAllFixtures = async (fixtures?: FreeFixture[]) => {
+    const sourceMatches = fixtures ?? fixtureScan?.fixtures;
+    if (!sourceMatches || bulkAnalysisLock.current || scanLoading) return;
+    const latestByFixture = new Map<string, TrackerRecord>();
+    for (const row of readRecords()) {
+      if (row.kind === "prediction" && typeof row.details.fixtureId === "string" && !latestByFixture.has(row.details.fixtureId)) latestByFixture.set(row.details.fixtureId, row);
+    }
+    const matches = [...new Map(sourceMatches.map(match => [match.id, match])).values()].filter(match => {
+      if (hasKickoffPassed(match.date, match.time)) return false;
+      const prior = latestByFixture.get(match.id);
+      return !prior || typeof prior.details.p1 !== "number" || typeof prior.details.px !== "number" || typeof prior.details.p2 !== "number";
+    });
+    if (!matches.length) { setRecords(readRecords()); return; }
+    bulkAnalysisLock.current = true;
     setBulkLoading(true);
     setBulkProgress(0);
-    const matches = fixtureScan.fixtures;
     const concurrency = 2;
     try {
       for (let index = 0; index < matches.length; index += concurrency) {
@@ -269,6 +281,7 @@ export default function App() {
         setBulkProgress(Math.min(index + batch.length, matches.length));
       }
     } finally {
+      bulkAnalysisLock.current = false;
       setBulkLoading(false);
       setRecords(readRecords());
     }
@@ -360,6 +373,9 @@ export default function App() {
         },
       }], "scanKey");
       setRecords(readRecords());
+      // Automatically analyze every newly discovered fixture after each successful scan.
+      // Existing predictions with complete 1X2 probabilities are not fetched again.
+      void analyzeAllFixtures(scan.fixtures);
     } catch (error) { setScanError(error instanceof Error ? error.message : "Nie udało się pobrać terminarza."); }
     finally { setScanLoading(false); }
   };
