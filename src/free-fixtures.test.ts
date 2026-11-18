@@ -1,5 +1,33 @@
+describe("API-Football Pro European fixture integration", () => {
+  const response = {
+    results: 3,
+    generatedAt: "2026-11-18T22:48:00.000Z",
+    fixtures: [
+      { fixture: { id: 99001, date: "2026-11-18T23:30:00+00:00", status: { short: "NS" } }, league: { id: 39, name: "Premier League", country: "England" }, teams: { home: { name: "Home FC" }, away: { name: "Away FC" } } },
+      { fixture: { id: 99002, date: "2026-11-18T17:00:00+00:00", status: { short: "NS" } }, league: { id: 140, name: "La Liga", country: "Spain" }, teams: { home: { name: "Madrid FC" }, away: { name: "Sevilla FC" } } },
+      { fixture: { id: 99003, date: "2026-11-18T17:00:00+00:00", status: { short: "NS" } }, league: { id: 307, name: "Saudi Pro League", country: "Saudi Arabia" }, teams: { home: { name: "Al Home" }, away: { name: "Al Away" } } },
+    ],
+  };
+  it("maps European matches only for the exact Brussels calendar day and retains provider IDs", () => {
+    const fixtures = parseApiFootballEuropeanFixtures(response, "2026-11-19", "2026-11-18T22:48:00.000Z");
+    expect(fixtures).toHaveLength(1);
+    expect(fixtures[0]).toMatchObject({
+      id: "api-football|99001", apiFootballFixtureId: "99001", apiFootballLeagueId: "39",
+      countryCode: "ENG", competition: "Premier League", date: "2026-11-19", time: "00:30",
+      home: "Home FC", away: "Away FC", source: "API-Football Pro",
+      sourceUpdatedAt: "2026-11-18T22:48:00.000Z",
+    });
+  });
+  it("excludes non-European countries and fixtures on other Brussels dates", () => {
+    expect(parseApiFootballEuropeanFixtures(response, "2026-11-18", "2026-11-18T22:48:00.000Z")).toHaveLength(1);
+    expect(parseApiFootballEuropeanFixtures({ results: 0, fixtures: [] }, "2026-11-18", "now")).toEqual([]);
+  });
+  it("rejects malformed provider payloads", () => {
+    expect(() => parseApiFootballEuropeanFixtures({ response: [] }, "2026-11-18", "now")).toThrow(/API-Football/);
+  });
+});
 import { describe, expect, it } from "vitest";
-import { fixtureKey, mergeFixtureSource, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaCountryCode, openLigaSeasonYears, parseEspnEuropeanFixtures, espnScoreboardDatesForBrusselsDay, parseTimezoneFootballFixtures, parsePitchApiLeagueFixtures } from "./free-fixtures";
+import { fixtureKey, mergeFixtureSource, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaCountryCode, openLigaSeasonYears, parseEspnEuropeanFixtures, espnScoreboardDatesForBrusselsDay, parseTimezoneFootballFixtures, parsePitchApiLeagueFixtures, parseApiFootballEuropeanFixtures } from "./free-fixtures";
 
 describe("PitchAPI catalogue fixture discovery", () => {
   const league = { id: "l_Den123", name: "Denmark 1. Division", country_code: "DEN", seasons: ["2026/2027"] };
