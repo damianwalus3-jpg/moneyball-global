@@ -149,7 +149,7 @@ export default function App() {
         const attempts: Array<{ name: string; run: () => Promise<TeamForm> }> = [];
         // Never send a malformed provider folder ID; fixtures from cups/other feeds may not
         // carry a valid open-matchday history folder.
-        if (match.leagueFolder && /^[A-Z]{3}_\\d+_[a-z0-9-]+$/.test(match.leagueFolder)) {
+        if (match.leagueFolder && /^[A-Z]{3}_[0-9]+_[a-z0-9-]+$/.test(match.leagueFolder)) {
           attempts.push({ name: "open-matchday · liga meczu", run: () => loadRecentTeamForm(match.leagueFolder, team, match.date) });
         }
         if (match.leagueShortcut && match.leagueSeason) attempts.push({ name: "OpenLigaDB", run: () => loadOpenLigaRecentTeamForm(match.leagueShortcut!, match.leagueSeason!, team, match.date) });
