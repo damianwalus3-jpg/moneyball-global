@@ -177,3 +177,19 @@ Validation boundary: the new Deno regression test passed in the CI run for `b6c4
 Deployments: `moneyball-public-sources` v66 is ACTIVE with corrected parser regexes; `footynomad-sync` v106 is ACTIVE but predates the new gender-detector change; `moneyball-results-sync` still requires the matching source deployment. Deploy these affected functions only after MAIN CI passes, preserving `footynomad-sync verify_jwt=true` and the existing results-sync setting.
 
 No production match, prediction, coupon, result, settlement, or bankroll rows were changed by these read-only audits or code commits.
+
+
+## Final deployment and smoke-test confirmation — 2026-11-18
+
+- MAIN CI passed on commit `d2fbe5399ff908b4722defa48231b75d4e9b6836` (Deno tests, shared-scope tests, Supabase Edge Function type-check, application tests, TypeScript check and production build).
+- Cloudflare MAIN deployment completed successfully: GitHub Actions run `44245990775`, including the production Worker deploy step.
+- Production Worker homepage `https://moneyball-global.damianwalus3.workers.dev/` returned HTTP-success content with title `MONEYBALL GLOBAL 2.0` and the expected Polish application landing page.
+- Supabase Edge Functions are ACTIVE after deployment:
+  - `moneyball-public-sources` v66, `verify_jwt=false`
+  - `footynomad-sync` v107, `verify_jwt=true`
+  - `moneyball-results-sync` v73, `verify_jwt=false`
+- The JWT settings were preserved. No secrets were added or exposed, and no paid source was activated.
+- The public-source aggregator GET smoke test returned `ok=true`; its 0 eligible European fixtures for 18 Nov is recorded as a supplemental-source limitation, not a statement that no matches exist. The FootyNomad source-page replay found 31 fixtures under the exact current Europe/senior-men/domestic-league scope.
+- Remaining acceptance item: run the authenticated owner scan through the app and verify inserted/read-back counts against the 31-fixture source-page replay. The protected endpoint correctly returns 401 without a user JWT; no attempt was made to weaken authentication or write test rows.
+
+No production matches, predictions, coupons, results, settlements or bankroll values were modified during this work.
