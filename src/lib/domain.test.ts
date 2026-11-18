@@ -1,4 +1,5 @@
 import { footyNomadSectionAt } from "../../supabase/functions/_shared/footynomad-section.ts";
+import { evaluatePredictionDecision } from "../../supabase/functions/_shared/prediction-decision.ts";
 import { describe, expect, it } from "vitest";
 import {
   bankrollBalance,
@@ -1052,5 +1053,40 @@ describe("FootyNomad country/competition section parser", () => {
     expect(section.countryHtml).toContain("Country B");
     expect(section.summaryHtml).toContain("League B");
     expect(section.summaryHtml).not.toContain("League A");
+  });
+});
+
+
+describe("separate model pick from bookmaker coupon readiness", () => {
+  const base = {
+    futureEligible: true,
+    hasModel: true,
+    evidenceCovered: true,
+    baselineOnly: false,
+    probability: 86.4,
+    modelCoverage: 78,
+  };
+
+  it("keeps a strong, evidence-backed prediction selected when the bookmaker quote is missing", () => {
+    expect(evaluatePredictionDecision({ ...base, oddsReady: false })).toEqual({
+      verdict: "WYBRANY",
+      decisionStatus: "CONDITIONAL",
+      couponEligibility: "WAITING_FOR_ODDS",
+    });
+  });
+
+  it("marks the same prediction final when a fresh approved quote is available", () => {
+    expect(evaluatePredictionDecision({ ...base, oddsReady: true })).toEqual({
+      verdict: "WYBRANY",
+      decisionStatus: "FINAL",
+      couponEligibility: "READY",
+    });
+  });
+
+  it("does not bypass weak probability, missing evidence, baseline-only models, or low coverage", () => {
+    expect(evaluatePredictionDecision({ ...base, probability: 75, oddsReady: true }).verdict).toBe("ODRZUCONY");
+    expect(evaluatePredictionDecision({ ...base, evidenceCovered: false, oddsReady: true }).verdict).toBe("ODRZUCONY");
+    expect(evaluatePredictionDecision({ ...base, baselineOnly: true, oddsReady: true }).verdict).toBe("ODRZUCONY");
+    expect(evaluatePredictionDecision({ ...base, modelCoverage: 54.9, oddsReady: true }).verdict).toBe("ODRZUCONY");
   });
 });
