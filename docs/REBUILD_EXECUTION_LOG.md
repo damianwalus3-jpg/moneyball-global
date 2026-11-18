@@ -1053,3 +1053,5 @@
 - Current public research references: https://github.com/openfootball/europe ; https://github.com/openfootball/leagues ; https://github.com/withqwerty/open-football ; https://github.com/xgabora/Club-Football-Match-Data ; https://github.com/datasets/football-datasets .
 - Code commits: `e0a40f59d7252b835e5126c232727637b7a6c136` (merge helper), `8071a155ec0fb18b997567a3ed8c0f8103ccff45` (prediction path), `dc789652ac538ffa40545ef013f6bd63334a8531` (tests). CI/deployment status must be verified before calling this stage deployed.
 - No production MAIN changes. No existing Tracker records, predictions, coupons, results or bankroll data were deleted or rewritten.
+
+- Follow-up cleanup commit: `e4484f34c8af988d658a4c88827387019600860e` removes an unused local declaration from the prediction loader. The branch's combined status still shows only the unrelated Vercel build-rate-limit failure; the available GitHub Actions connector returned no PR-triggered workflow runs for this push. This is not proof that the Cloudflare deploy ran. The new multi-source behavior remains pending CI/build/deploy verification.
