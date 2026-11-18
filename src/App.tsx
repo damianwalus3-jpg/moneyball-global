@@ -1053,7 +1053,7 @@ export default function App() {
               const eligible = row.details.evidenceComplete === true && (market === "1X2" ? row.details.strongCandidate === true : row.details.strongDoubleChance === true);
               const pick = typeof row.details.selection === "string" ? row.details.selection : "Brak typu";
               return <div className="selected-market">
-                <div className="selected-market-head"><b>{market === "1X2" ? "1X2" : "DOUBLE CHANCE"}</b><span className={eligible ? "selected-status eligible" : "selected-status rejected"}>{eligible ? "KANDYDAT ≥75%" : "ODRZUCONY / PONIŻEJ PROGU"}</span></div>
+                <div className="selected-market-head"><b>{market === "1X2" ? "1X2" : "DOUBLE CHANCE"}</b><span className={eligible ? "selected-status eligible" : "selected-status rejected"}>{eligible ? "KANDYDAT ≥75%" : row.details.evidenceComplete !== true ? "ODRZUCONY · BRAK DANYCH" : probability === null ? "BRAK POPRAWNEGO TYPU" : "PONIŻEJ PROGU 75%"}</span></div>
                 <div className="selected-pick">{pick}<strong>{probability === null ? "Brak %" : (probability * 100).toFixed(1) + "%"}</strong></div>
                 <p>{reasonFor(row)}</p>
                 <small>Model: {String(row.details.predictionMethod ?? row.details.modelName ?? "nieznany")} · próbka: {String(row.details.historySampleCounts ?? "brak danych")}</small>
