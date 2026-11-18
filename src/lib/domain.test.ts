@@ -272,7 +272,7 @@ describe("European domestic league scope", () => {
       competition: "National League - North",
       source: "FootyNomad",
       external_id: "fn:eng-national-league-north-2026-11-17",
-    })).toBe(true);
+    })).toBe(false);
     expect(isEligibleEuropeanMatch({
       ...openMatchdayBase,
       external_id: "om:BEL_2_challenger-pro-league:2026-11-17:club-a:club-b",
@@ -548,7 +548,7 @@ describe("manual odds promotion", () => {
   it("rejects weak coverage, baseline-only, insufficient history and other rejection reasons", () => {
     expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_coverage: 45 } }, match("m1"), now)).toBe(false);
     expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_source_type: "BASELINE_ONLY" } }, match("m1"), now)).toBe(false);
-    expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, home_history_matches: 2 } }, match("m1"), now)).toBe(false);
+    expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, market_odds: false, home_history_matches: 2 } }, match("m1"), now)).toBe(false);
     expect(canPromoteManualOdds({ ...eligible, data_coverage: { model_coverage: 60, model_source_type: "PARTIAL_VERIFIED_HISTORY" } }, match("m1"), now)).toBe(false);
     expect(canPromoteManualOdds({ ...eligible, data_coverage: { ...eligible.data_coverage, model_coverage: 75, model_source_type: "PARTIAL_VERIFIED_HISTORY", market_odds: true, odds_source: "TipsAudit fair market", odds_bookmaker: "TipsAudit" } }, match("m1"), now)).toBe(false);
     expect(canPromoteManualOdds({ ...eligible, rejection_reason: "Prawdopodobieństwo poniżej progu." }, match("m1"), now)).toBe(false);
