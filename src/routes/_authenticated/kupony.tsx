@@ -402,7 +402,7 @@ function Kupony() {
                   if (!value || typeof value !== "object") return "—";
                   const form = value as Record<string, unknown>;
                   const w = displayDetail(form["w"]), d = displayDetail(form["d"]), l = displayDetail(form["l"]);
-                  const count = displayDetail(form["matches"] ?? form["last10"]);
+                  const count = displayDetail(form["matches"] ?? (Array.isArray(form["last10"]) ? form["last10"].length : (Number(form["w"] ?? 0) + Number(form["d"] ?? 0) + Number(form["l"] ?? 0))));
                   const goals = form["goals_for"] != null && form["goals_against"] != null
                     ? ` · gole ${displayDetail(form["goals_for"])}:${displayDetail(form["goals_against"])}`
                     : "";
