@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
 import { addRecord, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, removeRecord, type TrackerKind, type TrackerRecord } from "./tracker-store";
-import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, type TeamForm } from "./team-form";
+import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, mergeVerifiedTeamForms, type TeamForm } from "./team-form";
 import { predictFromRecentForm, type FormPrediction } from "./form-prediction";
 import { buildThreeLegCandidates } from "./coupon-engine";
 import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from "./openfootball";
@@ -138,35 +138,26 @@ export default function App() {
     setTeamForms(current => ({ ...current, [match.id]: { ...current[match.id], loading: true, error: undefined } }));
     try {
       const load = async (team: string): Promise<TeamForm> => {
+        const providers: Array<Promise<TeamForm>> = [];
         const failures: string[] = [];
-        const minimumHistory = 3;
-        if (match.leagueFolder) {
-          try {
-            const form = await loadRecentTeamForm(match.leagueFolder, team, match.date);
-            if (form.matches.length >= minimumHistory) return form;
-            failures.push("open-matchday: tylko " + form.matches.length + "/" + minimumHistory + " zakończonych meczów");
-          } catch (error) { failures.push(error instanceof Error ? error.message : "open-matchday history failed"); }
-        }
-        if (match.leagueShortcut && match.leagueSeason) {
-          try {
-            const form = await loadOpenLigaRecentTeamForm(match.leagueShortcut, match.leagueSeason, team, match.date);
-            if (form.matches.length >= minimumHistory) return form;
-            failures.push("OpenLigaDB: tylko " + form.matches.length + "/" + minimumHistory + " zakończonych meczów");
-          } catch (error) { failures.push(error instanceof Error ? error.message : "OpenLigaDB history failed"); }
-        }
-        if (match.openFootballFeedId) {
-          try {
-            const form = await loadOpenFootballRecentTeamForm(match.openFootballFeedId, team, match.date);
-            if (form.matches.length >= minimumHistory) return form;
-            failures.push("OpenFootball: tylko " + form.matches.length + "/" + minimumHistory + " zakończonych meczów");
-          } catch (error) { failures.push(error instanceof Error ? error.message : "OpenFootball history failed"); }
-        }
-        try {
-          const form = await loadEspnRecentTeamForm(team, match.date);
-          if (form.matches.length >= minimumHistory) return form;
-          failures.push("ESPN: tylko " + form.matches.length + "/" + minimumHistory + " zakończonych meczów");
-        } catch (error) { failures.push(error instanceof Error ? error.message : "ESPN team history failed"); }
-        throw new Error(failures.join(" · ") || "Brak źródła historii dla tej ligi.");
+        const attempts: Array<{ name: string; run: () => Promise<TeamForm> }> = [];
+        if (match.leagueFolder) attempts.push({ name: "open-matchday", run: () => loadRecentTeamForm(match.leagueFolder, team, match.date) });
+        if (match.leagueShortcut && match.leagueSeason) attempts.push({ name: "OpenLigaDB", run: () => loadOpenLigaRecentTeamForm(match.leagueShortcut!, match.leagueSeason!, team, match.date) });
+        if (match.openFootballFeedId) attempts.push({ name: "OpenFootball", run: () => loadOpenFootballRecentTeamForm(match.openFootballFeedId!, team, match.date) });
+        attempts.push({ name: "ESPN", run: () => loadEspnRecentTeamForm(team, match.date) });
+        const settled = await Promise.allSettled(attempts.map(item => item.run()));
+        const accepted: TeamForm[] = [];
+        settled.forEach((result, index) => {
+          if (result.status === "fulfilled") {
+            const form = result.value;
+            const valid = form.matches.filter(row => row.date < match.date && Number.isInteger(row.goalsFor) && Number.isInteger(row.goalsAgainst) && row.goalsFor >= 0 && row.goalsAgainst >= 0);
+            accepted.push({ ...form, matches: valid });
+            if (!valid.length) failures.push(attempts[index].name + ": brak poprawnych wcześniejszych wyników");
+          } else failures.push(attempts[index].name + ": " + (result.reason instanceof Error ? result.reason.message : "błąd źródła"));
+        });
+        const merged = mergeVerifiedTeamForms(accepted, team);
+        if (merged.matches.length < 3) throw new Error(failures.concat("Po scaleniu źródeł tylko " + merged.matches.length + "/3 unikalnych, zgodnych wyników").join(" · "));
+        return merged;
       };
       const [home, away] = await Promise.all([load(match.home), load(match.away)]);
       let prediction: FormPrediction | undefined;
