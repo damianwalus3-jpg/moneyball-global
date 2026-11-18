@@ -307,3 +307,37 @@ export async function loadEspnRecentTeamForm(team: string, beforeDate: string): 
   espnTeamFormRequests.set(key, request);
   try { return await request; } finally { espnTeamFormRequests.delete(key); }
 }
+
+
+/** Merge historical results from independent providers. Exact duplicate rows collapse;
+ * conflicting scores for the same team/opponent/date/venue are excluded, never guessed. */
+export function mergeVerifiedTeamForms(forms: TeamForm[], team: string): TeamForm {
+  const normalize = (value: string) => normalizeTeam(value);
+  const grouped = new Map<string, FormMatch[]>();
+  for (const form of forms) {
+    for (const match of form.matches) {
+      if (!match.date || !Number.isInteger(match.goalsFor) || !Number.isInteger(match.goalsAgainst) || match.goalsFor < 0 || match.goalsAgainst < 0) continue;
+      const key = [match.date, normalize(match.opponent), match.venue].join("|");
+      const rows = grouped.get(key) ?? [];
+      rows.push(match);
+      grouped.set(key, rows);
+    }
+  }
+  const merged: FormMatch[] = [];
+  for (const rows of grouped.values()) {
+    const scores = new Set(rows.map(row => row.goalsFor + ":" + row.goalsAgainst));
+    if (scores.size !== 1) continue;
+    merged.push(rows[0]);
+  }
+  merged.sort((a, b) => b.date.localeCompare(a.date));
+  const sourceNames = [...new Set(forms.map(form => form.source).filter(Boolean))];
+  const timestamps = forms.map(form => form.sourceUpdatedAt).filter(Boolean);
+  return {
+    team,
+    matches: merged.slice(0, 5),
+    home: merged.filter(row => row.venue === "H").slice(0, 5),
+    away: merged.filter(row => row.venue === "A").slice(0, 5),
+    source: sourceNames.join(" + "),
+    sourceUpdatedAt: timestamps.join(" | ") || "brak daty aktualizacji",
+  };
+}
