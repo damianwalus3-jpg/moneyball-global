@@ -14,7 +14,7 @@ export function isEligibleResultsSyncMatch(match: {
   const gender = String(match.gender ?? "").trim().toLowerCase();
   if (gender && gender !== "men") return false;
   return isEligibleDomesticTopTwoLeague(match.country, match.competition ?? match.league)
-    && isEligibleOpenMatchdayTier(match.source, match.external_id)
+    && (String(match.source ?? "").toLowerCase() !== "openmatchday" || isEligibleOpenMatchdayTier(match.external_id))
     && !isWomensTeam(match.home_team) && !isWomensTeam(match.away_team)
     && !isExcludedSeniorTeam(match.home_team) && !isExcludedSeniorTeam(match.away_team);
 }

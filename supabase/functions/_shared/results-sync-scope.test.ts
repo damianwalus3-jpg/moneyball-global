@@ -16,6 +16,6 @@ Deno.test("results sync accepts only European men's domestic tiers one and two",
 });
 
 Deno.test("results sync honors explicit OpenMatchday tier folders", () => {
-  if (!isEligibleResultsSyncMatch({ ...base, source: "OpenMatchday", external_id: "ENG_2_2026-27_01" })) throw new Error("OpenMatchday tier two should be eligible.");
-  if (isEligibleResultsSyncMatch({ ...base, source: "OpenMatchday", external_id: "ENG_3_2026-27_01" })) throw new Error("OpenMatchday tier three must be excluded.");
+  if (!isEligibleResultsSyncMatch({ ...base, source: "OpenMatchday", external_id: "om:ENG_2_2026-27_01" })) throw new Error("OpenMatchday tier two should be eligible.");
+  if (isEligibleResultsSyncMatch({ ...base, source: "OpenMatchday", external_id: "om:ENG_3_2026-27_01" })) throw new Error("OpenMatchday tier three must be excluded.");
 });
