@@ -27,9 +27,10 @@ function isEligibleScheduledFixture(f:any):boolean {
  const competition=String(f?.competition||f?.league||"");
  const country=String(f?.country||"");
  const source=String(f?.source||"").toLowerCase();
+ // Scheduled FootyNomad/public feeds cover every European senior domestic tier.
  const competitionEligible=source==="openmatchday"
   ? isEligibleOpenMatchdayMatch(f)
-  : isEligibleDomesticTopTwoLeague(country,competition);
+  : isEligibleDomesticSeniorLeague(country,competition);
  return isEuropeanFixture(country,competition,f?.home_team||f?.home,f?.away_team||f?.away)
   && competitionEligible && fixtureGender(f)==="men";
 }
