@@ -12,6 +12,8 @@ Deno.test("results sync accepts only European men's domestic tiers one and two",
   if (isEligibleResultsSyncMatch({ ...base, competition: "FA Cup" })) throw new Error("Domestic cups must be excluded.");
   if (isEligibleResultsSyncMatch({ ...base, competition: "Women's Super League", gender: "women" })) throw new Error("Women's leagues must be excluded.");
   if (isEligibleResultsSyncMatch({ ...base, home_team: "Arsenal U21" })) throw new Error("Youth teams must be excluded.");
+  if (isEligibleResultsSyncMatch({ ...base, gender: "unknown" })) throw new Error("Unknown gender must not be settled as men.");
+  if (!isEligibleResultsSyncMatch({ ...base, gender: null })) throw new Error("Missing gender is accepted only when league/team markers are clearly men.");
   if (isEligibleResultsSyncMatch({ ...base, country: "Brazil" })) throw new Error("Non-European countries must be excluded.");
 });
 
