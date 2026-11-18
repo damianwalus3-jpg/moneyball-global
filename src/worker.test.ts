@@ -402,6 +402,19 @@ describe("PitchAPI secure Worker proxy", () => {
     expect(JSON.stringify(await forbidden.json())).not.toContain("pk_test_");
     expect(fetchMock).not.toHaveBeenCalled();
   });
+  it("proxies the PitchAPI league catalogue through the server-side secret", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { leagues: [{ id: "l_Ab12Cd", country_code: "BEL", seasons: ["2026/2027"] }] } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const waitUntil = vi.fn();
+    const response = await worker.fetch(new Request("https://moneyball.example/api/pitchapi/leagues"), env("pk_test_12345678901234567890"), { waitUntil });
+    expect(response.status).toBe(200);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.pitchapi.dev/v1/leagues");
+    expect(fetchMock.mock.calls[0][1].headers["X-API-KEY"]).toBe("pk_test_12345678901234567890");
+    expect(response.headers.get("X-MONEYBALL-SOURCE")).toBe("PitchAPI");
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+  });
   it("proxies PitchAPI league metadata and historical match lists with validated query parameters", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
