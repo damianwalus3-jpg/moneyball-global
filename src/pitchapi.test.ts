@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildPitchApiXgForm, fetchPitchApiXgFormsForFixture, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
+import { buildPitchApiXgForm, fetchPitchApiXgFormsForFixture, isPitchApiCountryEligible, parsePitchApiXgStats, type PitchApiAdvancedStats, type PitchApiLeagueMatch, type PitchApiTeamMatchStats } from "./pitchapi";
 
 const match: PitchApiLeagueMatch = {
   id: "m_Ab12Cd", time_utc: "2026-11-17T19:00:00Z", status: "finished",
@@ -22,9 +22,14 @@ const stats: PitchApiTeamMatchStats = {
 
 describe("PitchAPI xG history parsing", () => {
   it("extracts team-specific xG and shots from the All period", () => {
-    expect(parsePitchApiXgStats(stats, "t_Home01", match)).toMatchObject({
+    const advanced: PitchApiAdvancedStats = { match_id: match.id, teams: [
+      { team: { id: "t_Home01", name: "Home FC" }, defending: { ppda: 8.4 }, territory: { field_tilt: 61, box_entries: 14 }, possession_value: { xt_total: 0.92 }, creation: { xag: 0.75 }, tempo: { direct_speed: 1.8 } },
+      { team: { id: "t_Away01", name: "Away FC" }, defending: { ppda: 12.1 }, territory: { field_tilt: 39, box_entries: 6 }, possession_value: { xt_total: 0.31 }, creation: { xag: 0.2 }, tempo: { direct_speed: 1.2 } },
+    ] };
+    expect(parsePitchApiXgStats(stats, "t_Home01", match, advanced)).toMatchObject({
       matchId: "m_Ab12Cd", isHome: true, xgFor: 1.82, xgAgainst: 0.74, goalsFor: 2, goalsAgainst: 1, shotsFor: 15, shotsAgainst: 7, shotsOnTargetFor: 6, shotsOnTargetAgainst: 2,
       bigChancesFor: 3, bigChancesAgainst: 1, xgOnTargetFor: 1.4, xgOnTargetAgainst: 0.6, xgNonPenaltyFor: 1.7, xgNonPenaltyAgainst: 0.7,
+      ppdaFor: 8.4, fieldTiltFor: 61, boxEntriesFor: 14, xThreatFor: 0.92, xAssistedGoalsFor: 0.75, directSpeedFor: 1.8,
     });
     expect(parsePitchApiXgStats(stats, "t_Away01", match)).toMatchObject({
       isHome: false, xgFor: 0.74, xgAgainst: 1.82, goalsFor: 1, goalsAgainst: 2, shotsFor: 7, shotsAgainst: 15, shotsOnTargetFor: 2, shotsOnTargetAgainst: 6,
