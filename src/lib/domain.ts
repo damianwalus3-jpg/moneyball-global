@@ -252,7 +252,9 @@ function isExcludedSeniorTeamName(value: string | null | undefined): boolean {
 
 /** The application admits all geographic-Europe senior men's domestic tiers; OpenMatchday stays at its published tier 1/2 catalogue. */
 export function isEligibleEuropeanMatch(match: Pick<Match, "country" | "competition" | "league" | "gender" | "home_team" | "away_team"> & Partial<Pick<Match, "source" | "external_id">>): boolean {
-  if (!["men","male","m","mens","men senior"].includes(String(match.gender ?? "").trim().toLowerCase())) return false;
+  const gender = String(match.gender ?? "").trim().toLowerCase();
+  // Match the database predicate: absent gender is legacy metadata, not proof of a womens fixture.
+  if (gender && !["men","male","m","mens","men senior"].includes(gender)) return false;
   if (isWomensTeamName(match.home_team) || isWomensTeamName(match.away_team)) return false;
   if (isExcludedSeniorTeamName(match.home_team) || isExcludedSeniorTeamName(match.away_team)) return false;
   if (String(match.source ?? "").trim().toLowerCase() === "openmatchday") return isOpenMatchdayLeagueMatch(match);
