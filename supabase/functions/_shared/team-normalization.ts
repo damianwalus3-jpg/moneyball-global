@@ -26,3 +26,13 @@ export function teamHistoryKey(value: unknown): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/**
+ * Detect women's team/competition markers without treating a lowercase final
+ * "w" in ordinary club names (for example, Sułów) as the uppercase W suffix.
+ */
+export function isWomensTeam(value: unknown): boolean {
+  const raw = String(value ?? "");
+  return /\bW\b/.test(raw)
+    || /\b(women|female|girls|damallsvenskan|wsl|liga f|frauen|femenina|femenino|feminin|damen|ladies)\b/i.test(raw);
+}
