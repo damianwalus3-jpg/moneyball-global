@@ -224,7 +224,7 @@ export default function App() {
     setBulkLoading(true);
     setBulkProgress(0);
     const matches = fixtureScan.fixtures;
-    const concurrency = 4;
+    const concurrency = 2;
     try {
       for (let index = 0; index < matches.length; index += concurrency) {
         const batch = matches.slice(index, index + concurrency);
