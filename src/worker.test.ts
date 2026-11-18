@@ -33,6 +33,20 @@ describe("FootyNomad fixture parser", () => {
     });
   });
 
+  it("normalizes UEFA country headings with diacritics and alternate official names", () => {
+    const cases = [
+      { country: "Kazakhstan", code: "KAZ" },
+      { country: "Republic of Ireland", code: "IRE" },
+      { country: "Türkiye", code: "TUR" },
+    ];
+    for (const [index, item] of cases.entries()) {
+      const html = `<h2>${item.country} <span>1</span></h2><details class="league-group"><summary><a href="/league/6">Premier League</a></summary><a href="/fixture/${110 + index}-home-vs-away" class="ticket ticket-ns"><time datetime="2026-11-18T17:00:00Z">18:00</time><span class="ticket-home">Home FC</span><span class="ticket-away">Away FC</span></a></details>`;
+      const result = parseFootyNomadFixtures(html, "2026-11-18");
+      expect(result.fixtures).toHaveLength(1);
+      expect(result.fixtures[0].countryCode).toBe(item.code);
+    }
+  });
+
   it("skips live fixture cards with no exact kickoff timestamp instead of inventing a time", () => {
     const html = '<h2>England 1</h2><details class="league-group"><summary><a href="/league/4">WSL Cup</a></summary><a href="/fixture/104-live-vs-team" class="ticket ticket-live"><small class="ticket-sub">11&#39; live</small><span class="ticket-home">Home W</span><span class="ticket-away">Away W</span></a></details>';
     const result = parseFootyNomadFixtures(html, "2026-11-18");
