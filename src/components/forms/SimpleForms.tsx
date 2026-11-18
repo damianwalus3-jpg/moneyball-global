@@ -63,21 +63,90 @@ export function ScanRunForm({ open, onOpenChange, scan }: { open: boolean; onOpe
     });
   }, [open, scan]);
   const save = useAction(async () => {
+    const startedAt = brusselsInputToISO(form.started);
     const row = {
-      prediction_id: form.prediction_id,
+      scan_date: form.started.slice(0, 10),
+      source: form.source.trim() || "manual",
+      started_at: startedAt,
+      completed_at: form.status === "started" ? null : (scan?.completed_at ?? new Date().toISOString()),
+      status: form.status,
+      matches_found: Math.max(0, Math.floor(Number(form.matches_found) || 0)),
+      notes: form.notes.trim() || null,
+    };
+    if (scan) await updateRow("scan_runs", scan.id, row);
+    else await insertRow("scan_runs", row);
+  }, { success: "Zapisano skan", onDone: () => onOpenChange(false) });
+  return (
+    <FormDialog open={open} onOpenChange={onOpenChange} title={scan ? "Edytuj skan" : "Nowy skan"} pending={save.isPending} onSubmit={() => {
+      if (!brusselsInputToISO(form.started)) return setError("Podaj datę skanu.");
+      setError("");
+      save.mutate(undefined);
+    }}>
+      <Field label="Data skanu (Bruksela)" error={error}><Input type="datetime-local" value={form.started} onChange={(event) => setForm({ ...form, started: event.target.value })} /></Field>
+      <Field label="Źródło"><Input value={form.source} onChange={(event) => setForm({ ...form, source: event.target.value })} placeholder="np. FootyNomad + źródła publiczne" /></Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Status">
+          <Select value={form.status} onValueChange={(value) => setForm({ ...form, status: value })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="started">started</SelectItem>
+              <SelectItem value="completed">completed</SelectItem>
+              <SelectItem value="partial">partial</SelectItem>
+              <SelectItem value="failed">failed</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Liczba znalezionych meczów"><Input inputMode="numeric" value={form.matches_found} onChange={(event) => setForm({ ...form, matches_found: event.target.value })} /></Field>
+      </div>
+      <Field label="Notatki"><Textarea rows={2} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
+    </FormDialog>
+  );
+}
+
+/* ---------------- Odds snapshots ---------------- */
+export function OddsForm({
+  open,
+  onOpenChange,
+  snapshot,
+  predictions,
+  matches,
+  defaultPredictionId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  snapshot?: OddsSnapshot | null;
+  predictions: Prediction[];
+  matches: Match[];
+  defaultPredictionId?: string | undefined;
+}) {
+  const [form, setForm] = useState({ prediction_id: "", bookmaker: "", odds: "", captured: "", source_url: "" });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const matchById = new Map(matches.map((match) => [match.id, match]));
+  useEffect(() => {
+    if (!open) return;
+    setErrors({});
+    setForm({
+      prediction_id: snapshot?.prediction_id ?? defaultPredictionId ?? "",
+      bookmaker: snapshot?.bookmaker ?? "",
+      odds: snapshot?.odds != null ? String(snapshot.odds) : "",
+      captured: isoToBrusselsInput(snapshot?.captured_at) || nowBrusselsInput(),
+      source_url: snapshot?.source_url ?? "",
+    });
+  }, [open, snapshot, defaultPredictionId]);
+  const save = useAction(async () => {
+    const parsedOdds = parseDecimal(form.odds);
+    const capturedAt = brusselsInputToISO(form.captured);
+    if (parsedOdds == null || parsedOdds <= 1 || !capturedAt) throw new Error("Nieprawidłowy kurs lub czas.");
+    const prediction = predictions.find((item) => item.id === form.prediction_id);
+    if (!prediction) throw new Error("Nie znaleziono prognozy, do której zapisujesz kurs.");
+    const row = {
+      prediction_id: prediction.id,
       bookmaker: form.bookmaker.trim(),
-      odds: parseDecimal(form.odds),
-      captured_at: brusselsInputToISO(form.captured),
+      odds: parsedOdds,
+      captured_at: capturedAt,
       source_url: form.source_url.trim() || null,
     };
-    const prediction = predictions.find((item) => item.id === row.prediction_id);
-    if (!prediction) throw new Error("Nie znaleziono prognozy, do której zapisujesz kurs.");
     const nowMs = Date.now();
-    const quoteFresh = isFreshOddsTimestamp(row.captured_at, nowMs);
-    const sourceUrlValid = isValidOddsSourceUrl(row.source_url);
-    if (!row.bookmaker || row.odds == null || row.odds <= 1 || !quoteFresh || !sourceUrlValid)
-      throw new Error("Kurs wymaga bukmachera, wartości powyżej 1,00, poprawnego URL http/https i czasu nie starszego niż 6 godzin.");
-    const match = matchById.get(prediction.match_id);
     const manualCoverage = {
       ...(prediction.data_coverage ?? {}),
       market_odds: true,
@@ -89,18 +158,21 @@ export function ScanRunForm({ open, onOpenChange, scan }: { open: boolean; onOpe
       odds_status: "CONFIRMED",
       odds_source_url: row.source_url,
     };
-    const quotedPrediction = { ...prediction, odds: row.odds, data_coverage: manualCoverage };
-    if (!hasFreshConfirmedOdds(quotedPrediction, nowMs)) throw new Error("Kurs musi pochodzić z Bwin, Unibet, Ladbrokes, Circus lub betFIRST i spełniać pozostałe warunki aktualności.");
+    const quotedPrediction = { ...prediction, odds: parsedOdds, data_coverage: manualCoverage };
+    if (!hasFreshConfirmedOdds(quotedPrediction, nowMs)) {
+      throw new Error("Kurs musi pochodzić z Bwin, Unibet, Ladbrokes, Circus lub betFIRST i spełniać warunki aktualności.");
+    }
+    const match = matchById.get(prediction.match_id);
     const canPromote = canPromoteManualOdds(prediction, match, nowMs, row);
     const canUsePrice = hasFreshConfirmedOdds(quotedPrediction, nowMs)
       && (canPromote || isCouponCandidate(quotedPrediction, match, nowMs));
     if (snapshot) await updateRow("odds_snapshots", snapshot.id, row);
     else await insertRow("odds_snapshots", row);
     await updateRow("predictions", prediction.id, {
-      odds: row.odds,
+      odds: parsedOdds,
       data_coverage: manualCoverage,
       ...(canPromote ? { verdict: "WYBRANY", selection_status: "WYBRANY", decision_status: "FINAL", rejection_reason: null } : {}),
-      ...(canUsePrice ? { stake: 4, potential_return: Math.round(4 * Number(row.odds) * 100) / 100 } : {}),
+      ...(canUsePrice ? { stake: 4, potential_return: Math.round(4 * parsedOdds * 100) / 100 } : {}),
     });
   }, { success: "Zapisano kurs i przypisano go do wybranego typu", onDone: () => onOpenChange(false) });
   function submit() {
@@ -112,9 +184,7 @@ export function ScanRunForm({ open, onOpenChange, scan }: { open: boolean; onOpe
     const capturedAt = brusselsInputToISO(form.captured);
     if (!capturedAt) next["captured"] = "Podaj czas.";
     else if (!isFreshOddsTimestamp(capturedAt, Date.now())) next["captured"] = "Kurs musi być aktualny (maksymalnie 6 godzin) i nie może pochodzić z przyszłości.";
-    if (!isValidOddsSourceUrl(form.source_url.trim())) {
-      next["source_url"] = "Podaj poprawny adres URL źródła (http/https).";
-    }
+    if (!isValidOddsSourceUrl(form.source_url.trim())) next["source_url"] = "Podaj poprawny adres URL źródła (http/https).";
     setErrors(next);
     if (!Object.keys(next).length) save.mutate(undefined);
   }
