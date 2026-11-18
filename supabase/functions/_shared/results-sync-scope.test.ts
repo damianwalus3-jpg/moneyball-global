@@ -6,9 +6,11 @@ const base = {
   source: "FootyNomad", external_id: "fn:eng-premier-league-2026-11-18-arsenal-chelsea",
 };
 
-Deno.test("results sync accepts only European men's domestic tiers one and two", () => {
+Deno.test("results sync accepts all European senior men's domestic league tiers", () => {
   if (!isEligibleResultsSyncMatch(base)) throw new Error("Top-flight men's league should be eligible.");
-  if (isEligibleResultsSyncMatch({ ...base, competition: "National League North" })) throw new Error("Tier three must be excluded.");
+  for (const competition of ["National League - North","Third League - Northeast","Tercera División RFEF - Group 13","Oberliga - Hessen","Football League - Lowland League","III Liga - Group 3","1st League - RS"]) {
+    if (!isEligibleResultsSyncMatch({ ...base, competition })) throw new Error("Senior domestic tier should be eligible: " + competition);
+  }
   if (isEligibleResultsSyncMatch({ ...base, competition: "FA Cup" })) throw new Error("Domestic cups must be excluded.");
   if (isEligibleResultsSyncMatch({ ...base, competition: "Women's Super League", gender: "women" })) throw new Error("Women's leagues must be excluded.");
   if (isEligibleResultsSyncMatch({ ...base, home_team: "Arsenal U21" })) throw new Error("Youth teams must be excluded.");
