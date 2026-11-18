@@ -1179,3 +1179,12 @@
 - Tradeoff: this deliberately prefers a false negative over importing a non-football event when OpenLigaDB omits the sport category. The current live catalogue confirms this field is populated for all 88 entries.
 - CI, rebuild checks and Cloudflare deployment for the new test commit must pass before marking Stage 95 deployed.
 - No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
+
+
+## Stage 96 — ESPN Nations League geography correction (2026-11-18)
+- Date-specific audit of the live ESPN UTC scoreboards for Brussels 2026-11-18 exposed a serious false-positive: the parser treated any competition containing the words "Nations League" as UEFA, so five Concacaf Nations League fixtures at non-European venues could be incorrectly labelled European.
+- Corrected the rule: only an explicit `UEFA Nations League` note receives the UEFA national-team history key. All other events must independently qualify by a recognized European venue country or an explicitly UEFA/European tournament note.
+- Added a regression case with the observed Concacaf Nations League / Guadeloupe venue shape alongside the valid UEFA Nations League case.
+- Live ESPN raw source inventory: 65 events on 2026-11-17 UTC and 28 on 2026-11-18 UTC. Applying the Brussels-date and geography rules showed 24 event candidates on 2026-11-18 before the correction; five were Concacaf Nations League false positives. The corrected rule removes those five.
+- Source commit: 3755a47aaa84c463c9d1faf12d8f827ec17d57c3. Test commit: 28b3f625f1f34c105db7219b86cf0e77966ccb87. Validation and deployment pending.
+- No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
