@@ -1639,3 +1639,14 @@ The new `moneyball_manual_prediction_scan_page` RPC uses the strict helper. The 
 - Verified all 32 fixtures in the 2026-11-18 FootyNomad feed pass the production senior-men European scope. There were zero future-eligible fixtures at verification time, so no selected pick or coupon was expected.
 - All six production migrations listed in the preceding section are committed on MAIN and recorded as applied in Supabase. The app code, DB predicates, scan-page RPCs, result sync, odds sync and frontend eligibility now agree on all senior European domestic tiers.
 - Remaining verification is operational, not a known code failure: the next 08:00 Europe/Brussels daily scan and 08:15 audit must confirm the widened scope against a fresh future match date. Authenticated visual confirmation of the selected-picks panel is still pending; no claim of Android visual verification is made.
+
+
+## 2026-11-18 — UI sorting and odds-source audit
+
+- Match list now offers explicit sorting by kickoff time (default), selected-pick confidence, league A–Z, and teams A–Z. Confidence values are precomputed once per match to avoid repeated full prediction scans inside the comparator.
+- Navigation reordered to match the daily workflow: dashboard, fixtures, prediction markets, coupons, tracker, results, history, statistics, settings. Mobile primary navigation now prioritizes dashboard, fixtures, coupons, tracker and history.
+- Production odds audit: `provider_odds` contains 219,022 historical quote rows across 286 matches, but zero quotes are fresh within 6 hours or 24 hours. Latest captured quote is 2026-11-16 02:11:13 UTC. Do not display these as current prices or use them to validate a present-day coupon.
+- MoviOdds sync cron job 10 remains deliberately disabled because `MOVIODDS_API_KEY` is not configured. Do not reactivate it without a valid provider credential and a successful dry-run. The provider docs currently advertise a free API key, but the service still requires that key in the `X-API-Key` header.
+- Public odds-source research: MoviOdds publishes bet365 REST/WebSocket odds and a free-key tier; The Odds API has a 500-credit/month free plan and requires an API key; API-Football pre-match odds also require an API key and are refreshed every 3 hours. These are integration candidates, not proof that any quote is currently available for a given fixture.
+- Current quote confirmation policy remains strict: bookmaker must be an approved Belgian book (Bwin, Unibet, Ladbrokes, Circus, betFIRST), quote must be prematch, unsuspended, correctly mapped, and timestamp-fresh. MoviOdds bet365 quotes alone do not satisfy the Belgian bookmaker confirmation rule.
+- External authenticated browser inspection could not be completed in this session. GitHub CI and Cloudflare deployment must be checked for the new UI commits; no live visual test is claimed.
