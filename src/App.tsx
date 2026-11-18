@@ -654,7 +654,8 @@ export default function App() {
     const latestRows = [...latestByFixtureMarketModel.values()];
     const oneXTwo = latestRows.filter(row => row.details.market !== "DOUBLE_CHANCE");
     const doubleChance = latestRows.filter(row => row.details.market === "DOUBLE_CHANCE");
-    const coverage = auditMarketCoverage(records, fixtureScan?.date);
+    const coverageDate = fixtureScan?.date ?? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    const coverage = auditMarketCoverage(records, coverageDate);
     const candidates = new Set(oneXTwo.filter(row => row.details.strongCandidate === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
     const dcCandidates = new Set(doubleChance.filter(row => row.details.strongDoubleChance === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
     const withProbabilities = new Set(oneXTwo.filter(row => [row.details.p1, row.details.px, row.details.p2]
@@ -890,7 +891,7 @@ export default function App() {
                 return <article className="coupon-candidate" key={coupon.legs.map(leg => leg.fixtureId).join("|")}>
                   <div className="coupon-candidate-top"><b>Kupon testowy #{index + 1}</b><span>3/3 mecze</span></div>
                   {coupon.legs.map((leg, legIndex) => <div className="coupon-leg" key={leg.fixtureId}>
-                    <b>{leg.title}</b><span>{leg.selection} · {Math.round(leg.probability * 100)}%</span><small>{leg.competition}{priced ? ` · kurs ${priced.legs[legIndex].decimalOdds.toFixed(2)} · EV ${(priced.legs[legIndex].expectedValue * 100).toFixed(1)}%` : ""}</small>
+                    <b>{leg.title}</b><span>{leg.market === "DOUBLE_CHANCE" ? "DC " : "1X2 "}{leg.selection} · {Math.round(leg.probability * 100)}%</span><small>{leg.competition}{priced ? ` · kurs ${priced.legs[legIndex].decimalOdds.toFixed(2)} · EV ${(priced.legs[legIndex].expectedValue * 100).toFixed(1)}%` : ""}</small>
                   </div>)}
                   <div className="coupon-candidate-bottom">
                     <span>Prawdopodobieństwo modelu: {(coupon.combinedProbability * 100).toFixed(1)}%</span>
