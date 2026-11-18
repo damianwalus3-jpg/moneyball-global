@@ -104,6 +104,19 @@ describe("dynamic European OpenFootball catalogue", () => {
     expect(feeds[0].urlForSeason("ignored")).toContain("france/2026-27_fr1.txt");
   });
 
+  it("discovers feeds for England, Germany, Italy, Spain and Belgium", async () => {
+    const { buildEuropeanOpenFootballFeeds } = await import("./openfootball");
+    const feeds = buildEuropeanOpenFootballFeeds([
+      "england/2026-27_1-premierleague.txt",
+      "germany/2026-27_1-bundesliga.txt",
+      "italy/2026-27_1-seriea.txt",
+      "spain/2026-27_1-liga.txt",
+      "belgium/2026-27_be1.txt",
+    ], "2026-11-18");
+    expect(feeds.map(feed => feed.countryCode)).toEqual(["ENG", "GER", "ITA", "ESP", "BEL"]);
+    expect(feeds).toHaveLength(5);
+  });
+
   it("discovers calendar-year seasons for Nordic leagues", async () => {
     const { buildEuropeanOpenFootballFeeds } = await import("./openfootball");
     const feeds = buildEuropeanOpenFootballFeeds(["finland/2026_fi1.txt", "finland/2025_fi1.txt"], "2026-07-10");
