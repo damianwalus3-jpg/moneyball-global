@@ -840,13 +840,17 @@ export default function App() {
             <p className="source-note">Ustaw identyczny sekret <b>ODDS_PILOT_TOKEN</b> w Cloudflare Workerze <b>moneyball-global-rebuild</b> i zapisz go tutaj tylko raz. Token pozostaje lokalnie w tej przeglądarce; nie wklejaj go do czatu. Po skanie dzisiejszych meczów aplikacja automatycznie pobierze dzienny pakiet kursów. Limit aplikacji to jedna próba na datę, aby chronić darmowe kredyty. StrikerAPI daje 500 darmowych kredytów miesięcznie; jeden odczyt dzienny kosztuje 10 (około 300 na 30 dni). Dostawca obejmuje tylko wybrane ligi, nie całą Europę. Daty dostawcy są UTC; dopasowanie meczu odbywa się po nazwach drużyn, dacie i godzinie Europe/Brussels.</p>
             {oddsNotice && <div className="tracker-notice">{oddsNotice}</div>}
             {oddsAudit && <p className="source-note">Ostatni audyt · UTC {oddsAudit.utcDate} · dopasowane {oddsAudit.matched} · niejednoznaczne {oddsAudit.ambiguous} · bez dopasowania {oddsAudit.unmatched} · nowe snapshoty {oddsAudit.snapshots}.</p>}
-            <h3>Ostatnie snapshoty kursów</h3>
+            <h3>Ostatnie snapshoty kursów</h3><p className="source-note">Historia zachowuje starsze odczyty, ale tylko snapshoty do 60 minut są oznaczane jako świeże. Starsze ceny są archiwalne i nie mogą potwierdzać aktualnego kuponu.</p>
             <div className="tracker-table">
               <div className="tracker-head"><span>BUKMACHER</span><span>MECZ</span><span>1</span><span>X</span><span>2</span></div>
               {records.filter(row => row.kind === "odds").slice(0, 20).map(row => {
                 const price = (value: unknown) => typeof value === "number" && value > 1 ? value.toFixed(2) : "—";
+                const capturedAt = typeof row.details.capturedAt === "string" ? Date.parse(row.details.capturedAt) : NaN;
+                const ageMs = Date.now() - capturedAt;
+                const freshness = Number.isFinite(capturedAt) && ageMs >= 0 && ageMs <= 60 * 60 * 1000 ? "ŚWIEŻY" : "ARCHIWALNY";
+                const timestamp = Number.isFinite(capturedAt) ? new Date(capturedAt).toLocaleString("pl-BE") : "brak czasu";
                 return <div className="tracker-row" key={row.id}>
-                  <span>{String(row.details.bookmaker ?? "—")}</span>
+                  <span>{String(row.details.bookmaker ?? "—")} · {freshness} · {timestamp}</span>
                   <b>{row.title}</b>
                   <span>{price(row.details.odds1)}</span>
                   <span>{price(row.details.oddsX)}</span>
