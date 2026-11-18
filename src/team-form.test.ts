@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { loadRecentTeamForm } from "./team-form";
+import { loadEspnRecentTeamForm, loadRecentTeamForm, mapEspnTeamForm } from "./team-form";
 
 const csv = `gw,date,time,home,away,ft_home,ft_away,ft_result
 1,2026-08-01,15:00,Club A,Club B,2,0,H
@@ -39,5 +39,27 @@ describe("historical team form", () => {
   });
   it("rejects invalid league folder identifiers", async () => {
     await expect(loadRecentTeamForm("../etc", "Club A", "2026-09-10")).rejects.toThrow();
+  });
+});
+
+
+describe("ESPN team history fallback", () => {
+  it("maps only finished matches before the target date and calculates form", () => {
+    const form = mapEspnTeamForm({ team: "France", generatedAt: "2026-11-18T07:19:13Z", matches: [
+      { date: "2026-11-15", opponent: "Türkiye", venue: "H", goalsFor: 2, goalsAgainst: 1 },
+      { date: "2026-11-10", opponent: "Spain", venue: "A", goalsFor: 0, goalsAgainst: 0 },
+      { date: "2026-11-05", opponent: "Italy", venue: "H", goalsFor: 1, goalsAgainst: 2 },
+      { date: "2026-11-20", opponent: "Future", venue: "H", goalsFor: 9, goalsAgainst: 0 },
+      { date: "2026-11-01", opponent: "Bad", venue: "A", goalsFor: -1, goalsAgainst: 0 },
+    ] }, "France", "2026-11-18");
+    expect(form.matches).toHaveLength(3);
+    expect(form.matches[0]).toMatchObject({ opponent: "Türkiye", result: "W", points: 3 });
+    expect(form.home).toHaveLength(2);
+    expect(form.away).toHaveLength(1);
+    expect(form.source).toContain("ESPN");
+  });
+
+  it("rejects malformed ESPN payloads", () => {
+    expect(() => mapEspnTeamForm({ matches: "bad" }, "France", "2026-11-18")).toThrow(/nieprawidłowa/);
   });
 });
