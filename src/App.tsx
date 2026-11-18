@@ -397,6 +397,13 @@ export default function App() {
         status: "SCHEDULED",
         details: { fixtureId: match.id, date: match.date, time: match.time, competition: match.competition, source: match.source, sourceUpdatedAt: match.sourceUpdatedAt ?? null, sourceUrl: match.sourceUrl ?? null },
       })), "fixtureId");
+      // Every fixture in today's European list receives both market rows. A match
+      // already in play/finished is explicitly rejected as a pre-match prediction.
+      for (const match of scan.fixtures) {
+        if (hasKickoffPassed(match.date, match.time)) {
+          savePredictionRecord(match, undefined, "ODRZUCONY: mecz już się rozpoczął lub zakończył — brak prognozy przedmeczowej.");
+        }
+      }
       const scanKey = [scan.date, scan.source, scan.fixtures.length, scan.leaguesChecked, JSON.stringify(scan.coverage), scan.leaguesFailed.join("|")].join("::");
       addRecordsIfMissing([{
         kind: "scan",
@@ -636,12 +643,18 @@ export default function App() {
       const key = fixtureId + "|" + market + "|" + model;
       if (!latestByFixtureMarketModel.has(key)) latestByFixtureMarketModel.set(key, row);
     }
-    const oneXTwo = [...latestByFixtureMarketModel.values()].filter(row => row.details.market !== "DOUBLE_CHANCE");
-    const doubleChance = [...latestByFixtureMarketModel.values()].filter(row => row.details.market === "DOUBLE_CHANCE");
-    const fixtures = new Set(oneXTwo.map(row => String(row.details.fixtureId)));
+    const latestRows = [...latestByFixtureMarketModel.values()];
+    const oneXTwo = latestRows.filter(row => row.details.market !== "DOUBLE_CHANCE");
+    const doubleChance = latestRows.filter(row => row.details.market === "DOUBLE_CHANCE");
+    const oneXTwoFixtures = new Set(oneXTwo.map(row => String(row.details.fixtureId)));
+    const dcFixtures = new Set(doubleChance.map(row => String(row.details.fixtureId)));
+    const expectedFixtures = new Set(records.filter(row => row.kind === "match" && row.details.date === fixtureScan?.date
+      && typeof row.details.fixtureId === "string").map(row => String(row.details.fixtureId)));
+    const total = expectedFixtures.size || oneXTwoFixtures.size;
     const candidates = new Set(oneXTwo.filter(row => row.details.strongCandidate === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
     const dcCandidates = new Set(doubleChance.filter(row => row.details.strongDoubleChance === true && row.status === "KANDYDAT").map(row => String(row.details.fixtureId)));
-    const withProbabilities = new Set(oneXTwo.filter(row => [row.details.p1, row.details.px, row.details.p2].every(value => typeof value === "number" && Number.isFinite(value))).map(row => String(row.details.fixtureId)));
+    const withProbabilities = new Set(oneXTwo.filter(row => [row.details.p1, row.details.px, row.details.p2]
+      .every(value => typeof value === "number" && Number.isFinite(value))).map(row => String(row.details.fixtureId)));
     const latestPerFixture = new Map<string, TrackerRecord>();
     for (const row of oneXTwo.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
       const id = String(row.details.fixtureId); if (!latestPerFixture.has(id)) latestPerFixture.set(id, row);
@@ -649,10 +662,10 @@ export default function App() {
     const rejected = [...latestPerFixture.values()].filter(row => !candidates.has(String(row.details.fixtureId)));
     const reasons = new Map<string, number>();
     for (const row of rejected) { const reason = String(row.details.reason ?? "Nie zapisano konkretnego powodu"); reasons.set(reason, (reasons.get(reason) ?? 0) + 1); }
-    return { total: fixtures.size, rejected: rejected.length, candidates: candidates.size, dcCandidates: dcCandidates.size,
-      withoutProbabilities: fixtures.size - withProbabilities.size, reasons: [...reasons.entries()].sort((a, b) => b[1] - a[1]),
-      oneXTwoRecords: oneXTwo.length, doubleChanceRecords: doubleChance.length };
-  }, [records]);
+    return { total, rejected: Math.max(rejected.length, total - candidates.size), candidates: candidates.size, dcCandidates: dcCandidates.size,
+      withoutProbabilities: total - withProbabilities.size, missing1X2: total - oneXTwoFixtures.size, missingDC: total - dcFixtures.size,
+      reasons: [...reasons.entries()].sort((a, b) => b[1] - a[1]), oneXTwoRecords: oneXTwo.length, doubleChanceRecords: doubleChance.length };
+  }, [records, fixtureScan?.date]);
   const safestPick = useMemo(() => getSafestPick(records), [records]);
   const visibleRecords = useMemo(() => records.filter(row => (active === "tracker" ? true : row.kind === (active === "matches" ? "match" : active === "coupons" ? "coupon" : active === "pick" ? "prediction" : "scan")) && (row.title.toLowerCase().includes(query.toLowerCase()) || row.status.toLowerCase().includes(query.toLowerCase()))), [records, active, query]);
   const refreshRecords = () => setRecords(readRecords());
@@ -911,7 +924,7 @@ export default function App() {
           <h2>Jakość modelu · wyniki rozliczone</h2><button className="settle-button" onClick={() => void settlePendingResults()} disabled={settling}>{settling ? `Sprawdzanie ${settleProgress}…` : "Pobierz wyniki i rozlicz"}</button>
           <p>Metryki liczone wyłącznie z prognoz połączonych z rzeczywistym wynikiem przez identyfikator meczu.</p>
           {modelAudit.metrics ? <><div className="audit-metrics"><DetailMetric label="Próba" value={modelAudit.metrics.count} detail="Liczba różnych meczów z prognozą 1X2 i dopasowanym rzeczywistym wynikiem. Duplikaty tego samego meczu nie zwiększają próby."/><DetailMetric label="Skuteczność 1X2" value={(modelAudit.metrics.accuracy*100).toFixed(1)+"%"} detail="Odsetek rozliczonych meczów, w których najwyższe prawdopodobieństwo 1X2 wskazało prawidłowy wynik."/><DetailMetric label="Brier score" value={modelAudit.metrics.brierScore.toFixed(4)} detail="Średni kwadratowy błąd prawdopodobieństw. Niższa wartość oznacza lepszą jakość probabilistyczną."/><DetailMetric label="Log loss" value={modelAudit.metrics.logLoss.toFixed(4)} detail="Kara za przypisywanie niskiego prawdopodobieństwa wynikowi, który faktycznie wystąpił. Niżej znaczy lepiej."/></div>{modelAudit.doubleChance && <><h3>Double Chance · osobny audyt rynku</h3><div className="audit-metrics"><DetailMetric label="Próba DC (3 rynki/mecz)" value={modelAudit.doubleChance.count} detail="Każdy rozliczony mecz dostarcza do trzech obserwacji: 1X, X2 i 12. To nie jest liczba meczów."/><DetailMetric label="Skuteczność DC" value={(modelAudit.doubleChance.accuracy*100).toFixed(1)+"%"} detail="Odsetek rynków Double Chance, dla których prognoza przekroczyła 50% i zdarzenie rzeczywiście zaszło."/><DetailMetric label="Brier DC" value={modelAudit.doubleChance.brierScore.toFixed(4)} detail="Średni kwadratowy błąd prawdopodobieństw dla trzech rynków Double Chance. Niższa wartość jest lepsza."/><DetailMetric label="Log loss DC" value={modelAudit.doubleChance.logLoss.toFixed(4)} detail="Logarytmiczna kara dla prognoz Double Chance, szczególnie za zbyt pewne nietrafione wskazania."/></div></>}<h3>Kalibracja pewności</h3><div className="audit-buckets">{modelAudit.buckets.map(bucket => <div key={bucket.label}><b>{bucket.label}</b><span>Prognoza: {(bucket.averageConfidence*100).toFixed(1)}%</span><span>Trafienia: {(bucket.observedAccuracy*100).toFixed(1)}%</span><small>n={bucket.count}</small></div>)}</div></> : <div className="tracker-empty">Brak rozliczonych prognoz. Zapisz wynik z tym samym fixtureId co prognoza, aby uruchomić Brier score, log loss, skuteczność i kalibrację.</div>}
-          <details className="scan-warnings" open><summary>Diagnostyka prognoz: {predictionDiagnostics.total} meczów · 1X2 ≥75%: {predictionDiagnostics.candidates} · DC ≥75%: {predictionDiagnostics.dcCandidates} · bez progu: {predictionDiagnostics.rejected}</summary><p>Bez pełnych prawdopodobieństw 1X2: {predictionDiagnostics.withoutProbabilities}. To zwykle oznacza brak historii, niedostępny feed wyników albo brak potwierdzonej godziny meczu.</p>{predictionDiagnostics.reasons.length ? predictionDiagnostics.reasons.map(([reason,count]) => <p key={reason}><b>{count}×</b> {reason}</p>) : <p>Brak zapisanych odrzuceń w najnowszej prognozie każdego meczu.</p>}<p>Kandydat 1X2: 75%. Kandydat Double Chance: 75%. To niezależne kryteria — mecz może spełnić próg DC, nawet jeśli nie spełnia progu 1X2.</p></details>
+          <details className="scan-warnings" open><summary>Pokrycie: {predictionDiagnostics.total} meczów · brak 1X2: {predictionDiagnostics.missing1X2} · brak DC: {predictionDiagnostics.missingDC} · 1X2 ≥75%: {predictionDiagnostics.candidates} · DC ≥75%: {predictionDiagnostics.dcCandidates} · odrzucone: {predictionDiagnostics.rejected}</summary><p>Bez pełnych prawdopodobieństw 1X2: {predictionDiagnostics.withoutProbabilities}. To zwykle oznacza brak historii, niedostępny feed wyników albo brak potwierdzonej godziny meczu.</p>{predictionDiagnostics.reasons.length ? predictionDiagnostics.reasons.map(([reason,count]) => <p key={reason}><b>{count}×</b> {reason}</p>) : <p>Brak zapisanych odrzuceń w najnowszej prognozie każdego meczu.</p>}<p>Kandydat 1X2: 75%. Kandydat Double Chance: 75%. To niezależne kryteria — mecz może spełnić próg DC, nawet jeśli nie spełnia progu 1X2.</p></details>
           {modelAudit.modelComparisons.length > 0 && <><h3>Porównanie modeli · osobne rynki</h3><div className="audit-metrics">{modelAudit.modelComparisons.map(item => {
             const metric = item.metrics;
             return <DetailMetric key={item.market + "|" + item.model} label={item.market + " · " + item.model}
