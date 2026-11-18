@@ -1572,3 +1572,22 @@ No new provider was enabled, no API key was added, and no provider credits were 
 - The destination uses the existing authenticated, date-scoped `dashboardSelectedPicksQuery` and `moneyball_dashboard_selected_picks()` RPC. Each selected model pick already displays the exact market and selection, the stored probability, the saved rationale, source/data-coverage details, and settlement state. No new prediction or betting logic was added; no history, coupons, settlements or bankroll were changed.
 - Commits: `9f7e6ffa731415b8f500c24e2a7a6b70345c1130` (initial CTA and section heading); `b488d01ff0c8a993e8b45a9cd0626dc5da0fcfca` (move CTA to a prominent full-width position immediately below the header).
 - Verified by re-fetching `main/src/routes/_authenticated/panel.tsx`: button label, destination anchor and heading are present in the committed file. Combined status currently reports only the unrelated Vercel rate-limit failure; the GitHub connector did not expose a Cloudflare workflow run/status yet. **Do not claim production deployment or Android visual confirmation until Cloudflare MAIN deploy and live page are verified.**
+
+
+## Predictor trigger field-access regression — 2026-11-18
+
+Production evidence:
+- Supabase `moneyball-predict v251` logged HTTP 500 with `record "new" has no field "kickoff_at"` during prediction writes.
+- The scheduler lease was `running`, zero batches and zero fixtures processed, with a five-minute expiry. Do not manually bypass an active lease.
+- The database trigger `moneyball_guard_european_top_two_insert_scope()` combined a table-name check and references to `NEW.kickoff_at` / `NEW.kickoff_date` in one boolean expression. PostgreSQL expression evaluation can reorder boolean terms, allowing match-only fields to be evaluated for a `predictions` trigger row.
+
+Fix:
+- Production migration `20261118194635_fix_prediction_scope_guard_record_field_access` separates match-only kickoff logic into a nested PL/pgSQL `IF TG_TABLE_NAME = 'matches'` block.
+- The Europe M49, men's domestic tier 1/2 and OpenMatchday eligibility rules remain unchanged. Match deduplication/advisory locking remains insert-only and scoped to match rows.
+- Migration source committed to MAIN: `ec045424d7073da880f93b709839a1af9028b084`.
+
+Regression check:
+- Rollback-safe duplicate prediction INSERT using an existing eligible prediction completed without the missing-field error; `ON CONFLICT DO NOTHING` inserted zero rows.
+- No production match, prediction, coupon, settlement, bankroll or historical record was modified by this test.
+- CI `44383849914` and Cloudflare MAIN deploy `44383849917` both SUCCESS.
+- No further predictor 500 was present in the inspected post-migration log interval. Automatic scheduler recovery after the five-minute lease expiry remains to be verified; incident is not fully closed until a subsequent batch succeeds.
