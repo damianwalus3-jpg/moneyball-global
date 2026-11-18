@@ -58,3 +58,23 @@ export function compareBelgianProviderQuotes(left: ProviderOddsQuote, right: Pro
   if (priority !== 0) return priority;
   return Date.parse(String(right.captured_at ?? "")) - Date.parse(String(left.captured_at ?? ""));
 }
+
+export function isFreshConfirmedManualBelgianQuote(
+  odds: unknown,
+  coverage: Record<string, unknown> | null | undefined,
+  nowMs = Date.now(),
+): boolean {
+  if (!coverage || Number(odds) <= 1) return false;
+  const source = String(coverage["odds_source"] ?? "").trim().toLowerCase();
+  const url = String(coverage["odds_source_url"] ?? "").trim();
+  const bookmaker = coverage["odds_bookmaker"];
+  const capturedAt = coverage["odds_captured_at"];
+  const suspended = coverage["odds_suspended"] === true || String(coverage["odds_suspended"] ?? "").toLowerCase() === "true";
+  return source === "manual"
+    && belgianBookmakerPriority(bookmaker) !== Number.MAX_SAFE_INTEGER
+    && /^https?:\/\/[^\s]+$/i.test(url)
+    && String(coverage["odds_status"] ?? "").toUpperCase() === "CONFIRMED"
+    && String(coverage["odds_phase"] ?? "").trim().toLowerCase() === "prematch"
+    && !suspended
+    && freshTimestamp(capturedAt, nowMs);
+}
