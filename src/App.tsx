@@ -75,12 +75,20 @@ function shouldRetryIncompletePrediction(fixtureId: string, prior: TrackerRecord
     const parsed: unknown = raw ? JSON.parse(raw) : {};
     const attempts = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
     const attemptKey = fixtureId + "|" + market;
-    const now = Date.now();
     const lastAttempt = attempts[attemptKey];
-    if (!shouldRetryPredictionAttempt(lastAttempt, now, FALLBACK_RETRY_INTERVAL_MS)) return false;
-    localStorage.setItem(key, JSON.stringify({ ...attempts, [attemptKey]: now }));
-    return true;
+    return shouldRetryPredictionAttempt(lastAttempt, Date.now(), FALLBACK_RETRY_INTERVAL_MS);
   } catch { return false; }
+}
+
+function markIncompletePredictionAttempt(fixtureId: string, market: "1X2" | "DOUBLE_CHANCE"): void {
+  try {
+    const key = "moneyball.incompletePredictionRetryAt";
+    const raw = localStorage.getItem(key);
+    const parsed: unknown = raw ? JSON.parse(raw) : {};
+    const attempts = parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown> : {};
+    localStorage.setItem(key, JSON.stringify({ ...attempts, [fixtureId + "|" + market]: Date.now() }));
+  } catch { /* Storage failure must not block prediction generation. */ }
 }
 
 type Tab = "dashboard" | "matches" | "pick" | "coupons" | "intelligence" | "bets" | "tracker";
@@ -347,19 +355,21 @@ export default function App() {
       const key = String(row.details.fixtureId) + "|" + market;
       if (!latestByFixtureMarket.has(key)) latestByFixtureMarket.set(key, row);
     }
+    const retryMarketByFixture = new Map<string, { oneXTwo: boolean; doubleChance: boolean }>();
     const matches = [...new Map(sourceMatches.map(match => [match.id, match])).values()].filter(match => {
       if (hasKickoffPassed(match.date, match.time)) return false;
       const prior = latestByFixtureMarket.get(match.id + "|1X2");
       const priorDc = latestByFixtureMarket.get(match.id + "|DOUBLE_CHANCE");
-      const missingProbabilities = shouldRetryIncompletePrediction(match.id, prior, "1X2")
-        || shouldRetryIncompletePrediction(match.id, priorDc, "DOUBLE_CHANCE");
+      const retryOneXTwo = shouldRetryIncompletePrediction(match.id, prior, "1X2");
+      const retryDoubleChance = shouldRetryIncompletePrediction(match.id, priorDc, "DOUBLE_CHANCE");
+      retryMarketByFixture.set(match.id, { oneXTwo: retryOneXTwo, doubleChance: retryDoubleChance });
+      const missingProbabilities = retryOneXTwo || retryDoubleChance;
       const xgModel = "moneyball:pitchapi-recent-xg-poisson";
       const xgModelComplete = hasValidPredictionMarket(currentRecords, match.id, "1X2", xgModel)
         && hasValidPredictionMarket(currentRecords, match.id, "DOUBLE_CHANCE", xgModel);
       const missingXgModel = !!(match.pitchApiLeagueId && match.pitchApiHomeTeamId && match.pitchApiAwayTeamId)
         && !xgModelComplete && shouldRetryMissingXg(match.id);
-      // Each market is checked independently, including its probability normalization.
-      // Failed lookups are retried at most every six hours, not on every 15-minute refresh.
+      // Cooldown is committed only after the analysis has actually run, never when queued.
       return missingProbabilities || shouldRetryNeutralFallback(match.id, prior) || missingXgModel;
     });
     if (!matches.length) { setRecords(readRecords()); return; }
@@ -370,7 +380,12 @@ export default function App() {
     try {
       for (let index = 0; index < matches.length; index += concurrency) {
         const batch = matches.slice(index, index + concurrency);
-        await Promise.all(batch.map(match => loadFixtureForms(match)));
+        await Promise.all(batch.map(async match => {
+          await loadFixtureForms(match);
+          const retry = retryMarketByFixture.get(match.id);
+          if (retry?.oneXTwo) markIncompletePredictionAttempt(match.id, "1X2");
+          if (retry?.doubleChance) markIncompletePredictionAttempt(match.id, "DOUBLE_CHANCE");
+        }));
         setBulkProgress(Math.min(index + batch.length, matches.length));
       }
     } finally {
