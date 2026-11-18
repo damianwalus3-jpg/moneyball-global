@@ -377,6 +377,17 @@ function Mecze() {
     }
     return byMatch;
   }, [odds, predictionById]);
+  const bestSelectedProbabilityByMatch = useMemo(() => {
+    const values = new Map<string, number>();
+    for (const prediction of preds) {
+      if (!isActivePredictionVersion(prediction.model_version) || prediction.verdict !== "WYBRANY") continue;
+      const probability = Number(prediction.probability);
+      if (!Number.isFinite(probability)) continue;
+      values.set(prediction.match_id, Math.max(values.get(prediction.match_id) ?? -1, probability));
+    }
+    return values;
+  }, [preds]);
+
   const predCount = useMemo(() => {
     const counts = new Map<string, { x12: number; dc: number; goals: number; sel: number }>();
     for (const prediction of preds.filter((item) => isActivePredictionVersion(item.model_version))) {
@@ -432,13 +443,7 @@ function Mecze() {
           || matchSortKey(a).localeCompare(matchSortKey(b));
       }
       if (sortMode === "confidence") {
-        const bestProbability = (matchId: string) => Math.max(-1, ...preds
-          .filter((prediction) => prediction.match_id === matchId
-            && isActivePredictionVersion(prediction.model_version)
-            && prediction.verdict === "WYBRANY"
-            && Number.isFinite(Number(prediction.probability)))
-          .map((prediction) => Number(prediction.probability)));
-        return bestProbability(b.id) - bestProbability(a.id)
+        return (bestSelectedProbabilityByMatch.get(b.id) ?? -1) - (bestSelectedProbabilityByMatch.get(a.id) ?? -1)
           || matchSortKey(a).localeCompare(matchSortKey(b));
       }
       return matchSortKey(a).localeCompare(matchSortKey(b))
