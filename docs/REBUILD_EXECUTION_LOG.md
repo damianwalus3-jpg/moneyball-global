@@ -1468,3 +1468,12 @@
 - Added a regression test for this coverage-gap message.
 - Researched SportsEvents24 as a potential free, keyless supplement. Its documented beta allows 100 data requests/day, 5,000 returned rows/month and only event dates from the previous 7 days to next 30 days; that window cannot independently supply a reliable 3–5 match historical sample for weekly leagues. Not integrated as a replacement for historical form and no request was made.
 - No live odds fetches, paid calls, or secrets were used. No existing predictions, coupons, settlements, bankroll, or Tracker rows were modified.
+
+## Stage 125 — Italian Serie D history fallback (2026-11-18)
+- Expanded the free historical-results search beyond Open-Matchday's published Italian Serie A/B/Coppa coverage.
+- Researched calcio.it and verified its Serie D group pages (A–I), team directory pages and round-by-round results archive. The site publishes identifiable team links and completed match pages; source coverage can be resolved per team instead of assuming a cup fixture's teams share one league group.
+- Added a cached same-origin Worker proxy restricted to calcio.it Serie D group A–I team directories and results pages (base latest round or explicit round 1–34). No arbitrary URL proxy is exposed.
+- Added client parsing to resolve a team's group by matching the official team link and to extract completed results from the latest eight league rounds. It excludes matches on/after the fixture date, deduplicates by date/opponent/venue, and requires at least three earlier results before contributing a form sample.
+- Integrated this source as an additional fallback for Italian Serie D and Coppa Italia Serie D fixtures. It merges with other sources using existing conflict checks; conflicting results are not silently selected.
+- Added parser tests for team-to-group resolution and round result extraction.
+- No paid API calls, bookmaker calls, or secret values were used. No existing predictions, coupons, settlements, bankroll or Tracker rows were modified. Deployment and live source validation remain pending CI.
