@@ -110,9 +110,9 @@ describe("PitchAPI league catalogue", () => {
     expect(leagues).toHaveLength(2);
     expect(leagues[0]).toMatchObject({ id: "l_Bel123", country_code: "BEL", seasons: ["2026/2027", "2025/2026"] });
   });
-  it("retries one transient network failure and then returns the provider payload", async () => {
+  it.each(["fetch failed", "Failed to fetch"])("retries a transient network failure (%s) and then returns the provider payload", async message => {
     const fetchMock = vi.fn()
-      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockRejectedValueOnce(new TypeError(message))
       .mockResolvedValueOnce(new Response(JSON.stringify({ data: { leagues: [{ id: "l_Bel123", name: "Belgium", country_code: "BEL" }] } }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const leagues = await fetchPitchApiLeagueCatalog();
