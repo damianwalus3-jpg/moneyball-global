@@ -334,8 +334,25 @@ export default {
               body: JSON.stringify(strikerGameId ? { game_id: strikerGameId } : { date: strikerDate }),
               signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
             });
-            const payload = await readJson(response) as { data?: { games?: Array<Record<string, unknown>> }; games?: Array<Record<string, unknown>> };
-            const games = payload && typeof payload === "object" ? (payload.data?.games ?? payload.games ?? []) : [];
+            const responseText = await response.text();
+            let payload: { data?: { games?: Array<Record<string, unknown>> }; games?: Array<Record<string, unknown>> } = {};
+            try {
+              payload = JSON.parse(responseText) as typeof payload;
+            } catch {
+              if (!response.ok) throw new Error(`upstream_http_${response.status}: non_json_response`);
+              throw new Error("upstream_invalid_json");
+            }
+            if (!response.ok) {
+              const body = payload as Record<string, unknown>;
+              const rawDetail = body.message ?? body.detail ?? body.error ?? body.description;
+              const detail = typeof rawDetail === "string" ? rawDetail : "";
+              const safeDetail = detail
+                .replaceAll(env.STRIKERAPI_API_KEY, "[redacted]")
+                .replaceAll(env.ODDS_PILOT_TOKEN ?? "", "[redacted]")
+                .slice(0, 240);
+              throw new Error(`upstream_http_${response.status}${safeDetail ? `: ${safeDetail}` : ""}`);
+            }
+            const games = payload.data?.games ?? payload.games ?? [];
             const normalized = games.map((game) => {
               const books = Array.isArray(game.books) ? game.books as Array<Record<string, unknown>> : [];
               return {
