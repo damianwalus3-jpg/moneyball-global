@@ -126,11 +126,13 @@ describe("timezone.football supplemental European fixtures", () => {
       matches: [
         { competition: "premier-league", home: "Arsenal", away: "Chelsea", kickoff: "2026-11-18T17:00:00Z", status: "TIMED", url: "https://timezone.football/premier-league/match/arsenal-v-chelsea/" },
         { competition: "bundesliga", home: "Bayern", away: "Köln", kickoff: "2026-11-17T23:30:00Z", status: "TIMED", url: "https://timezone.football/bundesliga/match/bayern-v-koln/" },
+        { competition: "nations-league", home: "Denmark", away: "Norway", kickoff: "2026-11-17T19:45:00Z", status: "TIMED", url: "https://timezone.football/nations-league/match/denmark-v-norway/" },
         { competition: "unknown-competition", home: "Home", away: "Away", kickoff: "2026-11-18T17:00:00Z", url: "https://timezone.football/unknown/" },
         { competition: "premier-league", home: "Home", away: "Away", kickoff: "2026-11-18T17:00:00Z", url: "https://example.com/not-attributed/" },
       ],
     }, "2026-11-18");
-    expect(fixtures).toHaveLength(2);
+    expect(fixtures).toHaveLength(3);
+    expect(fixtures.find(fixture => fixture.home === "Denmark")).toMatchObject({ countryCode: "UEFA", competition: "UEFA Nations League", leagueShortcut: "nla", leagueSeason: "2026" });
     expect(fixtures[0]).toMatchObject({
       countryCode: "ENG", competition: "England · Premier League", date: "2026-11-18", time: "18:00",
       home: "Arsenal", away: "Chelsea", source: "timezone.football",
@@ -159,6 +161,20 @@ describe("ESPN European daily fixture fallback", () => {
     ] }, "2026-11-18");
     expect(fixtures).toHaveLength(1);
     expect(fixtures[0]).toMatchObject({ id: "espn|401", countryCode: "SWE", competition: "UEFA Women's Champions League, League Phase", date: "2026-11-18", time: "18:45", home: "BK Häcken", away: "Manchester City", source: "ESPN" });
+  });
+
+  it("recognizes UEFA Nations League events and attaches the OpenLigaDB national-team history key", () => {
+    const fixtures = parseEspnEuropeanFixtures({ events: [{
+      id: 420, date: "2026-11-17T19:45:00Z", competitions: [{
+        altGameNote: "UEFA Nations League", venue: { address: { country: "Denmark" } },
+        competitors: [
+          { homeAway: "home", team: { displayName: "Denmark" } },
+          { homeAway: "away", team: { displayName: "Norway" } },
+        ],
+      }],
+    }] }, "2026-11-17");
+    expect(fixtures).toHaveLength(1);
+    expect(fixtures[0]).toMatchObject({ countryCode: "UEFA", competition: "UEFA Nations League", leagueShortcut: "nla", leagueSeason: "2026", home: "Denmark", away: "Norway" });
   });
 
   it("recognizes UEFA countries with alternate and diacritic venue names", () => {
