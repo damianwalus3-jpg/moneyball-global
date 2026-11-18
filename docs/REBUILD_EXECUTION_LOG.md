@@ -939,3 +939,14 @@
 
 - Follow-up UI refinement: clickable Dashboard metric cards retain the app's dark visual style and inherit typography; the metric-card navigation opens the relevant module.
 - CI/deployment check: the commit-status API currently exposes only a Vercel build-rate-limit failure, which is outside the permitted REBUILD deployment path. No successful Cloudflare REBUILD run is visible yet for this change set, so deployment is not claimed. The isolated branch changes are saved; verify the Cloudflare workflow before treating the UI fixes as live.
+
+
+## Stage 76 — continuation verification (2026-11-18)
+- Re-opened the current `moneyball-rebuild` branch files after the user asked to continue. Confirmed the cross-source metadata merge helper is present in `src/free-fixtures.ts`, the fallback threshold of 3 completed matches is present in `src/App.tsx`, the dashboard drill-down and `predictionDiagnostics` are present, and the regression test is present.
+- Inspected the actual model implementation: `predictFromRecentForm` uses last completed match goals, preferring at least 2 home-only/away-only matches where available, and then derives Poisson 1X2 probabilities. It does not use xG, confirmed lineups, injuries, tactical data or current bookmaker odds. This is a key model limitation and must be disclosed in the UI, not marketed as a full-data model.
+- Confirmed the 75% threshold labels a top 1X2 probability as `KANDYDAT`; the main daily pick independently requires one of 1X/X2/12 probabilities >=80%. A match may have valid probabilities but not pass either selection gate.
+- Confirmed the EV value displayed in coupon pricing is a post-model coupon pricing metric, not a rejection gate. The user wrote FV; no FV symbol/feature was found. EV removal remains unapproved/unresolved; do not remove it without confirmation.
+- Rechecked TinyFish wallet: available balance is $0.00 as of 2026-11-18 07:09 UTC. Interactive browser verification remains blocked until the wallet is topped up. No new browser run was started and no additional charge was incurred.
+- Public web open of the isolated Worker was not accessible to the web reader; therefore live UI deployment is not verified from this check. GitHub combined commit status only showed a Vercel build-rate-limit failure, not a Cloudflare success. Continue to keep MAIN untouched and do not claim REBUILD is deployed until the Cloudflare workflow result or a live app response confirms it.
+- Current work remains isolated to `moneyball-rebuild`. No user Tracker/localStorage data, predictions, coupons, results or bankroll records were deleted or rewritten.
+- Persistent history is this execution log plus Git commit history. Continue appending each meaningful investigation, change, test, and deployment result here.
