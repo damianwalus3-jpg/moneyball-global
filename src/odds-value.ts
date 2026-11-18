@@ -107,7 +107,7 @@ export function shouldAutoFetchDailyOdds(input: {
   lastSuccessfulDate: string;
   lastAttemptedDate: string;
 }): boolean {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(input.fixtureDate)) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.fixtureDate)) return false;
   const year = Number(input.fixtureDate.slice(0, 4));
   const month = Number(input.fixtureDate.slice(5, 7));
   const day = Number(input.fixtureDate.slice(8, 10));
