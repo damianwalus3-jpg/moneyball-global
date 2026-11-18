@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeHistoryProvenance, hasMissingPredictionMarket, parseHistoryProvenance, shouldAppendPrediction } from "./prediction-record";
+import { describeHistoryProvenance, hasMissingPredictionMarket, hasValidPredictionMarket, parseHistoryProvenance, shouldAppendPrediction } from "./prediction-record";
 import type { TrackerRecord } from "./tracker-store";
 
 function row(id: string, probabilities: [number | null, number | null, number | null]): TrackerRecord {
@@ -53,6 +53,22 @@ describe("fixture market repair detection", () => {
     const one = row("one", [0.6, 0.2, 0.2]);
     const dc = { ...row("dc", [null, null, null]), details: { ...row("dc", [null, null, null]).details, market: "DOUBLE_CHANCE", p1x: 0.8, px2: 0.7, p12: 0.6 } };
     expect(hasMissingPredictionMarket([one, dc], "fixture-1")).toBe(false);
+  });
+  it("detects a present but unusable Double Chance row as an incomplete market", () => {
+    const invalidDc = { ...row("dc-invalid", [null, null, null]), details: { ...row("dc-invalid", [null, null, null]).details, market: "DOUBLE_CHANCE", p1x: null, px2: null, p12: null } };
+    expect(hasValidPredictionMarket([invalidDc], "fixture-1", "DOUBLE_CHANCE")).toBe(false);
+  });
+  it("accepts Double Chance only when all three probabilities sum to two", () => {
+    const validDc = { ...row("dc-valid", [null, null, null]), details: { ...row("dc-valid", [null, null, null]).details, market: "DOUBLE_CHANCE", p1x: 0.8, px2: 0.7, p12: 0.5 } };
+    const invalidDc = { ...validDc, id: "dc-bad", details: { ...validDc.details, p12: 0.4 } };
+    expect(hasValidPredictionMarket([validDc], "fixture-1", "DOUBLE_CHANCE")).toBe(true);
+    expect(hasValidPredictionMarket([invalidDc], "fixture-1", "DOUBLE_CHANCE")).toBe(false);
+  });
+  it("checks the latest row for the requested model rather than another model", () => {
+    const valid = row("valid", [0.6, 0.2, 0.2]);
+    const invalidOther = { ...row("other-model", [null, null, null]), details: { ...row("other-model", [null, null, null]).details, model: "model-v2" } };
+    expect(hasValidPredictionMarket([valid, invalidOther], "fixture-1", "1X2", "model-v1")).toBe(true);
+    expect(hasValidPredictionMarket([valid, invalidOther], "fixture-1", "1X2", "model-v2")).toBe(false);
   });
   it("does not confuse another fixture's market rows", () => {
     expect(hasMissingPredictionMarket([row("other", [0.6, 0.2, 0.2])], "fixture-2")).toBe(true);
