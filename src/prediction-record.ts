@@ -24,7 +24,13 @@ export function hasValidPredictionMarket(records: TrackerRecord[], fixtureId: st
     && (row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2") === market
     && (model === undefined || row.details.model === model))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  return rows.length > 0 && hasValidProbabilities(rows[0].details, market);
+  if (model !== undefined) return rows.length > 0 && hasValidProbabilities(rows[0].details, market);
+  const latestByModel = new Map<string, TrackerRecord>();
+  for (const row of rows) {
+    const key = typeof row.details.model === "string" ? row.details.model : "legacy";
+    if (!latestByModel.has(key)) latestByModel.set(key, row);
+  }
+  return [...latestByModel.values()].some(row => hasValidProbabilities(row.details, market));
 }
 
 export function hasMissingPredictionMarket(records: TrackerRecord[], fixtureId: string): boolean {
