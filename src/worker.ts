@@ -56,13 +56,13 @@ const FOOTYNOMAD_COUNTRIES: Record<string, string> = {
   belgium: "BEL", bosnia: "BIH", "bosnia and herzegovina": "BIH", bulgaria: "BUL", croatia: "CRO",
   cyprus: "CYP", "czech republic": "CZE", czechia: "CZE", denmark: "DEN", england: "ENG",
   estonia: "EST", "faroe islands": "FRO", finland: "FIN", france: "FRA", georgia: "GEO",
-  germany: "GER", gibraltar: "GIB", greece: "GRE", hungary: "HUN", iceland: "ISL", ireland: "IRE",
+  germany: "GER", gibraltar: "GIB", greece: "GRE", hungary: "HUN", iceland: "ISL", ireland: "IRE", "republic of ireland": "IRE", kazakhstan: "KAZ",
   italy: "ITA", israel: "ISR", kosovo: "KOS", latvia: "LVA", liechtenstein: "LIE", lithuania: "LTU",
   luxembourg: "LUX", malta: "MLT", moldova: "MDA", monaco: "MCO", montenegro: "MNE",
   netherlands: "NED", "north macedonia": "MKD", "northern ireland": "NIR", norway: "NOR",
   poland: "POL", portugal: "POR", romania: "ROU", russia: "RUS", "san marino": "SMR",
   scotland: "SCO", serbia: "SRB", slovakia: "SVK", slovenia: "SVN", spain: "ESP",
-  sweden: "SWE", switzerland: "SUI", turkey: "TUR", ukraine: "UKR", wales: "WAL",
+  sweden: "SWE", switzerland: "SUI", turkey: "TUR", turkiye: "TUR", ukraine: "UKR", wales: "WAL",
 };
 function footyHtmlText(value: string): string {
   return value
@@ -80,7 +80,7 @@ export function parseFootyNomadFixtures(html: string, targetDate: string): { fix
   let skippedNoTimestamp = 0;
   for (let index = 0; index < headings.length; index++) {
     const heading = headings[index];
-    const country = footyHtmlText(heading[1]).replace(/\s+\d+$/, "").toLowerCase();
+    const country = footyHtmlText(heading[1]).replace(/\s+\d+$/, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     const countryCode = FOOTYNOMAD_COUNTRIES[country];
     const sectionStart = (heading.index ?? 0) + heading[0].length;
     const sectionEnd = index + 1 < headings.length ? (headings[index + 1].index ?? html.length) : html.length;
