@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixtureKey, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaSeasonYears, parseEspnEuropeanFixtures, espnScoreboardDatesForBrusselsDay } from "./free-fixtures";
+import { fixtureKey, isEuropeanCompetitionFolder, isEuropeanOpenLiga, openLigaCountryCode, openLigaSeasonYears, parseEspnEuropeanFixtures, espnScoreboardDatesForBrusselsDay } from "./free-fixtures";
 
 describe("European fixture source classification", () => {
   it("accepts known European country names and competition prefixes", () => {
@@ -59,6 +59,21 @@ describe("European fixture source classification", () => {
       .toBe(fixtureKey("2026-11-18", "Chelsea Women", "Paris Saint Germain Women", "WSL Cup"));
     expect(fixtureKey("2026-11-18", "Chelsea W", "Paris Saint Germain W", "WSL Cup"))
       .not.toBe(fixtureKey("2026-11-18", "Chelsea", "Paris Saint Germain", "Premier League"));
+  });
+});
+
+describe("OpenLigaDB country attribution", () => {
+  it("assigns a real European country instead of the generic EU code when identifiable", () => {
+    expect(openLigaCountryCode({ leagueId: 1, leagueName: "1. Bundesliga", leagueShortcut: "bl1" })).toBe("GER");
+    expect(openLigaCountryCode({ leagueId: 2, leagueName: "League", leagueShortcut: "fr1" })).toBe("FRA");
+    expect(openLigaCountryCode({ leagueId: 3, leagueName: "Premier League", leagueShortcut: "pl" })).toBe("ENG");
+    expect(openLigaCountryCode({ leagueId: 4, leagueName: "UEFA Conference League", leagueShortcut: "uecl" })).toBe("UEFA");
+  });
+
+  it("recognizes Israel and smaller European countries by league name", () => {
+    expect(openLigaCountryCode({ leagueId: 5, leagueName: "Israel Premier League", leagueShortcut: "ipl" })).toBe("ISR");
+    expect(openLigaCountryCode({ leagueId: 6, leagueName: "League of Faroe Islands", leagueShortcut: "unknown" })).toBe("FRO");
+    expect(openLigaCountryCode({ leagueId: 7, leagueName: "Kosovo Superliga", leagueShortcut: "unknown" })).toBe("KOS");
   });
 });
 
