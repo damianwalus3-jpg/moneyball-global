@@ -253,3 +253,57 @@ export async function findOpenLigaFixtureResult(shortcut: string, season: string
   if (!Number.isInteger(homeGoals) || !Number.isInteger(awayGoals) || (homeGoals as number) < 0 || (awayGoals as number) < 0) return null;
   return { actual: (homeGoals as number) > (awayGoals as number) ? "1" : homeGoals === awayGoals ? "X" : "2", homeGoals: homeGoals as number, awayGoals: awayGoals as number, date, source: "OpenLigaDB" };
 }
+
+
+interface EspnTeamFormPayload {
+  team?: string;
+  generatedAt?: string;
+  matches?: Array<{ date?: string; opponent?: string; venue?: "H" | "A"; goalsFor?: number; goalsAgainst?: number }>;
+}
+export function mapEspnTeamForm(payload: unknown, team: string, beforeDate: string): TeamForm {
+  if (!payload || typeof payload !== "object" || !Array.isArray((payload as EspnTeamFormPayload).matches)) {
+    throw new Error("ESPN: nieprawidłowa odpowiedź historii drużyny");
+  }
+  const data = payload as EspnTeamFormPayload;
+  const matches = (data.matches ?? []).flatMap(row => {
+    if (!row.date || !/^\d{4}-\d{2}-\d{2}$/.test(row.date) || row.date >= beforeDate
+      || !row.opponent?.trim() || (row.venue !== "H" && row.venue !== "A")
+      || !Number.isInteger(row.goalsFor) || !Number.isInteger(row.goalsAgainst)
+      || (row.goalsFor as number) < 0 || (row.goalsAgainst as number) < 0) return [];
+    const goalsFor = row.goalsFor as number, goalsAgainst = row.goalsAgainst as number;
+    const result: FormMatch["result"] = goalsFor > goalsAgainst ? "W" : goalsFor === goalsAgainst ? "D" : "L";
+    return [{ date: row.date, opponent: row.opponent.trim(), venue: row.venue, goalsFor, goalsAgainst, result, points: result === "W" ? 3 : result === "D" ? 1 : 0 }];
+  }).sort((a,b) => b.date.localeCompare(a.date)).slice(0, 5);
+  return {
+    team: data.team?.trim() || team,
+    matches,
+    home: matches.filter(row => row.venue === "H"),
+    away: matches.filter(row => row.venue === "A"),
+    source: "ESPN team schedule (nieoficjalny publiczny endpoint)",
+    sourceUpdatedAt: data.generatedAt || "brak daty aktualizacji ESPN",
+  };
+}
+const espnTeamFormRequests = new Map<string, Promise<TeamForm>>();
+export async function loadEspnRecentTeamForm(team: string, beforeDate: string): Promise<TeamForm> {
+  if (!team.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(beforeDate)) throw new Error("ESPN: nieprawidłowa drużyna lub data");
+  const key = normalizeTeam(team) + ":" + beforeDate;
+  const pending = espnTeamFormRequests.get(key);
+  if (pending) return pending;
+  const request = (async () => {
+    const cacheKey = "moneyball.espn-team-form.v1:" + key;
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached) as { cachedAt?: number; form?: TeamForm };
+        if (parsed.form && typeof parsed.cachedAt === "number" && Date.now() - parsed.cachedAt < 6 * 60 * 60 * 1000) return parsed.form;
+      }
+    } catch { /* ignore cache errors */ }
+    const response = await fetch("/api/espn/team-form?team=" + encodeURIComponent(team) + "&before=" + encodeURIComponent(beforeDate), { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("ESPN historia drużyny niedostępna (HTTP " + response.status + ")");
+    const form = mapEspnTeamForm(await response.json(), team, beforeDate);
+    try { localStorage.setItem(cacheKey, JSON.stringify({ cachedAt: Date.now(), form })); } catch { /* cache is optional */ }
+    return form;
+  })();
+  espnTeamFormRequests.set(key, request);
+  try { return await request; } finally { espnTeamFormRequests.delete(key); }
+}
