@@ -1,96 +1,109 @@
 import { evaluatePredictions, type PredictionMetrics } from "./prediction-engine";
 import type { TrackerRecord } from "./tracker-store";
-
-export interface CalibrationBucket {
-  label: string;
-  count: number;
-  averageConfidence: number;
-  observedAccuracy: number;
-}
-export interface BinaryMarketMetrics {
-  count: number;
-  brierScore: number;
-  logLoss: number;
-  accuracy: number;
+export interface CalibrationBucket { label: string; count: number; averageConfidence: number; observedAccuracy: number; }
+export interface BinaryMarketMetrics { count: number; brierScore: number; logLoss: number; accuracy: number; }
+export interface ModelComparison {
+  model: string; market: "1X2" | "DOUBLE_CHANCE"; count: number; sampleMatches: number;
+  minimumSampleSize: number; sampleQualified: boolean;
+  metrics: PredictionMetrics | BinaryMarketMetrics | null; expectedCalibrationError: number | null; buckets: CalibrationBucket[];
 }
 export interface ModelAudit {
-  metrics: PredictionMetrics | null;
-  doubleChance: BinaryMarketMetrics | null;
-  buckets: CalibrationBucket[];
-  unmatchedPredictions: number;
-  settledPredictions: number;
+  metrics: PredictionMetrics | null; doubleChance: BinaryMarketMetrics | null; buckets: CalibrationBucket[];
+  unmatchedPredictions: number; settledPredictions: number; modelComparisons: ModelComparison[]; minimumSampleSize: number;
 }
-
-export function auditTrackerPredictions(records: TrackerRecord[]): ModelAudit {
-  const results = new Map<string, "1" | "X" | "2">();
-  // Tracker records are newest-first. Keep the newest valid result if a
-  // fixture has duplicate/legacy settlement rows instead of letting an older
-  // row silently overwrite it during iteration.
-  for (const record of records) {
-    if (record.kind !== "result" || typeof record.details.fixtureId !== "string" || results.has(record.details.fixtureId)) continue;
-    const actual = record.details.actual;
-    if (actual === "1" || actual === "X" || actual === "2") results.set(record.details.fixtureId, actual);
-  }
-  const predictionByFixture = new Map<string, TrackerRecord>();
-  for (const record of records) {
-    if (record.kind !== "prediction" || typeof record.details.fixtureId !== "string" || predictionByFixture.has(record.details.fixtureId)) continue;
-    // Tracker is newest-first: one canonical prediction per fixture prevents duplicate rows from overweighting metrics.
-    predictionByFixture.set(record.details.fixtureId, record);
-  }
-  const predictions = [...predictionByFixture.values()];
-  const settled = predictions.flatMap(record => {
-    const d = record.details;
-    const actual = results.get(d.fixtureId as string);
-    const p = [d.p1, d.px, d.p2];
-    if (!actual || p.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) return [];
-    const sum = (d.p1 as number) + (d.px as number) + (d.p2 as number);
-    if (Math.abs(sum - 1) > 0.0001) return [];
-    return [{
-      fixtureId: d.fixtureId as string,
-      probabilities: { home: d.p1 as number, draw: d.px as number, away: d.p2 as number },
-      actual,
-    }];
-  });
-  const metrics = evaluatePredictions(settled);
-  const doubleChanceRows = settled.flatMap(row => {
-    const d = predictionByFixture.get(row.fixtureId)?.details;
-    if (!d) return [];
-    const probabilities = [d.dc1x, d.dcx2, d.dc12];
-    if (probabilities.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) return [];
-    return [
-      { probability: d.dc1x as number, actual: row.actual !== "2" },
-      { probability: d.dcx2 as number, actual: row.actual !== "1" },
-      { probability: d.dc12 as number, actual: row.actual !== "X" },
-    ];
-  });
-  const doubleChance = doubleChanceRows.length ? {
-    count: doubleChanceRows.length,
-    brierScore: doubleChanceRows.reduce((sum, row) => sum + (row.probability - (row.actual ? 1 : 0)) ** 2, 0) / doubleChanceRows.length,
-    logLoss: doubleChanceRows.reduce((sum, row) => sum - Math.log(Math.max(row.actual ? row.probability : 1 - row.probability, 1e-15)), 0) / doubleChanceRows.length,
-    accuracy: doubleChanceRows.filter(row => (row.probability >= 0.5) === row.actual).length / doubleChanceRows.length,
-  } : null;
+function calibrationBuckets(rows: Array<{ confidence: number; correct: boolean }>): CalibrationBucket[] {
   const buckets: CalibrationBucket[] = [];
-  for (let index = 0; index < 5; index++) {
-    const lower = index * 0.2;
-    const upper = lower + 0.2;
-    const rows = settled.filter(row => {
-      const confidence = Math.max(row.probabilities.home, row.probabilities.draw, row.probabilities.away);
-      return confidence >= lower && (index === 4 ? confidence <= upper : confidence < upper);
-    });
-    if (!rows.length) continue;
-    const averageConfidence = rows.reduce((sum, row) => sum + Math.max(row.probabilities.home, row.probabilities.draw, row.probabilities.away), 0) / rows.length;
-    const observedAccuracy = rows.filter(row => {
-      const predicted = row.probabilities.home >= row.probabilities.draw && row.probabilities.home >= row.probabilities.away ? "1"
-        : row.probabilities.draw >= row.probabilities.away ? "X" : "2";
-      return predicted === row.actual;
-    }).length / rows.length;
-    buckets.push({ label: `${Math.round(lower * 100)}–${Math.round(upper * 100)}%`, count: rows.length, averageConfidence, observedAccuracy });
+  for (let i = 0; i < 5; i++) {
+    const lower = i * 0.2, upper = lower + 0.2;
+    const sample = rows.filter(row => row.confidence >= lower && (i === 4 ? row.confidence <= upper : row.confidence < upper));
+    if (sample.length) buckets.push({ label: Math.round(lower * 100) + "–" + Math.round(upper * 100) + "%",
+      count: sample.length, averageConfidence: sample.reduce((s, r) => s + r.confidence, 0) / sample.length,
+      observedAccuracy: sample.filter(r => r.correct).length / sample.length });
   }
-  return {
-    metrics,
-    doubleChance,
-    buckets,
-    unmatchedPredictions: predictions.length - settled.length,
-    settledPredictions: settled.length,
-  };
+  return buckets;
+}
+function ece(buckets: CalibrationBucket[], count: number): number | null {
+  return count ? buckets.reduce((sum, b) => sum + b.count / count * Math.abs(b.averageConfidence - b.observedAccuracy), 0) : null;
+}
+function binaryMetrics(rows: Array<{ probability: number; actual: boolean }>): BinaryMarketMetrics | null {
+  if (!rows.length) return null;
+  return { count: rows.length, brierScore: rows.reduce((s, r) => s + (r.probability - (r.actual ? 1 : 0)) ** 2, 0) / rows.length,
+    logLoss: rows.reduce((s, r) => s - Math.log(Math.max(r.actual ? r.probability : 1 - r.probability, 1e-15)), 0) / rows.length,
+    accuracy: rows.filter(r => (r.probability >= 0.5) === r.actual).length / rows.length };
+}
+function valid1x2(d: TrackerRecord["details"]): boolean {
+  const p = [d.p1, d.px, d.p2];
+  return p.every(v => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1)
+    && Math.abs((d.p1 as number) + (d.px as number) + (d.p2 as number) - 1) <= 0.0001;
+}
+function validDC(d: TrackerRecord["details"]): boolean {
+  return [d.p1x, d.px2, d.p12].every(v => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1);
+}
+export function auditTrackerPredictions(records: TrackerRecord[], minimumSampleSize = 30): ModelAudit {
+  const results = new Map<string, "1" | "X" | "2">();
+  for (const r of records) if (r.kind === "result" && typeof r.details.fixtureId === "string" && !results.has(r.details.fixtureId)
+    && ["1", "X", "2"].includes(String(r.details.actual))) results.set(r.details.fixtureId, r.details.actual as "1" | "X" | "2");
+  const ordered = records.filter(r => r.kind === "prediction" && typeof r.details.fixtureId === "string")
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const latest = new Map<string, TrackerRecord>();
+  for (const r of ordered) {
+    const d = r.details, model = typeof d.model === "string" ? d.model : "legacy";
+    const market = d.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2";
+    const key = [d.fixtureId, model, market].join("|");
+    if (!latest.has(key)) latest.set(key, r);
+  }
+  const explicitDC = new Set([...latest.values()].filter(r => r.details.market === "DOUBLE_CHANCE")
+    .map(r => String(r.details.fixtureId) + "|" + String(r.details.model ?? "legacy")));
+  const grouped1 = new Map<string, Array<{ fixtureId: string; probabilities: { home: number; draw: number; away: number }; actual: "1" | "X" | "2" }>>();
+  const groupedDC = new Map<string, Array<{ fixtureId: string; probability: number; actual: boolean }>>();
+  for (const r of latest.values()) {
+    const d = r.details, fixtureId = d.fixtureId as string, actual = results.get(fixtureId);
+    const model = typeof d.model === "string" ? d.model : "legacy";
+    if (!actual) continue;
+    if (d.market === "DOUBLE_CHANCE") {
+      if (!validDC(d)) continue;
+      const rows = groupedDC.get(model) ?? [];
+      rows.push({ fixtureId, probability: d.p1x as number, actual: actual !== "2" },
+        { fixtureId, probability: d.px2 as number, actual: actual !== "1" },
+        { fixtureId, probability: d.p12 as number, actual: actual !== "X" });
+      groupedDC.set(model, rows);
+    } else if (valid1x2(d)) {
+      const rows = grouped1.get(model) ?? [];
+      rows.push({ fixtureId, probabilities: { home: d.p1 as number, draw: d.px as number, away: d.p2 as number }, actual });
+      grouped1.set(model, rows);
+      if (!explicitDC.has(fixtureId + "|" + model) && [d.dc1x, d.dcx2, d.dc12].every(v => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1)) {
+        const dc = groupedDC.get(model) ?? [];
+        dc.push({ fixtureId, probability: d.dc1x as number, actual: actual !== "2" },
+          { fixtureId, probability: d.dcx2 as number, actual: actual !== "1" },
+          { fixtureId, probability: d.dc12 as number, actual: actual !== "X" });
+        groupedDC.set(model, dc);
+      }
+    }
+  }
+  const comparisons: ModelComparison[] = [];
+  for (const [model, rows] of grouped1) {
+    const metrics = evaluatePredictions(rows);
+    const buckets = calibrationBuckets(rows.map(row => {
+      const p = [row.probabilities.home, row.probabilities.draw, row.probabilities.away], max = Math.max(...p), index = p.indexOf(max);
+      return { confidence: max, correct: (index === 0 ? "1" : index === 1 ? "X" : "2") === row.actual };
+    }));
+    comparisons.push({ model, market: "1X2", count: rows.length, sampleMatches: rows.length, minimumSampleSize,
+      sampleQualified: rows.length >= minimumSampleSize, metrics, expectedCalibrationError: ece(buckets, rows.length), buckets });
+  }
+  for (const [model, rows] of groupedDC) {
+    const metrics = binaryMetrics(rows);
+    const buckets = calibrationBuckets(rows.map(row => ({ confidence: row.probability, correct: (row.probability >= 0.5) === row.actual })));
+    const sampleMatches = new Set(rows.map(row => row.fixtureId)).size;
+    comparisons.push({ model, market: "DOUBLE_CHANCE", count: rows.length, sampleMatches, minimumSampleSize,
+      sampleQualified: sampleMatches >= minimumSampleSize, metrics, expectedCalibrationError: ece(buckets, rows.length), buckets });
+  }
+  comparisons.sort((a, b) => a.market.localeCompare(b.market) || a.model.localeCompare(b.model));
+  const primary = comparisons.find(c => c.market === "1X2"), primaryDC = comparisons.find(c => c.market === "DOUBLE_CHANCE");
+  const all1x2 = [...latest.values()].filter(r => r.details.market !== "DOUBLE_CHANCE");
+  const fixtureIds = new Set(all1x2.map(r => String(r.details.fixtureId)));
+  const settledIds = new Set([...grouped1.values()].flatMap(rows => rows.map(row => row.fixtureId)));
+  return { metrics: primary?.metrics as PredictionMetrics | null ?? null,
+    doubleChance: primaryDC?.metrics as BinaryMarketMetrics | null ?? null, buckets: primary?.buckets ?? [],
+    unmatchedPredictions: Math.max(0, fixtureIds.size - settledIds.size), settledPredictions: settledIds.size,
+    modelComparisons: comparisons, minimumSampleSize };
 }
