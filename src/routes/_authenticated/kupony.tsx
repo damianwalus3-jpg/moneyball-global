@@ -13,7 +13,7 @@ import { fmtMoney, fmtOdds, fmtPct, matchLabel } from "@/lib/format";
 import { couponPageDataQuery, latestScanRunQuery, useAction } from "@/lib/queries";
 import { useQuery } from "@tanstack/react-query";
 import { fmtDateTime } from "@/lib/time";
-import type { Coupon, CouponStatus, CouponType, Prediction } from "@/lib/types";
+import type { Coupon, CouponStatus, Prediction } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/kupony")({
   head: () => ({ meta: [{ title: "Kupony — MONEYBALL GLOBAL 2.0" }, { name: "description", content: "Generator kuponów z dzisiejszych meczów: 3 różne spotkania, prawdopodobieństwo powyżej 75%." }, { property: "og:title", content: "Kupony — MONEYBALL GLOBAL 2.0" }, { property: "og:description", content: "Generuj i zapisuj kupony z dzisiejszych meczów." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
@@ -23,7 +23,8 @@ export const Route = createFileRoute("/_authenticated/kupony")({
   component: Kupony,
 });
 
-const COUPON_TYPES: CouponType[] = ["MAIN", "MEGA", "EXTRA"];
+const COUPON_TYPES = ["MEGA", "EXTRA"] as const;
+type CouponGeneratorType = (typeof COUPON_TYPES)[number];
 const STATUS_FILTERS: ("all" | CouponStatus)[] = ["all", "pending", "won", "lost", "void", "cancelled"];
 
 function statusLabel(status: CouponStatus) {
@@ -50,7 +51,7 @@ function Kupony() {
   const [couponCount, setCouponCount] = useState("2");
   const couponSize = 3 as const;
   const recordStake = true;
-  const [couponType, setCouponType] = useState<CouponType>("MEGA");
+  const [couponType, setCouponType] = useState<CouponGeneratorType>("MEGA");
   const [namePrefix, setNamePrefix] = useState("MONEYBALL");
   const [excludeActive, setExcludeActive] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"all" | CouponStatus>("all");
@@ -138,6 +139,7 @@ function Kupony() {
     setGenerated(buildBatch());
   }
   function generateAndSave() {
+    if (previewMissingOdds) return;
     if (preview.length > 0) {
       saveBatch.mutate(preview);
       return;
@@ -150,7 +152,7 @@ function Kupony() {
     saveBatch.isPending ||
     candidates.length < couponSize ||
     preview.some((coupon) => coupon.length !== 3) ||
-    (couponType !== "TEST" && previewMissingOdds);
+    previewMissingOdds;
 
   return (
     <div>
@@ -188,7 +190,7 @@ function Kupony() {
             <Input inputMode="numeric" className="num" value={couponCount} onChange={(event) => { setCouponCount(event.target.value); setGenerated([]); }} />
           </Field>
           <Field label="Typ kuponu">
-            <Select value={couponType} onValueChange={(value) => { setCouponType(value as CouponType); setGenerated([]); }}>
+            <Select value={couponType} onValueChange={(value) => { setCouponType(value as CouponGeneratorType); setGenerated([]); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{COUPON_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}</SelectContent>
             </Select>
@@ -225,7 +227,7 @@ function Kupony() {
           <>
             {previewMissingOdds && (
               <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
-                Brak potwierdzonych kursów dla części typów. Możesz zapisać taki kupon wyłącznie jako TEST do analizy skuteczności — nie jest gotowy do zagrania u bukmachera.
+                Brak potwierdzonych kursów dla części typów. Kupon nie zostanie zapisany bez rzeczywistych, świeżych kursów bukmacherskich. Uzupełnij kurs w Terminarzu albo poczekaj na synchronizację.
               </p>
             )}
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -268,8 +270,8 @@ function Kupony() {
           <Ticket className="size-5" />
           {saveBatch.isPending
             ? "Zapisywanie…"
-            : couponType !== "TEST" && previewMissingOdds
-              ? "Brak kursów — wybierz TEST"
+            : previewMissingOdds
+              ? "Brak kursów — nie można zapisać"
               : "GENERUJ I ZAPISZ KUPONY"}
         </Button>
         <p className="mt-2 text-center text-xs text-muted-foreground">
