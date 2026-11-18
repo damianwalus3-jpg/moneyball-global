@@ -276,7 +276,9 @@ export default {
         const scheduleUrl = "https://site.api.espn.com/apis/site/v2/sports/soccer/" + encodeURIComponent(selected.defaultLeagueSlug) + "/teams/" + encodeURIComponent(selected.id) + "/schedule";
         const scheduleResponse = await fetch(scheduleUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
         if (!scheduleResponse.ok) throw new Error("espn_team_schedule_http_" + scheduleResponse.status);
-        const schedule = await scheduleResponse.json() as { timestamp?: string; events?: any[] };
+        type EspnScheduleCompetitor = { homeAway?: string; team?: { displayName?: string; name?: string }; score?: { value?: number; displayValue?: string } | string };
+        type EspnScheduleEvent = { id?: string; date?: string; competitions?: Array<{ competitors?: EspnScheduleCompetitor[]; status?: { type?: { completed?: boolean } } }> };
+        const schedule = await scheduleResponse.json() as { timestamp?: string; events?: EspnScheduleEvent[] };
         const events = (schedule.events ?? []).flatMap(event => {
           const competition = event.competitions?.[0];
           if (!event.date || !competition?.status?.type?.completed) return [];
