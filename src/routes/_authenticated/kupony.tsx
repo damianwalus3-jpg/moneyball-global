@@ -73,12 +73,16 @@ function Kupony() {
     return used;
   }, [legs, activeCouponIds, predictionById]);
 
-  const candidates = predictions
+  const modelCandidates = predictions
     .filter((prediction) => isActivePredictionVersion(prediction.model_version))
     .filter((prediction) => isCouponCandidate(prediction, matchById.get(prediction.match_id), Date.now()))
     .filter((prediction) => isKickoffToday(matchById.get(prediction.match_id)?.kickoff_at, Date.now()))
     .filter((prediction) => !excludeActive || !activeMatchIds.has(prediction.match_id))
     .sort((a, b) => Number(b.probability) - Number(a.probability));
+  // A strong model pick without a live Belgian price is kept visible as waiting,
+  // but is not silently inserted into a coupon with an invented payout.
+  const candidates = modelCandidates.filter((prediction) => hasFreshConfirmedOdds(prediction, Date.now()));
+  const awaitingOddsCount = modelCandidates.length - candidates.length;
 
   const detailsCoupon = coupons.find((coupon) => coupon.id === detailsCouponId) ?? null;
   const detailsLegs = detailsCoupon ? legs.filter((leg) => leg.coupon_id === detailsCoupon.id) : [];
@@ -182,7 +186,8 @@ function Kupony() {
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <StatCard label="Kupony w grze" value={counts.pending} hint={`Zamrożone stawki: ${fmtMoney(pendingStake)}`} tone="warning" />
-          <StatCard label="Dostępne mecze" value={uniqueCandidateMatches} hint="Dziś · WYBRANY · powyżej 75%" tone="primary" />
+          <StatCard label="Dostępne mecze" value={uniqueCandidateMatches} hint="Dziś · >75% · świeży kurs" tone="primary" />
+          <StatCard label="Oczekują na kurs" value={awaitingOddsCount} hint="Prognozy zachowane · bez odrzucania" />
           <StatCard label="Anulowane" value={coupons.filter((coupon) => coupon.status === "cancelled").length} hint="Stawka zwrócona do wirtualnego salda" />
         </div>
       </section>
@@ -193,7 +198,7 @@ function Kupony() {
           <h2 className="text-xl font-semibold uppercase">GENERATOR KUPONÓW</h2>
         </div>
         <p className="mb-4 rounded-md border border-primary/40 bg-primary/10 p-3 text-sm text-foreground">
-          Skan aktualizuje prognozy automatycznie. Kupon zapisujesz przyciskiem poniżej. AKO zawiera dokładnie 3 różne mecze, a każdy nowy kupon ma stałą stawkę 4 €. Wynik finansowy aktualizuje się po potwierdzeniu wyników spotkań.
+          Prognoza modelu i gotowość kuponu są rozdzielone. Brak kursu nie odrzuca prognozy — trafia ona do „Oczekują na kurs”. Kupon AKO zapisujemy dopiero po pobraniu świeżego kursu z zatwierdzonego belgijskiego bukmachera. Każdy kupon ma dokładnie 3 różne mecze i stawkę 4 €.
         </p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Liczba kuponów">
@@ -231,7 +236,7 @@ function Kupony() {
         </div>
         {preview.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
-            Dostępne kwalifikujące się mecze: {uniqueCandidateMatches}. Do kuponu potrzeba minimum 3 różnych spotkań z WYBRANY i prawdopodobieństwem powyżej 75%. Jeśli liczba jest mniejsza, sprawdź powody odrzucenia w Terminarzu. Nie tworzymy kuponów MAIN/MEGA/EXTRA bez wystarczających danych i potwierdzonych kursów.
+            Dostępne do kuponów: {uniqueCandidateMatches}. Prognozy modelowe powyżej 75% bez aktualnego kursu: {awaitingOddsCount} — pozostają WYBRANE i czekają na synchronizację. Do zapisu AKO potrzeba 3 różnych meczów z aktualnym, potwierdzonym kursem. Nie blokujemy ani nie odrzucamy samej prognozy z powodu braku kursu.
           </p>
         ) : (
           <>
