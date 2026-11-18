@@ -1799,3 +1799,5 @@
 - Dokumentacja API-Football opisuje endpoint odds i informuje, że pokrycie odds jest zależne od ligi/sezonu; pole coverage ligi może mieć wartość false. Sam plan Pro daje dostęp do endpointu, ale nie gwarantuje kursów dla każdego spotkania.
 - Źródła dokumentacji: API-Football v3 docs i oficjalna tabela planów/coverage (sprawdzone 2026-11-19).
 - Wdrożenie i testy CI są wymagane przed uznaniem pilota za aktywny produkcyjnie. Nie wykonywano jeszcze zapytań live o kursy na konkretnych meczach.
+
+- Walidacja pierwszego commitu Stage 153 wykryła nieaktualny tekst oczekiwanej odpowiedzi w istniejącym teście 400 (kod produkcyjny poprawnie rozszerzył listę parametrów, test nadal oczekiwał starej listy). Zaktualizowano asercję i dodano test odrzucający niepoprawne API-Football fixture ID przed wywołaniem dostawcy. Typecheck przechodził; test suite miała 247/248 zaliczonych przed korektą. Ponowna walidacja i wdrożenie są uruchamiane po poprawce.
