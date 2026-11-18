@@ -140,15 +140,14 @@ BEGIN
   END IF;
   IF NOT public.moneyball_is_eligible_european_match(v_country,v_competition,v_gender,v_home,v_away)
      OR NOT public.moneyball_is_openmatchday_tier(v_source,v_external_id) THEN RETURN null; END IF;
-  IF tg_table_name='matches' AND tg_op='INSERT' AND new.kickoff_at IS NOT NULL THEN
-    v_day:=(new.kickoff_at AT TIME ZONE 'Europe/Brussels')::date;
+  IF tg_table_name='matches' AND tg_op='INSERT' AND (new.kickoff_at IS NOT NULL OR new.kickoff_date IS NOT NULL) THEN
+    v_day:=coalesce((new.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,new.kickoff_date);
     v_home_key:=regexp_replace(normalize(lower(btrim(v_home)),NFD),'[^a-z0-9]+','','g');
     v_away_key:=regexp_replace(normalize(lower(btrim(v_away)),NFD),'[^a-z0-9]+','','g');
     PERFORM pg_advisory_xact_lock(hashtextextended(coalesce(new.owner_id::text,'')||'|'||v_day::text||'|'||v_home_key||'|'||v_away_key,0));
     IF EXISTS (
       SELECT 1 FROM public.matches m
-      WHERE m.owner_id=new.owner_id AND m.kickoff_at IS NOT NULL
-        AND (m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date=v_day
+      WHERE m.owner_id=new.owner_id AND coalesce((m.kickoff_at AT TIME ZONE 'Europe/Brussels')::date,m.kickoff_date)=v_day
         AND regexp_replace(normalize(lower(btrim(coalesce(m.home_team,''))),NFD),'[^a-z0-9]+','','g')=v_home_key
         AND regexp_replace(normalize(lower(btrim(coalesce(m.away_team,''))),NFD),'[^a-z0-9]+','','g')=v_away_key
         AND public.moneyball_is_eligible_european_match(m.country,coalesce(m.competition,m.league),m.gender,m.home_team,m.away_team)
