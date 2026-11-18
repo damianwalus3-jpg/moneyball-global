@@ -131,7 +131,7 @@ const OPENLIGA_COUNTRY_NAME_CODES: Array<[string, string]> = [
   ["northern ireland", "NIR"], ["bosnia and herzegovina", "BIH"], ["north macedonia", "MKD"],
   ["faroe islands", "FRO"], ["san marino", "SMR"], ["liechtenstein", "LIE"],
   ["netherlands", "NED"], ["england", "ENG"], ["scotland", "SCO"], ["wales", "WAL"],
-  ["ireland", "IRE"], ["france", "FRA"], ["germany", "GER"], ["italy", "ITA"],
+  ["ireland", "IRE"], ["france", "FRA"], ["germany", "GER"], ["deutschland", "GER"], ["osterreich", "AUT"], ["italy", "ITA"],
   ["spain", "ESP"], ["portugal", "POR"], ["belgium", "BEL"], ["austria", "AUT"],
   ["switzerland", "SUI"], ["turkey", "TUR"], ["greece", "GRE"], ["denmark", "DEN"],
   ["sweden", "SWE"], ["norway", "NOR"], ["romania", "ROU"], ["poland", "POL"],
@@ -160,7 +160,7 @@ const OPENLIGA_SHORTCUT_COUNTRY_CODES: Record<string, string> = {
   lu: "LUX", mt: "MLT", ee: "EST", lv: "LVA", lt: "LTU", md: "MDA", ge: "GEO",
   am: "ARM", az: "AZE", mk: "MKD", me: "MNE", ad: "AND", fo: "FRO", gi: "GIB",
   il: "ISR", ko: "KOS", by: "BLR", li: "LIE", sm: "SMR", pl1: "POL",
-  bl: "GER", la1: "ESP", ere: "NED", "öbl": "AUT", wcl: "UEFA", ucl: "UEFA",
+  bl: "GER", la1: "ESP", ere: "NED", obl: "AUT", wcl: "UEFA", ucl: "UEFA",
   uel: "UEFA", uecl: "UEFA", nla: "UEFA", pl: "ENG",
 };
 export function openLigaCountryCode(league: OpenLigaLeague): string {
