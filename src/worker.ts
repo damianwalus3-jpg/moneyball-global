@@ -543,7 +543,7 @@ export default {
         upstreamPath = "/v1/matches/" + pitchMatch![1] + (pitchMatch![2] ? "/" + pitchMatch![2] : "");
       }
       const isLive = pitchMatch?.[2] === "live";
-      const cacheSeconds = isLive ? 0 : pitchDate ? 600 : pitchLeague || pitchLeagueMatches ? 21600 : pitchMatch?.[2] === "lineups" ? 120 : pitchMatch?.[2] === "shots" || pitchMatch?.[2]?.startsWith("advanced") ? 21600 : 1800;
+      const cacheSeconds = isLive ? 0 : pitchDate ? 600 : pitchLeague || pitchLeagueMatches ? 21600 : pitchMatch?.[2] === "lineups" ? 120 : pitchMatch?.[2] === "shots" || pitchMatch?.[2] === "stats" || pitchMatch?.[2]?.startsWith("advanced") ? 21600 : 1800;
       const cacheKey = new Request(url.toString(), { method: "GET" });
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
       if (cacheSeconds > 0) {
