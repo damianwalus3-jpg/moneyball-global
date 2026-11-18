@@ -37,7 +37,7 @@ export function valueSelectionFromOdds(
   bookmaker: string,
   modelProbabilities: { p1: number; px: number; p2: number },
   now = new Date().toISOString(),
-  maxAgeMinutes = 15,
+  maxAgeMinutes = 60,
 ): OddsValuation | null {
   if (!fixtureId || !bookmaker.trim() || !Number.isFinite(Date.parse(now)) || maxAgeMinutes < 0) return null;
   const probabilities = [modelProbabilities.p1, modelProbabilities.px, modelProbabilities.p2];
@@ -80,7 +80,7 @@ export function valueSelectionFromOdds(
   };
 }
 
-export function listOddsBookmakers(records: TrackerRecord[], fixtureIds: string[], now = new Date().toISOString(), maxAgeMinutes = 15): string[] {
+export function listOddsBookmakers(records: TrackerRecord[], fixtureIds: string[], now = new Date().toISOString(), maxAgeMinutes = 60): string[] {
   const ids = new Set(fixtureIds);
   const current = Date.parse(now);
   if (!Number.isFinite(current)) return [];
@@ -94,6 +94,30 @@ export function listOddsBookmakers(records: TrackerRecord[], fixtureIds: string[
     const captured = Date.parse(d.capturedAt);
     return Number.isFinite(captured) && captured <= current && current - captured <= maxAgeMinutes * 60_000 ? [d.bookmaker] : [];
   }))].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Returns only complete 1X2 snapshots within the provider's hourly refresh
+ * window. Stale and future-dated quotes are excluded from the live fixture view.
+ */
+export function listFreshOddsSnapshots(
+  records: TrackerRecord[],
+  fixtureId: string,
+  now = new Date().toISOString(),
+  maxAgeMinutes = 60,
+): TrackerRecord[] {
+  const current = Date.parse(now);
+  if (!fixtureId || !Number.isFinite(current) || maxAgeMinutes < 0) return [];
+  return records.filter(row => {
+    const d = row.details;
+    if (row.kind !== "odds" || row.status !== "COMPLETE_1X2"
+      || d.fixtureId !== fixtureId || d.market !== "1X2" || d.complete1X2 !== true
+      || !validDecimalOdds(d.odds1) || !validDecimalOdds(d.oddsX) || !validDecimalOdds(d.odds2)
+      || typeof d.capturedAt !== "string") return false;
+    const captured = Date.parse(d.capturedAt);
+    return Number.isFinite(captured) && captured <= current
+      && current - captured <= maxAgeMinutes * 60_000;
+  }).sort((a, b) => Date.parse(String(b.details.capturedAt)) - Date.parse(String(a.details.capturedAt)));
 }
 
 /**
