@@ -168,6 +168,7 @@ describe("European domestic league scope", () => {
     expect(isEuropeanTopTwoLeague("France", "National 2 - Group C")).toBe(false);
     expect(isEuropeanTopTwoLeague("France", "National 3 - Group C")).toBe(false);
     expect(isEuropeanTopTwoLeague("France", "Ligue 2")).toBe(true);
+    expect(isEuropeanTopTwoLeague("England", "Championship")).toBe(true);
     expect(isEuropeanTopTwoLeague("TUR", "2. Lig")).toBe(false);
     expect(isEuropeanTopTwoLeague("DNK", "2. Division")).toBe(false);
     expect(isEuropeanTopTwoLeague("SWE", "Division 1")).toBe(false);
@@ -280,7 +281,7 @@ describe("European domestic league scope", () => {
     })).toBe(true);
     expect(isEligibleEuropeanMatch({
       ...openMatchdayBase,
-      external_id: "om:ENG_2_championship:2026-11-17:club-a:club-b",
+      external_id: "om:ENG_2_2026-27:2026-11-17:club-a:club-b",
       competition: "Championship",
       country: "England",
     })).toBe(true);
