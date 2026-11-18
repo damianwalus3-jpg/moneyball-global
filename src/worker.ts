@@ -339,7 +339,7 @@ export default {
         signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
       });
       const headers = new Headers(upstream.headers);
-      headers.set("Cache-Control", matches ? "public, max-age=900" : "public, max-age=28800");
+      headers.set("Cache-Control", matches ? "public, max-age=3600" : "public, max-age=28800");
       headers.set("X-MONEYBALL-SOURCE", "OpenLigaDB");
       const allowedCors = corsHeaders(origin);
       const allowOrigin = allowedCors.get("Access-Control-Allow-Origin");
