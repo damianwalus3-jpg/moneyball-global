@@ -1595,3 +1595,14 @@ The new `moneyball_manual_prediction_scan_page` RPC uses the strict helper. The 
 - Production migrations applied: 20261118195523_expand_european_scope_to_all_senior_domestic_tiers, 20261118195610_fix_accented_team_name_w_suffix_scope_false_positive, and 20261118195739_remove_tier_marker_false_exclusions_from_prediction_scan_pages.
 - Source migrations are being committed to MAIN. The code-only CI for all-tier predictor/results/odds changes passed; the final Cloudflare deployment and final docs/migration commit must be verified before calling this stage deployed.
 - No existing match, prediction, coupon, settlement, bankroll or historical row was deleted or rewritten by the scope migrations. No auto-coupon behavior was introduced. Project remains NOT complete; next verify final MAIN deploy, then ensure the next scheduled scan imports and predicts all eligible senior European fixtures with evidence gates intact.
+
+
+## 2026-11-18 — frontend all-tier parity and provider-label hardening
+
+- The frontend had a remaining strict-tier filter in src/lib/domain.ts: non-OpenMatchday fixtures were still checked with isEuropeanTopTwoLeague even after the backend was widened. Updated isEligibleEuropeanMatch and isEuropeanDomesticLeague to use the shared isEligibleDomesticSeniorLeague predicate. OpenMatchday remains constrained to the tier folder IDs published by that source (tiers 1–2).
+- Frontend team-name exclusions now reuse the shared isWomensTeam / isExcludedSeniorTeam helpers. The uppercase standalone W marker remains case-sensitive; lowercase w in Barycz Sułów is accepted.
+- CI caught a missing alias in the all-tier generic league marker (Lithuanian TOPLYGA). The shared helper now also falls back to the complete established top-tier alias catalogue, while retaining generic markers for lower tiers. Additional aliases cover TOPLYGA, Kakkonen, Ykkosliiga/Ykkönen, Campionato, Superiore, Ligat, Dasta, Cymru and related domestic labels.
+- Added localized cup exclusions (Kupa, Puchar, Cupa, Taça/Taca) so broad all-tier matching does not admit those cup competitions.
+- Production SQL migration applied: 20261118200217_align_all_tier_scope_aliases_and_localized_cup_exclusions. Regression checks cover TOPLYGA, Kakkonen, Campionato Sammarinese and localized cup exclusions.
+- Latest main code commit 362b3cb0e846f86b6efbdc2347b11c11601cf941 still had a CI failure because TOPLYGA alias fallback was added immediately afterward; final CI and Cloudflare deploy must be verified on the follow-up commit before calling this stage deployed.
+- No historical data, predictions, coupons, settlements or bankroll records were deleted or rewritten. Project remains NOT complete; after CI/deploy pass, verify the next scheduled scan and authenticated MAIN panel for all senior European tiers.
