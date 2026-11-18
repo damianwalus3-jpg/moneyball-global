@@ -1140,3 +1140,14 @@
 - Implementation commit: 75ae831eae3ff3d574f4fe87db8afb6511c505e8; tests commit: 99cb24e35984838303863c638593c550c2bd5818.
 - Stage 90's initial country-map-only change is superseded by this more accurate repository-aware implementation. CI and deployment for Stage 91 are pending; do not claim it is deployed until all checks pass.
 - No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
+
+
+## Stage 92 — resilient partial OpenFootball catalogue discovery (2026-11-18)
+- Live code review after Stage 91 found a reliability defect: the seven parallel GitHub tree requests used `Promise.all`, so one unavailable country repository caused the entire dynamic OpenFootball discovery to fail and discarded feeds from healthy repositories.
+- Replaced the all-or-nothing catalogue collection with `Promise.allSettled` plus deterministic feed merging and deduplication. Successful repositories now continue to contribute fixtures when another catalogue fails; failed repositories are reported separately in scan diagnostics. If every catalogue fails, the existing static-feed fallback remains available and the catalogue failure is visible.
+- Added a regression test for mixed healthy/failed repositories and duplicate feed IDs.
+- The broader fixture pipeline already integrates open-matchday, OpenLigaDB, OpenFootball, ESPN, FootyNomad and timezone.football. open-matchday currently publishes 75 competitions with daily CSV refresh, but its README limits the free dataset to informational/non-commercial use; it is not evidence of complete European national-league coverage. Detailed stats are uneven and it does not provide xG.
+- Verified the deployed REBUILD homepage is live and identifies the project as CLEAN BUILD 0.1.0; it currently labels fixture-source coverage as ACTIVE and explicitly says coverage is not complete. Visual mobile testing remains outstanding.
+- Source change commit: 31215a60166de5907473106097cbebd7ba1d2986; regression test commit: e090656c6093663c1e29d80ebc3bdd0ef2b5c97f.
+- CI for the implementation commit passed typecheck, tests and production build (run 44270232489). Rebuild Checks and Cloudflare deploy for the latest test commit are still running at the time of this log entry; do not mark Stage 92 deployed until both pass.
+- No production MAIN resources, historical Tracker rows, predictions, coupons, settlements or bankroll values were changed. No paid API, key, database or subscription added.
