@@ -273,7 +273,8 @@ export function isFinishedStatus(status: string | null | undefined) {
 
 /** A coupon price must have a source timestamp, be unsuspended, prematch and at most six hours old. */
 function isAllowedBelgianBookmaker(value: unknown): boolean {
-  return /\\b(?:bwin|unibet|ladbrokes|circus|bet\\s*first)\\b/i.test(String(value ?? ""));
+  const normalized = String(value ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return ["bwin", "unibet", "ladbrokes", "circus", "betfirst"].some((name) => normalized.includes(name));
 }
 
 /** Model evidence gate shared by manual-odds promotion, coupons and dashboard candidates. */
