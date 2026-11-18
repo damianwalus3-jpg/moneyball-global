@@ -40,6 +40,14 @@ export interface PitchApiXgObservation {
   goalsAgainst: number;
   shotsFor: number | null;
   shotsAgainst: number | null;
+  shotsOnTargetFor: number | null;
+  shotsOnTargetAgainst: number | null;
+  bigChancesFor: number | null;
+  bigChancesAgainst: number | null;
+  xgOnTargetFor: number | null;
+  xgOnTargetAgainst: number | null;
+  xgNonPenaltyFor: number | null;
+  xgNonPenaltyAgainst: number | null;
 }
 export interface PitchApiXgForm {
   team: string;
@@ -49,6 +57,12 @@ export interface PitchApiXgForm {
   xgAgainstPerMatch: number | null;
   shotsForPerMatch: number | null;
   shotsAgainstPerMatch: number | null;
+  shotsOnTargetForPerMatch: number | null;
+  shotsOnTargetAgainstPerMatch: number | null;
+  bigChancesForPerMatch: number | null;
+  bigChancesAgainstPerMatch: number | null;
+  xgOnTargetForPerMatch: number | null;
+  xgOnTargetAgainstPerMatch: number | null;
   source: "PitchAPI";
 }
 async function getData<T>(path: string): Promise<T> {
@@ -86,6 +100,14 @@ export function parsePitchApiXgStats(data: PitchApiTeamMatchStats, teamId: strin
   if (homeXg == null || awayXg == null) return null;
   const homeShots = find(["total_shots", "shots"], "home");
   const awayShots = find(["total_shots", "shots"], "away");
+  const homeOnTarget = find(["ShotsOnTarget", "shots_on_target"], "home");
+  const awayOnTarget = find(["ShotsOnTarget", "shots_on_target"], "away");
+  const homeBig = find(["big_chance", "big_chances"], "home");
+  const awayBig = find(["big_chance", "big_chances"], "away");
+  const homeXgot = find(["expected_goals_on_target"], "home");
+  const awayXgot = find(["expected_goals_on_target"], "away");
+  const homeNpxg = find(["expected_goals_non_penalty"], "home");
+  const awayNpxg = find(["expected_goals_non_penalty"], "away");
   const date = match.time_utc.slice(0, 10);
   return {
     matchId: match.id, date, isHome: homeSide,
@@ -95,6 +117,14 @@ export function parsePitchApiXgStats(data: PitchApiTeamMatchStats, teamId: strin
     goalsAgainst: (homeSide ? match.score_away : match.score_home) as number,
     shotsFor: homeSide ? homeShots : awayShots,
     shotsAgainst: homeSide ? awayShots : homeShots,
+    shotsOnTargetFor: homeSide ? homeOnTarget : awayOnTarget,
+    shotsOnTargetAgainst: homeSide ? awayOnTarget : homeOnTarget,
+    bigChancesFor: homeSide ? homeBig : awayBig,
+    bigChancesAgainst: homeSide ? awayBig : homeBig,
+    xgOnTargetFor: homeSide ? homeXgot : awayXgot,
+    xgOnTargetAgainst: homeSide ? awayXgot : homeXgot,
+    xgNonPenaltyFor: homeSide ? homeNpxg : awayNpxg,
+    xgNonPenaltyAgainst: homeSide ? awayNpxg : homeNpxg,
   };
 }
 export function buildPitchApiXgForm(team: string, matches: PitchApiXgObservation[]): PitchApiXgForm {
@@ -109,6 +139,12 @@ export function buildPitchApiXgForm(team: string, matches: PitchApiXgObservation
     xgAgainstPerMatch: average(ordered.map(row => row.xgAgainst)),
     shotsForPerMatch: average(ordered.map(row => row.shotsFor)),
     shotsAgainstPerMatch: average(ordered.map(row => row.shotsAgainst)),
+    shotsOnTargetForPerMatch: average(ordered.map(row => row.shotsOnTargetFor)),
+    shotsOnTargetAgainstPerMatch: average(ordered.map(row => row.shotsOnTargetAgainst)),
+    bigChancesForPerMatch: average(ordered.map(row => row.bigChancesFor)),
+    bigChancesAgainstPerMatch: average(ordered.map(row => row.bigChancesAgainst)),
+    xgOnTargetForPerMatch: average(ordered.map(row => row.xgOnTargetFor)),
+    xgOnTargetAgainstPerMatch: average(ordered.map(row => row.xgOnTargetAgainst)),
     source: "PitchAPI",
   };
 }
