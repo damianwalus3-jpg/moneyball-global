@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { isEligibleResultsSyncMatch } from "../_shared/results-sync-scope.ts";
+import { dedupeResultsSyncMatches, isEligibleResultsSyncMatch } from "../_shared/results-sync-scope.ts";
 import { isWomensTeam } from "../_shared/team-normalization.ts";
 import { selectEspnLeagues } from "./espn-leagues.ts";
 const SUPABASE_URL="https://gzgeklcukrclgwbsmbsp.supabase.co";
