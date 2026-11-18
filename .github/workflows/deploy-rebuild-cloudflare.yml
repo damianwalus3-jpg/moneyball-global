@@ -46,5 +46,14 @@ jobs:
           TODAY="$(TZ=Europe/Brussels date +%F)"
           curl --fail --location --silent --show-error "$BASE/api/pitchapi/date/$TODAY?status=all" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);if(!Array.isArray(p.data?.matches)){console.error("PitchAPI date feed missing data.matches:",p);process.exit(1)}console.log("PitchAPI live date feed OK:",p.data.matches.length,"matches for",p.data.date)})'
           curl --fail --location --silent --show-error "$BASE/api/footynomad/fixtures/$TODAY" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);if(!Array.isArray(p.fixtures)||!Number.isInteger(p.pagesChecked)||p.pagesChecked<1){console.error("FootyNomad live date feed invalid:",p);process.exit(1)}console.log("FootyNomad live date feed OK:",p.fixtures.length,"European fixtures from",p.pagesChecked,"UTC pages")})'
+          API_FOOTBALL_CONFIGURED="$(echo "$HEALTH" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).apiFootballConfigured?"yes":"no"))')"
+          API_FOOTBALL_STATUS="$(curl --silent --show-error -o /tmp/api-football.json -w "%{http_code}" "$BASE/api/api-football/fixtures/$TODAY")"
+          if [ "$API_FOOTBALL_CONFIGURED" = "yes" ]; then
+            test "$API_FOOTBALL_STATUS" = "200" || { cat /tmp/api-football.json; echo "API-Football configured but gateway did not return HTTP 200"; exit 1; }
+            node -e 'const p=require("/tmp/api-football.json");if(p.provider!=="API-Football Pro"||!Array.isArray(p.fixtures)||typeof p.results!=="number"){console.error("API-Football response shape invalid",p);process.exit(1)}console.log("API-Football Pro OK:",p.results,"fixtures for",p.date)'
+          else
+            test "$API_FOOTBALL_STATUS" = "503" || { cat /tmp/api-football.json; echo "API-Football secret status unexpected"; exit 1; }
+            echo "API-Football gateway deployed; API_FOOTBALL_KEY secret is not configured in this Worker."
+          fi
       - name: Full current-day European source reconciliation
         run: npx --yes tsx scripts/audit-live-fixtures.ts
