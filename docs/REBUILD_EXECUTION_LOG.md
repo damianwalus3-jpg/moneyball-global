@@ -1486,3 +1486,12 @@
 - Integrated the fallback into the shared fixture analysis path used by bulk analysis and individual fixture analysis. Added a regression test for normalized probabilities, method label, zero sample counts and non-candidate status.
 - CI/typecheck/test/build validation pending for this stage. No historical predictions, coupons, settlement, bankroll or Tracker rows were edited.
 - Follow-up hardening: fixtures without a verified kickoff time also receive the same explicit neutral-prior 1X2/DC record, while retaining the warning that kickoff is unverified. Fixtures whose kickoff has already passed remain excluded from pre-match forecasting.
+
+
+## Stage 127 — automatic prediction generation after European fixture scans (2026-11-18)
+- Root cause confirmed in the production code: the fixture scan stored and displayed the day's matches, but it did not invoke the shared bulk-analysis path. Forecasts therefore depended on the user manually pressing “Analizuj wszystkie” or opening each fixture.
+- Updated the shared bulk-analysis action to accept the just-returned fixture list directly, so a successful initial, manual or scheduled 15-minute scan automatically starts analysis without waiting for React state to settle.
+- Added an in-memory lock to prevent overlapping bulk runs. Fixtures are deduplicated by fixture ID, already-recorded rows with complete 1X2 probabilities are skipped, and fixtures whose kickoff has passed are not sent to the pre-match model again. Rows without complete probabilities remain eligible for retry.
+- Retained concurrency of two fixture analyses to limit load on free public sources. The existing neutral-prior fallback remains visibly marked and evidence-gated; it cannot become a strong candidate or enter coupons.
+- The manual “Analizuj wszystkie” action remains available for recovery. The scan UI's progress count is based on the number of fixtures actually queued for analysis.
+- This change does not request paid odds, add API keys, change historical prediction values, or modify coupons, settlements, bankroll, or existing Tracker records. CI, rebuild checks, and Cloudflare deployment must pass before activation is claimed.
