@@ -347,7 +347,7 @@ export interface FixtureScan {
   source: string;
   cache: boolean;
   coverage: {
-    openMatchday: { cataloguesChecked: number; fixtures: number; errors: number };
+    openMatchday: { cataloguesChecked: number; fixtures: number; errors: number; catalogueGeneratedAt: string };
     openLigaDB: { competitionsChecked: number; fixtures: number; errors: number };
     openFootball: { feedsChecked: number; fixtures: number; errors: number };
     espn: { scoreboardsChecked: number; fixtures: number; errors: number };
@@ -373,6 +373,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   const byKey = new Map<string, FreeFixture>();
   let generatedAt = new Date().toISOString();
   let openMatchdayChecked = 0;
+  let openMatchdayCatalogueGeneratedAt = "";
   let openLigaChecked = 0;
   let openFootballChecked = 0;
   let openMatchdayFixturesFound = 0;
@@ -397,7 +398,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   // Source 1: every European folder in open-matchday, including cups and youth competitions.
   try {
     const index = JSON.parse(await fetchText(`${ROOT}/build_summary.json`)) as LeagueIndex;
-    generatedAt = index.generated_utc;
+    openMatchdayCatalogueGeneratedAt = index.generated_utc;
     const leagues = index.leagues.filter(league => {
       return isEuropeanCompetitionFolder(league.folder) && league.fixtures > 0;
     });
@@ -699,6 +700,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   }
 
   const fixtures = [...byKey.values()].sort((a,b) => a.time.localeCompare(b.time) || a.competition.localeCompare(b.competition));
+  generatedAt = new Date().toISOString();
   const result: FixtureScan = {
     date,
     generatedAt,
@@ -708,7 +710,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     source: SOURCE,
     cache: false,
     coverage: {
-      openMatchday: { cataloguesChecked: openMatchdayChecked, fixtures: openMatchdayFixturesFound, errors: errors.filter(error => error.startsWith("open-matchday ·")).length },
+      openMatchday: { cataloguesChecked: openMatchdayChecked, fixtures: openMatchdayFixturesFound, errors: errors.filter(error => error.startsWith("open-matchday ·")).length, catalogueGeneratedAt: openMatchdayCatalogueGeneratedAt },
       openLigaDB: { competitionsChecked: openLigaChecked, fixtures: openLigaFixturesFound, errors: errors.filter(error => error.startsWith("OpenLigaDB ·")).length },
       openFootball: { feedsChecked: openFootballChecked, fixtures: openFootballFixturesFound, errors: errors.filter(error => error.startsWith("openfootball ·")).length },
       espn: { scoreboardsChecked: espnChecked, fixtures: espnFixturesFound, errors: errors.filter(error => error.startsWith("ESPN ·")).length },
