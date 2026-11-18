@@ -46,7 +46,7 @@ const descriptions: Record<Tab, { eyebrow: string; title: string; subtitle: stri
 };
 
 function Metric({ label, value, note, icon: Icon, onClick }: { label: string; value: string; note: string; icon: typeof Activity; onClick: () => void }) {
-  return <button type="button" className="metric-card metric-card-button" onClick={onClick} aria-label={`${label}: ${value}. Otwórz szczegóły`}><div className="metric-top"><span>{label}</span><Icon size={17} /></div><strong>{value}</strong><small>{note}</small><span className="metric-drilldown">Szczegóły <ChevronRight size={13}/></span></button>;
+  return <button type="button" className="metric-card metric-card-button" style={{ appearance: "none", textAlign: "left", width: "100%", cursor: "pointer", color: "inherit", font: "inherit" }} onClick={onClick} aria-label={`${label}: ${value}. Otwórz szczegóły`}><div className="metric-top"><span>{label}</span><Icon size={17} /></div><strong>{value}</strong><small>{note}</small><span className="metric-drilldown">Szczegóły <ChevronRight size={13}/></span></button>;
 }
 
 function savePredictionRecord(match: FreeFixture, prediction?: FormPrediction, reason?: string): TrackerRecord[] {
