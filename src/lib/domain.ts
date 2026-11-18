@@ -154,11 +154,11 @@ export function impliedProbability(odds: number | null | undefined): number | nu
 const EUROPEAN_COUNTRIES = new Set([
   "albania","andorra","austria","belarus","belgium","bosnia","bosnia and herzegovina","bosnia herzegovina","aland islands","guernsey","jersey","svalbard and jan mayen","holy see","vatican city","great britain",
   "bulgaria","croatia","czechia","czech republic","denmark","england","estonia","faroe islands",
-  "finland","france","germany","gibraltar","greece","hungary","iceland","ireland","isle of man",
+  "finland","france","germany","gibraltar","greece","guernsey","hungary","iceland","ireland","republic of ireland","isle of man",
   "italy","kosovo","latvia","liechtenstein","lithuania","luxembourg","malta","moldova","monaco",
   "montenegro","netherlands","macedonia","north macedonia","northern ireland","norway","poland","portugal","romania",
   "russia","san marino","scotland","serbia","slovakia","slovenia","spain","sweden","switzerland",
-  "ukraine","wales","united kingdom","uk","gb","ala","ggy","jey","sjm","vat","alb","and","aut","blr","bel","bih","bul",
+  "ukraine","wales","united kingdom","united kingdom of great britain and northern ireland","svalbard and jan mayen islands","uk","gb","ala","ggy","imn","jey","sjm","vat","alb","and","aut","blr","bel","bih","bgr","bul","hrv","mco",
   "cro","cze","dnk","eng","est","fro","fin","fra","deu","ger","gib","grc","gre","hun","isl",
   "irl","ita","kos","lva","lie","ltu","lux","mlt","mda","mne","nld","mkd","nir","nor","pol","prt",
   "por","rou","rus","smr","sco","srb","svk","svn","esp","swe","che","sui","ukr","wal","gbr"
