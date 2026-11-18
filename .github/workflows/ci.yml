@@ -34,7 +34,7 @@ jobs:
       - name: Test MoviOdds missing-key guard
         run: deno test --no-check supabase/functions/_shared/movi-odds-config.test.ts
       - name: Test public-source service-role key fallback
-        run: deno test --no-check supabase/functions/_shared/service-role-key.test.ts
+        run: deno test --no-check supabase/functions/_shared/public-source-auth.test.ts
       - name: Type-check Supabase Edge Functions
         run: deno check --node-modules-dir=auto --no-lock supabase/functions/*/index.ts
       - name: Run tests
