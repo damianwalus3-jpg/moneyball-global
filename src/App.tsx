@@ -96,7 +96,7 @@ type Tab = "dashboard" | "matches" | "pick" | "coupons" | "intelligence" | "bets
 const nav: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "matches", label: "Mecze", icon: CalendarDays },
-  { id: "pick", label: "Typ dnia", icon: Sparkles },
+  { id: "pick", label: "Wytypowane mecze", icon: Sparkles },
   { id: "coupons", label: "Kupony", icon: Ticket },
   { id: "intelligence", label: "Intelligence", icon: BarChart3 },
   { id: "bets", label: "Stawki", icon: Ticket },
@@ -106,7 +106,7 @@ const nav: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
 const descriptions: Record<Tab, { eyebrow: string; title: string; subtitle: string }> = {
   dashboard: { eyebrow: "CENTRUM DOWODZENIA", title: "Trust the Process.", subtitle: "Przejrzysta analityka. Zweryfikowane dane. Każda decyzja z uzasadnieniem." },
   matches: { eyebrow: "CENTRUM MECZÓW", title: "Mecze", subtitle: "Europejskie rozgrywki, forma drużyn i komplet danych źródłowych." },
-  pick: { eyebrow: "SELEKCJA DNIA", title: "Typ dnia", subtitle: "Jedna selekcja oparta na danych — albo uczciwa informacja, że dziś brak przewagi." },
+  pick: { eyebrow: "WYTYPOWANE MECZE", title: "Mecze wybrane przez aplikację", subtitle: "Wybór modelu 1X2 i Double Chance, dokładne prawdopodobieństwo oraz krótkie uzasadnienie każdego meczu." },
   coupons: { eyebrow: "ZARZĄDZANIE KUPONAMI", title: "Kupony", subtitle: "Buduj, zapisuj i rozliczaj kupony analityczne. Bez obstawiania za prawdziwe pieniądze." },
   intelligence: { eyebrow: "ANALITYKA MODELU", title: "Intelligence", subtitle: "Skuteczność, kalibracja, jakość danych i wyniki według lig oraz rynków." },
   bets: { eyebrow: "REJESTR ZAKŁADÓW", title: "Stawki i wyniki", subtitle: "Wybrane i odrzucone typy, kursy, stawki oraz rzeczywisty bilans zysków i strat." },
@@ -813,7 +813,7 @@ export default function App() {
         {active === "dashboard" && <>
           <section className="welcome-panel"><div className="welcome-glow"/><div className="welcome-copy"><div className="welcome-tag"><Sparkles size={14}/> NOWY ROZDZIAŁ</div><h2>Najpierw dane.<br/><em>Potem decyzje.</em></h2><p>Nowa platforma analityczna budowana od podstaw. Bez fikcyjnych statystyk i bez ukrywania brakujących informacji.</p><button className="primary-button" onClick={() => changeTab("tracker")}>Otwórz Tracker <ChevronRight size={16}/></button></div><div className="welcome-visual"><div className="orb orb-one"/><div className="orb orb-two"/><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="visual-center"><Activity size={36}/><span>MB</span></div><div className="visual-label label-top">DATA FIRST</div><div className="visual-label label-bottom">MODEL VERIFIED</div></div></section>
           <div className="section-title"><div><h3>Stan systemu</h3><p>{fixtureScan ? `Skan ${fixtureScan.date} · dane z ${fixtureScan.leaguesChecked} katalogów i kanałów` : "Automatyczne pobieranie europejskich terminarzy po uruchomieniu aplikacji"}</p></div><span className="neutral-tag">{scanLoading ? "ŁADOWANIE" : fixtureScan ? fixtureScan.leaguesFailed.length ? "ŹRÓDŁA Z OSTRZEŻENIAMI" : "SKAN GOTOWY" : scanError ? "BŁĄD ŹRÓDEŁ" : "START"}</span></div>
-          <section className="module-panel dashboard-safest-pick"><div className="module-icon"><Sparkles/></div><div><span className="safest-pick-label">JEDEN NAJMOCNIEJSZY TYP DNIA</span>{safestPick ? <><h2>{safestPick.title}</h2><b>{safestPick.market} · {(safestPick.probability*100).toFixed(1)}%</b><p>{safestPick.competition} · {safestPick.kickoff}</p><small>{safestPick.reason}</small></> : <p>Brak potwierdzonego kandydata DC ≥75%. Po analizie meczów pokażemy jeden wybór tylko wtedy, gdy spełni kryteria.</p>}<button className="text-link" onClick={() => changeTab("pick")}>Otwórz szczegóły selekcji <ChevronRight size={14}/></button></div></section>
+          <section className="module-panel dashboard-safest-pick"><div className="module-icon"><Sparkles/></div><div><span className="safest-pick-label">JEDEN NAJMOCNIEJSZY TYP DNIA</span>{safestPick ? <><h2>{safestPick.title}</h2><b>{safestPick.market} · {(safestPick.probability*100).toFixed(1)}%</b><p>{safestPick.competition} · {safestPick.kickoff}</p><small>{safestPick.reason}</small></> : <p>Brak potwierdzonego kandydata DC ≥75%. Po analizie meczów pokażemy jeden wybór tylko wtedy, gdy spełni kryteria.</p>}<button className="text-link" onClick={() => changeTab("pick")}>Otwórz szczegóły selekcji <ChevronRight size={14}/></button><button className="primary-button selected-matches-cta" onClick={() => changeTab("pick")}>Mecze wytypowane przez aplikację <ChevronRight size={16}/></button></div></section>
           <section className="metrics-grid"><Metric label="Dzisiejsze mecze" value={fixtureScan ? String(fixtureScan.fixtures.length) : "—"} note={fixtureScan ? `Europa · ${fixtureScan.leaguesChecked} kanałów · otwórz terminarz` : scanError ? "Źródło chwilowo niedostępne" : "Pobieranie terminarzy"} icon={CalendarDays} onClick={() => changeTab("matches")}/><Metric label="Prognozy" value={String(predictionDiagnostics.total)} note={`${predictionDiagnostics.candidates} kandydatów · ${predictionDiagnostics.rejected} odrzuconych`} icon={Gauge} onClick={() => changeTab("intelligence")}/><Metric label="Aktywne kupony" value={String(records.filter(row => row.kind === "coupon" && ["PAPER_NO_ODDS", "PAPER_WITH_ODDS"].includes(row.status) && !records.some(child => child.kind === "coupon" && child.details.parentCouponId === row.id)).length)} note="Otwórz kupony i zobacz szczegóły" icon={Ticket} onClick={() => changeTab("coupons")}/><Metric label="Tracker" value={String(records.length)} note="Historia i zapisane dane lokalne" icon={Database} onClick={() => changeTab("tracker")}/></section>
           <section className="matches-preview"><div className="panel-heading"><div><h3>Dzisiaj w Europie</h3><p>{fixtureScan ? `open-matchday build: ${new Date(fixtureScan.generatedAt).toLocaleString("pl-BE")}` : "Darmowy terminarz publiczny · PitchAPI przez bezpieczny Worker"}</p></div><button onClick={() => void runFixtureScan(true)} disabled={scanLoading}>{scanLoading ? "Pobieranie…" : "Odśwież"}</button></div>{scanError && <p className="scan-error">{scanError}</p>}{fixtureScan?.fixtures.slice(0,6).map(match => <div className="match-preview-row" key={match.id}><time>{match.time}</time><b>{match.home}</b><span>vs</span><b>{match.away}</b><small>{match.competition}</small><details className="fixture-details"><summary>Szczegóły meczu</summary><p>Data i czas: {match.date} · {match.time} (Europe/Brussels)</p><p>Kraj / federacja: {match.countryCode}</p><p>Źródła: {match.source}</p><p>Aktualizacja źródła: {match.sourceUpdatedAt}</p><p>Identyfikator meczu: {match.id}</p><p>Folder historii: {match.leagueFolder || "brak"} · OpenLigaDB: {match.leagueShortcut || "brak"} / {match.leagueSeason || "brak"} · OpenFootball: {match.openFootballFeedId || "brak"} · PitchAPI: {match.pitchApiMatchId || "brak"} / liga {match.pitchApiLeagueId || "brak"}</p>{match.sourceUrl ? <a href={match.sourceUrl} target="_blank" rel="noreferrer">Otwórz źródło meczu</a> : <span>Brak bezpośredniego linku źródłowego</span>}</details>{match.sourceUrl ? <a href={match.sourceUrl} target="_blank" rel="noreferrer">Źródło</a> : null}</div>)}{fixtureScan && fixtureScan.fixtures.length === 0 && <div className="empty-state"><b>Brak zaplanowanych meczów w pobranych źródłach</b><span>To nie potwierdza braku meczów we wszystkich rozgrywkach Europy. Sprawdź liczbę błędów i katalogów w zakładce Mecze.</span></div>}<div className="source-note">Źródła: <a href="https://github.com/oladeeayo/open-matchday" target="_blank" rel="noreferrer">open-matchday</a> (użytek niekomercyjny) · <a href="https://www.openligadb.de/" target="_blank" rel="noreferrer">OpenLigaDB</a> · <a href="https://github.com/openfootball/europe" target="_blank" rel="noreferrer">OpenFootball</a> · <a href="https://www.espn.com/soccer/scoreboard" target="_blank" rel="noreferrer">ESPN</a> · <a href="https://footynomad.com/fixtures/" target="_blank" rel="noreferrer">FootyNomad</a> · <a href="https://timezone.football/about/data/" target="_blank" rel="noreferrer">timezone.football</a> · <a href="https://pitchapi.dev/" target="_blank" rel="noreferrer">PitchAPI</a> (xG, strzały, składy i analityka meczowa; zależnie od ligi). Pokrycie zależy od aktualnych plików dostawców.</div><button className="text-link" onClick={() => changeTab("matches")}>Pokaż wszystkie mecze <ChevronRight size={14}/></button></section>
           <section className="lower-grid"><article className="panel"><div className="panel-heading"><div><h3>Ostatnia aktywność</h3><p>Rzeczywiste zdarzenia w lokalnym Trackerze</p></div><Activity size={18}/></div>{records.length ? <div className="check-list">{[...records].sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0,5).map(row => <div className="check-row" key={row.id}><span>{row.kind.toUpperCase().slice(0,3)}</span><div><b>{row.title}</b><small>{new Date(row.createdAt).toLocaleString("pl-BE")}</small></div><i>{row.status}</i></div>)}</div> : <div className="empty-state"><div className="empty-icon"><Activity size={21}/></div><b>Brak zapisanych zdarzeń</b><span>Po pierwszym skanie, prognozie lub rozliczeniu historia pojawi się tutaj.</span></div>}</article><article className="panel"><div className="panel-heading"><div><h3>Stan etapów platformy</h3><p>Rzeczywisty zakres wdrożenia</p></div><Trophy size={18}/></div><div className="check-list"><div className="check-row done"><span>01</span><div><b>Fundament, PWA i publikacja</b><small>Oddzielny Cloudflare Worker i automatyczny deploy</small></div><i>DONE</i></div><div className="check-row done"><span>02</span><div><b>Tracker, kopie JSON i walidacja</b><small>Lokalny rejestr z importem łączonym</small></div><i>DONE</i></div><div className="check-row"><span>03</span><div><b>Europejskie źródła terminarzy</b><small>7 publicznych źródeł; pokrycie nie jest kompletne</small></div><i>ACTIVE</i></div><div className="check-row"><span>04</span><div><b>Forma, prognozy i kupony testowe</b><small>Oddzielny model historycznego xG PitchAPI; kursy i kalibracja nadal wymagają weryfikacji</small></div><i>ACTIVE</i></div><div className="check-row"><span>05</span><div><b>Audyt i testy końcowe</b><small>CI, testy i deploy potwierdzone; wizualny test Androida niepotwierdzony</small></div><i>LIMIT</i></div></div></article></section>
@@ -1012,9 +1012,66 @@ export default function App() {
           <p className="source-note">Nie pokazujemy skuteczności dla prognoz bez wyniku. Metryki nie są wyliczane z typów odrzuconych bez prawdopodobieństw.</p>
         </section>}
         {active === "pick" && <section className="module-panel safest-pick-panel">
-          <div className="module-icon"><Sparkles/></div><h2>Najmocniejszy kandydat dnia</h2>
-          {safestPick ? <><div className="safest-pick-card"><span className="safest-pick-label">TOP WYBÓR MODELU · NIE GWARANCJA</span><h3>{safestPick.title}</h3><b className="safest-pick-market">{safestPick.market} · {(safestPick.probability * 100).toFixed(1)}%</b><p>{safestPick.competition} · {safestPick.kickoff} (Europe/Brussels)</p><small>{safestPick.reason}</small></div></> : <div className="tracker-empty">Brak kandydata spełniającego próg Double Chance 75% wśród zapisanych prognoz przedmeczowych. Najpierw uruchom „Analizuj wszystkie”. Jeśli żaden mecz nie spełnia kryteriów, nie wybieramy typu na siłę.</div>}
-          <div className="module-status"><span className="status-dot"/> Zapisane prognozy: {records.filter(row => row.kind === "prediction").length} · kandydaci 1X2 ≥75%: {records.filter(row => row.kind === "prediction" && row.details.evidenceComplete === true && row.details.strongCandidate === true).length} · kandydaci DC ≥75%: {records.filter(row => row.kind === "prediction" && row.details.evidenceComplete === true && (row.details.strongDoubleChance === true || (typeof row.details.dc1x === "number" && typeof row.details.dcx2 === "number" && typeof row.details.dc12 === "number" && Math.max(row.details.dc1x,row.details.dcx2,row.details.dc12) >= 0.75))).length}</div>
+          <div className="module-icon"><Sparkles/></div><h2>Mecze wytypowane przez aplikację</h2>
+          <p>Pokazujemy najnowszą zapisaną prognozę każdego rynku dla meczu. Procent jest prawdopodobieństwem przypisanym dokładnie do wskazanego typu, a nie gwarancją wyniku.</p>
+          {safestPick && <div className="safest-pick-card"><span className="safest-pick-label">NAJMOCNIEJSZY KANDYDAT · NIE GWARANCJA</span><h3>{safestPick.title}</h3><b className="safest-pick-market">{safestPick.market} · {(safestPick.probability * 100).toFixed(1)}%</b><p>{safestPick.competition} · {safestPick.kickoff} (Europe/Brussels)</p><small>{safestPick.reason}</small></div>}
+          {(() => {
+            const latest = new Map<string, TrackerRecord>();
+            for (const row of records.filter(item => item.kind === "prediction" && typeof item.details.fixtureId === "string")
+              .sort((a,b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))) {
+              const market = row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2";
+              const key = String(row.details.fixtureId) + "|" + market;
+              const prior = latest.get(key);
+              const priority = (item: TrackerRecord) => item.details.predictionMethod === "pitchapi-recent-xg-poisson" ? 3 : item.details.predictionMethod === "recent-form-goals-poisson" ? 2 : 1;
+              if (!prior || priority(row) > priority(prior) || (priority(row) === priority(prior) && Date.parse(row.createdAt) > Date.parse(prior.createdAt))) latest.set(key,row);
+            }
+            const fixtures = new Map<string, { one?: TrackerRecord; dc?: TrackerRecord }>();
+            for (const row of latest.values()) {
+              const id = String(row.details.fixtureId);
+              const item = fixtures.get(id) ?? {};
+              if (row.details.market === "DOUBLE_CHANCE") item.dc = row; else item.one = row;
+              fixtures.set(id,item);
+            }
+            const ordered = [...fixtures.entries()].sort((a,b) => String(b[1].one?.details.fixtureDate ?? b[1].dc?.details.fixtureDate ?? "").localeCompare(String(a[1].one?.details.fixtureDate ?? a[1].dc?.details.fixtureDate ?? "")) || String(a[1].one?.title ?? a[1].dc?.title ?? "").localeCompare(String(b[1].one?.title ?? b[1].dc?.title ?? "")));
+            const chosenProbability = (row: TrackerRecord | undefined, market: "1X2" | "DOUBLE_CHANCE") => {
+              if (!row || typeof row.details.selection !== "string") return null;
+              const key = market === "1X2" ? ({ "1":"p1", "X":"px", "2":"p2" } as Record<string,string>)[row.details.selection] : ({ "1X":"p1x", "X2":"px2", "12":"p12" } as Record<string,string>)[row.details.selection];
+              const value = key ? row.details[key] : null;
+              return typeof value === "number" && Number.isFinite(value) ? value : null;
+            };
+            const reasonFor = (row: TrackerRecord) => {
+              const parts: string[] = [];
+              if (typeof row.details.reason === "string" && row.details.reason) parts.push(String(row.details.reason));
+              if (typeof row.details.expectedGoalsBasis === "string") parts.push(String(row.details.expectedGoalsBasis));
+              if (typeof row.details.lambdaProxyHome === "number" && typeof row.details.lambdaProxyAway === "number") parts.push("Oczekiwane gole " + Number(row.details.lambdaProxyHome).toFixed(2) + "–" + Number(row.details.lambdaProxyAway).toFixed(2));
+              if (typeof row.details.evidenceGaps === "string" && row.details.evidenceGaps) parts.push("Braki danych: " + String(row.details.evidenceGaps));
+              return parts.length ? parts.join(" · ") : "Wybór na podstawie zapisanych prawdopodobieństw modelu; szczegóły danych źródłowych w Trackerze.";
+            };
+            const card = (row: TrackerRecord | undefined, market: "1X2" | "DOUBLE_CHANCE") => {
+              if (!row) return <div className="selected-market-missing">Brak zapisanego typu dla tego rynku.</div>;
+              const probability = chosenProbability(row,market);
+              const eligible = row.details.evidenceComplete === true && (market === "1X2" ? row.details.strongCandidate === true : row.details.strongDoubleChance === true);
+              const pick = typeof row.details.selection === "string" ? row.details.selection : "Brak typu";
+              return <div className="selected-market">
+                <div className="selected-market-head"><b>{market === "1X2" ? "1X2" : "DOUBLE CHANCE"}</b><span className={eligible ? "selected-status eligible" : "selected-status rejected"}>{eligible ? "KANDYDAT ≥75%" : "ODRZUCONY / PONIŻEJ PROGU"}</span></div>
+                <div className="selected-pick">{pick}<strong>{probability === null ? "Brak %" : (probability * 100).toFixed(1) + "%"}</strong></div>
+                <p>{reasonFor(row)}</p>
+                <small>Model: {String(row.details.predictionMethod ?? row.details.modelName ?? "nieznany")} · próbka: {String(row.details.historySampleCounts ?? "brak danych")}</small>
+              </div>;
+            };
+            return <div className="selected-fixture-list">
+              <div className="module-status"><span className="status-dot"/> Mecze: {fixtures.size} · kandydaci 1X2 ≥75%: {[...latest.values()].filter(row => row.details.market !== "DOUBLE_CHANCE" && row.details.evidenceComplete === true && row.details.strongCandidate === true).length} · kandydaci DC ≥75%: {[...latest.values()].filter(row => row.details.market === "DOUBLE_CHANCE" && row.details.evidenceComplete === true && row.details.strongDoubleChance === true).length}</div>
+              {ordered.map(([id,item]) => {
+                const row = item.one ?? item.dc!;
+                return <article className="selected-fixture-card" key={id}>
+                  <div className="selected-fixture-title"><div><b>{String(row.details.home ?? "Gospodarze")} – {String(row.details.away ?? "Goście")}</b><small>{String(row.details.competition ?? "Rozgrywki")} · {String(row.details.fixtureDate ?? "Data nieznana")} {String(row.details.fixtureTime ?? "")}</small></div><span>{item.one && item.dc ? "1X2 + DC" : item.one ? "1X2" : "DC"}</span></div>
+                  <div className="selected-markets">{card(item.one,"1X2")}{card(item.dc,"DOUBLE_CHANCE")}</div>
+                </article>;
+              })}
+              {!ordered.length && <div className="tracker-empty">Nie ma jeszcze zapisanych prognoz. Uruchom „Skanuj dzisiaj” i poczekaj na automatyczną analizę meczów.</div>}
+            </div>;
+          })()}
+          <div className="module-status"><span className="status-dot"/> Łącznie zapisane rekordy prognoz: {records.filter(row => row.kind === "prediction").length}. Historia, kupony, rozliczenia i bankroll nie są modyfikowane przez ten widok.</div>
         </section>}
 
         <footer className="footer"><span>MONEYBALL — TRUST THE PROCESS</span><span>FRESH BUILD · DATA TRANSPARENCY FIRST</span></footer>
