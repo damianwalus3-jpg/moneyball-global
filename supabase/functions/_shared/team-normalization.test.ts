@@ -13,5 +13,5 @@ Deno.test("excludes reserve, academy and youth teams but keeps senior teams", ()
 
 Deno.test("team history keys remove club prefixes and retain women's identity", () => {
   if (teamHistoryKey("FC Atlético Madrid") !== "atletico madrid") throw new Error("Club-prefix normalization failed");
-  if (teamHistoryKey("W FC Barcelona") !== "women fc barcelona") throw new Error("Women's identity marker failed");
+  if (teamHistoryKey("W FC Barcelona") !== "women barcelona") throw new Error("Women's identity marker failed");
 });
