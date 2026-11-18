@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { predictFromRecentForm } from "./form-prediction";
+import { predictFromRecentForm, predictFromPitchApiXgForm } from "./form-prediction";
+import type { PitchApiXgForm } from "./pitchapi";
 import type { TeamForm } from "./team-form";
 
 function form(team: string, scored: number, conceded: number, venue: "H" | "A"): TeamForm {
@@ -37,5 +38,29 @@ describe("recent-form Poisson baseline", () => {
     const short = form("Home", 1, 1, "H");
     short.matches = short.matches.slice(0, 2);
     expect(() => predictFromRecentForm(short, form("Away", 1, 1, "A"))).toThrow(/co najmniej 3/);
+  });
+});
+
+describe("PitchAPI xG Poisson model", () => {
+  const xgForm = (team: string, xgFor: number, xgAgainst: number, isHome: boolean): PitchApiXgForm => ({
+    team, sampleSize: 5, xgForPerMatch: xgFor, xgAgainstPerMatch: xgAgainst,
+    shotsForPerMatch: 12, shotsAgainstPerMatch: 8, source: "PitchAPI",
+    matches: Array.from({ length: 5 }, (_, index) => ({
+      matchId: "m_" + team + index, date: `2026-11-${String(17-index).padStart(2,"0")}`,
+      isHome, xgFor, xgAgainst, goalsFor: 1, goalsAgainst: 0, shotsFor: 12, shotsAgainst: 8,
+    })),
+  });
+  it("uses observed xG rather than goals-derived lambda and labels the model separately", () => {
+    const prediction = predictFromPitchApiXgForm(xgForm("Home", 2.1, 0.7, true), xgForm("Away", 0.8, 1.6, false));
+    expect(prediction.method).toBe("pitchapi-recent-xg-poisson");
+    expect(prediction.prediction.expectedGoals.home).toBeCloseTo(1.85, 8);
+    expect(prediction.prediction.expectedGoals.away).toBeCloseTo(0.75, 8);
+    expect(prediction.strongCandidate).toBe(false);
+    expect(prediction.note).toContain("out-of-sample");
+  });
+  it("requires at least three matches with real xG per side", () => {
+    const short = xgForm("Home", 1, 1, true);
+    short.matches = short.matches.slice(0, 2);
+    expect(() => predictFromPitchApiXgForm(short, xgForm("Away", 1, 1, false))).toThrow(/co najmniej 3/);
   });
 });
