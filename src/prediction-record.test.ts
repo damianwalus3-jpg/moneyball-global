@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldAppendPrediction } from "./prediction-record";
+import { describeHistoryProvenance, parseHistoryProvenance, shouldAppendPrediction } from "./prediction-record";
 import type { TrackerRecord } from "./tracker-store";
 
 function row(id: string, probabilities: [number | null, number | null, number | null]): TrackerRecord {
@@ -21,5 +21,32 @@ describe("prediction record refresh policy", () => {
   });
   it("ignores records from another model or fixture", () => {
     expect(shouldAppendPrediction([row("other", [0.6, 0.2, 0.2])], "fixture-2", "model-v1", true)).toBe(true);
+  });
+});
+
+
+describe("history provenance metadata", () => {
+  it("decodes multi-source history details without losing sample counts", () => {
+    const value = JSON.stringify({
+      home: { source: "OpenLigaDB + ESPN", matches: 5, homeMatches: 3, awayMatches: 2, sourceUpdatedAt: "2026-11-18T08:00:00Z" },
+      away: { source: "OpenFootball", matches: 4, homeMatches: 2, awayMatches: 2 },
+      cutoffDateExclusive: "2026-11-18",
+    });
+    const parsed = parseHistoryProvenance(value);
+    expect(parsed?.home?.matches).toBe(5);
+    expect(parsed?.away?.source).toBe("OpenFootball");
+    expect(describeHistoryProvenance(value)).toContain("Dane wyłącznie sprzed: 2026-11-18");
+  });
+  it("handles legacy, empty and malformed Tracker values safely", () => {
+    expect(parseHistoryProvenance(null)).toBeNull();
+    expect(parseHistoryProvenance("")).toBeNull();
+    expect(parseHistoryProvenance("{broken")).toBeNull();
+    expect(describeHistoryProvenance(undefined)).toContain("Brak zapisanych");
+  });
+  it("rejects invalid sample counts", () => {
+    const parsed = parseHistoryProvenance(JSON.stringify({ home: { matches: -2, homeMatches: 1.5, source: "ESPN" } }));
+    expect(parsed?.home?.matches).toBeUndefined();
+    expect(parsed?.home?.homeMatches).toBeUndefined();
+    expect(parsed?.home?.source).toBe("ESPN");
   });
 });
