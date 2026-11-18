@@ -166,6 +166,7 @@ export default function App() {
   const [oddsTokenSaved, setOddsTokenSaved] = useState(() => { try { return Boolean(localStorage.getItem(ODDS_PILOT_TOKEN_KEY)); } catch { return false; } });
   const [lastOddsFetchDate, setLastOddsFetchDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_FETCH_KEY) ?? ""; } catch { return ""; } });
   const [lastOddsAttemptDate, setLastOddsAttemptDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
+  const [oddsProviderStatus, setOddsProviderStatus] = useState<{ strikerapi: boolean; pilotEnabled: boolean } | null>(null);
   const [oddsLoading, setOddsLoading] = useState(false);
   const [oddsNotice, setOddsNotice] = useState("");
   const [oddsAudit, setOddsAudit] = useState<{ matched: number; unmatched: number; ambiguous: number; snapshots: number; utcDate: string } | null>(null);
@@ -510,10 +511,23 @@ export default function App() {
     if (shouldAutoFetchDailyOdds({
       fixtureDate: fixtureScan.date,
       tokenSaved: oddsTokenSaved,
+      providerReady: oddsProviderStatus?.strikerapi === true && oddsProviderStatus.pilotEnabled === true,
       lastSuccessfulDate: lastOddsFetchDate,
       lastAttemptedDate: lastOddsAttemptDate,
     })) void fetchDailyOdds();
-  }, [fixtureScan, oddsTokenSaved, lastOddsFetchDate, lastOddsAttemptDate]);
+  }, [fixtureScan, oddsTokenSaved, oddsProviderStatus, lastOddsFetchDate, lastOddsAttemptDate]);
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/odds/status").then(async response => {
+      if (!response.ok) throw new Error("odds_status_unavailable");
+      return response.json() as Promise<{ providers?: { strikerapi?: boolean }; pilotEnabled?: boolean }>;
+    }).then(payload => {
+      if (active) setOddsProviderStatus({ strikerapi: payload.providers?.strikerapi === true, pilotEnabled: payload.pilotEnabled === true });
+    }).catch(() => {
+      if (active) setOddsProviderStatus({ strikerapi: false, pilotEnabled: false });
+    });
+    return () => { active = false; };
+  }, []);
   useEffect(() => {
     const syncTracker = () => setRecords(readRecords());
     window.addEventListener("storage", syncTracker);
@@ -648,7 +662,7 @@ export default function App() {
               <input type="password" autoComplete="off" value={oddsPilotToken} onChange={event => { setOddsPilotToken(event.target.value); setOddsTokenSaved(false); }} placeholder="ODDS_PILOT_TOKEN · min. 32 znaki" aria-label="Token dostępu do automatycznych kursów"/>
               <button onClick={saveOddsPilotToken}>Zapisz token</button>
               <button onClick={clearOddsPilotToken} disabled={!oddsTokenSaved && !oddsPilotToken}>Usuń</button>
-              <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsFetchDate === fixtureScan?.date ? "Kursy pobrane dzisiaj" : lastOddsAttemptDate === fixtureScan?.date ? "Dzisiejsza próba wykonana — bez ponownego obciążania limitu" : oddsTokenSaved ? "Oczekiwanie na skan — pobieranie automatyczne" : "Wymagane jednorazowe zapisanie tokenu"}</span>
+              <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsFetchDate === fixtureScan?.date ? "Kursy pobrane dzisiaj" : lastOddsAttemptDate === fixtureScan?.date ? "Dzisiejsza próba wykonana — bez ponownego obciążania limitu" : oddsProviderStatus === null ? "Sprawdzanie konfiguracji dostawcy…" : !oddsProviderStatus.strikerapi ? "Brak STRIKERAPI_API_KEY w Workerze" : !oddsProviderStatus.pilotEnabled ? "Brak sekretu ODDS_PILOT_TOKEN w Workerze" : oddsTokenSaved ? "Oczekiwanie na skan — pobieranie automatyczne" : "Wymagane jednorazowe zapisanie tokenu"}</span>
             </div>
             <p className="source-note">Ustaw identyczny sekret <b>ODDS_PILOT_TOKEN</b> w Cloudflare Workerze <b>moneyball-global-rebuild</b> i zapisz go tutaj tylko raz. Token pozostaje lokalnie w tej przeglądarce; nie wklejaj go do czatu. Po skanie dzisiejszych meczów aplikacja automatycznie pobierze dzienny pakiet kursów. Limit aplikacji to jedna próba na datę, aby chronić darmowe kredyty. StrikerAPI daje 500 darmowych kredytów miesięcznie; jeden odczyt dzienny kosztuje 10 (około 300 na 30 dni). Dostawca obejmuje tylko wybrane ligi, nie całą Europę. Daty dostawcy są UTC; dopasowanie meczu odbywa się po nazwach drużyn, dacie i godzinie Europe/Brussels.</p>
             {oddsNotice && <div className="tracker-notice">{oddsNotice}</div>}
