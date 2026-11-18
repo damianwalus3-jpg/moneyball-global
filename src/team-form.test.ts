@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
-import { loadRecentTeamForm, mapEspnTeamForm } from "./team-form";
+import { loadRecentTeamForm, mapEspnTeamForm, mergeVerifiedTeamForms, type TeamForm } from "./team-form";
 
 const csv = `gw,date,time,home,away,ft_home,ft_away,ft_result
 1,2026-08-01,15:00,Club A,Club B,2,0,H
@@ -61,5 +61,34 @@ describe("ESPN team history fallback", () => {
 
   it("rejects malformed ESPN payloads", () => {
     expect(() => mapEspnTeamForm({ matches: "bad" }, "France", "2026-11-18")).toThrow(/nieprawidłowa/);
+  });
+});
+
+describe("multi-source historical form merge", () => {
+  const form = (source: string, rows: TeamForm["matches"]): TeamForm => ({
+    team: "Club A", matches: rows, home: rows.filter(row => row.venue === "H"), away: rows.filter(row => row.venue === "A"),
+    source, sourceUpdatedAt: "2026-11-18T00:00:00Z",
+  });
+  const row = (date: string, opponent: string, venue: "H" | "A", goalsFor: number, goalsAgainst: number) => ({
+    date, opponent, venue, goalsFor, goalsAgainst,
+    result: goalsFor > goalsAgainst ? "W" as const : goalsFor === goalsAgainst ? "D" as const : "L" as const,
+    points: goalsFor > goalsAgainst ? 3 : goalsFor === goalsAgainst ? 1 : 0,
+  });
+  it("combines independent sources and collapses exact duplicates", () => {
+    const merged = mergeVerifiedTeamForms([
+      form("open-matchday", [row("2026-09-10","Club B","H",2,0), row("2026-09-03","Club C","A",1,1)]),
+      form("OpenLigaDB", [row("2026-09-10","Club B","H",2,0), row("2026-08-27","Club D","H",0,1)]),
+      form("ESPN", [row("2026-08-20","Club E","A",3,1)]),
+    ], "Club A");
+    expect(merged.matches).toHaveLength(4);
+    expect(merged.source).toContain("open-matchday");
+    expect(merged.source).toContain("ESPN");
+  });
+  it("rejects conflicting scores for the same fixture rather than choosing one", () => {
+    const merged = mergeVerifiedTeamForms([
+      form("source A", [row("2026-09-10","Club B","H",2,0)]),
+      form("source B", [row("2026-09-10","Club B","H",1,0)]),
+    ], "Club A");
+    expect(merged.matches).toHaveLength(0);
   });
 });
