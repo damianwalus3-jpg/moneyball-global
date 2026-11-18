@@ -46,7 +46,7 @@ const ROOT = "https://raw.githubusercontent.com/oladeeayo/open-matchday/master";
 const OPENLIGA = "/api/openligadb";
 const SOURCE = "FootyNomad + open-matchday + OpenLigaDB + openfootball + ESPN + timezone.football (publiczne terminarze)";
 const EUROPE = new Set(["ENG","ESP","GER","ITA","FRA","NED","POR","BEL","SCO","AUT","SUI","TUR","GRE","DEN","SWE","NOR","ROU","RUS","IRE","POL","WAL","NIR","CRO","CZE","UKR","CYP","SVK","SVN","FIN","KAZ","ALB","SRB","BIH","BUL","HUN","ISL","LUX","MLT","EST","LVA","LTU","MDA","GEO","ARM","AZE","MKD","MNE","AND","FRO","GIB","ISR","KOS","BLR","LIE","SMR","MCO","VAT","UEFA"]);
-const CACHE_KEY = "moneyball.free-fixtures.v11";
+const CACHE_KEY = "moneyball.free-fixtures.v12";
 const CACHE_MS = 15 * 60 * 1000;
 const TIMEZONE_FEED_CACHE_KEY = "moneyball.timezone-football.v1";
 const TIMEZONE_FEED_CACHE_MS = 15 * 60 * 1000;
@@ -98,6 +98,8 @@ const TIMEZONE_COMPETITIONS: Record<string, { countryCode: string; label: string
   "europa-league": { countryCode: "UEFA", label: "UEFA Europa League" },
   "dfb-pokal": { countryCode: "GER", label: "Germany · DFB-Pokal" },
   "coppa-italia": { countryCode: "ITA", label: "Italy · Coppa Italia" },
+  "nations-league": { countryCode: "UEFA", label: "UEFA Nations League" },
+  "uefa-nations-league": { countryCode: "UEFA", label: "UEFA Nations League" },
 };
 export function parseTimezoneFootballFixtures(payload: unknown, targetDate: string): FreeFixture[] {
   if (!payload || typeof payload !== "object" || !Array.isArray((payload as TimezoneFootballFeed).matches)) throw new Error("timezone.football: nieprawidłowy feed lub brak tablicy matches");
@@ -108,9 +110,12 @@ export function parseTimezoneFootballFixtures(payload: unknown, targetDate: stri
     if (kickoff.date !== targetDate) return [];
     const sourceUrl = match.url?.trim();
     if (!sourceUrl || !/^https:\/\/timezone\.football\//.test(sourceUrl)) return [];
+    const isNationsLeague = /(?:UEFA\s+)?Nations\s+League/i.test(mapped.label);
     return [{
       id: "timezone-football|" + [match.competition, match.kickoff, match.home, match.away].join("|"),
-      competition: mapped.label, countryCode: mapped.countryCode, leagueFolder: "", date: kickoff.date, time: kickoff.time,
+      competition: mapped.label, countryCode: mapped.countryCode, leagueFolder: "",
+      leagueShortcut: isNationsLeague ? "nla" : undefined, leagueSeason: isNationsLeague ? targetDate.slice(0, 4) : undefined,
+      date: kickoff.date, time: kickoff.time,
       home: match.home.trim(), away: match.away.trim(), source: "timezone.football",
       sourceUpdatedAt: (payload as TimezoneFootballFeed).generated ?? "not provided by timezone.football",
       sourceUrl,
@@ -264,8 +269,9 @@ export function parseEspnEuropeanFixtures(payload: unknown, targetDate: string):
   for (const event of events) {
     const competition = event.competitions?.[0];
     const country = (competition?.venue?.address?.country ?? "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    const countryCode = ESPN_COUNTRIES[country];
     const note = competition?.altGameNote?.trim() || competition?.notes?.find(item => item.headline?.trim())?.headline?.trim() || "";
+    const isNationsLeague = /(?:UEFA\s+)?Nations\s+League/i.test(note);
+    const countryCode = isNationsLeague ? "UEFA" : ESPN_COUNTRIES[country];
     const europeanTournament = /\bUEFA\b|European Championship/i.test(note);
     if (!countryCode && !europeanTournament) continue;
     if (!event.date || !Number.isFinite(Date.parse(event.date))) continue;
@@ -275,7 +281,7 @@ export function parseEspnEuropeanFixtures(payload: unknown, targetDate: string):
     const home = competitors.find(item => item.homeAway === "home")?.team?.displayName?.trim();
     const away = competitors.find(item => item.homeAway === "away")?.team?.displayName?.trim();
     if (!home || !away) continue;
-    output.push({ id: "espn|" + String(event.id ?? [targetDate, home, away].join("|")), competition: note || ("ESPN Soccer · " + (countryCode ?? "UEFA")), countryCode: countryCode ?? "UEFA", leagueFolder: "", date: kickoff.date, time: kickoff.time, home, away, source: "ESPN", sourceUpdatedAt: new Date().toISOString() });
+    output.push({ id: "espn|" + String(event.id ?? [targetDate, home, away].join("|")), competition: note || ("ESPN Soccer · " + (countryCode ?? "UEFA")), countryCode: countryCode ?? "UEFA", leagueFolder: "", leagueShortcut: isNationsLeague ? "nla" : undefined, leagueSeason: isNationsLeague ? targetDate.slice(0, 4) : undefined, date: kickoff.date, time: kickoff.time, home, away, source: "ESPN", sourceUpdatedAt: new Date().toISOString() });
   }
   return output;
 }
