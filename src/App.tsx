@@ -312,7 +312,7 @@ export default function App() {
   const [lastApiFootballOddsAttemptKey, setLastApiFootballOddsAttemptKey] = useState(() => { try { return localStorage.getItem(API_FOOTBALL_ODDS_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
   const [apiFootballOddsLoading, setApiFootballOddsLoading] = useState(false);
   const [apiFootballOddsNotice, setApiFootballOddsNotice] = useState("");
-  const [oddsProviderStatus, setOddsProviderStatus] = useState<{ strikerapi: boolean; oddspapi: boolean; pilotEnabled: boolean; oddspapiAccount?: { status?: string; requestLimit?: number; requestCount?: number; remaining?: number; bookmakerSlugs?: string[] } | null } | null>(null);
+  const [oddsProviderStatus, setOddsProviderStatus] = useState<{ apiFootball: boolean; strikerapi: boolean; oddspapi: boolean; pilotEnabled: boolean; oddspapiAccount?: { status?: string; requestLimit?: number; requestCount?: number; remaining?: number; bookmakerSlugs?: string[] } | null } | null>(null);
   const [oddsLoading, setOddsLoading] = useState(false);
   const [oddsNotice, setOddsNotice] = useState("");
   const [oddsAudit, setOddsAudit] = useState<{ matched: number; unmatched: number; ambiguous: number; snapshots: number; utcDate: string } | null>(null);
@@ -1028,6 +1028,8 @@ export default function App() {
         }];
       });
       const added = addRecordsIfMissing(snapshots, "snapshotKey");
+      const quotedFixtureIds = new Set(quotes.map(quote => quote.fixtureId));
+      const missingQuoteCount = requestedIds.filter(id => !quotedFixtureIds.has(id)).length;
       const matchedFixtures = new Set(snapshots.map(row => String(row.details.fixtureId))).size;
       setRecords(readRecords());
       setOddsAudit({
@@ -1035,7 +1037,7 @@ export default function App() {
         unmatched: Math.max(0, requestedIds.length - matchedFixtures),
         ambiguous: 0, snapshots: added, utcDate: fixtureScan.date,
       });
-      setApiFootballOddsNotice(`API-Football Pro: ${requestedIds.length} identyfikatorów, ${quotes.length} kwotowań, ${added} nowych snapshotów 1X2/DC; pominięte identyfikatory ponad limit 20: ${Math.max(0, uniqueIds.length - requestedIds.length)}; bez kursów: ${(payload.failedFixtureIds ?? []).length}.`);
+      setApiFootballOddsNotice(`API-Football Pro: ${requestedIds.length} identyfikatorów, ${quotes.length} kwotowań, ${added} nowych snapshotów 1X2/DC; pominięte identyfikatory ponad limit 20: ${Math.max(0, uniqueIds.length - requestedIds.length)}; mecze bez kwotowań: ${missingQuoteCount}; błędy dostawcy: ${(payload.failedFixtureIds ?? []).length}.`);
     } catch (error) {
       setApiFootballOddsNotice("API-Football Pro: " + (error instanceof Error ? error.message : "brak kursów") + ". Pozostałe dane i prognozy pozostają bez zmian.");
     } finally {
@@ -1070,11 +1072,11 @@ export default function App() {
     let active = true;
     void fetch("/api/odds/status").then(async response => {
       if (!response.ok) throw new Error("odds_status_unavailable");
-      return response.json() as Promise<{ providers?: { strikerapi?: boolean; oddspapi?: boolean }; pilotEnabled?: boolean; oddspapiAccount?: { status?: string; requestLimit?: number; requestCount?: number; remaining?: number; bookmakerSlugs?: string[] } | null }>;
+      return response.json() as Promise<{ providers?: { apiFootball?: boolean; strikerapi?: boolean; oddspapi?: boolean }; pilotEnabled?: boolean; oddspapiAccount?: { status?: string; requestLimit?: number; requestCount?: number; remaining?: number; bookmakerSlugs?: string[] } | null }>;
     }).then(payload => {
-      if (active) setOddsProviderStatus({ strikerapi: payload.providers?.strikerapi === true, oddspapi: payload.providers?.oddspapi === true, pilotEnabled: payload.pilotEnabled === true, oddspapiAccount: payload.oddspapiAccount ?? null });
+      if (active) setOddsProviderStatus({ apiFootball: payload.providers?.apiFootball === true, strikerapi: payload.providers?.strikerapi === true, oddspapi: payload.providers?.oddspapi === true, pilotEnabled: payload.pilotEnabled === true, oddspapiAccount: payload.oddspapiAccount ?? null });
     }).catch(() => {
-      if (active) setOddsProviderStatus({ strikerapi: false, oddspapi: false, pilotEnabled: false, oddspapiAccount: null });
+      if (active) setOddsProviderStatus({ apiFootball: false, strikerapi: false, oddspapi: false, pilotEnabled: false, oddspapiAccount: null });
     });
     return () => { active = false; };
   }, []);
@@ -1248,7 +1250,7 @@ export default function App() {
               <input type="password" autoComplete="off" value={oddsPilotToken} onChange={event => { setOddsPilotToken(event.target.value); setOddsTokenSaved(false); }} placeholder="ODDS_PILOT_TOKEN · min. 32 znaki" aria-label="Token dostępu do automatycznych kursów"/>
               <button onClick={saveOddsPilotToken}>Zapisz token</button>
               <button onClick={clearOddsPilotToken} disabled={!oddsTokenSaved && !oddsPilotToken}>Usuń</button>
-              <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") && lastOddsFetchDate === fixtureScan?.date ? "OddsPapi i StrikerAPI: próby wykonane dzisiaj" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") ? "OddsPapi: próba wykonana dzisiaj" : lastOddsFetchDate === fixtureScan?.date ? "StrikerAPI: kursy pobrane dzisiaj; OddsPapi osobno" : lastOddsAttemptDate === fixtureScan?.date ? "StrikerAPI: próba wykonana — bez ponawiania kosztownych zapytań" : oddsProviderStatus === null ? "Sprawdzanie konfiguracji dostawców…" : !oddsProviderStatus.oddspapi && !oddsProviderStatus.strikerapi ? "Brak skonfigurowanych źródeł kursów" : !oddsProviderStatus.pilotEnabled ? "Brak sekretu ODDS_PILOT_TOKEN w Workerze" : oddsTokenSaved ? "OddsPapi: synchronizacja po zapisaniu tokenu; StrikerAPI wyłączony bez osobnej zgody" : "Wymagane jednorazowe zapisanie tokenu"}</span>
+              <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") && lastOddsFetchDate === fixtureScan?.date ? "OddsPapi i StrikerAPI: próby wykonane dzisiaj" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") ? "OddsPapi: próba wykonana dzisiaj" : lastOddsFetchDate === fixtureScan?.date ? "StrikerAPI: kursy pobrane dzisiaj; OddsPapi osobno" : lastOddsAttemptDate === fixtureScan?.date ? "StrikerAPI: próba wykonana — bez ponawiania kosztownych zapytań" : oddsProviderStatus === null ? "Sprawdzanie konfiguracji dostawców…" : !oddsProviderStatus.apiFootball && !oddsProviderStatus.oddspapi && !oddsProviderStatus.strikerapi ? "Brak skonfigurowanych źródeł kursów" : !oddsProviderStatus.apiFootball ? (!oddsProviderStatus.pilotEnabled ? "Brak sekretu ODDS_PILOT_TOKEN dla dodatkowych dostawców" : oddsTokenSaved ? "OddsPapi: synchronizacja po zapisaniu tokenu; StrikerAPI wyłączony bez osobnej zgody" : "API-Football Pro niedostępny; token jest opcjonalny dla dodatkowych źródeł") : oddsTokenSaved ? "API-Football Pro działa automatycznie; dodatkowe OddsPapi dostępne po zapisaniu tokenu; StrikerAPI wyłączony bez osobnej zgody" : "API-Football Pro działa automatycznie; token jest opcjonalny dla dodatkowych OddsPapi/StrikerAPI"}</span>
             </div>
             <p className="source-note">{apiFootballOddsLoading ? "API-Football Pro: pobieranie kursów…" : apiFootballOddsNotice}</p>
             <p className="source-note">API-Football Pro pobiera automatycznie kursy przedmeczowe dla dopasowanych identyfikatorów meczów. Dostępność zależy od pokrycia ligi i bukmachera; dostawca aktualizuje ten endpoint co 3 godziny i udostępnia kursy w oknie 1–14 dni przed meczem. Znaczniki czasu pochodzą z pola aktualizacji dostawcy — brak czasu lub brak rynku nie jest uzupełniany sztucznie. OddsPapi używa istniejącego <b>ODDSPAPI_API_KEY</b>; Worker sprawdza rzeczywisty limit przez bezpłatny endpoint /account, preferuje Bwin.be i wysyła jednego bukmachera oraz maksymalnie trzy rozgrywki na zapytanie. Budżet 250 zapytań miesięcznych jest rozkładany na pozostałe dni miesiąca i dwa okna synchronizacji; pominięte rozgrywki są raportowane. Katalog rynków Double Chance jest odkrywany najwyżej raz na 7 dni, jeśli budżet pozwala; brak kursu nie blokuje prognozy. Sekret <b>ODDS_PILOT_TOKEN</b> jest potrzebny wyłącznie do dodatkowego OddsPapi i StrikerAPI i pozostaje w Workerze oraz lokalnej przeglądarce. StrikerAPI jest wyłączony bez osobnej zgody.</p>
