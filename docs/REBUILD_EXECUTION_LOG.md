@@ -1907,3 +1907,16 @@
 - Cloudflare deployment run 44456262742: deploy step and Worker smoke test completed successfully; full live fixture reconciliation was still running when this log entry was written.
 - No previous local Tracker records, coupons, settlement rows or legacy MAIN bankroll were modified. The €91.60 amount is a virtual opening seed for the fresh rebuild only; legacy history is not silently imported.
 - Remaining acceptance: complete the final live reconciliation for the latest commit; verify the new balance guard in a real Android session; obtain the user's current Tracker JSON export to compare actual on-device history; implement/verify remaining evidence adapters and bookmaker integration separately.
+
+
+## 2026-11-19 — Stage 160: API-Football Pro enrichment and live acceptance
+- Integrated the existing API-Football Pro Worker secret into the European date scan and match analysis. The key remains server-side; no credential is shipped to the browser.
+- Added a 1–20 fixture batch endpoint for full fixture payloads (available events, lineups, team statistics and player statistics), plus a daily injuries/suspensions endpoint and safe subscription/quota diagnostics.
+- Integrated the returned fixture details and injury rows into prediction Tracker metadata. Empty injury feeds remain PARTIAL rather than being misrepresented as proof of no injuries.
+- Cache policy: daily fixture feed 15 minutes; fixture enrichment 15 minutes; injury feed 24 hours; status metadata 60 seconds. Provider rate-limit responses are sanitized, are not cached as successful data, and are handled as a temporary upstream limitation.
+- Fixed provider error parsing so empty/null error fields do not become false rate-limit failures. Added safe diagnostic details, fresh status bypass, and workflow smoke-test handling for HTTP 429.
+- Extended API-Football Europe filtering to include UEFA competitions whose provider country is reported as World, while continuing to reject non-UEFA world competitions.
+- Latest live audit (2026-11-19T04:48:24Z): 48 unique fixtures, 15 countries/federations, 27 competitions; all 9 source-health checks healthy; zero source errors, duplicate canonical keys, wrong-date fixtures or non-European fixtures. API-Football Pro: 111 raw provider fixtures, 21 accepted European fixtures.
+- Latest CI: TypeScript, unit tests and production build passed; 290 tests passed across 29 files. Cloudflare deployment to the separate REBUILT Worker, production smoke tests and full live European source reconciliation all passed. Feature commit: 4404b769e9ef6331362538051adf972464674e8b; deployment run: 44460654084; validation run: 44460654085.
+- A temporary API-Football per-minute 429 was observed during repeated development/deployment smoke tests. The workflow now treats a correctly identified provider throttle as a safe upstream limitation rather than a failed application deployment. No paid plan was purchased or upgraded by this work.
+- No historical Tracker rows, coupons, settlement records or bankroll entries were rewritten. The Tracker remains browser-local and requires JSON export/import between devices. Physical Android interaction/performance acceptance remains unverified.

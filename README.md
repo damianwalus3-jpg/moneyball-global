@@ -2,17 +2,19 @@
 
 Independent, Polish-language football analytics PWA. This is a clean rebuild, separate from the existing production application.
 
-## Zero-cost design
-- Static application hosted on Cloudflare Workers Free within the published free quotas.
-- No paid API keys, subscriptions, Supabase project, paid database, Google Sheets, Vercel or Lovable.
+## Hosting and data services
+- Static PWA hosting uses Cloudflare Workers Free within the published free quotas.
+- **API-Football Pro is the configured paid football-data provider.** Its existing subscription is accessed only through the Cloudflare Worker secret API_FOOTBALL_KEY; the key is never sent to browser code. No additional plan or service was purchased by this implementation.
+- PitchAPI is used server-side for xG/xGA history and selected lineups; its key is stored in the Worker secret PITCHAPI_API_KEY.
+- Seven additional public fixture sources are combined: open-matchday, OpenLigaDB, OpenFootball, ESPN, FootyNomad, timezone.football and Flashscore.
 - The Tracker stores data locally in the user's browser. JSON backup/restore is built in. Browser-local records do not sync automatically between devices.
-- Public football sources are fetched directly from the browser where CORS and source terms allow it.
-- If free quotas or a provider's terms change, the app reports the limitation instead of silently switching to a paid service.
+- Provider quotas and source terms are respected. Temporary rate limits are reported explicitly; failed responses are not cached or marked as verified data.
+- No paid database, Supabase project, Google Sheets, Vercel or Lovable is required.
 
 ## Current implementation
 - Mobile-first React + TypeScript + Vite shell.
 - Dashboard, European fixtures, Typ dnia, coupons, Intelligence and Tracker modules.
-- Daily Europe/Brussels fixture scan combines open-matchday, OpenLigaDB, OpenFootball, ESPN, FootyNomad, timezone.football and the public Flashscore daily feed. All source results are merged and deduplicated; per-source coverage and errors are retained.
+- Daily Europe/Brussels fixture scan combines API-Football Pro with seven public fixture sources. PitchAPI supplies a separate league catalogue and xG/xGA data. All source results are merged and deduplicated; per-source coverage and errors are retained.
 - Local Tracker with append/import/export behavior; import merges missing IDs and never overwrites existing rows.
 - Prediction-domain checks for 1X2 normalization, derived Double Chance, fixture deduplication and exactly-three-distinct-match coupon calculation.
 
@@ -30,11 +32,11 @@ bun run build
 See `docs/PRODUCT_SPEC.md`, `docs/DOMAIN_MODEL.md` and `docs/REBUILD_EXECUTION_LOG.md`.
 
 
-This project is designed to stay within free service quotas; no paid services are required or configured.
+Hosting and public feeds are kept within their free quotas. API-Football Pro is a paid data source already configured in the Worker; usage remains subject to the active subscription limits.
 
 ## European fixture sources
 
-The daily scan combines seven public fixture sources: **open-matchday**, **OpenLigaDB**, **OpenFootball**, **ESPN Soccer**, **FootyNomad**, **timezone.football** and the **Flashscore public daily feed**. The first six are read through their public feeds/pages; Flashscore is proxied by the same Cloudflare Worker and filtered server-side. No paid scraper or proxy is used.
+The daily scan combines seven public fixture sources — **open-matchday**, **OpenLigaDB**, **OpenFootball**, **ESPN Soccer**, **FootyNomad**, **timezone.football** and the **Flashscore public daily feed** — plus **API-Football Pro**. The first six are read through their public feeds/pages; Flashscore and API-Football Pro are proxied by the same Cloudflare Worker and filtered server-side. No paid scraper or proxy is used.
 
 - **open-matchday** — daily CSV catalogue, including all currently indexed European folders with fixtures; non-commercial terms apply and coverage varies by competition.
 - **OpenLigaDB** — public season catalogue and match feeds; requests are throttled and Worker responses cached.
@@ -44,7 +46,7 @@ The daily scan combines seven public fixture sources: **open-matchday**, **OpenL
 - **timezone.football** — attributed public 14-day feed, cached for 15 minutes as required by its feed guidance.
 - **Flashscore** — public daily feed proxied by the Worker; explicit non-European confederations are excluded and only today's Europe/Brussels fixtures are accepted.
 
-All feeds are normalized to Europe/Brussels date, merged and deduplicated by date/team identity (with women's fixtures distinguished). Per-source counts and errors are retained. Provider counts must not be summed as unique matches. No single free feed or combination currently proves complete coverage of every European senior, women's, youth, regional and amateur match; missing data is never invented. OpenLigaDB data is subject to its ODbL 1.0 and fair-use guidance; open-matchday's non-commercial terms must be respected.
+All feeds are normalized to Europe/Brussels date, merged and deduplicated by date/team identity (with women's fixtures distinguished). Per-source counts and errors are retained. Provider counts must not be summed as unique matches. No single feed or combination currently proves complete coverage of every European senior, women's, youth, regional and amateur match; missing data is never invented. OpenLigaDB data is subject to its ODbL 1.0 and fair-use guidance; open-matchday's non-commercial terms must be respected.
 
 ### Additional fixture source: OpenFootball
 
@@ -54,7 +56,7 @@ The rebuild also reads public-domain Football.TXT feeds from OpenFootball for se
 
 The live open-matchday build summary listed 75 competitions, 65 of which were European folders accepted by the current country/UEFA allowlist. This included domestic cups, selected lower tiers and Belgian U21. It is a dated source snapshot, not a complete census of Europe. The app shows current provider counts and failures; it never claims that every European match is guaranteed to be present.
 
-Automated FotMob/Sofascore scraping is intentionally not used: their terms/official support material restrict programmatic reuse or do not offer public API access. The current source set stays within public open-matchday, OpenLigaDB and public-domain OpenFootball feeds.
+Automated FotMob/Sofascore scraping is intentionally not used: their terms/official support material restrict programmatic reuse or do not offer public API access. The current source set uses the official API-Football Pro API, PitchAPI and the documented public feeds above.
 
 
 ## Release acceptance — 2026-11-18
@@ -81,3 +83,22 @@ Automated FotMob/Sofascore scraping is intentionally not used: their terms/offic
 - Coupon candidates require a selected market probability of at least 75%. Each generated coupon contains exactly 3 distinct fixtures; a fixture qualifying in both markets can appear only once. Double Chance legs are settled as 1X/X2/12 and are not assigned bookmaker odds unless a complete DC odds feed exists.
 - Tracker records remain append-only in the UI; destructive per-row deletion is disabled. Backup import merges missing record IDs and never overwrites existing rows.
 - PitchAPI is a free API source (key required) and is accessed server-side through the Cloudflare Worker secret `PITCHAPI_API_KEY`; no API key is exposed in browser code. See [PitchAPI reference](https://pitchapi.dev/).
+
+
+## API-Football Pro enrichment — 2026-11-19
+
+- GET /api/api-football/fixtures/YYYY-MM-DD retrieves the provider date feed using Europe/Brussels; the app accepts only European domestic competitions and UEFA competitions. The provider raw count is global and must not be presented as a European match count.
+- GET /api/api-football/enrichment?ids=... accepts batches of up to 20 fixture IDs and returns the provider full fixture payload, including available events, lineups, team statistics and player statistics. The client batches IDs and spaces requests to reduce minute-limit pressure.
+- GET /api/api-football/injuries?date=YYYY-MM-DD retrieves the daily injury/suspension feed. An empty response is not proof that every league has complete injury coverage or that no player is unavailable.
+- GET /api/api-football/status exposes only safe subscription and quota metadata; account PII and API credentials are never returned. Add ?fresh=1 to bypass the short status cache for diagnostics.
+- Worker cache policy: date fixtures 15 minutes, fixture enrichment 15 minutes, daily injuries 24 hours, status metadata 60 seconds. Provider 429 responses are surfaced with sanitized diagnostic details and are never cached as successful data.
+- API-Football Pro fixture data is stored with prediction Tracker records when available. PitchAPI remains the xG/xGA source; missing xG is not inferred from ordinary shot statistics.
+- API-Football Pro is a paid service. Its per-minute and daily quotas are controlled by the active account plan; a temporary HTTP 429 is a provider limit, not proof that the subscription is inactive.
+
+### Live Europe/Brussels audit — 2026-11-19
+
+- 48 unique fixtures across 15 countries/federations and 27 competitions.
+- All 9 configured source-health checks passed; zero source errors, duplicate canonical keys, wrong-date fixtures or non-European fixtures.
+- API-Football Pro returned 111 raw provider fixtures, of which 21 were accepted as European fixtures for the Brussels date after domestic-country and UEFA-world competition filtering.
+- This is a dated multi-source snapshot, not proof of exhaustive European senior, youth, women's, amateur or regional coverage.
+- CI, 290 unit tests across 29 test files, production build, Cloudflare Worker deployment, smoke tests and live source reconciliation passed on the latest feature commit. Physical Android interaction testing remains a separate acceptance task.
