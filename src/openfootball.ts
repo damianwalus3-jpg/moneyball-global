@@ -104,7 +104,7 @@ export function parseJsDelivrOpenFootballTree(payload: unknown): string[] {
     throw new Error("jsDelivr OpenFootball catalogue: missing files array");
   }
   return ((payload as { files: Array<{ name?: unknown }> }).files)
-    .flatMap(file => typeof file?.name === "string" ? [file.name.replace(/^\\/+/, "")] : [])
+    .flatMap(file => typeof file?.name === "string" ? [file.name.startsWith("/") ? file.name.slice(1) : file.name] : [])
     .filter(path => path.length > 0);
 }
 
