@@ -248,6 +248,47 @@ describe("odds provider pilot proxy", () => {
   });
 
 
+  it("fetches a Brussels-day OddsPapi batch with only two billable calls and maps real Bwin prices", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const account = { subscriptions: [{ is_active: true, request_limit: 250, request_count: 0,
+      bookmakers: { "bwin.be": {}, "unibet.be": {} } }] };
+    const fixtures = [{ fixtureId: "op-1", tournamentId: 77, startTime: "2026-11-19T18:00:00.000Z",
+      participant1Name: "Club Brugge FC", participant2Name: "KAA Gent", hasOdds: true, updatedAt: "2026-11-19T09:00:00.000Z" }];
+    const price = (value: number) => ({ active: true, price: value, changedAt: "2026-11-19T10:00:00.000Z" });
+    const odds = { fixtureId: "op-1", bookmakerOdds: { "bwin.be": {
+      bookmakerIsActive: true, suspended: false, fixturePath: "https://sports.bwin.be/event",
+      markets: { "101": { marketActive: true, outcomes: {
+        "101": { players: { "0": price(2.1) } },
+        "102": { players: { "0": price(3.2) } },
+        "103": { players: { "0": price(3.5) } },
+      } } },
+    } } };
+    const upstream = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(account), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(fixtures), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(odds), { status: 200 }));
+    vi.stubGlobal("fetch", upstream);
+    const token = "pilot-secret-0123456789-abcdef-extra";
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/oddspapi/daily", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ date: "2026-11-19", slot: "morning", fixtures: [
+        { id: "local-1", date: "2026-11-19", time: "19:00", home: "Club Brugge", away: "KAA Gent" },
+      ] }),
+    }), { ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "provider-secret", ODDS_PILOT_TOKEN: token }, { waitUntil: vi.fn() });
+    const body = await response.json() as { status: string; estimatedRequestsUsed: number; quotes: Array<{ fixtureId: string; bookmaker: string; odds1: number; oddsX: number; odds2: number; complete1X2: boolean }> };
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({ status: "ok", estimatedRequestsUsed: 2 });
+    expect(body.quotes).toEqual([expect.objectContaining({
+      fixtureId: "local-1", bookmaker: "Bwin Belgium", odds1: 2.1, oddsX: 3.2, odds2: 3.5, complete1X2: true,
+    })]);
+    expect(upstream).toHaveBeenCalledTimes(3);
+    expect(String(upstream.mock.calls[1][0])).toContain("/v4/fixtures?");
+    expect(String(upstream.mock.calls[2][0])).toContain("/v4/odds-by-tournaments?");
+    expect(String(upstream.mock.calls[2][0])).toContain("tournamentIds=77");
+  });
+
   it("fails closed when the owner pilot token is not configured", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
