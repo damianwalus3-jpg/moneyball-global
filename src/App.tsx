@@ -233,6 +233,7 @@ function savePredictionRecord(
     historyProvenance: buildHistoryProvenance(homeForm, awayForm, match.date),
     evidenceComplete: evidenceAudit.complete, evidenceAudit: JSON.stringify(evidenceAudit),
     evidenceGaps: getEvidenceGaps(evidenceAudit).join(", "),
+    qualificationPolicyVersion: 2,
   };
   const current = readRecords();
   const pendingPredictionRecords: Array<Omit<TrackerRecord, "id" | "createdAt">> = [];
@@ -277,7 +278,7 @@ function savePredictionRecord(
     const hasOneXTwoProbabilities = !!probabilities
       && [probabilities.home, probabilities.draw, probabilities.away].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
       && Math.abs(probabilities.home + probabilities.draw + probabilities.away - 1) <= 0.0001;
-    if (shouldAppendPrediction(current, match.id, model, hasOneXTwoProbabilities, method, "1X2", evidenceAudit.complete, shared.evidenceGaps)) {
+    if (shouldAppendPrediction(current, match.id, model, hasOneXTwoProbabilities, method, "1X2", evidenceAudit.complete, shared.evidenceGaps, 2)) {
       pendingPredictionRecords.push({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · 1X2 · " + method,
         status: getPredictionRecordStatus({ probabilitiesAvailable: hasOneXTwoProbabilities, strongCandidate, couponEligible, evidenceComplete: evidenceAudit.complete, thresholdMet: typeof topProbability === "number" && topProbability >= 0.75 }), details: oneXTwoDetails });
     }
@@ -288,7 +289,7 @@ function savePredictionRecord(
     const hasDcProbabilities = !!dc
       && [dc.oneX, dc.xTwo, dc.oneTwo].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
       && Math.abs(dc.oneX + dc.xTwo + dc.oneTwo - 2) <= 0.0001;
-    if (shouldAppendPrediction(current, match.id, model, hasDcProbabilities, method, "DOUBLE_CHANCE", evidenceAudit.complete, shared.evidenceGaps)) {
+    if (shouldAppendPrediction(current, match.id, model, hasDcProbabilities, method, "DOUBLE_CHANCE", evidenceAudit.complete, shared.evidenceGaps, 2)) {
       pendingPredictionRecords.push({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · DOUBLE CHANCE · " + method,
         status: getPredictionRecordStatus({ probabilitiesAvailable: hasDcProbabilities, strongCandidate: strongDoubleChance, couponEligible, evidenceComplete: evidenceAudit.complete, thresholdMet: dcProbability !== null && dcProbability >= 0.75 }), details: dcDetails });
     }
