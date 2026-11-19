@@ -6,6 +6,8 @@ import { shouldSkipMoviOddsSync } from "../_shared/movi-odds-config.ts";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const MOVI_KEY = Deno.env.get("MOVIODDS_API_KEY") || "";
+const API_FOOTBALL_KEY = Deno.env.get("API_FOOTBALL_KEY") || "";
+const API_FOOTBALL_BASE = "https://v3.football.api-sports.io";
 const BASE = "https://moviodds.com";
 const CORS = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-cron-token","Access-Control-Allow-Methods":"GET,POST,OPTIONS"};
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{...CORS,"Content-Type":"application/json","Cache-Control":"no-store"}});
@@ -18,6 +20,13 @@ async function authorized(token:string){
  if(!token)return false;
  const r=await fetch(SUPABASE_URL+"/rest/v1/rpc/moneyball_cron_token_valid",{method:"POST",headers:{apikey:SERVICE_KEY,Authorization:"Bearer "+SERVICE_KEY,"Content-Type":"application/json"},body:JSON.stringify({p_token:token})});
  return r.ok&&(await r.json())===true;
+}
+async function apiFootball(path:string){
+ if(!API_FOOTBALL_KEY)throw new Error("API_FOOTBALL_KEY is not configured.");
+ const r=await fetch(API_FOOTBALL_BASE+path,{headers:{"x-apisports-key":API_FOOTBALL_KEY},signal:AbortSignal.timeout(25000)});
+ const payload=await r.json().catch(()=>({}));
+ if(!r.ok||payload?.errors&&Object.keys(payload.errors).length)throw new Error("API-Football HTTP "+r.status+": "+JSON.stringify(payload?.errors||{}).slice(0,400));
+ return payload;
 }
 async function movi(path:string){
  const headers:Record<string,string>={"Accept":"application/json","Accept-Encoding":"gzip"};
@@ -58,12 +67,23 @@ function selectionFor(q:any,home:string,away:string):{market:string;selection:st
 }
 Deno.serve(async(req)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
- if(req.method==="GET")return json({ok:true,service:"Moneyball MoviOdds sync",provider:"MoviOdds / bet365",key_configured:!!MOVI_KEY,mode:"REST snapshots",note:"No odds are fabricated; missing provider quotes remain missing."});
+ if(req.method==="GET")return json({ok:true,service:"Moneyball odds sync",primary_provider:"MoviOdds / bet365",movi_key_configured:!!MOVI_KEY,api_football_key_configured:!!API_FOOTBALL_KEY,mode:"provider fallback diagnostics enabled",note:"No odds are fabricated; missing provider quotes remain missing."});
  if(req.method!=="POST")return json({error:"POST required"},405);
  try{
   if(!(await authorized(req.headers.get("x-cron-token")||"")))return json({error:"Unauthorized"},401);
-  if(shouldSkipMoviOddsSync(MOVI_KEY))return json({ok:true,skipped:true,reason:"MOVIODDS_API_KEY is not configured; no provider request was made and no odds were changed.",provider:"MoviOdds",provider_requests:0,key_configured:false},200);
   const body=await req.json().catch(()=>({}));
+  if(shouldSkipMoviOddsSync(MOVI_KEY)&&API_FOOTBALL_KEY&&body.mode==="diagnostic"){
+   const day=String(body.date||new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()));
+   const [status,bookmakers,odds]=await Promise.all([
+    apiFootball("/status"),
+    apiFootball("/odds/bookmakers?search=Bwin"),
+    apiFootball("/odds?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels&page=1")
+   ]);
+   const bookmakerNames=(bookmakers.response||[]).map((x:any)=>({id:x.id,name:x.name}));
+   const fixtureSamples=(odds.response||[]).slice(0,10).map((x:any)=>({fixture_id:x.fixture?.id,date:x.fixture?.date,home:x.teams?.home?.name,away:x.teams?.away?.name,bookmakers:(x.bookmakers||[]).map((b:any)=>b.name),markets:(x.bookmakers||[]).flatMap((b:any)=>(b.bets||[]).map((m:any)=>m.name)).slice(0,12)}));
+   return json({ok:true,mode:"diagnostic",provider:"API-Football",date:day,key_configured:true,account:status.response?.account?{plan:status.response.account.subscription?.plan,subscription_active:status.response.account.subscription?.active,requests_remaining:status.response.requests?.limit_day!=null?Number(status.response.requests.limit_day)-Number(status.response.requests.current||0):null,requests_today:status.response.requests?.current,requests_limit:status.response.requests?.limit_day}:null,bwin_bookmakers:bookmakerNames,odds_results:odds.results||0,odds_pagination:odds.paging||null,fixtures:fixtureSamples});
+  }
+  if(shouldSkipMoviOddsSync(MOVI_KEY))return json({ok:true,skipped:true,reason:API_FOOTBALL_KEY?"MOVIODDS_API_KEY is not configured; API-Football fallback is available but requires a diagnostic/sync request.":"Neither MOVIODDS_API_KEY nor API_FOOTBALL_KEY is configured.",provider:"MoviOdds",api_football_key_configured:!!API_FOOTBALL_KEY,provider_requests:0,key_configured:false},200);
   const now=new Date(),day=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
   const owner=String(body.owner_id||"");
   const ownerFilter=owner?"&owner_id=eq."+encodeURIComponent(owner):"";
