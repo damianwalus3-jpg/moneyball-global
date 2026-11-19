@@ -308,6 +308,7 @@ export default function App() {
   const [notice, setNotice] = useState("");
   const [oddsPilotToken, setOddsPilotToken] = useState(() => { try { return localStorage.getItem(ODDS_PILOT_TOKEN_KEY) ?? ""; } catch { return ""; } });
   const [oddsTokenSaved, setOddsTokenSaved] = useState(() => { try { return Boolean(localStorage.getItem(ODDS_PILOT_TOKEN_KEY)); } catch { return false; } });
+  const [trackerDiagnosticsStatus, setTrackerDiagnosticsStatus] = useState("Oczekiwanie na autoryzowany kanał właściciela");
   const [lastOddsFetchDate, setLastOddsFetchDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_FETCH_KEY) ?? ""; } catch { return ""; } });
   const [lastOddsAttemptDate, setLastOddsAttemptDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
   const [lastOddsPapiAttemptKey, setLastOddsPapiAttemptDate] = useState(() => { try { return localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_STORAGE_KEY) ?? ""; } catch { return ""; } });
@@ -1143,6 +1144,40 @@ export default function App() {
       window.removeEventListener("moneyball:tracker-updated", syncTracker);
     };
   }, []);
+
+  // Send only non-sensitive aggregate counts to the owner-authenticated Worker.
+  // Full Tracker rows, identifiers, titles, odds, stakes and bankroll are never uploaded.
+  useEffect(() => {
+    const token = oddsPilotToken.trim();
+    if (token.length < 32) {
+      setTrackerDiagnosticsStatus("Brak zapisanego tokenu właściciela — dane pozostają lokalnie");
+      return;
+    }
+    let cancelled = false;
+    const syncAggregate = async () => {
+      try {
+        const lastAttempt = Number(localStorage.getItem("moneyball.trackerDiagnosticsLastSentAt") ?? "0");
+        if (Date.now() - lastAttempt < 5 * 60 * 1000) return;
+        const kinds = ["scan", "match", "prediction", "coupon", "result", "odds", "bet", "ledger"] as const;
+        const counts = Object.fromEntries(kinds.map(kind => [kind === "ledger" ? "ledgerEntries" : kind === "bet" ? "bets" : kind === "scan" ? "scans" : kind === "match" ? "matches" : kind === "prediction" ? "predictions" : kind === "coupon" ? "coupons" : kind === "result" ? "results" : "odds", records.filter(row => row.kind === kind).length]));
+        const lastRecordAt = records.reduce((latest, row) => Date.parse(row.createdAt) > Date.parse(latest) ? row.createdAt : latest, "");
+        const response = await fetch("/api/owner/tracker-diagnostics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+          body: JSON.stringify({ totalRecords: records.length, ...counts, lastRecordAt }),
+        });
+        if (!response.ok) throw new Error(response.status === 401 ? "Autoryzacja diagnostyki odrzucona" : "Serwer diagnostyczny HTTP " + response.status);
+        localStorage.setItem("moneyball.trackerDiagnosticsLastSentAt", String(Date.now()));
+        if (!cancelled) setTrackerDiagnosticsStatus("Połączono · wysłano wyłącznie bezpieczne statystyki Trackera");
+      } catch (error) {
+        if (!cancelled) setTrackerDiagnosticsStatus(error instanceof Error ? error.message : "Diagnostyka chwilowo niedostępna");
+      }
+    };
+    void syncAggregate();
+    const timer = window.setInterval(() => void syncAggregate(), 5 * 60 * 1000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [records, oddsPilotToken]);
+
   const fileRef = useRef<HTMLInputElement>(null);
   const modelAudit = useMemo(() => auditTrackerPredictions(records), [records]);
   const bankroll = useMemo(() => calculateBankroll(records), [records]);
@@ -1322,7 +1357,7 @@ export default function App() {
              </div>
              {fixtureScan && <details className="scan-warnings"><summary>Szczegóły kontroli wszystkich źródeł ({getSourceDiagnostics(fixtureScan).length})</summary>{getSourceDiagnostics(fixtureScan).map(source => <p key={source.name}><b>{source.name}</b> · {source.status} · sprawdzone: {source.checked} · przed filtrem: {source.preScopeFixtures ?? "N/D"} · przyjęte: {source.acceptedFixtures} · błędy: {source.errors}{source.errors ? " · " + source.detail : ""}</p>)}{fixtureScan.leaguesFailed.map((error,index) => <p className="scan-error" key={error + index}>{error}</p>)}</details>}
              <div className="panel-actions"><button onClick={() => void runFixtureScan(true)} disabled={scanLoading}>{scanLoading ? "Odświeżanie…" : "Uruchom pełny skan ponownie"}</button><button onClick={() => changeTab("tracker")}>Otwórz rejestr i integralność danych</button><button onClick={() => changeTab("bets")}>Otwórz kursy i bankroll</button></div>
-             <p className="source-note">Ważne: punkty 1, 4 i 6 odczytują localStorage na urządzeniu, na którym działa aplikacja. Nie wysyłamy pełnej historii, nazwisk, kuponów ani salda na publiczny serwer. Diagnostyka nie zmienia rekordów.</p>
+             <p className="source-note">Zdalna diagnostyka Trackera: <b>{trackerDiagnosticsStatus}</b>. Po autoryzacji wysyłane są wyłącznie sumy rekordów według typu i data ostatniego wpisu — bez pełnych rekordów, identyfikatorów, tytułów, kursów, stawek, kuponów i salda. Diagnostyka jest tylko do odczytu i nie zmienia historii.</p>
            </section>
         </>}
 
