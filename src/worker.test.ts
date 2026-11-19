@@ -529,3 +529,58 @@ describe("API-Football Pro secure status proxy", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+
+describe("API-Football Pro batch enrichment", () => {
+  const origin = "https://moneyball-global-rebuild.damianwalus3.workers.dev";
+  const env = { ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "test-api-football-secret" };
+
+  it("fetches up to 20 fixture IDs in one request and caches the complete fixture payload", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const payload = { results: 1, response: [{ fixture: { id: 123 }, events: [], lineups: [], statistics: [], players: [] }] };
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { status: 200, headers: { "X-RateLimit-Remaining": "50" } }));
+    vi.stubGlobal("fetch", upstream);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/enrichment?ids=123-456"), env, { waitUntil: vi.fn() });
+    expect(upstream).toHaveBeenCalledWith("https://v3.football.api-sports.io/fixtures?ids=123-456&timezone=Europe%2FBrussels", expect.objectContaining({ headers: expect.objectContaining({ "x-apisports-key": "test-api-football-secret" }) }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=21600");
+    await expect(response.json()).resolves.toMatchObject({ provider: "API-Football Pro", requestedFixtureIds: ["123","456"], fixtures: payload.response, includes: ["events","lineups","fixture_statistics","player_statistics"] });
+    expect(cache.put).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects empty, nonnumeric and over-20 fixture ID batches before contacting the provider", async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal("fetch", upstream);
+    for (const ids of ["", "abc-123", Array.from({ length: 21 }, (_,i) => String(i + 1)).join("-")]) {
+      const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/enrichment?ids=" + ids), env, { waitUntil: vi.fn() });
+      expect(response.status).toBe(400);
+    }
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("surfaces provider rate limiting as HTTP 429 and never caches it", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn() };
+    vi.stubGlobal("caches", { default: cache });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ errors: { rateLimit: "Too many requests. Exceeded requests per minute." }, response: [] }), { status: 200 })));
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/enrichment?ids=123"), env, { waitUntil: vi.fn() });
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited", retryAfterSeconds: 60 });
+    expect(cache.put).not.toHaveBeenCalled();
+  });
+});
+
+describe("API-Football Pro injury batch", () => {
+  it("fetches injury/suspension records for up to 20 fixture IDs and caches successful responses", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const payload = { results: 1, response: [{ player: { name: "Player" }, type: "Missing Fixture", reason: "Suspended" }] };
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));
+    vi.stubGlobal("fetch", upstream);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/injuries?ids=123-456"), env, { waitUntil: vi.fn() });
+    expect(upstream).toHaveBeenCalledWith("https://v3.football.api-sports.io/injuries?ids=123-456&timezone=Europe%2FBrussels", expect.any(Object));
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ provider: "API-Football Pro", requestedFixtureIds: ["123","456"], injuries: payload.response });
+    expect(cache.put).toHaveBeenCalledTimes(1);
+  });
+});
