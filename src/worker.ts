@@ -396,7 +396,7 @@ export default {
         lastRecordAt: input.lastRecordAt || null,
       };
       const response = json(result, 200, origin);
-      response.headers.set("Cache-Control", "private, max-age=0");
+      response.headers.set("Cache-Control", "public, max-age=86400");
       await cache.put(cacheKey, response.clone());
       return response;
     }
