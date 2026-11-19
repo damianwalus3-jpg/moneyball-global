@@ -112,8 +112,6 @@ describe("FootyNomad daily fixtures Worker proxy", () => {
     expect(body.fixtures).toHaveLength(2);
     expect(body.pagesChecked).toBe(2);
     expect(cache.put).toHaveBeenCalledTimes(1);
-    const cachedAccount = cache.put.mock.calls[0]?.[1] as Response | undefined;
-    expect(cachedAccount?.headers.get("Cache-Control")).toBe("public, max-age=300");
   });
 
   it("rejects impossible dates before contacting FootyNomad", async () => {
@@ -246,6 +244,8 @@ describe("odds provider pilot proxy", () => {
     expect(body).not.toContain("pilot-secret");
     expect(upstream).toHaveBeenCalledTimes(1);
     expect(cache.put).toHaveBeenCalledTimes(1);
+    const cachedAccount = cache.put.mock.calls[0]?.[1] as Response | undefined;
+    expect(cachedAccount?.headers.get("Cache-Control")).toBe("public, max-age=300");
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
