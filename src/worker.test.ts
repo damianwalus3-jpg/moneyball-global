@@ -513,6 +513,7 @@ describe("API-Football Pro secure status proxy", () => {
     }), env, { waitUntil: vi.fn() });
     const body = await response.json() as Record<string, any>;
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=60");
     expect(body.subscription).toMatchObject({ plan: "Pro", active: true });
     expect(body.requests).toMatchObject({ perMinuteLimit: "300", perMinuteRemaining: "299", dailyRemaining: "7488" });
     expect(JSON.stringify(body)).not.toContain("private@example.com");
@@ -521,6 +522,20 @@ describe("API-Football Pro secure status proxy", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("https://v3.football.api-sports.io/status");
     expect(cache.put).toHaveBeenCalledTimes(1);
   });
+
+  it("bypasses cached quota metadata when fresh=1 is requested", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      response: { subscription: { plan: "Pro", active: true }, requests: { current: 13, limit_day: 7500 } },
+    }), { status: 200, headers: { "X-RateLimit-Remaining": "298" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/status?fresh=1"), env, { waitUntil: vi.fn() });
+    expect(response.status).toBe(200);
+    expect(cache.match).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("does not call the provider when the secret is absent", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -600,6 +615,21 @@ describe("API-Football Pro daily feed and odds ID validation", () => {
     expect(response.status).toBe(429);
     await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited" });
     expect(cache.put).not.toHaveBeenCalled();
+  });
+
+
+  it("does not misclassify an empty rateLimit field as a provider throttle", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      errors: { rateLimit: null }, results: 0, response: [],
+    }), { status: 200 })));
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/fixtures/2026-11-19"), {
+      ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "private-api-football-key",
+    }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ provider: "API-Football Pro", results: 0, fixtures: [] });
+    expect(cache.put).toHaveBeenCalledTimes(1);
   });
 
   it("accepts a numeric API-Football fixture ID for the odds endpoint", async () => {

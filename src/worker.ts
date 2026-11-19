@@ -819,12 +819,13 @@ export default {
         let payload: { response?: unknown[]; results?: number; errors?: unknown; paging?: unknown };
         try { payload = JSON.parse(raw) as typeof payload; }
         catch { return json({ error: "api_football_injuries_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
-        const errorText = JSON.stringify(payload.errors ?? "").toLowerCase();
+        const errorText = apiFootballErrorText(payload.errors);
         const rateLimited = /too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429;
         if (rateLimited) return json({
           error: "api_football_rate_limited", provider: "API-Football Pro",
           retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60,
           message: "Dostawca ograniczył liczbę zapytań. Dane nie zostały oznaczone jako pobrane.",
+          providerError: safeApiFootballErrorDetails(payload.errors),
           rateLimit: { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
         }, 429, origin);
         if (!upstream.ok) return json({ error: "api_football_injuries_http_" + upstream.status }, upstream.status, origin);

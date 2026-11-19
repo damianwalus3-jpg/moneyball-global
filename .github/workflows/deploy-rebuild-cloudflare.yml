@@ -54,8 +54,15 @@ jobs:
           fi
           API_FOOTBALL_STATUS="$(curl --silent --show-error -o /tmp/api-football.json -w "%{http_code}" "$BASE/api/api-football/fixtures/$TODAY")"
           if [ "$API_FOOTBALL_CONFIGURED" = "yes" ]; then
-            test "$API_FOOTBALL_STATUS" = "200" || { cat /tmp/api-football.json; echo "API-Football configured but gateway did not return HTTP 200"; exit 1; }
-            node -e 'const p=require("/tmp/api-football.json");if(p.provider!=="API-Football Pro"||!Array.isArray(p.fixtures)||typeof p.results!=="number"){console.error("API-Football response shape invalid",p);process.exit(1)}console.log("API-Football Pro OK:",p.results,"fixtures for",p.date)'
+            if [ "$API_FOOTBALL_STATUS" = "200" ]; then
+              node -e 'const p=require("/tmp/api-football.json");if(p.provider!=="API-Football Pro"||!Array.isArray(p.fixtures)||typeof p.results!=="number"){console.error("API-Football response shape invalid",p);process.exit(1)}console.log("API-Football Pro OK:",p.results,"fixtures for",p.date)'
+            elif [ "$API_FOOTBALL_STATUS" = "429" ]; then
+              node -e 'const p=require("/tmp/api-football.json");if(p.error!=="api_football_rate_limited"){console.error("Unexpected API-Football HTTP 429:",p);process.exit(1)}console.log("API-Football Pro temporarily rate-limited; safe gateway response verified:",p.providerError ?? p.error)'
+            else
+              cat /tmp/api-football.json
+              echo "API-Football configured but gateway returned unexpected HTTP $API_FOOTBALL_STATUS"
+              exit 1
+            fi
           else
             test "$API_FOOTBALL_STATUS" = "503" || { cat /tmp/api-football.json; echo "API-Football secret status unexpected"; exit 1; }
             echo "API-Football gateway deployed; API_FOOTBALL_KEY secret is not configured in this Worker."
