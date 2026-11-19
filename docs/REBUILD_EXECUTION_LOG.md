@@ -1956,3 +1956,20 @@
 - Market discovery is limited by the existing seven-day cache and requires at least three requests remaining; the daily 1X2/odds calls remain quota-guarded. If the catalogue does not return a verified Double Chance market, the parser safely keeps 1X2 only and never synthesizes DC prices.
 - The owner-only ODDS_PILOT_TOKEN gate remains in place; no secret is exposed to the browser or repository. A first real quote import still requires the token to be saved locally in the app.
 - This stage changes only future OddsPapi discovery behavior; it does not alter Tracker history, predictions, coupons, settlements or bankroll entries.
+
+
+
+## 2026-11-19 — Stage 164: correct OddsPapi v4 odds request contract and monthly quota pacing
+- Compared the production adapter with the current official OddsPapi v4 documentation and found that `/v4/odds-by-tournaments` requires exactly one `bookmaker` parameter and accepts at most three `tournamentIds` per request. The previous adapter sent multiple bookmakers and unbounded tournament IDs in one request.
+- Corrected the adapter to prefer `bwin.be`, fall back to the next entitled Belgian bookmaker only when Bwin is not included in the active subscription, and send one bookmaker per request.
+- Added deterministic batches of at most three tournament IDs, ordered by earliest kickoff. Each additional request respects the documented 1-second endpoint cooldown. The response now reports queried and skipped tournament IDs and the number of odds batches.
+- Added a monthly request budget based on the remaining account allowance and days left in the Brussels-local month, split across morning/afternoon sync slots with a small reserve. The adapter never spends beyond the slot budget; when quota is tight it prioritizes the earliest kickoffs and explicitly reports skipped competitions.
+- The weekly market catalogue opt-in remains quota-guarded and cached for seven days. The app now reports the slot budget and the number of competitions omitted by quota; no synthetic Double Chance prices are created.
+- Added tests for the documented one-bookmaker/three-tournament request shape, four-tournament batching, Bwin priority, and monthly slot budgeting. TypeScript, unit tests and production build passed.
+- Production deployment run `44482763273` succeeded on commit `bf43dedab03fad91641d325ed36926ea9c135ddf`; Worker smoke tests and live European source reconciliation passed. The reconciliation returned 48 unique Europe/date fixtures before competition scope, 20 eligible domestic league fixtures, 9 healthy sources, 0 source errors, 0 duplicate canonical keys, 0 wrong-date fixtures and 0 non-European fixtures.
+- This corrects the request format but does not yet prove a real OddsPapi quote import from the Android browser. The Worker reports the owner-only pilot gate configured, but the token must be saved in the app's local browser before the first owner-authorized daily quote request. No secret was copied into the repository or exposed by the status endpoint.
+
+
+## 2026-11-19 — Stage 165: production OddsPapi health smoke test
+- Added a deployment smoke check for `/api/odds/status`. It verifies that the OddsPapi provider and owner-only pilot gate are configured, then logs only sanitized account quota status when the unmetered account endpoint is available.
+- The check makes no billable OddsPapi request and never logs API keys or pilot tokens. Temporary account-status unavailability is a warning, not a false application-deployment failure.
