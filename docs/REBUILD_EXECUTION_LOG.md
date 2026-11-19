@@ -2112,3 +2112,15 @@
 - The UI already exposes source-by-source diagnostics and the scope audit, including checked counts, accepted counts, errors, and explicit zero-result states. The app does not claim 100% European coverage.
 - Stage 176 integration and audit are DEPLOYED/VERIFIED for this daily snapshot. Exhaustive country-by-country and amateur/regional completeness is NOT proven; public free providers do not provide a complete authoritative catalogue. Project remains OPEN until broader provider coverage and Android-local acceptance are verified.
 - No historic Tracker records, predictions, coupons, results, settlements or bankroll entries were edited.
+
+
+## 2026-11-19 — Stage 177: lineup evidence hardening and Stage 3 production verification
+
+- Hardened projected-lineup classification: `LINEUP_PREDICTED` now requires exactly eleven starters on both sides and an explicit provider `lineup_type` signal containing `predict`, `project` or `expected`. Unlabelled unconfirmed XIs remain `LINEUP_PENDING`; they are not presented as predicted or confirmed.
+- Added regression tests for explicit projected evidence, untyped eleven-player lists and mixed provider evidence.
+- Implementation commits: `eae285b6cd675661ddcc1e8e1d50c6d89e0ccd09` and `59c3c8f19208e71bfdc9e6e2004b2870453e3626`.
+- MONEYBALL rebuild CI run `44504677895`: SUCCESS (TypeScript, unit tests and production build). Cloudflare deployment run `44504677918`: SUCCESS, including TypeScript, unit tests, production build, deployment, live smoke test and full current-day European source reconciliation.
+- Live production checks after deployment: `/api/health` returned `ok:true`; application shell loaded; `/api/odds/status` reported API-Football, OddsPapi and StrikerAPI configured, and owner-only pilot gate enabled. OddsPapi account metadata showed active entitlement and 250/250 requests remaining with `requestCount:0`.
+- The 19 Nov reconciliation was technically successful but explicitly degraded for API-Football fixture discovery due to upstream rate limiting (429 / Retry-After 60s). Public required sources remained healthy. Final scope validation reported zero duplicate canonical keys, zero wrong-date, non-European or out-of-scope fixtures; the audit does not prove exhaustive coverage of all European regional/amateur leagues.
+- Important integration limits remain: no authenticated OddsPapi quote request was made because the owner-only token is stored in the user's local browser and must not be bypassed; no live StrikerAPI request was made because its separate explicit-consent gate applies; API-Football daily quota was rate-limited during the fixture reconciliation. A provider being configured is not evidence that quotes were imported. No local Android Tracker or coupon/settlement E2E was performed because its localStorage/session is not available to this workflow.
+- No historical Tracker rows, predictions, coupons, results, settlements or bankroll entries were modified. Stage 3 implementation is deployed; authenticated provider acceptance and Android-local E2E remain OPEN and are not claimed as passed.
