@@ -643,6 +643,7 @@ export default {
     if (oddsHealth || oddsPilot) {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
       const configured = {
+        apiFootball: Boolean(env.API_FOOTBALL_KEY),
         oddspapi: Boolean(env.ODDSPAPI_API_KEY),
         strikerapi: Boolean(env.STRIKERAPI_API_KEY),
       };
