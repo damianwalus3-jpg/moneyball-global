@@ -3,9 +3,9 @@ import type { TrackerRecord } from "./tracker-store";
 import { listFreshOddsSnapshots, listOddsBookmakers, shouldAutoFetchDailyOdds, valueDoubleChanceSelectionFromOdds, valueSelectionFromOdds } from "./odds-value";
 
 const now = "2026-11-17T20:00:00.000Z";
-function odds(overrides: Partial<TrackerRecord["details"]> = {}, status = "COMPLETE_1X2"): TrackerRecord {
+function odds(overrides: Partial<TrackerRecord["details"]> = {}, status = "COMPLETE_1X2", id = "odds-1"): TrackerRecord {
   return {
-    id: "odds-1", kind: "odds", title: "Home vs Away · Book A", status,
+    id, kind: "odds", title: "Home vs Away · Book A", status,
     createdAt: now,
     details: {
       fixtureId: "fixture-1", bookmaker: "Book A", market: "1X2", complete1X2: true,
@@ -78,12 +78,12 @@ describe("verified odds valuation", () => {
   it("shows only complete odds captured within the 60-minute provider refresh window", () => {
     const rows = [
       odds({ capturedAt: "2026-11-17T19:55:00.000Z" }),
-      odds({ id: "stale", capturedAt: "2026-11-17T18:59:00.000Z" }),
-      odds({ id: "future", capturedAt: "2026-11-17T20:01:00.000Z" }),
-      odds({ id: "incomplete", complete1X2: false }, "INCOMPLETE_1X2"),
-      odds({ id: "other", fixtureId: "fixture-2" }),
+      odds({ capturedAt: "2026-11-17T18:59:00.000Z" }, "COMPLETE_1X2", "stale"),
+      odds({ capturedAt: "2026-11-17T20:01:00.000Z" }, "COMPLETE_1X2", "future"),
+      odds({ complete1X2: false }, "INCOMPLETE_1X2", "incomplete"),
+      odds({ fixtureId: "fixture-2" }, "COMPLETE_1X2", "other"),
       { ...odds({ market: "DOUBLE_CHANCE", complete1X2: false, completeDoubleChance: true,
-        odds1: null, oddsX: null, odds2: null, odds1x: 1.25, oddsX2: 1.4, odds12: 1.3 }, "COMPLETE_DOUBLE_CHANCE"), id: "dc" },
+        odds1: null, oddsX: null, odds2: null, odds1x: 1.25, oddsX2: 1.4, odds12: 1.3 }, "COMPLETE_DOUBLE_CHANCE", "dc"), id: "dc" },
     ];
     expect(listFreshOddsSnapshots(rows, "fixture-1", now).map(row => row.id)).toContain("dc");
     expect(listFreshOddsSnapshots(rows, "fixture-1", now).map(row => row.id)).toContain("odds-1");
