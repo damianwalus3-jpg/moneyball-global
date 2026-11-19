@@ -47,7 +47,7 @@ function freshCompleteSnapshot(
       || (d.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2") !== market) return false;
     if (!isFresh(d.capturedAt, now, maxAgeMinutes)) return false;
     if (market === "1X2") {
-      return row.status === "COMPLETE_1X2" && (d.complete1X2 === true || d.complete1X2 === undefined)
+      return row.status === "COMPLETE_1X2" && d.complete1X2 !== false
         && validDecimalOdds(d.odds1) && validDecimalOdds(d.oddsX) && validDecimalOdds(d.odds2);
     }
     return row.status === "COMPLETE_DOUBLE_CHANCE" && d.completeDoubleChance === true
@@ -125,7 +125,7 @@ function validCompleteSnapshotForList(row: TrackerRecord, fixtureIds: Set<string
   if (row.kind !== "odds" || typeof d.fixtureId !== "string" || !fixtureIds.has(d.fixtureId)
     || typeof d.bookmaker !== "string" || !d.bookmaker.trim() || !isFresh(d.capturedAt, now, maxAgeMinutes)) return false;
   if (d.market !== "DOUBLE_CHANCE") {
-    return row.status === "COMPLETE_1X2" && (d.complete1X2 === true || d.complete1X2 === undefined)
+    return row.status === "COMPLETE_1X2" && d.complete1X2 !== false
       && validDecimalOdds(d.odds1) && validDecimalOdds(d.oddsX) && validDecimalOdds(d.odds2);
   }
   if (d.market === "DOUBLE_CHANCE") {
