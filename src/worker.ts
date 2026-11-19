@@ -1,4 +1,4 @@
-import { brusselsUtcDayWindow, DEFAULT_ODDS_PAPI_MARKETS, discoverOddsPapiMarkets, matchOddsPapiFixtures, parseOddsPapiQuotes } from "./oddspapi";
+import { brusselsUtcDayWindow, DEFAULT_ODDS_PAPI_MARKETS, discoverOddsPapiMarkets, getOddsPapiSlotRequestBudget, matchOddsPapiFixtures, parseOddsPapiQuotes } from "./oddspapi";
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -456,9 +456,10 @@ export default {
         const requestLimit = account.requestLimit ?? 0;
         const requestCount = account.requestCount ?? 0;
         const remaining = account.remaining ?? 0;
-        if (remaining < 2) return json({
-          status: "quota_insufficient", provider: "OddsPapi", requestLimit, requestCount, remaining,
-          message: "Za mało pozostałych zapytań na bezpieczny dzienny odczyt; prognozy meczów pozostają niezależne od kursów.",
+        const slotRequestBudget = getOddsPapiSlotRequestBudget(remaining, slot);
+        if (remaining < 2 || slotRequestBudget < 2) return json({
+          status: "quota_insufficient", provider: "OddsPapi", requestLimit, requestCount, remaining, slotRequestBudget,
+          message: "Pozostały limit OddsPapi jest zbyt mały na bezpieczny odczyt w tym oknie; prognozy meczów pozostają niezależne od kursów.",
         }, 200, origin);
         const bookmakerEntitlements = account.bookmakerSlugs ?? [];
         // GET /odds-by-tournaments accepts exactly one bookmaker per request.
@@ -542,7 +543,7 @@ export default {
             }
           } catch { /* malformed cache falls back to documented 1X2 market */ }
         } else if (input.allowBillableMarketCatalogue === true && env.ODDSPAPI_MARKET_CATALOGUE_ENABLED === "true"
-          && remainingAfterFixtures >= fullOddsBatchCount + 1) {
+          && slotRequestBudget >= fullOddsBatchCount + 2 && remainingAfterFixtures >= fullOddsBatchCount + 1) {
           marketCatalogRequestUsed = true;
           // Market catalogue is billed once per seven-day cache window. Reserve enough quota
           // for every required odds batch before spending the catalogue request.
@@ -571,7 +572,8 @@ export default {
 
         // OddsPapi v4 limits odds-by-tournaments to three competitions and one bookmaker
         // per billable request. Spend only the remaining monthly quota, prioritizing earliest kickoffs.
-        const availableOddsCalls = Math.max(0, remainingAfterFixtures - (marketCatalogRequestUsed ? 1 : 0));
+        const slotOddsCallBudget = Math.max(0, slotRequestBudget - 1 - (marketCatalogRequestUsed ? 1 : 0));
+        const availableOddsCalls = Math.min(slotOddsCallBudget, Math.max(0, remainingAfterFixtures - (marketCatalogRequestUsed ? 1 : 0)));
         const queriedTournamentIds = tournamentIds.slice(0, availableOddsCalls * 3);
         const skippedTournamentIds = tournamentIds.slice(queriedTournamentIds.length);
         const tournamentBatches: number[][] = [];
@@ -615,7 +617,7 @@ export default {
           }).filter((row): row is NonNullable<typeof row> => row !== null);
         const result = {
           status: "ok", provider: "OddsPapi", date, requestLimit, requestCount,
-          remainingBefore: remaining,
+          remainingBefore: remaining, slotRequestBudget,
           estimatedRequestsUsed: 1 + tournamentBatches.length + (marketCatalogRequestUsed ? 1 : 0),
           bookmakers, marketCatalogStatus, marketTypes: marketDefinitions.map(row => row.marketType),
           sourceFixtures: validProviderFixtures.length, matched: matchAudit.matched.length,
