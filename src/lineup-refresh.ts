@@ -1,6 +1,6 @@
 export interface PitchApiLineupCheck {
-  home?: { confirmed?: boolean; starters?: unknown[] };
-  away?: { confirmed?: boolean; starters?: unknown[] };
+  home?: { confirmed?: boolean; lineup_type?: string; starters?: unknown[] };
+  away?: { confirmed?: boolean; lineup_type?: string; starters?: unknown[] };
 }
 
 /** Convert a Brussels-local fixture date/time to an epoch timestamp without relying on the device timezone. */
