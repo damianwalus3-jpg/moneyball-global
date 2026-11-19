@@ -969,6 +969,93 @@ export default {
 
 
 
+    // Pre-match odds: API-Football Pro is server-keyed, cached for the provider's three-hour update cycle.
+    // The public app can request only today's Brussels-local fixtures and at most 20 numeric fixture IDs.
+    if (url.pathname === "/api/api-football/odds") {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
+      if (!env.API_FOOTBALL_KEY) return json({ error: "api_football_not_configured" }, 503, origin);
+      const date = url.searchParams.get("date") ?? "";
+      const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date)
+        && Number.isFinite(Date.parse(date + "T00:00:00Z"))
+        && new Date(date + "T00:00:00Z").toISOString().slice(0, 10) === date;
+      const brusselsToday = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
+      }).format(new Date());
+      const rawIds = (url.searchParams.get("ids") ?? "").split("-").filter(Boolean);
+      const ids = [...new Set(rawIds)].sort();
+      if (!validDate || date !== brusselsToday || !ids.length || ids.length > 20 || ids.some(id => !/^\d{1,12}$/.test(id))) {
+        return json({ error: "invalid_api_football_odds_query", message: "Provide today's Europe/Brussels date and 1–20 numeric fixture IDs." }, 400, origin);
+      }
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      const cacheKey = new Request(`${APP_ORIGIN}/api/api-football/odds?date=${date}&ids=${ids.join("-")}`, { method: "GET" });
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+      const providerCooldown = await cache.match(API_FOOTBALL_COOLDOWN_KEY);
+      if (providerCooldown) return providerCooldown;
+      const odds: Array<{ fixtureId: string; status: string; results: number; data: unknown[]; updatedAt: string | null; error?: string }> = [];
+      try {
+        for (let index = 0; index < ids.length; index++) {
+          if (index > 0) await new Promise(resolve => setTimeout(resolve, 250));
+          const fixtureId = ids[index];
+          const fixtureCacheKey = new Request(`${APP_ORIGIN}/api/api-football/odds/${fixtureId}`, { method: "GET" });
+          const fixtureCached = await cache.match(fixtureCacheKey);
+          if (fixtureCached) {
+            const payload = await fixtureCached.json() as { status?: string; results?: number; data?: unknown[]; updatedAt?: string | null; error?: string };
+            odds.push({ fixtureId, status: payload.status ?? "ok", results: payload.results ?? payload.data?.length ?? 0,
+              data: payload.data ?? [], updatedAt: payload.updatedAt ?? null, ...(payload.error ? { error: payload.error } : {}) });
+            continue;
+          }
+          const apiUrl = new URL("https://v3.football.api-sports.io/odds");
+          apiUrl.searchParams.set("fixture", fixtureId);
+          const upstream = await fetch(apiUrl, {
+            headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
+            signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+          });
+          const raw = await upstream.text();
+          let payload: { response?: unknown[]; results?: number; errors?: unknown; paging?: unknown };
+          try { payload = JSON.parse(raw) as typeof payload; }
+          catch {
+            odds.push({ fixtureId, status: "error", results: 0, data: [], updatedAt: null, error: "api_football_odds_invalid_json" });
+            continue;
+          }
+          const errorText = apiFootballErrorText(payload.errors);
+          if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429) {
+            return cacheApiFootballCooldown(ctx, cache, buildApiFootballRateLimitResponse(
+              origin, upstream.headers.get("Retry-After"), "Dostawca ograniczył liczbę zapytań przy pobieraniu kursów.",
+              payload.errors,
+              { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
+            ));
+          }
+          if (!upstream.ok || errorText.trim()) {
+            odds.push({ fixtureId, status: "error", results: 0, data: [], updatedAt: null,
+              error: "api_football_odds_http_" + upstream.status });
+            continue;
+          }
+          const data = Array.isArray(payload.response) ? payload.response : [];
+          const updatedAt = data.length && data[0] && typeof data[0] === "object"
+            ? (data[0] as Record<string, unknown>).update as string | null ?? null : null;
+          const item = { fixtureId, status: "ok", results: payload.results ?? data.length, data, updatedAt };
+          odds.push(item);
+          const itemResponse = json(item, 200, origin);
+          itemResponse.headers.set("Cache-Control", "public, max-age=10800");
+          await cache.put(fixtureCacheKey, itemResponse);
+        }
+        const result = {
+          provider: "API-Football Pro", date, generatedAt: new Date().toISOString(),
+          requestedFixtureIds: ids, results: odds.reduce((sum, row) => sum + row.results, 0), odds,
+          failedFixtureIds: odds.filter(row => row.status !== "ok").map(row => row.fixtureId),
+        };
+        const response = json(result, 200, origin);
+        response.headers.set("Cache-Control", "public, max-age=10800");
+        await cache.put(cacheKey, response.clone());
+        return response;
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "api_football_odds_upstream_error" }, 502, origin);
+      }
+    }
+
+
     // API-Football account status: exposes only plan/quota metadata, never account PII or credentials.
     if (url.pathname === "/api/api-football/status") {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
