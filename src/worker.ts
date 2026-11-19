@@ -970,8 +970,8 @@ export default {
 
 
 
-    // Pre-match odds: API-Football Pro is server-keyed, cached for the provider's three-hour update cycle.
-    // The public app can request only today's Brussels-local fixtures and at most 20 numeric fixture IDs.
+    // Pre-match odds: use the provider's date+page endpoint, not one paid call per fixture.
+    // Each date page is shared and cached for three hours; only requested same-day fixture IDs are returned.
     if (url.pathname === "/api/api-football/odds") {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
       if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
@@ -994,58 +994,78 @@ export default {
       if (cached) return cached;
       const providerCooldown = await cache.match(API_FOOTBALL_COOLDOWN_KEY);
       if (providerCooldown) return providerCooldown;
-      const odds: Array<{ fixtureId: string; status: string; results: number; data: unknown[]; updatedAt: string | null; error?: string }> = [];
+
+      const requested = new Set(ids);
+      const found = new Map<string, unknown[]>();
+      const failedFixtureIds = new Set<string>();
+      let pagesFetched = 0;
+      let totalPages = 1;
       try {
-        for (let index = 0; index < ids.length; index++) {
-          if (index > 0) await new Promise(resolve => setTimeout(resolve, 250));
-          const fixtureId = ids[index];
-          const fixtureCacheKey = new Request(`${APP_ORIGIN}/api/api-football/odds/${fixtureId}`, { method: "GET" });
-          const fixtureCached = await cache.match(fixtureCacheKey);
-          if (fixtureCached) {
-            const payload = await fixtureCached.json() as { status?: string; results?: number; data?: unknown[]; updatedAt?: string | null; error?: string };
-            odds.push({ fixtureId, status: payload.status ?? "ok", results: payload.results ?? payload.data?.length ?? 0,
-              data: payload.data ?? [], updatedAt: payload.updatedAt ?? null, ...(payload.error ? { error: payload.error } : {}) });
-            continue;
+        // API-Football documents ten odds results per page and a three-hour update cycle.
+        // A hard three-page ceiling limits each uncached sync to at most three billable calls.
+        for (let page = 1; page <= Math.min(3, totalPages); page++) {
+          const pageCacheKey = new Request(`${APP_ORIGIN}/api/api-football/odds/page?date=${date}&page=${page}`, { method: "GET" });
+          let pagePayload: { response?: unknown[]; results?: number; paging?: { current?: number; total?: number }; errors?: unknown } | null = null;
+          const pageCached = await cache.match(pageCacheKey);
+          if (pageCached) {
+            pagePayload = await pageCached.json() as typeof pagePayload;
+          } else {
+            const apiUrl = new URL("https://v3.football.api-sports.io/odds");
+            apiUrl.searchParams.set("date", date);
+            apiUrl.searchParams.set("timezone", "Europe/Brussels");
+            apiUrl.searchParams.set("page", String(page));
+            const upstream = await fetch(apiUrl, {
+              headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
+              signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+            });
+            const raw = await upstream.text();
+            try { pagePayload = JSON.parse(raw) as typeof pagePayload; }
+            catch {
+              return json({ error: "api_football_odds_invalid_json", page }, 502, origin);
+            }
+            const errorText = apiFootballErrorText(pagePayload?.errors);
+            if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429) {
+              return cacheApiFootballCooldown(ctx, cache, buildApiFootballRateLimitResponse(
+                origin, upstream.headers.get("Retry-After"), "Dostawca ograniczył liczbę zapytań przy pobieraniu kursów.",
+                pagePayload?.errors,
+                { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
+              ));
+            }
+            if (!upstream.ok || errorText.trim()) {
+              return json({ error: "api_football_odds_http_" + upstream.status, page }, 502, origin);
+            }
+            const pageResponse = json(pagePayload, 200, origin);
+            pageResponse.headers.set("Cache-Control", "public, max-age=10800");
+            await cache.put(pageCacheKey, pageResponse);
           }
-          const apiUrl = new URL("https://v3.football.api-sports.io/odds");
-          apiUrl.searchParams.set("fixture", fixtureId);
-          const upstream = await fetch(apiUrl, {
-            headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
-            signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-          });
-          const raw = await upstream.text();
-          let payload: { response?: unknown[]; results?: number; errors?: unknown; paging?: unknown };
-          try { payload = JSON.parse(raw) as typeof payload; }
-          catch {
-            odds.push({ fixtureId, status: "error", results: 0, data: [], updatedAt: null, error: "api_football_odds_invalid_json" });
-            continue;
+          pagesFetched++;
+          totalPages = Math.max(1, Number(pagePayload?.paging?.total) || 1);
+          for (const raw of Array.isArray(pagePayload?.response) ? pagePayload.response : []) {
+            if (!raw || typeof raw !== "object") continue;
+            const event = raw as Record<string, unknown>;
+            const fixture = event.fixture && typeof event.fixture === "object" ? event.fixture as Record<string, unknown> : {};
+            const fixtureId = fixture.id === undefined || fixture.id === null ? "" : String(fixture.id);
+            if (requested.has(fixtureId)) found.set(fixtureId, [raw]);
           }
-          const errorText = apiFootballErrorText(payload.errors);
-          if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429) {
-            return cacheApiFootballCooldown(ctx, cache, buildApiFootballRateLimitResponse(
-              origin, upstream.headers.get("Retry-After"), "Dostawca ograniczył liczbę zapytań przy pobieraniu kursów.",
-              payload.errors,
-              { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
-            ));
-          }
-          if (!upstream.ok || errorText.trim()) {
-            odds.push({ fixtureId, status: "error", results: 0, data: [], updatedAt: null,
-              error: "api_football_odds_http_" + upstream.status });
-            continue;
-          }
-          const data = Array.isArray(payload.response) ? payload.response : [];
-          const updatedAt = data.length && data[0] && typeof data[0] === "object"
-            ? (data[0] as Record<string, unknown>).update as string | null ?? null : null;
-          const item = { fixtureId, status: "ok", results: payload.results ?? data.length, data, updatedAt };
-          odds.push(item);
-          const itemResponse = json(item, 200, origin);
-          itemResponse.headers.set("Cache-Control", "public, max-age=10800");
-          await cache.put(fixtureCacheKey, itemResponse);
+          if (ids.every(id => found.has(id)) || page >= totalPages) break;
         }
+
+        const odds = ids.map(fixtureId => {
+          const data = found.get(fixtureId) ?? [];
+          const status = data.length ? "ok" : "not_available";
+          if (!data.length) failedFixtureIds.add(fixtureId);
+          const first = data[0] && typeof data[0] === "object" ? data[0] as Record<string, unknown> : {};
+          return {
+            fixtureId, status, results: data.length, data,
+            updatedAt: typeof first.update === "string" ? first.update : null,
+          };
+        });
         const result = {
           provider: "API-Football Pro", date, generatedAt: new Date().toISOString(),
-          requestedFixtureIds: ids, results: odds.reduce((sum, row) => sum + row.results, 0), odds,
-          failedFixtureIds: odds.filter(row => row.status !== "ok").map(row => row.fixtureId),
+          requestedFixtureIds: ids, pagesFetched, totalPagesAvailable: totalPages,
+          results: odds.reduce((sum, row) => sum + row.results, 0), odds,
+          failedFixtureIds: [...failedFixtureIds],
+          message: "Pre-match odds są pobierane stronami dla bieżącej daty; nie znaleziono kursów dla brakujących identyfikatorów.",
         };
         const response = json(result, 200, origin);
         response.headers.set("Cache-Control", "public, max-age=10800");
