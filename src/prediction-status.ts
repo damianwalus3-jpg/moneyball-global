@@ -9,13 +9,14 @@ export interface PredictionStatusInput {
 }
 
 /**
- * Model qualification is based on valid probabilities, the model's minimum
- * history sample, and the configured threshold. Missing supporting evidence
- * remains visible as a warning; it must not veto a >=75% model candidate.
- * Pricing/EV is a separate gate before a real-money bet is valued or placed.
+ * Prediction qualification is a model decision: valid probabilities, sufficient
+ * model history, a valid kickoff and the configured probability threshold.
+ * Evidence completeness is an independent coupon gate and must never demote a
+ * qualified model prediction. couponEligible/evidenceComplete remain in the
+ * input for compatibility and for explicit downstream audit context.
  */
 export function getPredictionRecordStatus(input: PredictionStatusInput): PredictionRecordStatus {
-  if (input.strongCandidate && input.couponEligible && input.thresholdMet) return "KANDYDAT";
-  if (input.probabilitiesAvailable && (!input.couponEligible || !input.thresholdMet)) return "WSTEPNA";
+  if (input.probabilitiesAvailable && input.strongCandidate && input.thresholdMet) return "KANDYDAT";
+  if (input.probabilitiesAvailable) return "WSTEPNA";
   return "ODRZUCONY";
 }
