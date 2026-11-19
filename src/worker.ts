@@ -695,11 +695,120 @@ export default {
           fixtures: Array.isArray(data.response) ? data.response : [],
         }, 200, origin);
         response.headers.set("X-MONEYBALL-SOURCE", "API-Football Pro");
-        response.headers.set("Cache-Control", "public, max-age=300");
+        response.headers.set("Cache-Control", "public, max-age=21600");
         ctx.waitUntil(cache.put(cacheKey, response.clone()));
         return response;
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "api_football_upstream_error" }, 502, origin);
+      }
+    }
+
+
+    // Batch enrichment: API-Football returns events, lineups, fixture statistics and player
+    // statistics for up to 20 fixture IDs in one request. Cache for six hours to respect
+    // the provider's recommended low frequency for non-live fixtures.
+    const apiFootballEnrichment = url.pathname === "/api/api-football/enrichment";
+    if (apiFootballEnrichment) {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
+      if (!env.API_FOOTBALL_KEY) return json({ error: "api_football_not_configured" }, 503, origin);
+      const rawIds = (url.searchParams.get("ids") ?? "").split("-").filter(Boolean);
+      const ids = [...new Set(rawIds)];
+      if (!ids.length || ids.length > 20 || ids.some(id => !/^\d{1,12}$/.test(id))) {
+        return json({ error: "invalid_fixture_ids", message: "Provide 1–20 numeric fixture IDs separated by hyphens." }, 400, origin);
+      }
+      const cacheKey = new Request(`${APP_ORIGIN}/api/api-football/enrichment?ids=${ids.join("-")}`, { method: "GET" });
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+      try {
+        const upstream = await fetch("https://v3.football.api-sports.io/fixtures?ids=" + ids.join("-") + "&timezone=Europe%2FBrussels", {
+          headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        });
+        const raw = await upstream.text();
+        let payload: { response?: unknown[]; results?: number; errors?: unknown; paging?: unknown };
+        try { payload = JSON.parse(raw) as typeof payload; }
+        catch { return json({ error: "api_football_enrichment_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
+        const errorText = JSON.stringify(payload.errors ?? "").toLowerCase();
+        const rateLimited = /too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429;
+        if (rateLimited) return json({
+          error: "api_football_rate_limited", provider: "API-Football Pro",
+          retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60,
+          message: "Dostawca ograniczył liczbę zapytań. Dane nie zostały oznaczone jako pobrane.",
+          rateLimit: { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
+        }, 429, origin);
+        if (!upstream.ok) return json({ error: "api_football_enrichment_http_" + upstream.status }, upstream.status, origin);
+        if (payload.errors && Object.keys(payload.errors as object).length > 0) {
+          return json({ error: "api_football_enrichment_provider_error", details: payload.errors }, 502, origin);
+        }
+        const result = {
+          provider: "API-Football Pro", requestedFixtureIds: ids,
+          generatedAt: new Date().toISOString(), results: payload.results ?? payload.response?.length ?? 0,
+          paging: payload.paging ?? null,
+          rateLimit: { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
+          fixtures: Array.isArray(payload.response) ? payload.response : [],
+          includes: ["events", "lineups", "fixture_statistics", "player_statistics"],
+        };
+        const response = json(result, 200, origin);
+        response.headers.set("X-MONEYBALL-SOURCE", "API-Football Pro");
+        response.headers.set("Cache-Control", "public, max-age=21600");
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "api_football_enrichment_error" }, 502, origin);
+      }
+    }
+
+    // Injuries/suspensions are fetched in batches of up to 20 fixture IDs.
+    // An empty response is not proof of a fully available injury feed for that league.
+    const apiFootballInjuries = url.pathname === "/api/api-football/injuries";
+    if (apiFootballInjuries) {
+      if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
+      if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
+      if (!env.API_FOOTBALL_KEY) return json({ error: "api_football_not_configured" }, 503, origin);
+      const rawIds = (url.searchParams.get("ids") ?? "").split("-").filter(Boolean);
+      const ids = [...new Set(rawIds)];
+      if (!ids.length || ids.length > 20 || ids.some(id => !/^\d{1,12}$/.test(id))) {
+        return json({ error: "invalid_fixture_ids", message: "Provide 1–20 numeric fixture IDs separated by hyphens." }, 400, origin);
+      }
+      const cacheKey = new Request(`${APP_ORIGIN}/api/api-football/injuries?ids=${ids.join("-")}`, { method: "GET" });
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+      try {
+        const upstream = await fetch("https://v3.football.api-sports.io/injuries?ids=" + ids.join("-") + "&timezone=Europe%2FBrussels", {
+          headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+        });
+        const raw = await upstream.text();
+        let payload: { response?: unknown[]; results?: number; errors?: unknown; paging?: unknown };
+        try { payload = JSON.parse(raw) as typeof payload; }
+        catch { return json({ error: "api_football_injuries_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
+        const errorText = JSON.stringify(payload.errors ?? "").toLowerCase();
+        const rateLimited = /too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429;
+        if (rateLimited) return json({
+          error: "api_football_rate_limited", provider: "API-Football Pro",
+          retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60,
+          message: "Dostawca ograniczył liczbę zapytań. Dane nie zostały oznaczone jako pobrane.",
+          rateLimit: { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
+        }, 429, origin);
+        if (!upstream.ok) return json({ error: "api_football_injuries_http_" + upstream.status }, upstream.status, origin);
+        if (payload.errors && Object.keys(payload.errors as object).length > 0) {
+          return json({ error: "api_football_injuries_provider_error", details: payload.errors }, 502, origin);
+        }
+        const response = json({
+          provider: "API-Football Pro", requestedFixtureIds: ids,
+          generatedAt: new Date().toISOString(), results: payload.results ?? payload.response?.length ?? 0,
+          paging: payload.paging ?? null, injuries: Array.isArray(payload.response) ? payload.response : [],
+          note: "Pusta lista nie potwierdza braku kontuzji, jeśli dostawca nie udostępnia pokrycia dla danej ligi.",
+        }, 200, origin);
+        response.headers.set("X-MONEYBALL-SOURCE", "API-Football Pro");
+        response.headers.set("Cache-Control", "public, max-age=21600");
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : "api_football_injuries_error" }, 502, origin);
       }
     }
 
