@@ -43,10 +43,11 @@ function freshCompleteSnapshot(
 ): TrackerRecord | undefined {
   const eligible = records.filter(row => {
     const d = row.details;
-    if (row.kind !== "odds" || d.fixtureId !== fixtureId || d.bookmaker !== bookmaker || d.market !== market) return false;
+    if (row.kind !== "odds" || d.fixtureId !== fixtureId || d.bookmaker !== bookmaker
+      || (d.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2") !== market) return false;
     if (!isFresh(d.capturedAt, now, maxAgeMinutes)) return false;
     if (market === "1X2") {
-      return row.status === "COMPLETE_1X2" && d.complete1X2 === true
+      return row.status === "COMPLETE_1X2" && (d.complete1X2 === true || d.complete1X2 === undefined)
         && validDecimalOdds(d.odds1) && validDecimalOdds(d.oddsX) && validDecimalOdds(d.odds2);
     }
     return row.status === "COMPLETE_DOUBLE_CHANCE" && d.completeDoubleChance === true
@@ -123,8 +124,8 @@ function validCompleteSnapshotForList(row: TrackerRecord, fixtureIds: Set<string
   const d = row.details;
   if (row.kind !== "odds" || typeof d.fixtureId !== "string" || !fixtureIds.has(d.fixtureId)
     || typeof d.bookmaker !== "string" || !d.bookmaker.trim() || !isFresh(d.capturedAt, now, maxAgeMinutes)) return false;
-  if (d.market === "1X2") {
-    return row.status === "COMPLETE_1X2" && d.complete1X2 === true
+  if (d.market !== "DOUBLE_CHANCE") {
+    return row.status === "COMPLETE_1X2" && (d.complete1X2 === true || d.complete1X2 === undefined)
       && validDecimalOdds(d.odds1) && validDecimalOdds(d.oddsX) && validDecimalOdds(d.odds2);
   }
   if (d.market === "DOUBLE_CHANCE") {
