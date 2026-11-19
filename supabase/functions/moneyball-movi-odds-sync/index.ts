@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { isEligibleDomesticSeniorLeague } from "../_shared/domestic-league-scope.ts";
+import { isGeographicEuropeCountry } from "../_shared/geographic-europe.ts";
 import { isExcludedSeniorTeam, isWomensTeam } from "../_shared/team-normalization.ts";
 import { shouldSkipMoviOddsSync } from "../_shared/movi-odds-config.ts";
 
@@ -7,6 +8,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const MOVI_KEY = Deno.env.get("MOVIODDS_API_KEY") || "";
 const API_FOOTBALL_KEY = Deno.env.get("API_FOOTBALL_KEY") || "";
+const ODDSPAPI_KEY = Deno.env.get("ODDSPAPI_API_KEY") || "";
+const ODDSPAPI_BASE = "https://api.oddspapi.io/v4";
 const API_FOOTBALL_BASE = "https://v3.football.api-sports.io";
 const BASE = "https://moviodds.com";
 const CORS = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, apikey, content-type, x-cron-token","Access-Control-Allow-Methods":"GET,POST,OPTIONS"};
@@ -147,9 +150,106 @@ async function syncApiFootballOdds(day:string,matches:any[]){
  }
  return {ok:true,provider:"API-Football",date:day,fixture_requests:1,fixtures_found:fixtures.length,app_matches:matches.length,matched_fixtures:matched.length,odds_requests:oddsChecked,odds_errors:oddsErrors,approved_bookmakers:allowed,bookmakers_seen:[...bookmakersSeen].sort(),quotes_saved:rows.length,unmatched_matches:matches.filter(m=>!matched.some(x=>x.match.id===m.id)).map(m=>({home:m.home_team,away:m.away_team,kickoff:m.kickoff_at})),note:rows.length?"Only real API-Football prices from approved Belgian bookmakers were stored.":"No approved Belgian bookmaker quotes were available; no synthetic odds were created."};
 }
+
+async function oddsPapi(path:string){
+ if(!ODDSPAPI_KEY)throw new Error("ODDSPAPI_API_KEY is not configured.");
+ const url=new URL(ODDSPAPI_BASE+path);
+ url.searchParams.set("apiKey",ODDSPAPI_KEY);
+ const response=await fetch(url.toString(),{signal:AbortSignal.timeout(30000)});
+ const payload=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error("OddsPapi HTTP "+response.status+": "+String(payload?.message||payload?.error||"provider request failed").slice(0,300));
+ return payload;
+}
+function oddsPapiSelection(market:any,outcomeName:string):{market:string;selection:string}|null{
+ const type=norm(market?.marketType),name=norm(market?.marketName),outcome=norm(outcomeName);
+ if(type==="1x2"||name.includes("full time result")||name==="match winner"){
+  const selection=["1","home","home win"].includes(outcome)?"1":["x","draw"].includes(outcome)?"X":["2","away","away win"].includes(outcome)?"2":null;
+  return selection?{market:"1X2",selection}:null;
+ }
+ if(type.includes("double")||name.includes("double chance")){
+  const selection=["1x","home or draw","home draw"].includes(outcome)?"1X":["x2","draw or away","draw away"].includes(outcome)?"X2":["12","home or away","home away"].includes(outcome)?"12":null;
+  return selection?{market:"DOUBLE_CHANCE",selection}:null;
+ }
+ if(name.includes("both teams to score")||name==="btts"){
+  return ["yes","both teams to score yes"].includes(outcome)?{market:"GOALS",selection:"BTTS_YES"}:["no","both teams to score no"].includes(outcome)?{market:"GOALS",selection:"BTTS_NO"}:null;
+ }
+ if((type==="totals"||name.includes("over under"))&&!name.includes("both teams")){
+  const line=String(market?.handicap??"").replace(",",".");
+  const direction=outcome.startsWith("over")?"OVER":outcome.startsWith("under")?"UNDER":null;
+  return direction&&["1.5","2.5","3.5"].includes(line)?{market:"GOALS",selection:direction+"_"+line}:null;
+ }
+ return null;
+}
+async function syncOddsPapi(day:string,matches:any[]){
+ const [tournamentPayload,marketPayload]=await Promise.all([
+  oddsPapi("/tournaments?sportId=10&language=en"),
+  oddsPapi("/markets?language=en")
+ ]);
+ const tournaments=Array.isArray(tournamentPayload)?tournamentPayload:Array.isArray(tournamentPayload?.data)?tournamentPayload.data:[];
+ const markets=Array.isArray(marketPayload)?marketPayload:Array.isArray(marketPayload?.data)?marketPayload.data:[];
+ const eligibleTournaments=tournaments.filter((t:any)=>isGeographicEuropeCountry(String(t.categoryName||""))&&isEligibleDomesticSeniorLeague(String(t.categoryName||""),String(t.tournamentName||""))&&Number(t.futureFixtures||0)+Number(t.upcomingFixtures||0)+Number(t.liveFixtures||0)>0);
+ const tournamentIds=eligibleTournaments.map((t:any)=>Number(t.tournamentId)).filter((id:number)=>Number.isFinite(id)&&id>0);
+ if(!tournamentIds.length)return {ok:true,provider:"OddsPapi",date:day,tournaments_checked:0,fixtures_found:0,app_matches:matches.length,matched_fixtures:0,quotes_saved:0,note:"No active European domestic senior tournaments returned by OddsPapi."};
+ const oddsPayload=await oddsPapi("/odds-by-tournaments?tournamentIds="+encodeURIComponent(tournamentIds.join(","))+"&bookmakers=bwin.be&language=en&verbosity=3&oddsFormat=decimal");
+ const fixtures=Array.isArray(oddsPayload)?oddsPayload:Array.isArray(oddsPayload?.data)?oddsPayload.data:Array.isArray(oddsPayload?.response)?oddsPayload.response:[];
+ const aliases:Record<string,string>={"bayern munchen":"bayern munich","cologne":"koln","fc cologne":"koln","estac troyes":"troyes","le havre ac":"le havre","athletic bilbao":"athletic"};
+ const teamKey=(value:any)=>{const key=norm(value).replace(/\b(fc|cf|sc|ac|afc|club)\b/g," ").replace(/\s+/g," ").trim().replace(/^\d+\s*/,"");return aliases[key]||key;};
+ const marketById=new Map(markets.filter((m:any)=>Number(m.sportId)===10).map((m:any)=>[String(m.marketId),m]));
+ const matched:any[]=[],used=new Set<string>();
+ for(const match of matches){
+  const home=teamKey(match.home_team),away=teamKey(match.away_team),kickoff=Date.parse(match.kickoff_at||"");
+  if(!home||!away||!Number.isFinite(kickoff))continue;
+  let best:any=null,bestDelta=Infinity;
+  for(const fixture of fixtures){
+   const id=String(fixture.fixtureId||"");
+   if(!id||used.has(id)||home!==teamKey(fixture.participant1Name)||away!==teamKey(fixture.participant2Name))continue;
+   const appCountry=norm(match.country),apiCountry=norm(fixture.categoryName);
+   if(appCountry&&apiCountry&&appCountry!==apiCountry)continue;
+   const start=Date.parse(fixture.startTime||"");
+   const delta=Math.abs(start-kickoff);
+   if(!Number.isFinite(start)||delta>4*60*60*1000)continue;
+   if(delta<bestDelta){best=fixture;bestDelta=delta;}
+  }
+  if(best){used.add(String(best.fixtureId));matched.push({match,fixture:best});}
+ }
+ const captured=new Date().toISOString(),rows:any[]=[],bookmakersSeen=new Set<string>();
+ for(const pair of matched){
+  const {match,fixture}=pair,bookmaker=fixture.bookmakerOdds?.["bwin.be"];
+  if(!bookmaker||bookmaker.bookmakerIsActive!==true||bookmaker.suspended===true)continue;
+  for(const [marketId,marketData] of Object.entries(bookmaker.markets||{}) as [string,any][]){
+   const meta=marketById.get(String(marketId)) as any;
+   if(!meta||meta.playerProp===true||marketData?.marketActive===false)continue;
+   for(const [outcomeId,outcomeData] of Object.entries(marketData.outcomes||{}) as [string,any][]){
+    const outcomeMeta=(meta.outcomes||[]).find((item:any)=>String(item.outcomeId)===String(outcomeId));
+    const outcomeName=String(outcomeMeta?.outcomeName||outcomeData?.outcomeName||"");
+    const mapped=oddsPapiSelection(meta,outcomeName);
+    const player=outcomeData?.players?.["0"]||outcomeData?.players?.[0]||null;
+    const odd=Number(player?.price);
+    if(!mapped||!player||player.active!==true||!Number.isFinite(odd)||odd<=1)continue;
+    const ownerId=match.owner_id||match.user_id;
+    if(!ownerId)continue;
+    bookmakersSeen.add("Bwin Belgium");
+    rows.push({
+     owner_id:ownerId,match_id:match.id,provider:"OddsPapi",provider_fixture_id:String(fixture.fixtureId),
+     bookmaker:"Bwin Belgium",sport:"soccer",market_group_id:String(marketId),market_id:String(marketId),
+     market_name:String(meta.marketName||"Unknown"),selection_id:String(outcomeId),selection_label:outcomeName,selection_side:outcomeName,
+     selection_line:meta.handicap??null,selection_handicap:meta.handicap??null,odds:odd,suspended:false,phase:"prematch",
+     price_timestamp:player.bookmakerChangedAt||player.changedAt||fixture.updatedAt||captured,provider_polled_at:captured,captured_at:captured,
+     raw_quote:{fixtureId:fixture.fixtureId,fixturePath:bookmaker.fixturePath,bookmaker,market:meta,marketData,outcome:outcomeMeta,player},
+     mapped_market:mapped.market,mapped_selection:mapped.selection
+    });
+   }
+  }
+ }
+ for(let i=0;i<rows.length;i+=250){
+  await db("provider_odds?on_conflict=provider,provider_fixture_id,market_group_id,market_id,selection_id","POST",rows.slice(i,i+250),"resolution=merge-duplicates,return=minimal");
+ }
+ return {ok:true,provider:"OddsPapi",date:day,bookmaker:"Bwin Belgium",tournaments_checked:eligibleTournaments.length,fixtures_found:fixtures.length,app_matches:matches.length,matched_fixtures:matched.length,quotes_saved:rows.length,bookmakers_seen:[...bookmakersSeen],unmatched_matches:matches.filter(m=>!matched.some(x=>x.match.id===m.id)).map(m=>({home:m.home_team,away:m.away_team,kickoff:m.kickoff_at})),request_count:3,monthly_free_tier_budget_note:"Three API requests per sync; scheduled twice daily to stay within the 250-request free allowance."};
+}
+
 Deno.serve(async(req)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
- if(req.method==="GET")return json({ok:true,service:"Moneyball odds sync",primary_provider:"MoviOdds / bet365",movi_key_configured:!!MOVI_KEY,api_football_key_configured:!!API_FOOTBALL_KEY,mode:"provider fallback diagnostics enabled",note:"No odds are fabricated; missing provider quotes remain missing."});
+ if(req.method==="GET")return json({ok:true,service:"Moneyball odds sync",primary_provider:"MoviOdds / bet365",movi_key_configured:!!MOVI_KEY,api_football_key_configured:!!API_FOOTBALL_KEY,oddspapi_key_configured:!!ODDSPAPI_KEY,mode:"provider fallback diagnostics enabled",note:"No odds are fabricated; missing provider quotes remain missing."});
  if(req.method!=="POST")return json({error:"POST required"},405);
  try{
   if(!(await authorized(req.headers.get("x-cron-token")||"")))return json({error:"Unauthorized"},401);
@@ -179,8 +279,9 @@ Deno.serve(async(req)=>{
     && !isExcludedSeniorTeam(match.home_team)&&!isExcludedSeniorTeam(match.away_team);
   });
   if(shouldSkipMoviOddsSync(MOVI_KEY)){
-   if(!API_FOOTBALL_KEY)return json({ok:true,skipped:true,reason:"Neither MOVIODDS_API_KEY nor API_FOOTBALL_KEY is configured; no odds were changed.",provider_requests:0},200);
-   return json(await syncApiFootballOdds(day,matches));
+   if(ODDSPAPI_KEY)return json(await syncOddsPapi(day,matches));
+   if(API_FOOTBALL_KEY)return json(await syncApiFootballOdds(day,matches));
+   return json({ok:true,skipped:true,reason:"No odds provider key is configured; no odds were changed.",provider_requests:0},200);
   }
   const catalog=await movi("/catalog?sport=soccer");
   const fixtures=Array.isArray(catalog.fixtures)?catalog.fixtures:[];
