@@ -48,9 +48,14 @@ export function isConfirmedPitchApiLineups(lineups: PitchApiLineupCheck | null |
 
 /** A provider-supplied projected XI is useful evidence, but is not a confirmed lineup. */
 export function isProjectedPitchApiLineups(lineups: PitchApiLineupCheck | null | undefined): boolean {
-  const homeCount = lineups?.home?.starters?.length ?? 0;
-  const awayCount = lineups?.away?.starters?.length ?? 0;
-  return !isConfirmedPitchApiLineups(lineups) && homeCount > 0 && awayCount > 0;
+  const home = lineups?.home;
+  const away = lineups?.away;
+  const hasProjectedEvidence = (side: typeof home) =>
+    typeof side?.lineup_type === "string" && /predict|project|expected/i.test(side.lineup_type);
+  const hasElevenStarters = (side: typeof home) => side?.starters?.length === 11;
+  return !isConfirmedPitchApiLineups(lineups)
+    && hasElevenStarters(home) && hasElevenStarters(away)
+    && (hasProjectedEvidence(home) || hasProjectedEvidence(away));
 }
 
 export function getPitchApiLineupStatus(lineups: PitchApiLineupCheck | null | undefined): "LINEUP_CONFIRMED" | "LINEUP_PREDICTED" | "LINEUP_PENDING" {
