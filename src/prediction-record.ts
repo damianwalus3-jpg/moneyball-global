@@ -48,8 +48,8 @@ export function shouldRetryPredictionWithEvidence(
   intervalMs: number,
   requiredPolicyVersion = 2,
 ): boolean {
-  if (prior && typeof prior.details.qualificationPolicyVersion !== "number"
-    || (prior && (prior.details.qualificationPolicyVersion as number) < requiredPolicyVersion)) return true;
+  if (prior && typeof prior.details.qualificationPolicyVersion === "number"
+    && prior.details.qualificationPolicyVersion < requiredPolicyVersion) return true;
   if (prior && prior.details.evidenceComplete === true && hasValidProbabilities(prior.details, market)) return false;
   return shouldRetryPredictionAttempt(lastAttempt, now, intervalMs);
 }
