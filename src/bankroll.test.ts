@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { TrackerRecord } from "./tracker-store";
 import { calculateBankroll, canReserveStake, DEFAULT_OPENING_BANKROLL_EUR } from "./bankroll";
 
-function row(kind: TrackerRecord["kind"], status: string, details: TrackerRecord["details"], id: string): TrackerRecord {
-  return { id, kind, status, title: id, createdAt: "2026-11-19T10:00:00.000Z", details };
+function row(kind: TrackerRecord["kind"], status: string, details: TrackerRecord["details"], id: string, createdAt = "2026-11-19T10:00:00.000Z"): TrackerRecord {
+  return { id, kind, status, title: id, createdAt, details };
 }
 
 describe("virtual bankroll protection", () => {
@@ -65,6 +65,40 @@ describe("virtual bankroll protection", () => {
     expect(settled.settledProfitLoss).toBe(6);
     expect(settled.availableBalance).toBeCloseTo(97.60);
     expect(settled.settledCoupons).toBe(1);
+  });
+
+  it("does not let orphan coupon settlements or unpriced coupons change the bankroll", () => {
+    const orphan = row("coupon", "PAPER_HIT", { parentCouponId: "missing-coupon", profitLoss: 80 }, "orphan");
+    const noOdds = row("coupon", "PAPER_NO_ODDS", { stake: 5 }, "no-odds");
+    const noOddsSettlement = row("coupon", "PAPER_HIT", { parentCouponId: "no-odds", profitLoss: 50 }, "no-odds-settlement");
+    const value = calculateBankroll([orphan, noOdds, noOddsSettlement]);
+    expect(value.settledProfitLoss).toBe(0);
+    expect(value.settledCoupons).toBe(0);
+    expect(value.availableBalance).toBe(91.60);
+  });
+
+  it("uses only the newest settlement for a coupon and counts it once", () => {
+    const coupon = row("coupon", "PAPER_WITH_ODDS", { stake: 4, odds: 2.5 }, "coupon-1");
+    const oldLoss = row("coupon", "PAPER_MISS", { parentCouponId: "coupon-1", profitLoss: -4 }, "old", "2026-11-19T11:00:00.000Z");
+    const newerHit = row("coupon", "PAPER_HIT", { parentCouponId: "coupon-1", profitLoss: 6 }, "new", "2026-11-19T12:00:00.000Z");
+    const value = calculateBankroll([coupon, newerHit, oldLoss]);
+    expect(value.settledProfitLoss).toBe(6);
+    expect(value.settledCoupons).toBe(1);
+    expect(value.openExposure).toBe(0);
+    expect(value.availableBalance).toBeCloseTo(97.60);
+  });
+
+  it("combines settled bets and coupons without retaining their released stakes", () => {
+    const bet = row("bet", "OPEN", { decision: "SELECTED", stake: 5 }, "bet-1");
+    const coupon = row("coupon", "PAPER_WITH_ODDS", { stake: 4, odds: 2 }, "coupon-1");
+    const betWin = row("bet", "WON", { parentBetId: "bet-1", profitLoss: 5 }, "bet-win");
+    const couponLoss = row("coupon", "PAPER_MISS", { parentCouponId: "coupon-1", profitLoss: -4 }, "coupon-loss");
+    const value = calculateBankroll([bet, coupon, betWin, couponLoss]);
+    expect(value.settledProfitLoss).toBe(1);
+    expect(value.openExposure).toBe(0);
+    expect(value.availableBalance).toBeCloseTo(92.60);
+    expect(value.settledBets).toBe(1);
+    expect(value.settledCoupons).toBe(1);
   });
 
   it("ignores rejected paper decisions and rejects invalid stakes", () => {
