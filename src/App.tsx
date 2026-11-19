@@ -1168,7 +1168,10 @@ export default function App() {
           body: JSON.stringify({ totalRecords: records.length, ...counts, lastRecordAt }),
         });
         if (!response.ok) throw new Error(response.status === 401 ? "Autoryzacja diagnostyki odrzucona" : "Serwer diagnostyczny HTTP " + response.status);
-        if (!cancelled) setTrackerDiagnosticsStatus("Połączono · wysłano wyłącznie bezpieczne statystyki Trackera");
+        const saved = await response.json() as { storage?: string; retentionDays?: number };
+        if (!cancelled) setTrackerDiagnosticsStatus(saved.storage === "cloudflare_kv"
+          ? "Połączono · bezpieczne statystyki zapisane trwale w Cloudflare KV (30 dni)"
+          : "Połączono · statystyki wysłane, ale zapis serwerowy jest tymczasowy (Cache API), nie trwały");
       } catch (error) {
         if (!cancelled) setTrackerDiagnosticsStatus(error instanceof Error ? error.message : "Diagnostyka chwilowo niedostępna");
       }
