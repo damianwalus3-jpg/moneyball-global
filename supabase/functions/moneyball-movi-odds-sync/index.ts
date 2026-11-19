@@ -162,8 +162,16 @@ Deno.serve(async(req)=>{
     apiFootball("/odds?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels&bookmaker=6&page=1")
    ]);
    const bookmakerNames=(bookmakers.response||[]).map((x:any)=>({id:x.id,name:x.name}));
-   const fixtureSamples=(odds.response||[]).slice(0,10).map((x:any)=>({fixture_id:x.fixture?.id,date:x.fixture?.date,home:x.teams?.home?.name,away:x.teams?.away?.name,bookmakers:(x.bookmakers||[]).map((b:any)=>b.name),markets:(x.bookmakers||[]).flatMap((b:any)=>(b.bets||[]).map((m:any)=>m.name)).slice(0,12)}));
-   return json({ok:true,mode:"diagnostic",provider:"API-Football",date:day,key_configured:true,account:status.response?.account?{plan:status.response.account.subscription?.plan,subscription_active:status.response.account.subscription?.active,requests_remaining:status.response.requests?.limit_day!=null?Number(status.response.requests.limit_day)-Number(status.response.requests.current||0):null,requests_today:status.response.requests?.current,requests_limit:status.response.requests?.limit_day}:null,bwin_bookmakers:bookmakerNames,odds_results:odds.results||0,odds_pagination:odds.paging||null,bwin_odds_results:bwinOdds.results||0,bwin_fixtures:(bwinOdds.response||[]).map((x:any)=>({fixture_id:x.fixture?.id,home:x.teams?.home?.name,away:x.teams?.away?.name,bookmakers:(x.bookmakers||[]).map((b:any)=>b.name)})),fixtures:fixtureSamples});
+   const diagnosticPages:any[]=[odds];
+   const diagnosticTotal=Math.max(1,Math.min(30,Number(odds.paging?.total)||1));
+   for(let page=2;page<=diagnosticTotal;page+=4){
+    const batch=await Promise.all(Array.from({length:Math.min(4,diagnosticTotal-page+1)},(_,i)=>apiFootball("/odds?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels&page="+(page+i))));
+    diagnosticPages.push(...batch);
+   }
+   const allOddsFixtures=diagnosticPages.flatMap((x:any)=>Array.isArray(x.response)?x.response:[]);
+   const appMatches=await db("matches?select=id,home_team,away_team,kickoff_at,kickoff_date,competition,country&kickoff_date=eq."+encodeURIComponent(day)+"&order=kickoff_at.asc");
+   const fixtureSamples=allOddsFixtures.map((x:any)=>({fixture_id:x.fixture?.id,date:x.fixture?.date,home:x.teams?.home?.name,away:x.teams?.away?.name,bookmakers:(x.bookmakers||[]).map((b:any)=>b.name)}));
+   return json({ok:true,mode:"diagnostic",provider:"API-Football",date:day,key_configured:true,account:status.response?.account?{plan:status.response.account.subscription?.plan,subscription_active:status.response.account.subscription?.active,requests_remaining:status.response.requests?.limit_day!=null?Number(status.response.requests.limit_day)-Number(status.response.requests.current||0):null,requests_today:status.response.requests?.current,requests_limit:status.response.requests?.limit_day}:null,bwin_bookmakers:bookmakerNames,odds_results:odds.results||0,odds_pagination:odds.paging||null,bwin_odds_results:bwinOdds.results||0,bwin_fixtures:(bwinOdds.response||[]).map((x:any)=>({fixture_id:x.fixture?.id,home:x.teams?.home?.name,away:x.teams?.away?.name,bookmakers:(x.bookmakers||[]).map((b:any)=>b.name)})),app_matches,api_fixtures:fixtureSamples});
   }
   const now=new Date(),defaultDay=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(now),day=String(body.date||defaultDay);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return json({ok:false,error:"Invalid date; expected YYYY-MM-DD."},400);
