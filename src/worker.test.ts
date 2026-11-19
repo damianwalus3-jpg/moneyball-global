@@ -581,6 +581,7 @@ describe("API-Football Pro injury batch", () => {
     expect(upstream).toHaveBeenCalledWith("https://v3.football.api-sports.io/injuries?ids=123-456&timezone=Europe%2FBrussels", expect.any(Object));
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ provider: "API-Football Pro", requestedFixtureIds: ["123","456"], injuries: payload.response });
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=86400");
     expect(cache.put).toHaveBeenCalledTimes(1);
   });
 });
