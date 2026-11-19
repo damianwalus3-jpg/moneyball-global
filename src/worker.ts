@@ -706,7 +706,7 @@ export default {
           fixtures: Array.isArray(data.response) ? data.response : [],
         }, 200, origin);
         response.headers.set("X-MONEYBALL-SOURCE", "API-Football Pro");
-        response.headers.set("Cache-Control", "public, max-age=21600");
+        response.headers.set("Cache-Control", "public, max-age=900");
         ctx.waitUntil(cache.put(cacheKey, response.clone()));
         return response;
       } catch (error) {
@@ -821,7 +821,7 @@ export default {
           note: "Pusta lista nie potwierdza braku kontuzji, jeśli dostawca nie udostępnia pokrycia dla danej ligi.",
         }, 200, origin);
         response.headers.set("X-MONEYBALL-SOURCE", "API-Football Pro");
-        response.headers.set("Cache-Control", "public, max-age=21600");
+        response.headers.set("Cache-Control", "public, max-age=86400");
         ctx.waitUntil(cache.put(cacheKey, response.clone()));
         return response;
       } catch (error) {
