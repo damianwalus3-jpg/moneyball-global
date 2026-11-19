@@ -33,7 +33,7 @@ describe("OddsPapi adapter", () => {
   it("does not treat a missing or invalid price timestamp as current", () => {
     const payload = [{ fixtureId: "op-1", updatedAt: "invalid", bookmakerOdds: { "bwin.be": { bookmakerIsActive: true, suspended: false, markets: {
       "101": { marketActive: true, outcomes: { "101": { players: { "0": { active: true, price: 2 } } }, "102": { players: { "0": { active: true, price: 3 } } }, "103": { players: { "0": { active: true, price: 4 } } } } },
-    } } }];
+    } } } }];
     expect(parseOddsPapiQuotes(payload, {}).map(row => row.capturedAt)).toEqual([null]);
   });
   it("limits selected bookmakers to both target feeds and account entitlements", () => {
