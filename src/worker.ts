@@ -60,7 +60,7 @@ function buildApiFootballRateLimitResponse(
   return response;
 }
 
-function cacheApiFootballCooldown(ctx: ExecutionContext, cache: Cache, response: Response): Response {
+function cacheApiFootballCooldown(ctx: { waitUntil(promise: Promise<unknown>): void }, cache: Cache, response: Response): Response {
   ctx.waitUntil(cache.put(API_FOOTBALL_COOLDOWN_KEY, response.clone()));
   return response;
 }
