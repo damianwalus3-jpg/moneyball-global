@@ -73,7 +73,7 @@ describe("three-leg coupon odds valuation", () => {
       row("prediction", "f2", { market: "DOUBLE_CHANCE", model: "v1", p1x: 0.6, px2: 0.85, p12: 0.55, selection: "X2", probability: 0.85, strongDoubleChance: true }, "KANDYDAT"),
       row("prediction", "f3", { market: "DOUBLE_CHANCE", model: "v1", p1x: 0.6, px2: 0.6, p12: 0.8, selection: "12", probability: 0.8, strongDoubleChance: true }, "KANDYDAT"),
     ];
-    const prices = ["f1", "f2", "f3"].map((id, index) => row("odds", id, {
+    const prices = ["f1", "f2", "f3"].map(id => row("odds", id, {
       bookmaker: "Book A", market: "DOUBLE_CHANCE", completeDoubleChance: true,
       odds1x: 1.25, oddsX2: 1.3, odds12: 1.35, capturedAt: "2026-11-17T19:30:00.000Z",
     }, "COMPLETE_DOUBLE_CHANCE"));
