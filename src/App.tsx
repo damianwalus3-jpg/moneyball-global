@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
+import { fetchApiFootballEnrichment, fetchApiFootballInjuriesForDate, type ApiFootballFixtureEnrichment, type ApiFootballInjury } from "./api-football";
 import { addRecord, addRecords, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, loadRecentTeamFormAcrossCountry, mergeVerifiedTeamForms, loadCalcioItSerieDTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, predictFromPitchApiXgForm, predictFromNeutralPrior, type FormPrediction } from "./form-prediction";
@@ -142,6 +143,8 @@ function savePredictionRecord(
   pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm },
   pitchApiLineups?: PitchApiLineups,
   comparisonPredictions: FormPrediction[] = [],
+  apiFootballFixture?: ApiFootballFixtureEnrichment,
+  apiFootballInjuries?: ApiFootballInjury[],
 ): TrackerRecord[] {
   const evidenceAudit = buildBaselineEvidenceAudit();
   const xgReady = !!pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3;
@@ -157,6 +160,22 @@ function savePredictionRecord(
     const confirmed = pitchApiLineups.home.confirmed === true && pitchApiLineups.away.confirmed === true
       && (pitchApiLineups.home.starters?.length ?? 0) === 11 && (pitchApiLineups.away.starters?.length ?? 0) === 11;
     evidenceAudit.areas.confirmed_lineups = { status: confirmed ? "VERIFIED" : "PARTIAL", source: "PitchAPI", observedAt: new Date().toISOString(), note: confirmed ? "Obie jedenastki confirmed=true." : "Skład przewidywany lub niekompletny." };
+  }
+  const apiLineups = apiFootballFixture?.lineups ?? [];
+  const apiHomeId = apiFootballFixture?.teams?.home?.id;
+  const apiAwayId = apiFootballFixture?.teams?.away?.id;
+  const apiHomeLineup = apiLineups.find(row => row.team?.id === apiHomeId);
+  const apiAwayLineup = apiLineups.find(row => row.team?.id === apiAwayId);
+  const apiLineupsConfirmed = !!apiHomeLineup && !!apiAwayLineup
+    && (apiHomeLineup.startXI?.length ?? 0) === 11 && (apiAwayLineup.startXI?.length ?? 0) === 11;
+  if (apiFootballFixture && evidenceAudit.areas.confirmed_lineups.status !== "VERIFIED") {
+    evidenceAudit.areas.confirmed_lineups = { status: apiLineupsConfirmed ? "VERIFIED" : "PARTIAL", source: "API-Football Pro", observedAt: new Date().toISOString(), note: apiLineupsConfirmed ? "Obie jedenastki zawierają po 11 zawodników." : "API-Football nie zwrócił dwóch kompletnych jedenastek." };
+  }
+  if (apiFootballInjuries !== undefined) {
+    const injuryRows = apiFootballInjuries.filter(row => /injur|illness|injured/i.test(String(row.player?.reason ?? "") + " " + String(row.player?.type ?? "")));
+    const suspensionRows = apiFootballInjuries.filter(row => /suspend|ban|card accumulation/i.test(String(row.player?.reason ?? "") + " " + String(row.player?.type ?? "")));
+    evidenceAudit.areas.injuries = { status: injuryRows.length ? "VERIFIED" : "PARTIAL", source: "API-Football Pro", observedAt: new Date().toISOString(), note: injuryRows.length ? "Dostawca zwrócił " + injuryRows.length + " wpisów o kontuzjach/chorobach." : "Brak wpisów o kontuzjach; nie jest to potwierdzenie pełnego pokrycia ligi." };
+    evidenceAudit.areas.suspensions = { status: suspensionRows.length ? "VERIFIED" : "PARTIAL", source: "API-Football Pro", observedAt: new Date().toISOString(), note: suspensionRows.length ? "Dostawca zwrócił " + suspensionRows.length + " wpisów o zawieszeniach." : "Brak wpisów o zawieszeniach; nie jest to potwierdzenie pełnego pokrycia ligi." };
   }
   evidenceAudit.assessedAt = new Date().toISOString();
   evidenceAudit.complete = isEvidenceAuditComplete(evidenceAudit);
@@ -189,6 +208,10 @@ function savePredictionRecord(
     pitchApiXgSamples: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.sampleSize, away: pitchApiXgForms.away.sampleSize, source: "PitchAPI" }) : null,
     pitchApiXgHistory: pitchApiXgForms ? JSON.stringify({ home: pitchApiXgForms.home.matches, away: pitchApiXgForms.away.matches }) : null,
     pitchApiLineups: pitchApiLineups ? JSON.stringify(pitchApiLineups) : null,
+    apiFootballFixtureId: apiFootballFixture?.fixture?.id ?? match.apiFootballFixtureId ?? null,
+    apiFootballFixtureData: apiFootballFixture ? JSON.stringify(apiFootballFixture) : null,
+    apiFootballInjuries: apiFootballInjuries !== undefined ? JSON.stringify(apiFootballInjuries) : null,
+    apiFootballDataObservedAt: apiFootballFixture || apiFootballInjuries !== undefined ? new Date().toISOString() : null,
     historyProvenance: homeForm && awayForm ? JSON.stringify({
       home: { source: homeForm.source, sourceUpdatedAt: homeForm.sourceUpdatedAt, matches: homeForm.matches.length, homeMatches: homeForm.home.length, awayMatches: homeForm.away.length },
       away: { source: awayForm.source, sourceUpdatedAt: awayForm.sourceUpdatedAt, matches: awayForm.matches.length, homeMatches: awayForm.home.length, awayMatches: awayForm.away.length },
@@ -281,8 +304,8 @@ export default function App() {
   const bulkAnalysisLock = useRef(false);
   const [settleProgress, setSettleProgress] = useState(0);
   const [scanError, setScanError] = useState("");
-  const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm }; pitchApiLineups?: PitchApiLineups; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
-  const loadFixtureForms = async (match: NonNullable<typeof fixtureScan>["fixtures"][number]) => {
+  const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm }; pitchApiLineups?: PitchApiLineups; apiFootballFixture?: ApiFootballFixtureEnrichment; apiFootballInjuries?: ApiFootballInjury[]; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
+  const loadFixtureForms = async (match: NonNullable<typeof fixtureScan>["fixtures"][number], apiFootballFixture?: ApiFootballFixtureEnrichment, apiFootballInjuries?: ApiFootballInjury[]) => {
     if (!hasKnownKickoff(match.date, match.time)) {
       const reason = "ODRZUCONY: brak zweryfikowanej godziny rozpoczęcia. Nie tworzymy prognozy przedmeczowej bez potwierdzonego czasu.";
       const fallback = predictFromNeutralPrior();
@@ -356,8 +379,8 @@ export default function App() {
     const prediction = xgPrediction ?? goalsPrediction ?? predictFromNeutralPrior();
     const comparisonPredictions = [goalsPrediction, xgPrediction].filter((item): item is FormPrediction => !!item);
     const predictionError = prediction ? undefined : errors.join(" · ") || "Brak wystarczających danych do prognozy.";
-    setTeamForms(current => ({ ...current, [match.id]: { home: homeForm, away: awayForm, pitchApiXgForms, pitchApiLineups, prediction, predictionError, loading: false } }));
-    setRecords(savePredictionRecord(match, prediction, predictionError, homeForm, awayForm, pitchApiXgForms, pitchApiLineups, comparisonPredictions));
+    setTeamForms(current => ({ ...current, [match.id]: { home: homeForm, away: awayForm, pitchApiXgForms, pitchApiLineups, apiFootballFixture, apiFootballInjuries, prediction, predictionError, loading: false } }));
+    setRecords(savePredictionRecord(match, prediction, predictionError, homeForm, awayForm, pitchApiXgForms, pitchApiLineups, comparisonPredictions, apiFootballFixture, apiFootballInjuries));
   };
   const analyzeAllFixtures = async (fixtures?: FreeFixture[]) => {
     const sourceMatches = fixtures ?? fixtureScan?.fixtures;
@@ -388,6 +411,34 @@ export default function App() {
       return missingProbabilities || shouldRetryNeutralFallback(match.id, prior) || missingXgModel;
     });
     if (!matches.length) { setRecords(readRecords()); return; }
+    const apiFootballById = new Map<string, ApiFootballFixtureEnrichment>();
+    const injuriesByFixture = new Map<string, ApiFootballInjury[]>();
+    let apiFootballInjuriesLoaded = false;
+    const apiFixtureIds = [...new Set(matches.map(match => match.apiFootballFixtureId).filter((id): id is string => typeof id === "string" && /^\d{1,12}$/.test(id)))];
+    if (apiFixtureIds.length) {
+      try {
+        const enriched = await fetchApiFootballEnrichment(apiFixtureIds);
+        for (const [id, fixture] of enriched) apiFootballById.set(id, fixture);
+      } catch (error) {
+        setNotice("API-Football Pro · wzbogacenie meczów: " + (error instanceof Error ? error.message : "brak danych") + ". Pozostałe źródła analizy działają dalej.");
+      }
+    }
+    const targetDate = matches[0]?.date;
+    if (targetDate) {
+      try {
+        const injuryRows = await fetchApiFootballInjuriesForDate(targetDate);
+        apiFootballInjuriesLoaded = true;
+        for (const row of injuryRows) {
+          const id = row.fixture?.id;
+          if (typeof id !== "number") continue;
+          const list = injuriesByFixture.get(String(id)) ?? [];
+          list.push(row);
+          injuriesByFixture.set(String(id), list);
+        }
+      } catch (error) {
+        setNotice("API-Football Pro · kontuzje/zawieszenia: " + (error instanceof Error ? error.message : "brak danych") + ". Nie oznaczam braków jako zweryfikowanych.");
+      }
+    }
     bulkAnalysisLock.current = true;
     setBulkLoading(true);
     setBulkProgress(0);
@@ -396,7 +447,8 @@ export default function App() {
       for (let index = 0; index < matches.length; index += concurrency) {
         const batch = matches.slice(index, index + concurrency);
         await Promise.all(batch.map(async match => {
-          await loadFixtureForms(match);
+          const apiId = match.apiFootballFixtureId;
+          await loadFixtureForms(match, apiId ? apiFootballById.get(apiId) : undefined, apiId && apiFootballInjuriesLoaded ? injuriesByFixture.get(apiId) ?? [] : undefined);
           const retry = retryMarketByFixture.get(match.id);
           if (retry?.oneXTwo) markIncompletePredictionAttempt(match.id, "1X2");
           if (retry?.doubleChance) markIncompletePredictionAttempt(match.id, "DOUBLE_CHANCE");
