@@ -38,6 +38,108 @@ interface BatchResponse<T> {
   retryAfterSeconds?: number;
 }
 
+export interface ApiFootballOddsQuote {
+  fixtureId: string;
+  bookmaker: string;
+  bookmakerSlug: string;
+  market: "1X2" | "DOUBLE_CHANCE";
+  odds1: number | null;
+  oddsX: number | null;
+  odds2: number | null;
+  odds1x: number | null;
+  oddsX2: number | null;
+  odds12: number | null;
+  complete1X2: boolean;
+  completeDoubleChance: boolean;
+  capturedAt: string | null;
+  timestampBasis: "provider_update_at" | "missing";
+}
+
+function normalizeOddsLabel(value: unknown): string {
+  return String(value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+function parseDecimalOdds(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value.trim()) : NaN;
+  return Number.isFinite(parsed) && parsed > 1 ? Number(parsed.toFixed(4)) : null;
+}
+function validOddsTimestamp(value: unknown): string | null {
+  if (typeof value !== "string" || !Number.isFinite(Date.parse(value))) return null;
+  return new Date(value).toISOString();
+}
+
+/** Parse documented API-Football pre-match odds by market and outcome labels, without inventing missing prices. */
+export function parseApiFootballOdds(fixtures: unknown): ApiFootballOddsQuote[] {
+  const rows = Array.isArray(fixtures) ? fixtures : [];
+  const output: ApiFootballOddsQuote[] = [];
+  for (const raw of rows) {
+    if (!raw || typeof raw !== "object") continue;
+    const event = raw as Record<string, unknown>;
+    const fixture = event.fixture && typeof event.fixture === "object" ? event.fixture as Record<string, unknown> : {};
+    const fixtureId = fixture.id === undefined || fixture.id === null ? "" : String(fixture.id);
+    if (!/^\d{1,12}$/.test(fixtureId)) continue;
+    const capturedAt = validOddsTimestamp(event.update);
+    const bookmakers = Array.isArray(event.bookmakers) ? event.bookmakers : [];
+    for (const rawBookmaker of bookmakers) {
+      if (!rawBookmaker || typeof rawBookmaker !== "object") continue;
+      const bookmaker = rawBookmaker as Record<string, unknown>;
+      const bookmakerName = typeof bookmaker.name === "string" ? bookmaker.name.trim() : "";
+      if (!bookmakerName) continue;
+      const bookmakerSlug = normalizeOddsLabel(bookmakerName);
+      const bets = Array.isArray(bookmaker.bets) ? bookmaker.bets : [];
+      for (const rawBet of bets) {
+        if (!rawBet || typeof rawBet !== "object") continue;
+        const bet = rawBet as Record<string, unknown>;
+        const betName = normalizeOddsLabel(bet.name);
+        const market: "1X2" | "DOUBLE_CHANCE" | null = betName.includes("doublechance")
+          ? "DOUBLE_CHANCE"
+          : ["matchwinner", "matchresult", "fulltimeresult", "1x2"].some(label => betName.includes(label))
+            ? "1X2" : null;
+        if (!market) continue;
+        const prices: Record<string, number | null> = market === "1X2"
+          ? { "1": null, X: null, "2": null }
+          : { "1X": null, X2: null, "12": null };
+        const values = Array.isArray(bet.values) ? bet.values : [];
+        for (const rawValue of values) {
+          if (!rawValue || typeof rawValue !== "object") continue;
+          const value = rawValue as Record<string, unknown>;
+          const label = normalizeOddsLabel(value.value);
+          const key = market === "1X2"
+            ? (["home", "homewin", "1"].includes(label) ? "1"
+              : ["draw", "x"].includes(label) ? "X"
+              : ["away", "awaywin", "2"].includes(label) ? "2" : "")
+            : (["homedraw", "homeordraw", "1x"].includes(label) ? "1X"
+              : ["drawaway", "draworaway", "x2"].includes(label) ? "X2"
+              : ["homeaway", "homeoraway", "12"].includes(label) ? "12" : "");
+          if (key) prices[key] = parseDecimalOdds(value.odd);
+        }
+        const keys = market === "1X2" ? ["1", "X", "2"] : ["1X", "X2", "12"];
+        if (!keys.some(key => prices[key] !== null)) continue;
+        const complete = keys.every(key => prices[key] !== null);
+        output.push({
+          fixtureId, bookmaker: bookmakerName, bookmakerSlug, market,
+          odds1: market === "1X2" ? prices["1"] : null,
+          oddsX: market === "1X2" ? prices.X : null,
+          odds2: market === "1X2" ? prices["2"] : null,
+          odds1x: market === "DOUBLE_CHANCE" ? prices["1X"] : null,
+          oddsX2: market === "DOUBLE_CHANCE" ? prices.X2 : null,
+          odds12: market === "DOUBLE_CHANCE" ? prices["12"] : null,
+          complete1X2: market === "1X2" && complete,
+          completeDoubleChance: market === "DOUBLE_CHANCE" && complete,
+          capturedAt, timestampBasis: capturedAt ? "provider_update_at" : "missing",
+        });
+      }
+    }
+  }
+  return output;
+}
+
+export interface ApiFootballOddsBatch {
+  provider: string;
+  generatedAt: string;
+  requestedFixtureIds: string[];
+  odds: Array<{ fixtureId: string; status: string; results?: number; data?: unknown[]; error?: string }>;
+}
+
 export interface ApiFootballTrackerDetails {
   apiFootballFixtureId: number | null;
   apiFootballDataObservedAt: string | null;
@@ -170,6 +272,18 @@ export async function fetchApiFootballEnrichment(
     }
   }
   return output;
+}
+
+/** Fetch cached API-Football odds for up to 20 fixtures; provider keys stay inside the Worker. */
+export async function fetchApiFootballOdds(
+  fixtureIds: string[],
+  minimumIntervalMs = API_FOOTBALL_MIN_INTERVAL_MS,
+): Promise<ApiFootballOddsBatch> {
+  const ids = [...new Set(fixtureIds.map(value => String(value).trim()).filter(value => /^\d{1,12}$/.test(value)))];
+  if (!ids.length || ids.length > 20) throw new Error("API-Football odds wymaga 1–20 poprawnych identyfikatorów meczów.");
+  const query = new URLSearchParams({ ids: ids.join("-") });
+  const response = await pacedApiFootballFetch(API_ROOT + "/odds?" + query.toString(), minimumIntervalMs);
+  return readResponse<ApiFootballOddsBatch>(response);
 }
 
 /** One daily date query returns injury/suspension rows for every fixture supported by the provider. */
