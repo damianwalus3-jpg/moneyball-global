@@ -74,32 +74,80 @@ export function buildApiFootballTrackerDetails(
 
 const API_ROOT = "/api/api-football";
 const BATCH_SIZE = 20;
+/** Conservative shared pacing for every API-Football call made by this app tab. */
+export const API_FOOTBALL_MIN_INTERVAL_MS = 10_000;
+let lastApiFootballRequestAt = 0;
+let apiFootballBlockedUntil = 0;
+let apiFootballRequestQueue: Promise<void> = Promise.resolve();
+
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+/** Serialize requests across fixtures, enrichment and injuries; honour provider Retry-After. */
+async function pacedApiFootballFetch(path: string, minimumIntervalMs = API_FOOTBALL_MIN_INTERVAL_MS): Promise<Response> {
+  let release!: () => void;
+  const previous = apiFootballRequestQueue;
+  apiFootballRequestQueue = new Promise<void>(resolve => { release = resolve; });
+  await previous;
+  try {
+    const nextAllowedAt = Math.max(lastApiFootballRequestAt + Math.max(0, minimumIntervalMs), apiFootballBlockedUntil);
+    const waitMs = Math.max(0, nextAllowedAt - Date.now());
+    if (waitMs > 0) await delay(waitMs);
+    lastApiFootballRequestAt = Date.now();
+    const response = await fetch(path, { headers: { Accept: "application/json" } });
+    if (response.status === 429) {
+      const retryAfter = Number(response.headers.get("Retry-After"));
+      const retrySeconds = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 60;
+      apiFootballBlockedUntil = Math.max(apiFootballBlockedUntil, Date.now() + retrySeconds * 1000);
+    }
+    return response;
+  } finally {
+    release();
+  }
+}
+
 async function readResponse<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => ({})) as T & { error?: string; message?: string; retryAfterSeconds?: number };
   if (!response.ok) {
     const suffix = payload.message ?? payload.error ?? "API-Football request failed";
-    const retry = payload.retryAfterSeconds ? " (spróbuj ponownie za " + payload.retryAfterSeconds + " s)" : "";
+    const retrySeconds = payload.retryAfterSeconds ?? (response.status === 429 ? 60 : 0);
+    const retry = retrySeconds ? " (spróbuj ponownie za " + retrySeconds + " s)" : "";
     throw new Error(String(suffix) + retry);
   }
   return payload;
 }
+
+function assertBrusselsDate(date: string, label: string): void {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date + "T00:00:00Z"))
+    || new Date(date + "T00:00:00Z").toISOString().slice(0, 10) !== date) {
+    throw new Error("Nieprawidłowa data Europe/Brussels dla API-Football " + label + ".");
+  }
+}
+
+/** Fetch the Brussels-local daily fixture feed through the same shared quota queue. */
+export async function fetchApiFootballFixturesForDate(
+  date: string,
+  minimumIntervalMs = API_FOOTBALL_MIN_INTERVAL_MS,
+): Promise<{ results?: number; generatedAt?: string; fixtures?: unknown[] }> {
+  assertBrusselsDate(date, "fixtures");
+  const response = await pacedApiFootballFetch(API_ROOT + "/fixtures/" + date, minimumIntervalMs);
+  return readResponse(response);
+}
+
 /** Fetch all supported fixture enrichment in provider batches of max 20 IDs.
- * The Worker caches each batch for 15 minutes; sequential requests avoid bursts. */
+ * Worker caches each batch for 15 minutes; all batches share a conservative request queue. */
 export async function fetchApiFootballEnrichment(
   fixtureIds: string[],
-  minimumIntervalMs = 6500,
+  minimumIntervalMs = API_FOOTBALL_MIN_INTERVAL_MS,
 ): Promise<Map<string, ApiFootballFixtureEnrichment>> {
   const ids = [...new Set(fixtureIds.map(value => String(value).trim()).filter(value => /^\d{1,12}$/.test(value)))];
   const output = new Map<string, ApiFootballFixtureEnrichment>();
   const batches: string[][] = [];
   for (let index = 0; index < ids.length; index += BATCH_SIZE) batches.push(ids.slice(index, index + BATCH_SIZE));
-  for (let index = 0; index < batches.length; index++) {
-    if (index > 0 && minimumIntervalMs > 0) await delay(minimumIntervalMs);
-    const query = new URLSearchParams({ ids: batches[index].join("-") });
-    const response = await fetch(API_ROOT + "/enrichment?" + query.toString(), { headers: { Accept: "application/json" } });
+  for (const batch of batches) {
+    const query = new URLSearchParams({ ids: batch.join("-") });
+    const response = await pacedApiFootballFetch(API_ROOT + "/enrichment?" + query.toString(), minimumIntervalMs);
     const payload = await readResponse<BatchResponse<ApiFootballFixtureEnrichment>>(response);
     for (const fixture of payload.fixtures ?? []) {
       const id = fixture.fixture?.id;
@@ -108,14 +156,15 @@ export async function fetchApiFootballEnrichment(
   }
   return output;
 }
+
 /** One daily date query returns injury/suspension rows for every fixture supported by the provider. */
-export async function fetchApiFootballInjuriesForDate(date: string): Promise<ApiFootballInjury[]> {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date + "T00:00:00Z"))
-    || new Date(date + "T00:00:00Z").toISOString().slice(0, 10) !== date) {
-    throw new Error("Nieprawidłowa data Europe/Brussels dla API-Football injuries.");
-  }
+export async function fetchApiFootballInjuriesForDate(
+  date: string,
+  minimumIntervalMs = API_FOOTBALL_MIN_INTERVAL_MS,
+): Promise<ApiFootballInjury[]> {
+  assertBrusselsDate(date, "injuries");
   const query = new URLSearchParams({ date });
-  const response = await fetch(API_ROOT + "/injuries?" + query.toString(), { headers: { Accept: "application/json" } });
+  const response = await pacedApiFootballFetch(API_ROOT + "/injuries?" + query.toString(), minimumIntervalMs);
   const payload = await readResponse<BatchResponse<ApiFootballInjury>>(response);
   return payload.injuries ?? [];
 }

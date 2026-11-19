@@ -3,6 +3,7 @@ import { cacheOpenLigaTeamForms } from "./team-form";
 import { seasonCode } from "./season";
 import { fetchPitchApiDate, fetchPitchApiLeague, fetchPitchApiLeagueCatalog, fetchPitchApiLeagueMatches, isPitchApiCountryEligible, isPitchApiFreeEuropeanLeague, selectPitchApiSeason, type PitchApiLeague, type PitchApiLeagueMatch } from "./pitchapi";
 import { EUROPEAN_COUNTRY_CODES } from "./european-countries";
+import { fetchApiFootballFixturesForDate } from "./api-football";
 export interface FreeFixture {
   id: string;
   competition: string;
@@ -741,7 +742,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   // Source 9: API-Football Pro paid fixture feed. Provider data is independently mapped
   // using its authoritative country field and Brussels-local kickoff date before deduplication.
   try {
-    const payload = await fetchJson<{ results?: number; generatedAt?: string; fixtures?: unknown[] }>(`/api/api-football/fixtures/${date}`);
+    const payload = await fetchApiFootballFixturesForDate(date);
     apiFootballProviderFixturesFound = Number(payload.results ?? payload.fixtures?.length ?? 0);
     const mapped = parseApiFootballEuropeanFixtures(payload, date, payload.generatedAt || new Date().toISOString());
     apiFootballEuropeanFixturesFound = mapped.length;

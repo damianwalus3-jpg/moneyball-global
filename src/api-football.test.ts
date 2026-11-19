@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballInjuriesForDate } from "./api-football";
+import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballFixturesForDate, fetchApiFootballInjuriesForDate } from "./api-football";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -23,6 +23,17 @@ describe("API-Football Pro batch client", () => {
     expect(result.get("21")?.fixture?.id).toBe(21);
   });
 
+
+  it("routes the daily fixtures feed through the same API-Football client", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      provider: "API-Football Pro", generatedAt: "2026-11-19T00:00:00Z", results: 1, fixtures: [{ fixture: { id: 123 } }],
+    }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const payload = await fetchApiFootballFixturesForDate("2026-11-19", 0);
+    expect(String(fetchMock.mock.calls[0][0])).toBe("/api/api-football/fixtures/2026-11-19");
+    expect(payload.fixtures).toHaveLength(1);
+  });
+
   it("propagates a provider rate limit instead of treating the batch as successful", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       error: "api_football_rate_limited", message: "Too many requests", retryAfterSeconds: 60,
@@ -38,7 +49,7 @@ describe("API-Football daily injury feed", () => {
       injuries: [{ fixture: { id: 123 }, team: { name: "Home" }, player: { name: "Player", type: "Missing Fixture", reason: "Suspended" } }],
     }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
-    const result = await fetchApiFootballInjuriesForDate("2026-11-19");
+    const result = await fetchApiFootballInjuriesForDate("2026-11-19", 0);
     expect(String(fetchMock.mock.calls[0][0])).toBe("/api/api-football/injuries?date=2026-11-19");
     expect(result).toHaveLength(1);
     expect(result[0].player?.reason).toBe("Suspended");
@@ -71,5 +82,25 @@ describe("API-Football Tracker storage", () => {
     const full = buildApiFootballTrackerDetails(fixture, injuries, true, "2026-11-19T04:00:00Z");
     expect(JSON.parse(full.apiFootballFixtureData ?? "{}")).toMatchObject({ fixture: { id: 123 }, events: [{ type: "Goal" }] });
     expect(JSON.parse(full.apiFootballInjuries ?? "[]")).toHaveLength(1);
+  });
+});
+
+describe("API-Football shared quota pacing", () => {
+  it("honours Retry-After across different endpoint types after a 429", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "api_football_rate_limited", message: "Too many requests", retryAfterSeconds: 2 }), {
+        status: 429, headers: { "Retry-After": "2" },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ provider: "API-Football Pro", results: 0, fixtures: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchApiFootballEnrichment(["123"], 0)).rejects.toThrow("Too many requests");
+    const next = fetchApiFootballFixturesForDate("2026-11-19", 0);
+    await Promise.resolve();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(2000);
+    await expect(next).resolves.toMatchObject({ results: 0, fixtures: [] });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
   });
 });
