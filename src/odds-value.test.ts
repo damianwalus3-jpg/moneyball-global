@@ -82,8 +82,11 @@ describe("verified odds valuation", () => {
       odds({ id: "future", capturedAt: "2026-11-17T20:01:00.000Z" }),
       odds({ id: "incomplete", complete1X2: false }, "INCOMPLETE_1X2"),
       odds({ id: "other", fixtureId: "fixture-2" }),
+      odds({ id: "dc", market: "DOUBLE_CHANCE", complete1X2: false, completeDoubleChance: true,
+        odds1: null, oddsX: null, odds2: null, odds1x: 1.25, oddsX2: 1.4, odds12: 1.3 }, "COMPLETE_DOUBLE_CHANCE"),
     ];
-    expect(listFreshOddsSnapshots(rows, "fixture-1", now).map(row => row.id)).toEqual(["odds-1"]);
+    expect(listFreshOddsSnapshots(rows, "fixture-1", now).map(row => row.id)).toContain("dc");
+    expect(listFreshOddsSnapshots(rows, "fixture-1", now).map(row => row.id)).toContain("odds-1");
   });
 
   it("lists only bookmakers with fresh complete prices", () => {
@@ -91,8 +94,10 @@ describe("verified odds valuation", () => {
       odds(),
       odds({ bookmaker: "Stale", capturedAt: "2026-11-17T10:00:00.000Z" }),
       odds({ bookmaker: "Incomplete", complete1X2: false }, "INCOMPLETE_1X2"),
+      odds({ bookmaker: "Book DC", market: "DOUBLE_CHANCE", complete1X2: false, completeDoubleChance: true,
+        odds1: null, oddsX: null, odds2: null, odds1x: 1.25, oddsX2: 1.4, odds12: 1.3 }, "COMPLETE_DOUBLE_CHANCE"),
     ];
-    expect(listOddsBookmakers(records, ["fixture-1"], now)).toEqual(["Book A"]);
+    expect(listOddsBookmakers(records, ["fixture-1"], now)).toEqual(["Book A", "Book DC"]);
   });
 });
 
