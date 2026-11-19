@@ -7,6 +7,7 @@ import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamFo
 import { predictFromRecentForm, predictFromPitchApiXgForm, predictFromNeutralPrior, type FormPrediction } from "./form-prediction";
 import { fetchPitchApiMatchLineups, fetchPitchApiXgFormsForFixture, type PitchApiLineups, type PitchApiXgForm } from "./pitchapi";
 import { buildThreeLegCandidates } from "./coupon-engine";
+import { getPredictionRecordStatus } from "./prediction-status";
 import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from "./openfootball";
 import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
@@ -253,7 +254,7 @@ function savePredictionRecord(
     const dcProbability = typeof bestDc?.probability === "number" ? bestDc.probability : null;
     const modelStrongDoubleChance = couponEligible && dcProbability !== null && dcProbability >= 0.75;
     const strongDoubleChance = modelStrongDoubleChance && evidenceAudit.complete;
-    const evidenceRejectionReason = evidenceAudit.complete ? null : "ODRZUCONY: brak wymaganych danych: " + getEvidenceGaps(evidenceAudit).join(", ");
+    const evidenceRejectionReason = evidenceAudit.complete ? null : "WSTĘPNA PROGNOZA: brakuje części danych: " + getEvidenceGaps(evidenceAudit).join(", ");
     const common = {
       ...shared, ...modelMetadata, model, modelName: method, predictionMethod: variant?.method ?? null, modelMethod: variant?.method ?? null,
       expectedGoalsBasis: method === "pitchapi-recent-xg-poisson" ? "historyczne xG/xGA PitchAPI" : method === "recent-form-goals-poisson" ? "wyniki i gole historyczne (nie xG)" : "brak danych zespołów",
@@ -261,7 +262,7 @@ function savePredictionRecord(
       sampleCounts: variant ? JSON.stringify(variant.samples) : null,
       historySampleCounts: JSON.stringify({ home: homeForm?.matches.length ?? 0, away: awayForm?.matches.length ?? 0, xgHome: pitchApiXgForms?.home.sampleSize ?? 0, xgAway: pitchApiXgForms?.away.sampleSize ?? 0 }),
       minimumTeamHistoryMatches: 3, couponEligible,
-      reason: reason ?? (!couponEligible ? "ODRZUCONY: model wymaga co najmniej 3 wcześniejszych meczów dla obu drużyn oraz zweryfikowanej godziny rozpoczęcia." : evidenceRejectionReason ?? (topProbability === null ? "Brak prawidłowej prognozy 1X2." : topProbability < 0.75 ? "Najwyższe prawdopodobieństwo 1X2 poniżej 75%." : null)),
+      reason: reason ?? (!couponEligible ? "WSTĘPNA PROGNOZA: model nie ma jeszcze minimalnej próbki historii lub pełnych danych do kwalifikacji kuponowej." : evidenceRejectionReason ?? (topProbability === null ? "Brak prawidłowej prognozy 1X2." : topProbability < 0.75 ? "Najwyższe prawdopodobieństwo 1X2 poniżej 75%." : null)),
     };
     const oneXTwoDetails = {
       ...common,
@@ -277,18 +278,18 @@ function savePredictionRecord(
       && Math.abs(probabilities.home + probabilities.draw + probabilities.away - 1) <= 0.0001;
     if (shouldAppendPrediction(current, match.id, model, hasOneXTwoProbabilities, method, "1X2", evidenceAudit.complete, shared.evidenceGaps)) {
       pendingPredictionRecords.push({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · 1X2 · " + method,
-        status: strongCandidate ? "KANDYDAT" : "ODRZUCONY", details: oneXTwoDetails });
+        status: getPredictionRecordStatus({ probabilitiesAvailable: hasOneXTwoProbabilities, strongCandidate, couponEligible, evidenceComplete: evidenceAudit.complete, thresholdMet: typeof topProbability === "number" && topProbability >= 0.75 }), details: oneXTwoDetails });
     }
     const dcDetails = { ...common, market: "DOUBLE_CHANCE", selection: bestDc?.selection ?? null, probability: dcProbability,
       p1x: dc?.oneX ?? null, px2: dc?.xTwo ?? null, p12: dc?.oneTwo ?? null,
       strongCandidate: false, modelStrongDoubleChance, strongDoubleChance, source: match.source,
-      reason: reason ?? (!couponEligible ? "ODRZUCONY: brak minimalnej próbki lub wiarygodnej godziny meczu." : evidenceRejectionReason ?? (dcProbability === null ? "Brak prawidłowych prawdopodobieństw Double Chance." : dcProbability < 0.75 ? "Najwyższe prawdopodobieństwo Double Chance poniżej 75%." : null)) };
+      reason: reason ?? (!couponEligible ? "WSTĘPNA PROGNOZA: brak minimalnej próbki historii lub pełnych danych do kwalifikacji kuponowej." : evidenceRejectionReason ?? (dcProbability === null ? "Brak prawidłowych prawdopodobieństw Double Chance." : dcProbability < 0.75 ? "Najwyższe prawdopodobieństwo Double Chance poniżej 75%." : null)) };
     const hasDcProbabilities = !!dc
       && [dc.oneX, dc.xTwo, dc.oneTwo].every(value => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1)
       && Math.abs(dc.oneX + dc.xTwo + dc.oneTwo - 2) <= 0.0001;
     if (shouldAppendPrediction(current, match.id, model, hasDcProbabilities, method, "DOUBLE_CHANCE", evidenceAudit.complete, shared.evidenceGaps)) {
       pendingPredictionRecords.push({ kind: "prediction", title: match.date + " · " + match.home + " vs " + match.away + " · DOUBLE CHANCE · " + method,
-        status: strongDoubleChance ? "KANDYDAT" : "ODRZUCONY", details: dcDetails });
+        status: getPredictionRecordStatus({ probabilitiesAvailable: hasDcProbabilities, strongCandidate: strongDoubleChance, couponEligible, evidenceComplete: evidenceAudit.complete, thresholdMet: dcProbability !== null && dcProbability >= 0.75 }), details: dcDetails });
     }
   }
   addRecords(pendingPredictionRecords);
