@@ -990,6 +990,11 @@ export default function App() {
                   </div>
                   {priced && <p className="source-note">Stawka €{priced.stake.toFixed(2)} · możliwy zwrot €{priced.potentialReturn.toFixed(2)} · możliwy zysk €{priced.potentialProfit.toFixed(2)} · {priced.bookmaker}</p>}
                   <button disabled={alreadySaved} onClick={() => {
+                    if (priced && !canReserveStake(readRecords(), priced.stake)) {
+                      const balance = calculateBankroll(readRecords()).availableBalance;
+                      setNotice(`Brak wystarczającego salda na kupon papierowy. Dostępne: €${balance.toFixed(2)}; wymagana stawka: €${priced.stake.toFixed(2)}.`);
+                      return;
+                    }
                     addRecordsIfMissing([{
                       kind: "coupon",
                       title: `Kupon ${fixtureScan!.date} #${index + 1}`,
