@@ -249,12 +249,12 @@ function savePredictionRecord(
       && hasKnownKickoff(match.date, match.time);
     const topProbability = variant?.topProbability ?? null;
     const modelStrongCandidate = couponEligible && typeof topProbability === "number" && topProbability >= 0.75;
-    const strongCandidate = modelStrongCandidate && evidenceAudit.complete;
+    const strongCandidate = modelStrongCandidate; // Missing supporting evidence remains a warning, not a probability-qualification veto.
     const dcOptions = [{ selection: "1X", probability: dc?.oneX ?? null }, { selection: "X2", probability: dc?.xTwo ?? null }, { selection: "12", probability: dc?.oneTwo ?? null }];
     const bestDc = dcOptions.filter(item => typeof item.probability === "number").sort((a, b) => (b.probability as number) - (a.probability as number))[0];
     const dcProbability = typeof bestDc?.probability === "number" ? bestDc.probability : null;
     const modelStrongDoubleChance = couponEligible && dcProbability !== null && dcProbability >= 0.75;
-    const strongDoubleChance = modelStrongDoubleChance && evidenceAudit.complete;
+    const strongDoubleChance = modelStrongDoubleChance; // Double Chance uses the same independent model/sample threshold.
     const evidenceRejectionReason = evidenceAudit.complete ? null : "WSTĘPNA PROGNOZA: brakuje części danych: " + getEvidenceGaps(evidenceAudit).join(", ");
     const common = {
       ...shared, ...modelMetadata, model, modelName: method, predictionMethod: variant?.method ?? null, modelMethod: variant?.method ?? null,
@@ -263,7 +263,7 @@ function savePredictionRecord(
       sampleCounts: variant ? JSON.stringify(variant.samples) : null,
       historySampleCounts: JSON.stringify({ home: homeForm?.matches.length ?? 0, away: awayForm?.matches.length ?? 0, xgHome: pitchApiXgForms?.home.sampleSize ?? 0, xgAway: pitchApiXgForms?.away.sampleSize ?? 0 }),
       minimumTeamHistoryMatches: 3, couponEligible,
-      reason: reason ?? (!couponEligible ? "WSTĘPNA PROGNOZA: model nie ma jeszcze minimalnej próbki historii lub pełnych danych do kwalifikacji kuponowej." : evidenceRejectionReason ?? (topProbability === null ? "Brak prawidłowej prognozy 1X2." : topProbability < 0.75 ? "Najwyższe prawdopodobieństwo 1X2 poniżej 75%." : null)),
+      reason: reason ?? (!couponEligible ? "WSTĘPNA PROGNOZA: model nie ma jeszcze minimalnej próbki historii lub potwierdzonego terminu." : evidenceRejectionReason ?? (topProbability === null ? "Brak prawidłowej prognozy 1X2." : topProbability < 0.75 ? "Najwyższe prawdopodobieństwo 1X2 poniżej 75%." : null)),
     };
     const oneXTwoDetails = {
       ...common,
