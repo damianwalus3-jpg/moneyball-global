@@ -12,11 +12,12 @@ function row(overrides: Partial<TrackerRecord> = {}): TrackerRecord {
 }
 
 describe("evidence-qualified candidate gate", () => {
-  it("requires complete evidence and the market-specific 75% flag", () => {
+  it("qualifies a market-specific >=75% model candidate even when supporting evidence is incomplete", () => {
     expect(isEvidenceQualifiedCandidate(row(), "1X2")).toBe(true);
     expect(isEvidenceQualifiedCandidate(row(), "DOUBLE_CHANCE")).toBe(true);
-    expect(isEvidenceQualifiedCandidate(row({ details: { evidenceComplete: false, strongCandidate: true, strongDoubleChance: true } }), "1X2")).toBe(false);
+    expect(isEvidenceQualifiedCandidate(row({ details: { evidenceComplete: false, strongCandidate: true, strongDoubleChance: true } }), "1X2")).toBe(true);
     expect(isEvidenceQualifiedCandidate(row({ details: { evidenceComplete: true, strongCandidate: false, strongDoubleChance: true } }), "1X2")).toBe(false);
+    expect(isEvidenceQualifiedCandidate(row({ details: { evidenceComplete: false, strongCandidate: true, strongDoubleChance: true } }), "DOUBLE_CHANCE")).toBe(true);
     expect(isEvidenceQualifiedCandidate(row({ details: { evidenceComplete: true, strongCandidate: true, strongDoubleChance: false } }), "DOUBLE_CHANCE")).toBe(false);
   });
 
@@ -34,9 +35,11 @@ describe("evidence-qualified candidate gate", () => {
 });
 
 describe("prediction display status", () => {
-  it("does not label a high raw model probability as a qualified candidate when evidence is missing", () => {
+  it("labels a >=75% model candidate as qualified while separately retaining missing-evidence warnings", () => {
     const rejected = row({ status: "ODRZUCONY", details: { evidenceComplete: false, strongCandidate: false, strongDoubleChance: false } });
-    expect(getPredictionDisplayStatus(rejected, "1X2", 0.755)).toBe("WSTĘPNA PROGNOZA · NIEKWALIFIKOWANA");
+    expect(getPredictionDisplayStatus(rejected, "1X2", 0.755)).toBe("WSTĘPNA PROGNOZA · BRAK DANYCH UZUPEŁNIAJĄCYCH");
+    const candidate = row({ details: { evidenceComplete: false, strongCandidate: true, strongDoubleChance: true } });
+    expect(getPredictionDisplayStatus(candidate, "1X2", 0.832)).toBe("KANDYDAT MODELU ≥75%");
     expect(getPredictionDisplayStatus(rejected, "DOUBLE_CHANCE", 0.909)).toBe("WSTĘPNA PROGNOZA · NIEKWALIFIKOWANA");
     expect(isEvidenceQualifiedCandidate(rejected, "1X2")).toBe(false);
     expect(isEvidenceQualifiedCandidate(rejected, "DOUBLE_CHANCE")).toBe(false);
