@@ -271,24 +271,32 @@ function isAllowedBelgianBookmaker(value: unknown): boolean {
 
 /** Model evidence gate shared by manual-odds promotion, coupons and dashboard candidates. */
 export function hasSufficientPredictionEvidence(
-  prediction: Pick<Prediction, "model_version" | "data_source" | "rationale" | "data_coverage">,
+  prediction: Pick<Prediction, "model_version" | "data_source" | "rationale" | "data_coverage" | "confidence">,
 ): boolean {
   const coverage = prediction.data_coverage ?? {};
-  if (!String(prediction.data_source ?? "").trim() || !String(prediction.rationale ?? "").trim()) return false;
+  const dataSource = String(prediction.data_source ?? "").trim().toUpperCase();
+  if (!dataSource || !String(prediction.rationale ?? "").trim()) return false;
   if (coverage["baseline_only"] === true || String(coverage["baseline_only"] ?? "").toLowerCase() === "true") return false;
-  const modelSource = String(coverage["model_source_type"] ?? "").trim().toUpperCase();
+  const books = Number(coverage["books"]);
+  const normalized = coverage["normalised"] === true || String(coverage["normalised"] ?? "").toLowerCase() === "true";
+  const marketConsensusCovered = Number.isFinite(books) && books >= 3 && (
+    coverage["market_consensus_available"] === true
+    || /STRIKERAPI_ODDS/.test(dataSource) && normalized
+  );
+  const modelSource = String(coverage["model_source_type"] ?? (marketConsensusCovered ? "MARKET_CONSENSUS" : "")).trim().toUpperCase();
   if (modelSource === "BASELINE_ONLY" || modelSource === "BEYONDELO_ONLY") return false;
-  const modelCoverage = Number(coverage["model_coverage"]);
+  const modelCoverage = Number(coverage["model_coverage"] ?? (marketConsensusCovered ? prediction.confidence : NaN));
   const homeMatches = Number(coverage["home_history_matches"]);
   const awayMatches = Number(coverage["away_history_matches"]);
   const historyCovered = Number.isFinite(homeMatches) && Number.isFinite(awayMatches) && homeMatches >= 3 && awayMatches >= 3;
-  const marketCovered = (coverage["market_odds"] === true || String(coverage["market_odds"] ?? "").toLowerCase() === "true")
+  const bookmakerOddsCovered = (coverage["market_odds"] === true || String(coverage["market_odds"] ?? "").toLowerCase() === "true")
     && String(coverage["odds_status"] ?? "").toUpperCase() === "CONFIRMED"
     && String(coverage["odds_phase"] ?? "").toLowerCase() === "prematch"
     && String(coverage["odds_suspended"] ?? "false").toLowerCase() !== "true"
     && isAllowedBelgianBookmaker(coverage["odds_bookmaker"])
     && !/tipsaudit|fair.?market|fair.?odds/i.test(String(coverage["odds_source"] ?? ""));
-  return !!modelSource && Number.isFinite(modelCoverage) && modelCoverage >= 55 && (historyCovered || marketCovered);
+  return !!modelSource && Number.isFinite(modelCoverage) && modelCoverage >= 55
+    && (historyCovered || marketConsensusCovered || bookmakerOddsCovered);
 }
 
 export function isValidOddsSourceUrl(value: unknown): boolean {
