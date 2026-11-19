@@ -52,6 +52,28 @@ export const DEFAULT_ODDS_PAPI_MARKETS: OddsPapiMarketDefinition[] = [{
   marketId: "101", marketType: "1X2", outcomeIds: { "1": "101", X: "102", "2": "103" },
 }];
 
+/** Spread the monthly OddsPapi allowance across remaining Brussels-local days and both sync slots. */
+export function getOddsPapiSlotRequestBudget(
+  remaining: number,
+  slot: "morning" | "afternoon",
+  now = new Date(),
+): number {
+  if (!Number.isFinite(remaining) || remaining <= 0) return 0;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  const year = Number(values.year);
+  const month = Number(values.month);
+  const day = Number(values.day);
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const daysRemaining = Math.max(1, daysInMonth - day + 1);
+  const reserve = Math.min(5, Math.floor(remaining * 0.02));
+  const dailyBudget = Math.floor(Math.max(0, remaining - reserve) / daysRemaining);
+  const slotBudget = slot === "morning" ? Math.ceil(dailyBudget / 2) : Math.floor(dailyBudget / 2);
+  return Math.min(10, Math.max(0, slotBudget));
+}
+
 export function brusselsUtcDayWindow(date: string): { from: string; to: string } {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("invalid_brussels_date");
   const [year, month, day] = date.split("-").map(Number);
