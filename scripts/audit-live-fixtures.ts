@@ -1,6 +1,3 @@
-import { scanTodayEuropeanFixtures, fixtureKey, isDomesticLeagueFixture } from "../src/free-fixtures.ts";
-import { EUROPEAN_COUNTRY_CODES } from "../src/european-countries.ts";
-import { getSourceDiagnostics } from "../src/source-diagnostics.ts";
 import { resolveWorkerFetchUrl } from "../src/worker-url.ts";
 
 const WORKER_BASE = "https://moneyball-global-rebuild.damianwalus3.workers.dev";
@@ -12,6 +9,15 @@ globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
   return nativeFetch(request, init);
 };
 
+// Import source adapters only after replacing fetch. Some adapters capture the
+// global fetch binding at module evaluation time; static imports would retain
+// Node's native fetch and reject their relative Worker routes.
+const [{ scanTodayEuropeanFixtures, fixtureKey, isDomesticLeagueFixture },
+  { EUROPEAN_COUNTRY_CODES }, { getSourceDiagnostics }] = await Promise.all([
+  import("../src/free-fixtures.ts"),
+  import("../src/european-countries.ts"),
+  import("../src/source-diagnostics.ts"),
+]);
 
 const scan = await scanTodayEuropeanFixtures(true);
 const fixtures = scan.fixtures;
