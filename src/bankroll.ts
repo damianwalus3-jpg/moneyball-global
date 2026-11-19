@@ -26,7 +26,10 @@ function newestByParent(records: TrackerRecord[], kind: "bet" | "coupon", parent
     const parent = row.details[parentField];
     if (row.kind !== kind || typeof parent !== "string" || !statuses.includes(row.status)) continue;
     const previous = latest.get(parent);
-    if (!previous || Date.parse(row.createdAt) > Date.parse(previous.createdAt)) latest.set(parent, row);
+    const rowTime = Date.parse(row.createdAt), previousTime = previous ? Date.parse(previous.createdAt) : Number.NEGATIVE_INFINITY;
+    const safeRowTime = Number.isFinite(rowTime) ? rowTime : Number.NEGATIVE_INFINITY;
+    const safePreviousTime = Number.isFinite(previousTime) ? previousTime : Number.NEGATIVE_INFINITY;
+    if (!previous || safeRowTime > safePreviousTime || (safeRowTime === safePreviousTime && row.id.localeCompare(previous.id) > 0)) latest.set(parent, row);
   }
   return latest;
 }
