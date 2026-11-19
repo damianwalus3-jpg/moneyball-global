@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm, mergeOpenFootballCatalogueResults, openFootballSeasonFolder, parseOpenFootballFixtures, parseOpenFootballMatches, type OpenFootballFeed } from "./openfootball";
+import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm, mergeOpenFootballCatalogueResults, openFootballSeasonFolder, parseJsDelivrOpenFootballTree, parseOpenFootballFixtures, parseOpenFootballMatches, type OpenFootballFeed } from "./openfootball";
 import { vi } from "vitest";
 
 const france: OpenFootballFeed = {
@@ -129,6 +129,19 @@ describe("dynamic European OpenFootball catalogue", () => {
     const feeds = buildEuropeanOpenFootballFeeds(["finland/2026_fi1.txt", "finland/2025_fi1.txt"], "2026-07-10");
     expect(feeds).toHaveLength(1);
     expect(feeds[0].countryCode).toBe("FIN");
+  });
+});
+
+describe("OpenFootball jsDelivr catalogue adapter", () => {
+  it("normalizes flat jsDelivr file paths for European and national feed discovery", () => {
+    expect(parseJsDelivrOpenFootballTree({
+      type: "gh", name: "openfootball/europe", version: "master",
+      files: [{ name: "/france/2026-27_fr1.txt" }, { name: "/norway/2026_no1.txt" }, { name: "/README.md" }, {}],
+    })).toEqual(["france/2026-27_fr1.txt", "norway/2026_no1.txt", "README.md"]);
+  });
+
+  it("rejects invalid jsDelivr catalogue payloads instead of treating them as an empty healthy feed", () => {
+    expect(() => parseJsDelivrOpenFootballTree({ type: "gh", files: null })).toThrow("missing files array");
   });
 });
 
