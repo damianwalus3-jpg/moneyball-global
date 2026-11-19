@@ -411,6 +411,9 @@ export default function App() {
       return missingProbabilities || shouldRetryNeutralFallback(match.id, prior) || missingXgModel;
     });
     if (!matches.length) { setRecords(readRecords()); return; }
+    bulkAnalysisLock.current = true;
+    setBulkLoading(true);
+    setBulkProgress(0);
     const apiFootballById = new Map<string, ApiFootballFixtureEnrichment>();
     const injuriesByFixture = new Map<string, ApiFootballInjury[]>();
     let apiFootballInjuriesLoaded = false;
@@ -439,9 +442,6 @@ export default function App() {
         setNotice("API-Football Pro · kontuzje/zawieszenia: " + (error instanceof Error ? error.message : "brak danych") + ". Nie oznaczam braków jako zweryfikowanych.");
       }
     }
-    bulkAnalysisLock.current = true;
-    setBulkLoading(true);
-    setBulkProgress(0);
     const concurrency = 2;
     try {
       for (let index = 0; index < matches.length; index += concurrency) {
