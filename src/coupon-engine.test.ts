@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildThreeLegCandidates } from "./coupon-engine";
+import { canonicalFixtureId } from "./free-fixtures";
 import type { TrackerRecord } from "./tracker-store";
 
 function prediction(id: string, probability: number, date = "2026-11-17"): TrackerRecord {
@@ -21,7 +22,11 @@ describe("three-leg coupon candidates", () => {
   it("creates only coupons with exactly three unique matches above 75%", () => {
     const candidates = buildThreeLegCandidates([
       prediction("a", 0.80), prediction("b", 0.81), prediction("c", 0.90),
-      prediction("d", 0.74), prediction("a-duplicate", 0.95),
+      prediction("d", 0.74), {
+        ...prediction("a-duplicate", 0.95),
+        title: "2026-11-17 · Team a vs Opponent",
+        details: { ...prediction("a-duplicate", 0.95).details, fixtureId: "a", home: "Team a", away: "Opponent" },
+      },
     ], "2026-11-17");
     expect(candidates.length).toBe(1);
     expect(candidates[0].legs).toHaveLength(3);
@@ -50,8 +55,9 @@ describe("three-leg coupon candidates", () => {
     const dc = { ...prediction("shared", 0.90), id: "shared-dc", details: { ...prediction("shared", 0.90).details, market: "DOUBLE_CHANCE", selection: "1X", probability: 0.95, p1x: 0.95, px2: 0.55, p12: 0.5, strongCandidate: false, strongDoubleChance: true, couponEligible: true } };
     const candidates = buildThreeLegCandidates([oneXTwo, dc, prediction("b", 0.82), prediction("c", 0.85)], "2026-11-17");
     expect(candidates).toHaveLength(1);
-    expect(candidates[0].legs.filter(leg => leg.fixtureId === "shared")).toHaveLength(1);
-    expect(candidates[0].legs.find(leg => leg.fixtureId === "shared")?.market).toBe("DOUBLE_CHANCE");
+    const sharedId = canonicalFixtureId("2026-11-17", "Team shared", "Opponent", "Test league");
+    expect(candidates[0].legs.filter(leg => leg.fixtureId === sharedId)).toHaveLength(1);
+    expect(candidates[0].legs.find(leg => leg.fixtureId === sharedId)?.market).toBe("DOUBLE_CHANCE");
   });
   it("excludes candidates after the verified kickoff time", () => {
     const started = { ...prediction("started", 0.90), details: { ...prediction("started", 0.90).details, fixtureTime: "00:00" } };
@@ -64,12 +70,12 @@ describe("three-leg coupon candidates", () => {
     expect(candidates).toHaveLength(0);
   });
   it("uses the newest eligible prediction per fixture even when Tracker rows are out of order", () => {
-    const older = { ...prediction("a-old", 0.92), createdAt: "2026-11-17T08:00:00Z", details: { ...prediction("a-old", 0.92).details, fixtureId: "a" } };
-    const newer = {
-      ...prediction("a-new", 0.78),
-      createdAt: "2026-11-17T12:00:00Z",
-      details: { ...prediction("a-new", 0.78).details, fixtureId: "a" },
-    };
+    const olderBase = prediction("a-old", 0.92);
+    const older = { ...olderBase, title: "2026-11-17 · Team a vs Opponent", createdAt: "2026-11-17T08:00:00Z",
+      details: { ...olderBase.details, fixtureId: "a", home: "Team a", away: "Opponent" } };
+    const newerBase = prediction("a-new", 0.78);
+    const newer = { ...newerBase, title: "2026-11-17 · Team a vs Opponent", createdAt: "2026-11-17T12:00:00Z",
+      details: { ...newerBase.details, fixtureId: "a", home: "Team a", away: "Opponent" } };
     const rows = [
       older,
       prediction("b", 0.85),
@@ -78,7 +84,8 @@ describe("three-leg coupon candidates", () => {
     ];
     const candidates = buildThreeLegCandidates(rows, "2026-11-17");
     expect(candidates).toHaveLength(1);
-    expect(candidates[0].legs.find(leg => leg.fixtureId === "a")?.probability).toBe(0.78);
+    const aId = canonicalFixtureId("2026-11-17", "Team a", "Opponent", "Test league");
+    expect(candidates[0].legs.find(leg => leg.fixtureId === aId)?.probability).toBe(0.78);
   });
 
 
