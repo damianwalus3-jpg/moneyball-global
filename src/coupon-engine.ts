@@ -58,16 +58,17 @@ function fixturesAlreadyUsedByCoupons(records: TrackerRecord[]): Set<string> {
       for (const rawLeg of legs) {
         if (!rawLeg || typeof rawLeg !== "object") continue;
         const leg = rawLeg as Record<string, unknown>;
-        if (typeof leg.fixtureId !== "string" || !leg.fixtureId) continue;
+        const legFixtureId = typeof leg.fixtureId === "string" ? leg.fixtureId : "";
+        if (!legFixtureId) continue;
         const fallback = trackerFixtureIdentity({
           title: typeof leg.title === "string" ? leg.title : "",
           details: {
-            fixtureId: leg.fixtureId,
+            fixtureId: legFixtureId,
             date: typeof record.details.date === "string" ? record.details.date : typeof record.details.fixtureDate === "string" ? record.details.fixtureDate : null,
             competition: typeof leg.competition === "string" ? leg.competition : null,
           },
         });
-        used.add(rawToIdentity.get(leg.fixtureId) ?? fallback ?? leg.fixtureId);
+        used.add(rawToIdentity.get(legFixtureId) ?? fallback ?? legFixtureId);
       }
     } catch { /* malformed historical coupon is ignored, never rewritten */ }
   }
