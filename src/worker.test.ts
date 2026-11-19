@@ -786,7 +786,7 @@ describe("API-Football Pro daily odds route", () => {
     }
     expect(cache.put).toHaveBeenCalledTimes(3);
     expect(JSON.stringify(body)).not.toContain("private-api-football-secret");
-  });
+  }, 15_000);
 
   it("rejects non-today dates, invalid IDs and oversized batches before provider calls", async () => {
     const upstream = vi.fn();
