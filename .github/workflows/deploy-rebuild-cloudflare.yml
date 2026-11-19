@@ -103,5 +103,16 @@ jobs:
             test "$API_FOOTBALL_STATUS" = "503" || { cat /tmp/api-football.json; echo "API-Football secret status unexpected"; exit 1; }
             echo "API-Football gateway deployed; API_FOOTBALL_KEY secret is not configured in this Worker."
           fi
+      - name: Verify owner Tracker diagnostics rejects unauthenticated access
+        run: |
+          set -euo pipefail
+          BASE="https://moneyball-global-rebuild.damianwalus3.workers.dev"
+          STATUS="$(curl --silent --show-error -o /tmp/tracker-diagnostics-unauth.json -w "%{http_code}" "$BASE/api/owner/tracker-diagnostics")"
+          if [ "$STATUS" != "401" ]; then
+            cat /tmp/tracker-diagnostics-unauth.json
+            echo "Owner Tracker diagnostics must reject unauthenticated requests with HTTP 401; got $STATUS"
+            exit 1
+          fi
+          node -e 'const p=require("/tmp/tracker-diagnostics-unauth.json");if(p.error!=="unauthorized"){console.error("Unexpected owner diagnostics response",p);process.exit(1)}console.log("Owner Tracker diagnostics security check OK: unauthenticated access rejected")'
       - name: Full current-day European source reconciliation
         run: npx --yes tsx scripts/audit-live-fixtures.ts
