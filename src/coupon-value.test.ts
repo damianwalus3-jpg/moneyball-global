@@ -65,5 +65,9 @@ describe("three-leg coupon odds valuation", () => {
       ? { ...row, details: { ...row.details, capturedAt: "2026-11-17T10:00:00.000Z" } }
       : row);
     expect(valueThreeLegCoupon(candidate, stale, "Book A", now)).toBeNull();
+    const justOverHour = fullRecords().map(row => row.kind === "odds"
+      ? { ...row, details: { ...row.details, capturedAt: "2026-11-17T18:59:00.000Z" } }
+      : row);
+    expect(valueThreeLegCoupon(candidate, justOverHour, "Book A", now)).toBeNull();
   });
 });
