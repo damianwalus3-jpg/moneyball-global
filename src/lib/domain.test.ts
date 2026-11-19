@@ -509,6 +509,11 @@ describe("prediction evidence and payout quote gates", () => {
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"PARTIAL_VERIFIED_HISTORY", model_coverage:60, home_history_matches:2, away_history_matches:2 } }))).toBe(false);
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"MARKET_ODDS_MODEL", model_coverage:60, market_odds:true, odds_status:"CONFIRMED", odds_phase:"prematch", odds_suspended:false, odds_bookmaker:"Bwin", odds_source:"Bwin" } }))).toBe(true);
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_coverage: { model_source_type:"MARKET_ODDS_MODEL", model_coverage:60, market_odds:true, odds_status:"CONFIRMED", odds_phase:"prematch", odds_suspended:false, odds_bookmaker:"bet365", odds_source:"MoviOdds" } }))).toBe(false);
+    const marketConsensus = prediction("p","m1",95.4,{ data_source:"StrikerAPI_ODDS", confidence:"75.00", rationale:"Konsensus rynkowy z 7 znormalizowanych źródeł; oczekuje na kurs Bwin Belgium.", data_coverage:{books:7,normalised:true,competition:"Bundesliga"} });
+    expect(hasSufficientPredictionEvidence(marketConsensus)).toBe(true);
+    expect(isEligibleCouponPrediction(marketConsensus)).toBe(true);
+    expect(hasFreshConfirmedOdds(marketConsensus,Date.parse("2026-11-19T12:00:00.000Z"))).toBe(false);
+    expect(hasSufficientPredictionEvidence(prediction("p","m1",95,{ data_source:"StrikerAPI_ODDS", confidence:"75.00", data_coverage:{books:2,normalised:true} }))).toBe(false);
     expect(hasSufficientPredictionEvidence(prediction("p","m1",82,{ data_source:"", rationale:"" }))).toBe(false);
   });
 
