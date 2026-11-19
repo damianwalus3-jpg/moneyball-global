@@ -72,6 +72,17 @@ describe("verified odds valuation", () => {
     expect(valueDoubleChanceSelectionFromOdds([dc], "fixture-1", "1X", "Book A",
       { p1x: 0.8, px2: 0.7, p12: 0.6 }, now)).toBeNull();
   });
+  it("matches 1X2 prices by canonical fixture identity across providers", () => {
+    const date = "2026-11-17";
+    const fixtureId = canonicalFixtureId(date, "Club Brugge", "KAA Gent", "League");
+    const providerOdds = {
+      ...odds({ fixtureDate: date, home: "Club Brugge", away: "KAA Gent", competition: "League",
+        odds1: 1.8, oddsX: 3.6, odds2: 4.5 }),
+      id: "provider-1x2", title: "Club Brugge vs KAA Gent · Book A · OddsPapi · 1X2",
+    };
+    expect(valueSelectionFromOdds([providerOdds], fixtureId, "1", "Book A", model, now)?.decimalOdds).toBe(1.8);
+    expect(listFreshOddsSnapshots([providerOdds], fixtureId, now).map(row => row.id)).toContain("provider-1x2");
+  });
   it("matches DC prices by canonical fixture identity across providers", () => {
     const date = "2026-11-17";
     const fixtureId = canonicalFixtureId(date, "A", "B", "League");
