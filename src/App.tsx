@@ -19,7 +19,7 @@ import { brusselsDateToday, getSelectedFixturePredictions } from "./selected-mat
 import { auditMarketCoverage } from "./market-coverage";
 import { buildBetSettlementRows } from "./bet-settlement";
 import { calculateBankroll, canReserveStake } from "./bankroll";
-import { listFreshOddsSnapshots, listOddsBookmakers, shouldAutoFetchDailyOdds } from "./odds-value";
+import { listFreshOddsSnapshots, listOddsBookmakers } from "./odds-value";
 import { valueThreeLegCoupon } from "./coupon-value";
 import { buildBaselineEvidenceAudit, getEvidenceGaps, isEvidenceAuditComplete } from "./analysis-evidence";
 import { getSourceDiagnostics, summarizeFixtureCoverage } from "./source-diagnostics";
@@ -32,6 +32,7 @@ import {
 const ODDS_PILOT_TOKEN_KEY = "moneyball.oddsPilotToken";
 const STRIKER_DAILY_FETCH_KEY = "moneyball.strikerDailyFetchDate";
 const STRIKER_DAILY_ATTEMPT_KEY = "moneyball.strikerDailyOddsAttemptDate";
+const ODDSPAPI_DAILY_ATTEMPT_KEY = "moneyball.oddspapiDailyOddsAttemptDate";
 const FALLBACK_RETRY_KEY = "moneyball.neutralFallbackRetryAt";
 const FALLBACK_RETRY_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const XG_RETRY_KEY = "moneyball.xgModelRetryAt";
@@ -293,6 +294,7 @@ export default function App() {
   const [oddsTokenSaved, setOddsTokenSaved] = useState(() => { try { return Boolean(localStorage.getItem(ODDS_PILOT_TOKEN_KEY)); } catch { return false; } });
   const [lastOddsFetchDate, setLastOddsFetchDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_FETCH_KEY) ?? ""; } catch { return ""; } });
   const [lastOddsAttemptDate, setLastOddsAttemptDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
+  const [lastOddsPapiAttemptDate, setLastOddsPapiAttemptDate] = useState(() => { try { return localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
   const [oddsProviderStatus, setOddsProviderStatus] = useState<{ strikerapi: boolean; oddspapi: boolean; pilotEnabled: boolean; oddspapiAccount?: { status?: string; requestLimit?: number; requestCount?: number; remaining?: number; bookmakerSlugs?: string[] } | null } | null>(null);
   const [oddsLoading, setOddsLoading] = useState(false);
   const [oddsNotice, setOddsNotice] = useState("");
@@ -684,21 +686,34 @@ export default function App() {
       return;
     }
     const token = oddsPilotToken.trim();
-    if (lastOddsFetchDate === fixtureScan.date) {
-      setOddsNotice(`Kursy UTC ${fixtureScan.date} zostały już pobrane. Kolejne zapytanie kosztuje ponownie 10 kredytów. Odblokuj je świadomie poniżej.`);
-      return;
-    }
     if (!oddsTokenSaved || token.length < 32) {
       setOddsNotice("Najpierw zapisz token dostępu. Musi być identyczny z sekretem ODDS_PILOT_TOKEN w Cloudflare.");
       return;
     }
-    // Persist the attempt before making a paid-credit call. This is a synchronous
-    // guard against React StrictMode, page reloads and repeated 15-minute scans.
-    let attemptedDate = "";
-    try { attemptedDate = localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { /* storage may be unavailable */ }
-    if (attemptedDate === fixtureScan.date || lastOddsAttemptDate === fixtureScan.date) return;
-    try { localStorage.setItem(STRIKER_DAILY_ATTEMPT_KEY, fixtureScan.date); } catch { /* best-effort persistence */ }
-    setLastOddsAttemptDate(fixtureScan.date);
+    // Provider attempts are tracked separately: a completed StrikerAPI request must not suppress
+    // the first OddsPapi request (and vice versa) for the same Brussels date.
+    let strikerPending = oddsProviderStatus?.strikerapi === true
+      && lastOddsFetchDate !== fixtureScan.date && lastOddsAttemptDate !== fixtureScan.date;
+    let oddspapiPending = oddsProviderStatus?.oddspapi === true
+      && lastOddsPapiAttemptDate !== fixtureScan.date;
+    let strikerAttemptedDate = "";
+    let oddspapiAttemptedDate = "";
+    try { strikerAttemptedDate = localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { /* storage may be unavailable */ }
+    try { oddspapiAttemptedDate = localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_KEY) ?? ""; } catch { /* storage may be unavailable */ }
+    if (strikerAttemptedDate === fixtureScan.date) strikerPending = false;
+    if (oddspapiAttemptedDate === fixtureScan.date) oddspapiPending = false;
+    if (!strikerPending && !oddspapiPending) {
+      setOddsNotice(`Dzisiejsze próby dostawców kursów dla ${fixtureScan.date} zostały już wykonane.`);
+      return;
+    }
+    if (strikerPending) {
+      try { localStorage.setItem(STRIKER_DAILY_ATTEMPT_KEY, fixtureScan.date); } catch { /* best-effort persistence */ }
+      setLastOddsAttemptDate(fixtureScan.date);
+    }
+    if (oddspapiPending) {
+      try { localStorage.setItem(ODDSPAPI_DAILY_ATTEMPT_KEY, fixtureScan.date); } catch { /* best-effort persistence */ }
+      setLastOddsPapiAttemptDate(fixtureScan.date);
+    }
     setOddsLoading(true);
     setOddsNotice("");
     let oddspapiSummary = "";
@@ -712,7 +727,7 @@ export default function App() {
     try {
       const utcDate = fixtureScan.date;
       // OddsPapi is a separate price layer. Missing quotes never remove a fixture or its 1X2/DC prediction.
-      if (oddsProviderStatus?.oddspapi === true) {
+      if (oddspapiPending) {
         try {
           const oddspapiResponse = await fetch("/api/odds/oddspapi/daily", {
             method: "POST",
@@ -781,11 +796,9 @@ export default function App() {
           oddspapiSummary = "OddsPapi: " + (error instanceof Error ? error.message : "błąd dostawcy") + ". Prognozy pozostają bez zmian.";
         }
       }
-      if (oddsProviderStatus?.strikerapi !== true) {
-        try { localStorage.setItem(STRIKER_DAILY_FETCH_KEY, utcDate); } catch { /* quota guard is best-effort */ }
-        setLastOddsFetchDate(utcDate);
+      if (!strikerPending) {
         setRecords(readRecords());
-        setOddsNotice(oddspapiSummary || "OddsPapi: brak dostępnych kursów. Prognozy i rekordy 1X2/DC pozostają zapisane.");
+        setOddsNotice(oddspapiSummary || "OddsPapi: brak nowych kwotowań. Prognozy i rekordy 1X2/DC pozostają zapisane.");
         setOddsAudit(oddspapiAudit);
         return;
       }
@@ -913,15 +926,13 @@ export default function App() {
     return () => window.clearInterval(lineupRefreshId);
   }, [fixtureScan]);
   useEffect(() => {
-    if (!fixtureScan) return;
-    if (shouldAutoFetchDailyOdds({
-      fixtureDate: fixtureScan.date,
-      tokenSaved: oddsTokenSaved,
-      providerReady: (oddsProviderStatus?.strikerapi === true || oddsProviderStatus?.oddspapi === true) && oddsProviderStatus.pilotEnabled === true,
-      lastSuccessfulDate: lastOddsFetchDate,
-      lastAttemptedDate: lastOddsAttemptDate,
-    })) void fetchDailyOdds();
-  }, [fixtureScan, oddsTokenSaved, oddsProviderStatus, lastOddsFetchDate, lastOddsAttemptDate]);
+    if (!fixtureScan || !oddsTokenSaved || oddsProviderStatus?.pilotEnabled !== true) return;
+    const strikerPending = oddsProviderStatus.strikerapi === true
+      && lastOddsFetchDate !== fixtureScan.date && lastOddsAttemptDate !== fixtureScan.date;
+    const oddspapiPending = oddsProviderStatus.oddspapi === true
+      && lastOddsPapiAttemptDate !== fixtureScan.date;
+    if (strikerPending || oddspapiPending) void fetchDailyOdds();
+  }, [fixtureScan, oddsTokenSaved, oddsProviderStatus, lastOddsFetchDate, lastOddsAttemptDate, lastOddsPapiAttemptDate]);
   useEffect(() => {
     let active = true;
     void fetch("/api/odds/status").then(async response => {
