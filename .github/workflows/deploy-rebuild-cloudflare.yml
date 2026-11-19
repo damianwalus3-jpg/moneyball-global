@@ -49,8 +49,15 @@ jobs:
           API_FOOTBALL_CONFIGURED="$(echo "$HEALTH" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).apiFootballConfigured?"yes":"no"))')"
           if [ "$API_FOOTBALL_CONFIGURED" = "yes" ]; then
             API_FOOTBALL_ACCOUNT_STATUS="$(curl --silent --show-error -o /tmp/api-football-status.json -w "%{http_code}" "$BASE/api/api-football/status")"
-            test "$API_FOOTBALL_ACCOUNT_STATUS" = "200" || { cat /tmp/api-football-status.json; echo "API-Football status endpoint failed"; exit 1; }
-            node -e 'const p=require("/tmp/api-football-status.json");if(p.provider!=="API-Football Pro"||typeof p.requests!=="object"||typeof p.subscription!=="object"||JSON.stringify(p).includes("email")||JSON.stringify(p).includes("server-only-test-secret")){console.error("API-Football status response invalid or unsafe");process.exit(1)}console.log("API-Football subscription diagnostics OK:",p.subscription.plan,"active:",p.subscription.active,"per-minute remaining:",p.requests.perMinuteRemaining,"daily remaining:",p.requests.dailyRemaining)'
+            if [ "$API_FOOTBALL_ACCOUNT_STATUS" = "200" ]; then
+              node -e 'const p=require("/tmp/api-football-status.json");if(p.provider!=="API-Football Pro"||typeof p.requests!=="object"||typeof p.subscription!=="object"||JSON.stringify(p).includes("email")||JSON.stringify(p).includes("server-only-test-secret")){console.error("API-Football status response invalid or unsafe");process.exit(1)}console.log("API-Football subscription diagnostics OK:",p.subscription.plan,"active:",p.subscription.active,"per-minute remaining:",p.requests.perMinuteRemaining,"daily remaining:",p.requests.dailyRemaining)'
+            elif [ "$API_FOOTBALL_ACCOUNT_STATUS" = "429" ]; then
+              node -e 'const p=require("/tmp/api-football-status.json");if(p.error!=="api_football_rate_limited"){console.error("Unexpected API-Football status 429:",p);process.exit(1)}console.log("API-Football status temporarily rate-limited; safe diagnostics verified:",p.providerError ?? p.error)'
+            else
+              cat /tmp/api-football-status.json
+              echo "API-Football status endpoint returned unexpected HTTP $API_FOOTBALL_ACCOUNT_STATUS"
+              exit 1
+            fi
           fi
           API_FOOTBALL_STATUS="$(curl --silent --show-error -o /tmp/api-football.json -w "%{http_code}" "$BASE/api/api-football/fixtures/$TODAY")"
           if [ "$API_FOOTBALL_CONFIGURED" = "yes" ]; then

@@ -648,12 +648,12 @@ export default {
         const raw = await upstream.text();
         let payload: unknown;
         try { payload = JSON.parse(raw); } catch { return json({ error: "api_football_status_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
-        if (!upstream.ok) return json({ error: "api_football_status_http_" + upstream.status }, upstream.status, origin);
         const data = payload as { errors?: unknown; response?: { subscription?: { plan?: string; active?: boolean; end?: string }; requests?: { current?: number; limit_day?: number } } };
         const statusError = apiFootballErrorText(data.errors);
         if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(statusError) || upstream.status === 429) {
           return json({ provider: "API-Football Pro", error: "api_football_rate_limited", message: "Dostawca ograniczył liczbę zapytań; status planu i limitów nie jest obecnie dostępny.", providerError: safeApiFootballErrorDetails(data.errors), retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60 }, 429, origin);
         }
+        if (!upstream.ok) return json({ error: "api_football_status_http_" + upstream.status }, upstream.status, origin);
         const result = {
           provider: "API-Football Pro",
           checkedAt: new Date().toISOString(),
@@ -702,7 +702,6 @@ export default {
         const raw = await upstream.text();
         let payload: unknown;
         try { payload = JSON.parse(raw); } catch { return json({ error: "api_football_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
-        if (!upstream.ok) return json({ error: "api_football_upstream_http_" + upstream.status, upstreamStatus: upstream.status }, upstream.status, origin);
         const data = payload as { response?: unknown[]; errors?: unknown; results?: number; paging?: unknown };
         const errorText = apiFootballErrorText(data.errors);
         if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429) {
@@ -711,6 +710,7 @@ export default {
         if (apiFootballErrorText(data.errors).trim()) {
           return json({ error: "api_football_provider_error", details: data.errors }, 502, origin);
         }
+        if (!upstream.ok) return json({ error: "api_football_upstream_http_" + upstream.status, upstreamStatus: upstream.status }, upstream.status, origin);
         const response = json({
           provider: "API-Football Pro", date, timezone: "Europe/Brussels", generatedAt: new Date().toISOString(),
           results: data.results ?? data.response?.length ?? 0, paging: data.paging ?? null, errors: data.errors ?? null,

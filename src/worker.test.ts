@@ -536,6 +536,19 @@ describe("API-Football Pro secure status proxy", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+
+  it("normalizes an HTTP 429 from the status endpoint", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn() };
+    vi.stubGlobal("caches", { default: cache });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      errors: { rateLimit: "Too many requests per minute" }, response: {},
+    }), { status: 429 })));
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/status?fresh=1"), env, { waitUntil: vi.fn() });
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited" });
+    expect(cache.put).not.toHaveBeenCalled();
+  });
+
   it("does not call the provider when the secret is absent", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -630,6 +643,21 @@ describe("API-Football Pro daily feed and odds ID validation", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ provider: "API-Football Pro", results: 0, fixtures: [] });
     expect(cache.put).toHaveBeenCalledTimes(1);
+  });
+
+
+  it("normalizes an HTTP 429 from the daily fixtures endpoint", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn() };
+    vi.stubGlobal("caches", { default: cache });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      errors: { rateLimit: "Too many requests per minute" }, response: [], results: 0,
+    }), { status: 429 })));
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/fixtures/2026-11-19"), {
+      ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "private-api-football-key",
+    }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited" });
+    expect(cache.put).not.toHaveBeenCalled();
   });
 
   it("accepts a numeric API-Football fixture ID for the odds endpoint", async () => {
