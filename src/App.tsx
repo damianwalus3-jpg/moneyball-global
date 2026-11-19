@@ -16,6 +16,7 @@ import { auditOddsFixtureMatches } from "./odds-matching";
 import { brusselsDateToday, getSelectedFixturePredictions } from "./selected-matches";
 import { auditMarketCoverage } from "./market-coverage";
 import { buildBetSettlementRows } from "./bet-settlement";
+import { calculateBankroll, canReserveStake } from "./bankroll";
 import { listFreshOddsSnapshots, listOddsBookmakers, shouldAutoFetchDailyOdds } from "./odds-value";
 import { valueThreeLegCoupon } from "./coupon-value";
 import { buildBaselineEvidenceAudit, getEvidenceGaps, isEvidenceAuditComplete } from "./analysis-evidence";
@@ -706,6 +707,7 @@ export default function App() {
   }, []);
   const fileRef = useRef<HTMLInputElement>(null);
   const modelAudit = useMemo(() => auditTrackerPredictions(records), [records]);
+  const bankroll = useMemo(() => calculateBankroll(records), [records]);
   const predictionDiagnostics = useMemo(() => {
     const coverageDate = fixtureScan?.date ?? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
     const latestByFixtureMarketModel = new Map<string, TrackerRecord>();
@@ -763,6 +765,11 @@ export default function App() {
     }
     if (decision === "SELECTED" && (!Number.isFinite(stake) || stake <= 0)) {
       setNotice("Dla wybranego zakładu wpisz stawkę większą od zera.");
+      return;
+    }
+    if (decision === "SELECTED" && !canReserveStake(readRecords(), stake)) {
+      const balance = calculateBankroll(readRecords()).availableBalance;
+      setNotice(`Brak wystarczającego salda w wirtualnym bankrollu. Dostępne: €${balance.toFixed(2)}; wymagana stawka: €${stake.toFixed(2)}. Zmniejsz stawkę lub poczekaj na rozliczenie otwartych typów.`);
       return;
     }
     const prior = records.find(row => row.kind === "bet" && row.details.fixtureId === fixtureId && row.details.decision === decision);
@@ -842,6 +849,7 @@ export default function App() {
 
         {active === "bets" && <section className="module-panel bets-module">
           <div className="module-icon"><Ticket/></div><h2>Bilans wybranych zakładów</h2>
+          <div className="audit-metrics bet-metrics"><DetailMetric label="Saldo początkowe" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.openingBalance)} detail="Wirtualny bankroll startowy €91,60; można go nadpisać wpisem OPENING_BALANCE w lokalnym Trackerze."/><DetailMetric label="Saldo dostępne" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.availableBalance)} valueClass={bankroll.availableBalance >= 0 ? "profit-positive" : "profit-negative"} detail="Saldo początkowe + zysk/strata rozliczonych zakładów − stawki zarezerwowane w otwartych zakładach."/><DetailMetric label="Otwarte stawki" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.openExposure)} detail="Kwota zarezerwowana przez wybrane, nierozliczone zakłady. Nie jest liczona jako strata."/><DetailMetric label="Rozliczone P/L" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.settledProfitLoss)} detail="Suma rzeczywistego zysku/straty z rekordów rozliczeń; odrzucone typy nie zmieniają salda."/></div>
           <article className="panel">
             <div className="panel-heading"><div><h3>Automatyczne kursy · StrikerAPI</h3><p>Uruchomienie po skanie · maksymalnie 1 odczyt dziennie · 10 kredytów</p></div><ShieldCheck size={18}/></div>
             <div className="tracker-form">
