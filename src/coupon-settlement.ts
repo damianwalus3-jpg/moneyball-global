@@ -27,10 +27,19 @@ export function evaluatePaperCoupon(coupon: TrackerRecord, records: TrackerRecor
   } catch { return null; }
   if (new Set(legs.map(leg => leg.fixtureId)).size !== 3) return null;
   const resultMap = new Map<string, "1" | "X" | "2">();
-  for (const record of records) {
-    if (record.kind !== "result" || typeof record.details.fixtureId !== "string" || resultMap.has(record.details.fixtureId)) continue;
+  const orderedResults = records.filter(record => record.kind === "result" && typeof record.details.fixtureId === "string")
+    .map((record, index) => ({ record, index, time: Date.parse(record.createdAt) }))
+    .sort((a, b) => {
+      const aTime = Number.isFinite(a.time) ? a.time : Number.NEGATIVE_INFINITY;
+      const bTime = Number.isFinite(b.time) ? b.time : Number.NEGATIVE_INFINITY;
+      return bTime - aTime || a.index - b.index;
+    });
+  for (const item of orderedResults) {
+    const record = item.record;
+    const fixtureId = record.details.fixtureId as string;
+    if (resultMap.has(fixtureId)) continue;
     const actual = record.details.actual;
-    if (actual === "1" || actual === "X" || actual === "2") resultMap.set(record.details.fixtureId, actual);
+    if (actual === "1" || actual === "X" || actual === "2") resultMap.set(fixtureId, actual);
   }
   const legResults = legs.flatMap(leg => {
     const actual = resultMap.get(leg.fixtureId); if (!actual) return [];
