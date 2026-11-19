@@ -315,6 +315,71 @@ describe("odds provider pilot proxy", () => {
     expect(String(upstream.mock.calls[2][0])).toContain("/v4/markets?");
     expect(String(upstream.mock.calls[3][0])).toContain("/v4/odds-by-tournaments?");
     expect(String(upstream.mock.calls[3][0])).toContain("tournamentIds=77");
+    expect(String(upstream.mock.calls[3][0])).toContain("bookmaker=bwin.be");
+    expect(String(upstream.mock.calls[3][0])).not.toContain("bookmakers=");
+  });
+
+  it("batches OddsPapi odds requests by at most three tournaments and one primary bookmaker", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const account = { subscriptions: [{ is_active: true, request_limit: 250, request_count: 0,
+      bookmakers: { "bwin.be": {}, "unibet.be": {} } }] };
+    const local = Array.from({ length: 4 }, (_, index) => ({
+      id: "local-" + (index + 1), date: "2026-11-19", time: (18 + index) + ":00",
+      home: "Home Team " + (index + 1), away: "Away Team " + (index + 1),
+    }));
+    const fixtures = local.map((row, index) => ({
+      fixtureId: "op-" + (index + 1), tournamentId: 101 + index,
+      startTime: "2026-11-19T" + String(17 + index).padStart(2, "0") + ":00:00.000Z",
+      participant1Name: row.home, participant2Name: row.away, hasOdds: true,
+      updatedAt: "2026-11-19T09:00:00.000Z",
+    }));
+    const makeOdds = (index: number) => ({
+      fixtureId: "op-" + (index + 1),
+      bookmakerOdds: { "bwin.be": {
+        bookmakerIsActive: true, suspended: false,
+        markets: { "101": { marketActive: true, outcomes: {
+          "101": { players: { "0": { active: true, price: 2.1, changedAt: "2026-11-19T10:00:00.000Z" } } },
+          "102": { players: { "0": { active: true, price: 3.2, changedAt: "2026-11-19T10:00:00.000Z" } } },
+          "103": { players: { "0": { active: true, price: 3.5, changedAt: "2026-11-19T10:00:00.000Z" } } },
+        } } },
+      } },
+    });
+    const upstream = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(account), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(fixtures), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([makeOdds(0), makeOdds(1), makeOdds(2)]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify([makeOdds(3)]), { status: 200 }));
+    vi.stubGlobal("fetch", upstream);
+    const token = "pilot-secret-0123456789-abcdef-extra";
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/oddspapi/daily", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ date: "2026-11-19", slot: "morning", fixtures: local }),
+    }), { ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "provider-secret", ODDS_PILOT_TOKEN: token }, { waitUntil: vi.fn() });
+    const body = await response.json() as {
+      status?: string; error?: string; estimatedRequestsUsed?: number; oddsRequestBatches?: number;
+      bookmakers?: string[]; tournamentIds?: number[]; queriedTournamentIds?: number[];
+      quotes?: Array<{ fixtureId: string; bookmakerSlug: string; market: string }>;
+    };
+    expect(response.status, JSON.stringify(body)).toBe(200);
+    expect(body).toMatchObject({
+      status: "ok", estimatedRequestsUsed: 3, oddsRequestBatches: 2,
+      bookmakers: ["bwin.be"], tournamentIds: [101, 102, 103, 104],
+      queriedTournamentIds: [101, 102, 103, 104],
+    });
+    expect(body.quotes).toHaveLength(4);
+    expect(body.quotes?.every(row => row.bookmakerSlug === "bwin.be" && row.market === "1X2")).toBe(true);
+    expect(upstream).toHaveBeenCalledTimes(4);
+    const firstOddsUrl = new URL(String(upstream.mock.calls[2][0]));
+    const secondOddsUrl = new URL(String(upstream.mock.calls[3][0]));
+    expect(firstOddsUrl.searchParams.get("tournamentIds")).toBe("101,102,103");
+    expect(secondOddsUrl.searchParams.get("tournamentIds")).toBe("104");
+    for (const url of [firstOddsUrl, secondOddsUrl]) {
+      expect(url.searchParams.get("bookmaker")).toBe("bwin.be");
+      expect(url.searchParams.has("bookmakers")).toBe(false);
+      expect((url.searchParams.get("tournamentIds") ?? "").split(",").length).toBeLessThanOrEqual(3);
+    }
   });
 
   it("does not spend a billable market-catalogue request without separate opt-in", async () => {
