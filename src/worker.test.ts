@@ -778,4 +778,33 @@ describe("API-Football Pro daily feed and odds ID validation", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0].toString()).toContain("/odds?fixture=123");
   });
+  it("validates the OddsPapi daily sync date and slot before any billable provider calls", async () => {
+    const token = "test-pilot-token-0123456789-abcdef";
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const env = {
+      ASSETS: { fetch: vi.fn() },
+      ODDSPAPI_API_KEY: "private-oddspapi-key",
+      ODDS_PILOT_TOKEN: token,
+    };
+    const call = (payload: unknown) => worker.fetch(new Request("https://moneyball.example/api/odds/oddspapi/daily", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }), env, { waitUntil: vi.fn() });
+
+    const invalidDate = await call({ date: "2026-13-19", slot: "morning", fixtures: [] });
+    expect(invalidDate.status).toBe(400);
+    await expect(invalidDate.json()).resolves.toMatchObject({ error: "invalid_date" });
+
+    const invalidSlot = await call({ date: "2026-11-19", slot: "evening", fixtures: [] });
+    expect(invalidSlot.status).toBe(400);
+    await expect(invalidSlot.json()).resolves.toMatchObject({ error: "invalid_odds_sync_slot" });
+
+    const validWindow = await call({ date: "2026-11-19", slot: "morning", fixtures: [] });
+    expect(validWindow.status).toBe(400);
+    await expect(validWindow.json()).resolves.toMatchObject({ error: "fixtures_required" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
 });

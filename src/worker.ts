@@ -431,7 +431,8 @@ export default {
       catch { return json({ error: "invalid_json" }, 400, origin); }
       const date = typeof input.date === "string" ? input.date : "";
       const slot = input.slot === "morning" || input.slot === "afternoon" ? input.slot : "";
-      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return json({ error: "invalid_date" }, 400, origin);
+      const parsedDate = new Date(`${date}T00:00:00.000Z`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) return json({ error: "invalid_date" }, 400, origin);
       if (!slot) return json({ error: "invalid_odds_sync_slot" }, 400, origin);
       const localFixtures = Array.isArray(input.fixtures) ? input.fixtures : [];
       if (!localFixtures.length || localFixtures.length > 250) return json({ error: "fixtures_required", message: "Provide 1–250 scanned fixtures." }, 400, origin);
