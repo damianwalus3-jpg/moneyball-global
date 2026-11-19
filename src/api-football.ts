@@ -23,6 +23,41 @@ export interface ApiFootballFixtureEnrichment {
   statistics?: Array<{ team?: ApiFootballTeamRef; statistics?: Array<{ type?: string; value?: string | number | null }> }>;
   players?: Array<{ team?: ApiFootballTeamRef; players?: Array<Record<string, unknown>> }>;
 }
+
+export interface ApiFootballVerifiedResult {
+  actual: "1" | "X" | "2";
+  homeGoals: number;
+  awayGoals: number;
+  date: string;
+  source: "API-Football Pro";
+}
+
+/** Accept only a provider-confirmed final score for the expected Brussels-local fixture date. */
+export function parseApiFootballFinalResult(
+  fixture: ApiFootballFixtureEnrichment,
+  expectedDate: string,
+): ApiFootballVerifiedResult | null {
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(expectedDate)) return null;
+  const status = String(fixture.fixture?.status?.short ?? "").toUpperCase();
+  if (!["FT", "AET", "PEN", "AWD", "WO"].includes(status)) return null;
+  const kickoff = fixture.fixture?.date;
+  if (typeof kickoff !== "string" || !Number.isFinite(Date.parse(kickoff))) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(new Date(kickoff));
+  const dateParts = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  const brusselsDate = [dateParts.year, dateParts.month, dateParts.day].join("-");
+  if (brusselsDate !== expectedDate) return null;
+  const homeGoals = fixture.goals?.home, awayGoals = fixture.goals?.away;
+  if (!Number.isInteger(homeGoals) || !Number.isInteger(awayGoals)
+    || (homeGoals as number) < 0 || (awayGoals as number) < 0) return null;
+  return {
+    actual: (homeGoals as number) > (awayGoals as number) ? "1" : homeGoals === awayGoals ? "X" : "2",
+    homeGoals: homeGoals as number, awayGoals: awayGoals as number,
+    date: expectedDate, source: "API-Football Pro",
+  };
+}
+
 export interface ApiFootballInjury {
   fixture?: { id?: number; date?: string };
   team?: ApiFootballTeamRef;
