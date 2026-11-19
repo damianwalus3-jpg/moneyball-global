@@ -766,6 +766,7 @@ export default function App() {
           const oddspapiPayload = await oddspapiResponse.json() as {
             status?: string; error?: string; message?: string; matched?: number; unmatched?: number; ambiguous?: number;
             marketCatalogStatus?: string; marketTypes?: string[]; estimatedRequestsUsed?: number;
+            oddsRequestBatches?: number; slotRequestBudget?: number; skippedTournamentIds?: number[];
             quotes?: Array<{
               fixtureId: string; providerFixtureId: string; market: "1X2" | "DOUBLE_CHANCE";
               bookmaker: string; bookmakerSlug: string;
@@ -823,7 +824,7 @@ export default function App() {
             });
             const addedOddsPapi = addRecordsIfMissing(oddspapiSnapshots, "snapshotKey");
             oddspapiAudit = { ...oddspapiAudit, snapshots: addedOddsPapi };
-            oddspapiSummary = `OddsPapi: dopasowano ${oddspapiPayload.matched ?? 0}, snapshoty ${addedOddsPapi}, rynki ${(oddspapiPayload.marketTypes ?? ["1X2"]).join("/")}, katalog ${oddspapiPayload.marketCatalogStatus ?? "nieznany"}, niejednoznaczne ${oddspapiPayload.ambiguous ?? 0}, zapytania ${oddspapiPayload.estimatedRequestsUsed ?? "—"}.`;
+            oddspapiSummary = `OddsPapi: dopasowano ${oddspapiPayload.matched ?? 0}, snapshoty ${addedOddsPapi}, rynki ${(oddspapiPayload.marketTypes ?? ["1X2"]).join("/")}, katalog ${oddspapiPayload.marketCatalogStatus ?? "nieznany"}, niejednoznaczne ${oddspapiPayload.ambiguous ?? 0}, zapytania ${oddspapiPayload.estimatedRequestsUsed ?? "—"}/${oddspapiPayload.slotRequestBudget ?? "—"}, pominięte rozgrywki z limitu ${oddspapiPayload.skippedTournamentIds?.length ?? 0}.`;
             setRecords(readRecords());
           } else {
             oddspapiSummary = `OddsPapi: ${oddspapiPayload.message || oddspapiPayload.status || "brak kwotowań"}.`;
