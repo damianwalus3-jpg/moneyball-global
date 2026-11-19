@@ -537,16 +537,18 @@ describe("API-Football Pro secure status proxy", () => {
   });
 
 
-  it("normalizes an HTTP 429 from the status endpoint", async () => {
-    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn() };
+  it("normalizes and caches an HTTP 429 provider cooldown from the status endpoint", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       errors: { rateLimit: "Too many requests per minute" }, response: {},
-    }), { status: 429 })));
+    }), { status: 429, headers: { "Retry-After": "17" } })));
     const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/status?fresh=1"), env, { waitUntil: vi.fn() });
     expect(response.status).toBe(429);
-    await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited" });
-    expect(cache.put).not.toHaveBeenCalled();
+    expect(response.headers.get("Retry-After")).toBe("17");
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=17");
+    await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited", retryAfterSeconds: 17 });
+    expect(cache.put).toHaveBeenCalledTimes(1);
   });
 
   it("does not call the provider when the secret is absent", async () => {
@@ -586,14 +588,24 @@ describe("API-Football Pro batch enrichment", () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
-  it("surfaces provider rate limiting as HTTP 429 and never caches it", async () => {
-    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn() };
+  it("surfaces provider rate limiting as HTTP 429 and caches a shared cooldown", async () => {
+    const entries = new Map<string, Response>();
+    const cache = {
+      match: vi.fn(async (key: Request) => entries.get(key.url)?.clone()),
+      put: vi.fn(async (key: Request, response: Response) => { entries.set(key.url, response.clone()); }),
+    };
     vi.stubGlobal("caches", { default: cache });
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ errors: { rateLimit: "Too many requests. Exceeded requests per minute." }, response: [] }), { status: 200 })));
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({ errors: { rateLimit: "Too many requests. Exceeded requests per minute." }, response: [] }), { status: 200 }));
+    vi.stubGlobal("fetch", upstream);
     const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/enrichment?ids=123"), env, { waitUntil: vi.fn() });
     expect(response.status).toBe(429);
     await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited", retryAfterSeconds: 60 });
-    expect(cache.put).not.toHaveBeenCalled();
+    expect(cache.put).toHaveBeenCalledTimes(1);
+
+    const secondEndpoint = await worker.fetch(new Request("https://moneyball.example/api/api-football/fixtures/2026-11-19"), env, { waitUntil: vi.fn() });
+    expect(secondEndpoint.status).toBe(429);
+    await expect(secondEndpoint.json()).resolves.toMatchObject({ error: "api_football_rate_limited", retryAfterSeconds: 60 });
+    expect(upstream).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -616,8 +628,8 @@ describe("API-Football Pro injury batch", () => {
 
 
 describe("API-Football Pro daily feed and odds ID validation", () => {
-  it("does not cache a rate-limited daily fixture feed", async () => {
-    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn() };
+  it("caches a rate-limited daily fixture feed as a shared provider cooldown", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       errors: { rateLimit: "Too many requests. Exceeded requests per minute." }, response: [],
@@ -627,7 +639,7 @@ describe("API-Football Pro daily feed and odds ID validation", () => {
     }, { waitUntil: vi.fn() });
     expect(response.status).toBe(429);
     await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited" });
-    expect(cache.put).not.toHaveBeenCalled();
+    expect(cache.put).toHaveBeenCalledTimes(1);
   });
 
 
@@ -646,18 +658,19 @@ describe("API-Football Pro daily feed and odds ID validation", () => {
   });
 
 
-  it("normalizes an HTTP 429 from the daily fixtures endpoint", async () => {
-    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn() };
+  it("normalizes and caches an HTTP 429 from the daily fixtures endpoint", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       errors: { rateLimit: "Too many requests per minute" }, response: [], results: 0,
-    }), { status: 429 })));
+    }), { status: 429, headers: { "Retry-After": "12" } })));
     const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/fixtures/2026-11-19"), {
       ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "private-api-football-key",
     }, { waitUntil: vi.fn() });
     expect(response.status).toBe(429);
-    await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited" });
-    expect(cache.put).not.toHaveBeenCalled();
+    expect(response.headers.get("Retry-After")).toBe("12");
+    await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited", retryAfterSeconds: 12 });
+    expect(cache.put).toHaveBeenCalledTimes(1);
   });
 
   it("accepts a numeric API-Football fixture ID for the odds endpoint", async () => {
