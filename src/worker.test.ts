@@ -533,7 +533,7 @@ describe("API-Football Pro secure status proxy", () => {
     const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/status?fresh=1"), env, { waitUntil: vi.fn() });
     expect(response.status).toBe(200);
     expect(cache.match).toHaveBeenCalledTimes(1);
-    expect(String(cache.match.mock.calls[0][0])).toContain("/api/api-football/_provider-cooldown");
+    expect(cache.match.mock.calls[0][0].url).toContain("/api/api-football/_provider-cooldown");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
