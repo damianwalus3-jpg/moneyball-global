@@ -12,14 +12,24 @@ export interface OddsPapiBookmaker {
   bookmakerName: string;
   slug: string;
 }
+export interface OddsPapiMarketDefinition {
+  marketId: string;
+  marketType: "1X2" | "DOUBLE_CHANCE";
+  outcomeIds: Record<string, string>;
+}
 export interface OddsPapiQuote {
   providerFixtureId: string;
+  market: "1X2" | "DOUBLE_CHANCE";
   bookmaker: string;
   bookmakerSlug: string;
   odds1: number | null;
   oddsX: number | null;
   odds2: number | null;
+  odds1x: number | null;
+  oddsX2: number | null;
+  odds12: number | null;
   complete1X2: boolean;
+  completeDoubleChance: boolean;
   capturedAt: string | null;
   timestampBasis: "price_changed_at" | "fixture_updated_at" | "missing";
   bookmakerIsActive: boolean;
@@ -38,6 +48,9 @@ const TARGET_BOOKMAKER_SLUGS = new Set([
   "betcenter.be", "scooore.be", "starcasino.be", "napoleonsports.be",
   "bwin", "bwin.de", "bet365", "unibet", "ladbrokes", "betway", "pinnacle",
 ]);
+export const DEFAULT_ODDS_PAPI_MARKETS: OddsPapiMarketDefinition[] = [{
+  marketId: "101", marketType: "1X2", outcomeIds: { "1": "101", X: "102", "2": "103" },
+}];
 
 export function brusselsUtcDayWindow(date: string): { from: string; to: string } {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("invalid_brussels_date");
@@ -89,6 +102,53 @@ export function matchOddsPapiFixtures(
   };
 }
 
+function normalizeOutcome(value: unknown): string {
+  return typeof value === "string" ? value.toLowerCase().replace(/[^a-z0-9]/g, "") : "";
+}
+function findOutcomeId(outcomes: unknown[], aliases: string[]): string | null {
+  const accepted = new Set(aliases.map(normalizeOutcome));
+  for (const raw of outcomes) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as Record<string, unknown>;
+    if (accepted.has(normalizeOutcome(row.outcomeName)) && (typeof row.outcomeId === "string" || typeof row.outcomeId === "number")) {
+      return String(row.outcomeId);
+    }
+  }
+  return null;
+}
+/** Discover full-time 1X2 and Double Chance market/outcome IDs from the provider catalogue. */
+export function discoverOddsPapiMarkets(payload: unknown): OddsPapiMarketDefinition[] {
+  if (!Array.isArray(payload)) return [];
+  const found: OddsPapiMarketDefinition[] = [];
+  for (const raw of payload) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as Record<string, unknown>;
+    if (row.sportId !== 10 || row.playerProp === true || String(row.period ?? "").toLowerCase() !== "fulltime") continue;
+    if (!Array.isArray(row.outcomes) || typeof row.marketId !== "number" && typeof row.marketId !== "string") continue;
+    const type = String(row.marketType ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const name = String(row.marketName ?? "").toLowerCase();
+    const outcomes = row.outcomes as unknown[];
+    if (type === "1x2" || name.includes("full time result")) {
+      const ids = {
+        "1": findOutcomeId(outcomes, ["1", "home"]),
+        X: findOutcomeId(outcomes, ["x", "draw"]),
+        "2": findOutcomeId(outcomes, ["2", "away"]),
+      };
+      if (ids["1"] && ids.X && ids["2"]) found.push({ marketId: String(row.marketId), marketType: "1X2", outcomeIds: ids as Record<string, string> });
+    }
+    if (type.includes("doublechance") || name.includes("double chance")) {
+      const ids = {
+        "1X": findOutcomeId(outcomes, ["1x", "1 or x", "home or draw", "home/draw"]),
+        X2: findOutcomeId(outcomes, ["x2", "x or 2", "draw or away", "draw/away"]),
+        "12": findOutcomeId(outcomes, ["12", "1 or 2", "home or away", "home/away"]),
+      };
+      if (ids["1X"] && ids.X2 && ids["12"]) found.push({ marketId: String(row.marketId), marketType: "DOUBLE_CHANCE", outcomeIds: ids as Record<string, string> });
+    }
+  }
+  const first = (type: OddsPapiMarketDefinition["marketType"]) => found.find(row => row.marketType === type);
+  return [first("1X2"), first("DOUBLE_CHANCE")].filter((row): row is OddsPapiMarketDefinition => !!row);
+}
+
 function validPrice(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) && value > 1 && value <= 1000 ? value : null;
 }
@@ -97,10 +157,11 @@ function validTimestamp(value: unknown): string | null {
   return value;
 }
 
-/** Parse only active, unsuspended full-time 1X2 market 101 (1/X/2). */
+/** Parse only active, unsuspended full-time 1X2 and Double Chance prices discovered in the market catalogue. */
 export function parseOddsPapiQuotes(
   oddsPayload: unknown,
   bookmakerNames: Record<string, string>,
+  marketDefinitions: OddsPapiMarketDefinition[] = DEFAULT_ODDS_PAPI_MARKETS,
 ): OddsPapiQuote[] {
   const events = Array.isArray(oddsPayload) ? oddsPayload
     : oddsPayload && typeof oddsPayload === "object" && Array.isArray((oddsPayload as { fixtures?: unknown }).fixtures)
@@ -118,45 +179,56 @@ export function parseOddsPapiQuotes(
       if (!rawBook || typeof rawBook !== "object") continue;
       const book = rawBook as Record<string, unknown>;
       const markets = book.markets && typeof book.markets === "object" ? book.markets as Record<string, unknown> : {};
-      const marketRaw = markets["101"];
-      const market = marketRaw && typeof marketRaw === "object" ? marketRaw as Record<string, unknown> : {};
-      const outcomes = market.outcomes && typeof market.outcomes === "object" ? market.outcomes as Record<string, unknown> : {};
-      const readOutcome = (id: string): { price: number | null; timestamp: string | null } => {
-        const rawOutcome = outcomes[id];
-        if (!rawOutcome || typeof rawOutcome !== "object") return { price: null, timestamp: null };
-        const players = (rawOutcome as Record<string, unknown>).players;
-        if (!players || typeof players !== "object") return { price: null, timestamp: null };
-        const player = (players as Record<string, unknown>)["0"];
-        if (!player || typeof player !== "object") return { price: null, timestamp: null };
-        const item = player as Record<string, unknown>;
-        return {
-          price: item.active === true ? validPrice(item.price) : null,
-          timestamp: validTimestamp(item.bookmakerChangedAt) ?? validTimestamp(item.changedAt),
-        };
-      };
-      const one = readOutcome("101"), draw = readOutcome("102"), two = readOutcome("103");
       const bookmakerIsActive = book.bookmakerIsActive === true;
       const suspended = book.suspended === true;
-      const marketActive = market.marketActive === true;
-      const complete1X2 = bookmakerIsActive && !suspended && marketActive
-        && one.price !== null && draw.price !== null && two.price !== null;
-      const priceTimes = [one.timestamp, draw.timestamp, two.timestamp];
-      const allPriceTimesPresent = priceTimes.every((value): value is string => !!value);
-      // Use the oldest price timestamp so a single stale selection makes the whole 1X2 snapshot stale.
-      const capturedAt = allPriceTimesPresent
-        ? priceTimes.sort((a, b) => Date.parse(a) - Date.parse(b))[0]
-        : validTimestamp(event.updatedAt);
-      quotes.push({
-        providerFixtureId,
-        bookmaker: bookmakerNames[slug] ?? slug,
-        bookmakerSlug: slug,
-        odds1: one.price, oddsX: draw.price, odds2: two.price,
-        complete1X2,
-        capturedAt: capturedAt ?? null,
-        timestampBasis: allPriceTimesPresent ? "price_changed_at" : capturedAt ? "fixture_updated_at" : "missing",
-        bookmakerIsActive, suspended, marketActive,
-        fixturePath: typeof book.fixturePath === "string" ? book.fixturePath : null,
-      });
+      for (const definition of marketDefinitions) {
+        const marketRaw = markets[definition.marketId];
+        if (!marketRaw || typeof marketRaw !== "object") continue;
+        const market = marketRaw as Record<string, unknown>;
+        const outcomes = market.outcomes && typeof market.outcomes === "object" ? market.outcomes as Record<string, unknown> : {};
+        const readOutcome = (key: string): { price: number | null; timestamp: string | null } => {
+          const rawOutcome = outcomes[definition.outcomeIds[key]];
+          if (!rawOutcome || typeof rawOutcome !== "object") return { price: null, timestamp: null };
+          const players = (rawOutcome as Record<string, unknown>).players;
+          if (!players || typeof players !== "object") return { price: null, timestamp: null };
+          const player = (players as Record<string, unknown>)["0"];
+          if (!player || typeof player !== "object") return { price: null, timestamp: null };
+          const item = player as Record<string, unknown>;
+          return {
+            price: item.active === true ? validPrice(item.price) : null,
+            timestamp: validTimestamp(item.bookmakerChangedAt) ?? validTimestamp(item.changedAt),
+          };
+        };
+        const keys = definition.marketType === "1X2" ? ["1", "X", "2"] : ["1X", "X2", "12"];
+        const values = keys.map(readOutcome);
+        const bookmakerMarketActive = market.marketActive === true;
+        const complete = bookmakerIsActive && !suspended && bookmakerMarketActive
+          && values.every(item => item.price !== null);
+        const priceTimes = values.map(item => item.timestamp);
+        const allPriceTimesPresent = priceTimes.every((value): value is string => !!value);
+        // Use the oldest timestamp so one stale selection makes the entire market snapshot stale.
+        const capturedAt = allPriceTimesPresent
+          ? priceTimes.sort((a, b) => Date.parse(a) - Date.parse(b))[0]
+          : validTimestamp(event.updatedAt);
+        const common = {
+          providerFixtureId, bookmaker: bookmakerNames[slug] ?? slug, bookmakerSlug: slug,
+          complete1X2: definition.marketType === "1X2" && complete,
+          completeDoubleChance: definition.marketType === "DOUBLE_CHANCE" && complete,
+          capturedAt: capturedAt ?? null,
+          timestampBasis: allPriceTimesPresent ? "price_changed_at" as const : capturedAt ? "fixture_updated_at" as const : "missing" as const,
+          bookmakerIsActive, suspended, marketActive: bookmakerMarketActive,
+          fixturePath: typeof book.fixturePath === "string" ? book.fixturePath : null,
+        };
+        quotes.push(definition.marketType === "1X2" ? {
+          ...common, market: "1X2",
+          odds1: values[0].price, oddsX: values[1].price, odds2: values[2].price,
+          odds1x: null, oddsX2: null, odds12: null,
+        } : {
+          ...common, market: "DOUBLE_CHANCE",
+          odds1: null, oddsX: null, odds2: null,
+          odds1x: values[0].price, oddsX2: values[1].price, odds12: values[2].price,
+        });
+      }
     }
   }
   return quotes;
