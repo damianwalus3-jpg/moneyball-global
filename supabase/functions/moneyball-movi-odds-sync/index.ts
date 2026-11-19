@@ -110,6 +110,7 @@ async function syncApiFootballOdds(day:string,matches:any[]){
  }
  const allowed=["bwin","unibet","ladbrokes","circus","betfirst"];
  const captured=new Date().toISOString(),rows:any[]=[];
+ const bookmakersSeen=new Set<string>();
  let oddsChecked=0,oddsErrors=0;
  for(const pair of matched){
   const {match,fixture}=pair;
@@ -119,6 +120,7 @@ async function syncApiFootballOdds(day:string,matches:any[]){
   for(const oddsFixture of oddsPayload.response||[]){
    for(const bookmaker of oddsFixture.bookmakers||[]){
     const bookmakerName=String(bookmaker.name||""),bookmakerKey=norm(bookmakerName);
+    if(bookmakerName)bookmakersSeen.add(bookmakerName);
     if(!allowed.some(name=>bookmakerKey.includes(name)))continue;
     for(const bet of bookmaker.bets||[]){
      for(const value of bet.values||[]){
@@ -143,7 +145,7 @@ async function syncApiFootballOdds(day:string,matches:any[]){
  for(let i=0;i<rows.length;i+=250){
   await db("provider_odds?on_conflict=provider,provider_fixture_id,market_group_id,market_id,selection_id","POST",rows.slice(i,i+250),"resolution=merge-duplicates,return=minimal");
  }
- return {ok:true,provider:"API-Football",date:day,fixture_requests:1,fixtures_found:fixtures.length,app_matches:matches.length,matched_fixtures:matched.length,odds_requests:oddsChecked,odds_errors:oddsErrors,approved_bookmakers:allowed,quotes_saved:rows.length,unmatched_matches:matches.filter(m=>!matched.some(x=>x.match.id===m.id)).map(m=>({home:m.home_team,away:m.away_team,kickoff:m.kickoff_at})),note:rows.length?"Only real API-Football prices from approved Belgian bookmakers were stored.":"No approved Belgian bookmaker quotes were available; no synthetic odds were created."};
+ return {ok:true,provider:"API-Football",date:day,fixture_requests:1,fixtures_found:fixtures.length,app_matches:matches.length,matched_fixtures:matched.length,odds_requests:oddsChecked,odds_errors:oddsErrors,approved_bookmakers:allowed,bookmakers_seen:[...bookmakersSeen].sort(),quotes_saved:rows.length,unmatched_matches:matches.filter(m=>!matched.some(x=>x.match.id===m.id)).map(m=>({home:m.home_team,away:m.away_team,kickoff:m.kickoff_at})),note:rows.length?"Only real API-Football prices from approved Belgian bookmakers were stored.":"No approved Belgian bookmaker quotes were available; no synthetic odds were created."};
 }
 Deno.serve(async(req)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
