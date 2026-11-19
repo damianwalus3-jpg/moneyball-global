@@ -93,3 +93,15 @@
 .selected-market small{display:block;overflow-wrap:anywhere}
 .selected-market-missing{border:1px dashed var(--line);border-radius:9px;padding:12px;color:var(--muted);font-size:10px}
 @media(max-width:650px){.selected-markets{grid-template-columns:1fr}.selected-fixture-title b{font-size:13px}}
+
+
+/* Tracker settlement audit: high-contrast, compact and visible on mobile. */
+.tracker-audit-panel{margin:16px 0;padding:15px;border:1px solid #315347;border-radius:12px;background:linear-gradient(135deg,rgba(23,53,46,.42),rgba(17,26,41,.94));}
+.tracker-audit-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.tracker-audit-heading h3{margin:0;color:#dce8f2;font-size:13px;}
+.tracker-audit-heading p{margin:5px 0 0;color:#91a2b6;font-size:10px;}
+.tracker-audit-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:13px;}
+.tracker-audit-grid>div{min-width:0;padding:9px;border:1px solid #2a394f;border-radius:8px;background:#0b1422;}
+.tracker-audit-grid small{display:block;color:#91a2b6;font-size:9px;line-height:1.35;}
+.tracker-audit-grid b{display:block;margin-top:5px;color:#8ce6bf;font:700 19px 'DM Mono';}
+@media(max-width:520px){.tracker-audit-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.tracker-audit-heading .settle-button{width:100%;}}
