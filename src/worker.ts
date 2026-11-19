@@ -499,7 +499,7 @@ export default {
         if (!matchAudit.matched.length) {
           const empty = json({
             status: "ok", provider: "OddsPapi", date, slot, requestLimit, requestCount, remainingBefore: remaining,
-            sourceFixtures: validProviderFixtures.length, matched: 0, unmatched: matchAudit.unmatchedFixtureIds.length,
+            estimatedRequestsUsed: 1, sourceFixtures: validProviderFixtures.length, matched: 0, unmatched: matchAudit.unmatchedFixtureIds.length,
             ambiguous: matchAudit.ambiguousFixtureIds.length, quotes: [],
             message: "Brak jednoznacznych dopasowań kursów. Żaden mecz ani prognoza nie został odrzucony.",
           }, 200, origin);
@@ -509,6 +509,7 @@ export default {
         }
         let marketDefinitions = DEFAULT_ODDS_PAPI_MARKETS;
         let marketCatalogStatus = "default_1x2_only";
+        let marketCatalogRequestUsed = false;
         const cachedMarketCatalog = await cache.match(ODDSPAPI_MARKETS_CACHE_KEY);
         if (cachedMarketCatalog) {
           try {
@@ -519,6 +520,7 @@ export default {
             }
           } catch { /* malformed cache falls back to documented 1X2 market */ }
         } else if (remaining >= 3) {
+          marketCatalogRequestUsed = true;
           // Market catalogue is billed once per seven-day cache window. If quota is tight,
           // preserve the 1X2 fetch and defer direct Double Chance discovery.
           try {
@@ -569,7 +571,7 @@ export default {
           }).filter((row): row is NonNullable<typeof row> => row !== null);
         const result = {
           status: "ok", provider: "OddsPapi", date, requestLimit, requestCount,
-          remainingBefore: remaining, estimatedRequestsUsed: 2 + (marketCatalogStatus.startsWith("cached") ? 1 : 0), bookmakers, marketCatalogStatus,
+          remainingBefore: remaining, estimatedRequestsUsed: 2 + (marketCatalogRequestUsed ? 1 : 0), bookmakers, marketCatalogStatus,
           marketTypes: marketDefinitions.map(row => row.marketType),
           sourceFixtures: validProviderFixtures.length, matched: matchAudit.matched.length,
           unmatched: matchAudit.unmatchedFixtureIds.length, ambiguous: matchAudit.ambiguousFixtureIds.length,
