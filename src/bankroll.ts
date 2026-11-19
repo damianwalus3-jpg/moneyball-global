@@ -11,6 +11,9 @@ export interface BankrollSnapshot {
   selectedBets: number;
   settledBets: number;
   openBets: number;
+  selectedCoupons: number;
+  settledCoupons: number;
+  openCoupons: number;
 }
 
 function validAmount(value: unknown): value is number {
@@ -40,10 +43,22 @@ export function calculateBankroll(
     }
   }
 
+  const couponSettlements = new Map<string, TrackerRecord>();
+  for (const row of records) {
+    if (row.kind === "coupon" && typeof row.details.parentCouponId === "string"
+      && ["PAPER_HIT", "PAPER_MISS"].includes(row.status)) {
+      const parent = String(row.details.parentCouponId);
+      const previous = couponSettlements.get(parent);
+      if (!previous || Date.parse(row.createdAt) > Date.parse(previous.createdAt)) couponSettlements.set(parent, row);
+    }
+  }
+
   let settledProfitLoss = 0;
   let openExposure = 0;
   let settledBets = 0;
   let openBets = 0;
+  let settledCoupons = 0;
+  let openCoupons = 0;
   for (const bet of bets) {
     const settlement = settlements.get(bet.id);
     if (settlement) {
@@ -57,6 +72,20 @@ export function calculateBankroll(
     }
   }
 
+  for (const settlement of couponSettlements.values()) {
+    const pnl = settlement.details.profitLoss;
+    if (typeof pnl === "number" && Number.isFinite(pnl)) settledProfitLoss += pnl;
+    settledCoupons++;
+  }
+  const coupons = records.filter(row => row.kind === "coupon" && row.status === "PAPER_WITH_ODDS"
+    && typeof row.details.parentCouponId !== "string");
+  for (const coupon of coupons) {
+    if (couponSettlements.has(coupon.id)) continue;
+    openCoupons++;
+    const stake = coupon.details.stake;
+    if (typeof stake === "number" && Number.isFinite(stake) && stake > 0) openExposure += stake;
+  }
+
   return {
     openingBalance,
     settledProfitLoss,
@@ -65,6 +94,9 @@ export function calculateBankroll(
     selectedBets: bets.length,
     settledBets,
     openBets,
+    selectedCoupons: coupons.length,
+    settledCoupons,
+    openCoupons,
   };
 }
 
