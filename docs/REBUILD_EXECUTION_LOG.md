@@ -1973,3 +1973,21 @@
 ## 2026-11-19 — Stage 165: production OddsPapi health smoke test
 - Added a deployment smoke check for `/api/odds/status`. It verifies that the OddsPapi provider and owner-only pilot gate are configured, then logs only sanitized account quota status when the unmetered account endpoint is available.
 - The check makes no billable OddsPapi request and never logs API keys or pilot tokens. Temporary account-status unavailability is a warning, not a false application-deployment failure.
+
+
+
+## 2026-11-19 — Stage 166: automatic API-Football Pro odds import (no pilot token required)
+- Added a server-side `GET /api/api-football/odds` batch route using the existing `API_FOOTBALL_KEY` Worker secret. It accepts only the current Europe/Brussels date and 1–20 numeric API-Football fixture IDs; keys are never returned to the browser.
+- Each fixture's odds response is cached for three hours, matching API-Football's published pre-match odds update cycle. The batch response is cached for the same period; provider rate limits use the existing shared cooldown and are surfaced safely.
+- The app now automatically requests odds for scanned fixtures with an API-Football fixture ID in its morning/afternoon local sync slots, without requiring `ODDS_PILOT_TOKEN`. It imports bookmaker-specific 1X2 and Double Chance markets from the provider's actual `Match Winner` and `Double Chance` bets, preserving the provider's update timestamp and refusing to invent missing prices.
+- API-Football snapshots use a three-hour freshness window; other odds providers retain their stricter freshness policy. The UI distinguishes automatic API-Football odds from optional owner-token-protected OddsPapi/StrikerAPI extras.
+- Controlled live production test: French Ligue 3 fixture Amiens–Caen, API-Football fixture ID `1574786`, date 2026-11-19. The new endpoint returned one real odds fixture, no provider errors, a provider update timestamp of `2026-11-19T06:00:16Z`, and 10 bookmakers. The payload included both Match Winner (1X2) and Double Chance markets, including Bet365, William Hill and Marathonbet. Exactly one API-Football odds request was used; the result is cached for three hours.
+- Added parser tests for complete and partial 1X2/DC outcomes, provider timestamps, client pacing, Worker validation, 20-ID limits, caching, secret non-disclosure and shared 429 cooldown. Added a production smoke test that verifies the new route's invalid-ID guard without making a provider request.
+- The API-Football Pro odds path is now independent of the optional OddsPapi pilot token. OddsPapi remains configured as a supplementary source, with its owner token gate intact and its monthly 250-request allowance protected by the daily slot budget.
+- Physical Android acceptance is still separate from CI and live Worker verification; the app's browser-local Tracker and odds import must be checked on the user's device after the next app load.
+
+
+## 2026-11-19 — Stage 167: API-Football odds provider status and deployment guard
+- The sanitized `/api/odds/status` response now explicitly reports whether API-Football Pro is configured, alongside OddsPapi and StrikerAPI. No provider key or owner token is exposed.
+- The deployment smoke check now verifies API-Football and OddsPapi configuration, the optional owner gate, and the API-Football odds route's preflight validation without consuming a billable odds request.
+- The optional OddsPapi pilot token field is labelled as optional; API-Football Pro odds are automatic and do not require the local token.
