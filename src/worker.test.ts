@@ -229,9 +229,10 @@ describe("odds provider pilot proxy", () => {
     }));
     vi.stubGlobal("fetch", upstream);
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/status"), {
-      ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: secret, STRIKERAPI_API_KEY: secret, ODDS_PILOT_TOKEN: "pilot-secret-0123456789-abcdef-extra",
+      ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "api-football-private", ODDSPAPI_API_KEY: secret, STRIKERAPI_API_KEY: secret, ODDS_PILOT_TOKEN: "pilot-secret-0123456789-abcdef-extra",
     }, { waitUntil: vi.fn() });
     const body = await response.text();
+    expect(body).toContain('"apiFootball":true');
     expect(body).toContain('"oddspapi":true');
     expect(body).toContain('"strikerapi":true');
     expect(body).toContain('"pilotEnabled":true');
