@@ -91,7 +91,7 @@ function shouldRetryIncompletePrediction(fixtureId: string, prior: TrackerRecord
     const parsed: unknown = raw ? JSON.parse(raw) : {};
     const attempts = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
     const attemptKey = fixtureId + "|" + market;
-    return shouldRetryPredictionWithEvidence(prior, market, attempts[attemptKey], Date.now(), FALLBACK_RETRY_INTERVAL_MS);
+    return shouldRetryPredictionWithEvidence(prior, market, attempts[attemptKey], Date.now(), FALLBACK_RETRY_INTERVAL_MS, 2);
   } catch { return false; }
 }
 
