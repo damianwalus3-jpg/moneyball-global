@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { canonicalFixtureId, scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
-import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballInjuriesForDate, fetchApiFootballOdds, parseApiFootballOdds, type ApiFootballFixtureEnrichment, type ApiFootballInjury } from "./api-football";
+import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballInjuriesForDate, fetchApiFootballOdds, parseApiFootballFinalResult, parseApiFootballOdds, type ApiFootballFixtureEnrichment, type ApiFootballInjury } from "./api-football";
 import { brusselsKickoffTimestamp, getPitchApiLineupStatus, isWithinLineupRefreshWindow } from "./lineup-refresh";
 import { addRecord, addRecords, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, loadRecentTeamFormAcrossCountry, mergeVerifiedTeamForms, loadCalcioItSerieDTeamForm, type TeamForm } from "./team-form";
@@ -494,18 +494,51 @@ export default function App() {
     settlementLock.current = true;
     const all = readRecords();
     const pending = uniquePendingPredictions(all);
+    const unresolvedCoupons = all.filter(row => row.kind === "coupon"
+      && ["PAPER_NO_ODDS", "PAPER_WITH_ODDS"].includes(row.status)
+      && !all.some(item => item.kind === "coupon" && item.details.parentCouponId === row.id));
+    const couponFixtureIds = new Set<string>();
+    for (const coupon of unresolvedCoupons) {
+      if (typeof coupon.details.legsJson !== "string") continue;
+      try {
+        const legs: unknown = JSON.parse(coupon.details.legsJson);
+        if (Array.isArray(legs)) for (const leg of legs) {
+          if (leg && typeof leg === "object" && typeof (leg as { fixtureId?: unknown }).fixtureId === "string") {
+            couponFixtureIds.add((leg as { fixtureId: string }).fixtureId);
+          }
+        }
+      } catch { /* malformed historical coupon remains untouched */ }
+    }
+    const prioritizedPending = [...pending].sort((a, b) =>
+      Number(couponFixtureIds.has(String(b.details.fixtureId))) - Number(couponFixtureIds.has(String(a.details.fixtureId))));
     setSettling(true);
     setSettleProgress(0);
     let processed = 0;
     try {
-      for (let index = 0; index < pending.length; index += 4) {
-        const batch = pending.slice(index, index + 4);
+      // API-Football Pro is the primary result source. Keep each automatic run to
+      // one conservative batch (max 20 IDs); provider errors fall through to free feeds.
+      const apiIds = [...new Set(prioritizedPending
+        .map(row => String(row.details.apiFootballFixtureId ?? ""))
+        .filter(id => /^\\d{1,12}$/.test(id)))].slice(0, 20);
+      const apiResults = new Map<string, ApiFootballFixtureEnrichment>();
+      if (apiIds.length) {
+        try {
+          const enriched = await fetchApiFootballEnrichment(apiIds);
+          for (const [id, fixture] of enriched) apiResults.set(id, fixture);
+        } catch { /* 429/network errors are non-fatal; try public result feeds below */ }
+      }
+      for (let index = 0; index < prioritizedPending.length; index += 4) {
+        const batch = prioritizedPending.slice(index, index + 4);
         await Promise.all(batch.map(async prediction => {
           const d = prediction.details;
-          if (typeof d.fixtureDate !== "string" || typeof d.home !== "string" || typeof d.away !== "string") return;
+          if (typeof d.fixtureDate !== "string" || typeof d.home !== "string" || typeof d.away !== "string"
+            || typeof d.fixtureId !== "string") return;
           try {
             let result = null;
-            if (typeof d.leagueFolder === "string" && d.leagueFolder) {
+            const apiId = String(d.apiFootballFixtureId ?? "");
+            const apiFixture = apiResults.get(apiId);
+            if (apiFixture) result = parseApiFootballFinalResult(apiFixture, d.fixtureDate);
+            if (!result && typeof d.leagueFolder === "string" && d.leagueFolder) {
               try { result = await findOpenMatchdayResult(d.leagueFolder, d.home, d.away, d.fixtureDate); } catch { /* try next provider */ }
             }
             if (!result && typeof d.leagueShortcut === "string" && typeof d.leagueSeason === "string") {
@@ -518,11 +551,17 @@ export default function App() {
               kind: "result",
               title: `${prediction.title} · ${result.homeGoals}:${result.awayGoals}`,
               status: "SETTLED",
-              details: { fixtureId: d.fixtureId as string, actual: result.actual, homeGoals: result.homeGoals, awayGoals: result.awayGoals, date: result.date, source: result.source },
+              details: {
+                fixtureId: d.fixtureId, actual: result.actual,
+                homeGoals: result.homeGoals, awayGoals: result.awayGoals,
+                date: result.date, fixtureDate: d.fixtureDate,
+                home: d.home, away: d.away, competition: d.competition ?? null,
+                apiFootballFixtureId: apiId || null, source: result.source,
+              },
             }], "fixtureId");
           } catch { /* provider failures remain pending and are retried on next run */ }
         }));
-        processed = Math.min(index + batch.length, pending.length);
+        processed = Math.min(index + batch.length, prioritizedPending.length);
         setSettleProgress(processed);
       }
     } finally {
