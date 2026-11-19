@@ -13,7 +13,7 @@ function prediction(id: string, probability: number, date = "2026-11-17"): Track
     details: {
       fixtureId: id === "a-duplicate" ? "a" : id, fixtureDate: date, competition: "Test league", model: "test-v1",
       selection: "1", p1: probability, px: Math.min(0.1, (1 - probability) / 2), p2: 1 - probability - Math.min(0.1, (1 - probability) / 2),
-      strongCandidate: true, couponEligible: true, evidenceComplete: true, source: "test",
+      strongCandidate: true, couponEligible: true, evidenceComplete: false, source: "test",
     },
   };
 }
@@ -40,7 +40,7 @@ describe("three-leg coupon candidates", () => {
       ...prediction(id, 0.60), title: "DC " + id,
       details: { ...prediction(id, 0.60).details, model: "test-v1", market: "DOUBLE_CHANCE", selection: "1X", probability,
         p1x: probability, px2: 0.6, p12: 1.4 - probability,
-        strongCandidate: false, strongDoubleChance: true, couponEligible: true, evidenceComplete: true },
+        strongCandidate: false, strongDoubleChance: true, couponEligible: true, evidenceComplete: false },
     });
     const candidates = buildThreeLegCandidates([
       dc("dc-a", 0.75), dc("dc-b", 0.82), dc("dc-c", 0.79),
