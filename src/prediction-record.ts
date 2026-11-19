@@ -53,7 +53,7 @@ export function shouldRetryPredictionWithEvidence(
 
 export function shouldAppendPrediction(records: TrackerRecord[], fixtureId: string, model: string,
   nextProbabilitiesAvailable: boolean, nextMethod?: string, market = "1X2",
-  nextEvidenceComplete?: boolean, nextEvidenceGaps?: string): boolean {
+  nextEvidenceComplete?: boolean, nextEvidenceGaps?: string, nextQualificationPolicyVersion?: number): boolean {
   const existing = records.filter(row => row.kind === "prediction" && recordFixtureId(row.details) === fixtureId
     && row.details.model === model && (typeof row.details.market === "string" ? row.details.market : "1X2") === market);
   const latestValid = existing.filter(row => hasValidProbabilities(row.details, market))
@@ -62,6 +62,8 @@ export function shouldAppendPrediction(records: TrackerRecord[], fixtureId: stri
     const evidenceChanged = (typeof nextEvidenceComplete === "boolean" && latestValid.details.evidenceComplete !== nextEvidenceComplete)
       || (typeof nextEvidenceGaps === "string" && latestValid.details.evidenceGaps !== nextEvidenceGaps);
     if (evidenceChanged) return true;
+    if (typeof nextQualificationPolicyVersion === "number"
+      && latestValid.details.qualificationPolicyVersion !== nextQualificationPolicyVersion) return true;
     return latestValid.details.predictionMethod === "neutral-prior-poisson"
       && nextProbabilitiesAvailable && nextMethod !== "neutral-prior-poisson";
   }
