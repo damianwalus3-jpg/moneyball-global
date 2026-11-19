@@ -14,9 +14,10 @@ describe("OddsPapi adapter", () => {
   });
   it("never guesses ambiguous or reversed fixtures", () => {
     const fixture = { id: "local-1", date: "2026-11-19", time: "19:00", home: "Club Brugge", away: "KAA Gent" };
-    const provider = { fixtureId: "op-1", tournamentId: 77, startTime: "2026-11-19T18:00:00.000Z", participant1Name: "KAA Gent", participant2Name: "Club Brugge" };
-    expect(matchOddsPapiFixtures([fixture], [provider]).matched).toHaveLength(0);
-    expect(matchOddsPapiFixtures([fixture], [provider, { ...provider, fixtureId: "op-2" }]).ambiguousFixtureIds).toEqual(["local-1"]);
+    const reversed = { fixtureId: "op-1", tournamentId: 77, startTime: "2026-11-19T18:00:00.000Z", participant1Name: "KAA Gent", participant2Name: "Club Brugge" };
+    const matching = { ...reversed, participant1Name: "Club Brugge FC", participant2Name: "KAA Gent" };
+    expect(matchOddsPapiFixtures([fixture], [reversed]).matched).toHaveLength(0);
+    expect(matchOddsPapiFixtures([fixture], [matching, { ...matching, fixtureId: "op-2" }]).ambiguousFixtureIds).toEqual(["local-1"]);
   });
   it("accepts only active unsuspended complete 1X2 prices and records source timestamps", () => {
     const player = (price: number) => ({ active: true, price, changedAt: "2026-11-19T10:00:00.000Z" });
