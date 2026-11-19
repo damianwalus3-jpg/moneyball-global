@@ -2092,3 +2092,23 @@
 - Read-only `/api/odds/status` returned API-Football and OddsPapi configured, owner-only pilot gate enabled, OddsPapi subscription active with 250/250 requests remaining, and Belgian bookmaker entitlements including `bwin.be`. No billable OddsPapi odds request was made; account request count remained 0.
 - The production OddsPapi daily route still requires the owner token to be stored in the user's local app browser and sent as a Bearer token. This is a deliberate protection for the 250-request monthly allowance; the token is not exposed or bypassed. Physical Android-local Tracker import and authenticated end-to-end coupon/result/settlement acceptance remain unverified without access to that browser storage/session.
 - No historical Tracker records, predictions, coupons, results, settlements or bankroll entries were edited by this stage. Project status remains OPEN pending the authenticated Android acceptance test and real quote import.
+
+
+## 2026-11-19 — Stage 175: preliminary prediction records — production verified
+
+- Implementation commit: `df5aaf1658ee670cb42572dfa99eb14dfced430e`.
+- Added explicit `KANDYDAT`, `WSTEPNA`, `ODRZUCONY` status handling. Missing lineup/odds/history evidence no longer automatically rejects a prediction when a valid probability distribution exists; incomplete evidence is represented as preliminary.
+- CI run `44500563659` and Rebuild Checks run `44500563654`: SUCCESS.
+- Cloudflare deployment run `44500563708`: SUCCESS for the exact same commit.
+- Live production verification: `/api/health` returned `ok:true`, service `moneyball-global-rebuild`, API-Football and PitchAPI configured. The application shell loaded. `/api/odds/status` confirmed API-Football, OddsPapi and StrikerAPI configured, owner-only pilot gate enabled, OddsPapi active with 250/250 requests remaining. No OddsPapi quote request was made (requestCount 0).
+- Stage 175 is DEPLOYED and production endpoints are responding. Real authenticated Android Tracker behavior still requires device-local verification.
+
+## 2026-11-19 — Stage 176: fixture calendar production reconciliation
+
+- Reused the deployed multi-source European fixture integration in `src/free-fixtures.ts`; no duplicate calendar pipeline or parallel production environment was introduced.
+- The deploy workflow's full current-day source reconciliation completed successfully on 2026-11-19 Europe/Brussels.
+- Verified snapshot: 14 unique eligible men's domestic-league fixtures, 7 countries, 9 competitions. 45 unique Europe/date fixtures were observed before competition-scope filtering; 31 were correctly excluded (16 UEFA, 9 domestic cups, 1 non-league international/friendly, 3 reserve, 2 women's). Final list had 0 duplicate canonical keys, 0 wrong-date fixtures, 0 non-European fixtures and 0 out-of-scope fixtures.
+- All 8 required public source adapters passed their technical health checks; some returned a valid zero eligible-fixture result for this date. A healthy empty response is not evidence of match coverage. Current live FootyNomad raw feed returned 18 European/date entries across 2 pages; the production reconciliation's filtered FootyNomad contribution was 6. Flashscore contributed 9 and PitchAPI contributed 1; overlaps are deduplicated.
+- The UI already exposes source-by-source diagnostics and the scope audit, including checked counts, accepted counts, errors, and explicit zero-result states. The app does not claim 100% European coverage.
+- Stage 176 integration and audit are DEPLOYED/VERIFIED for this daily snapshot. Exhaustive country-by-country and amateur/regional completeness is NOT proven; public free providers do not provide a complete authoritative catalogue. Project remains OPEN until broader provider coverage and Android-local acceptance are verified.
+- No historic Tracker records, predictions, coupons, results, settlements or bankroll entries were edited.
