@@ -382,7 +382,7 @@ export default {
               catch { throw new Error("api_football_odds_invalid_json"); }
               if (!upstream.ok) throw new Error(`api_football_odds_http_${upstream.status}`);
               const result = {
-                status: payload.errors && Object.keys(payload.errors as object).length > 0 ? "provider_error" : "ok",
+                status: apiFootballErrorText(payload.errors).trim() ? "provider_error" : "ok",
                 provider: "API-Football Pro",
                 fixtureId: apiFootballFixtureId,
                 capturedAt: new Date().toISOString(),
@@ -708,7 +708,7 @@ export default {
         if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429) {
           return json({ error: "api_football_rate_limited", provider: "API-Football Pro", retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60, message: "Dostawca ograniczył liczbę zapytań; terminarz nie został zapisany w cache.", providerError: safeApiFootballErrorDetails(data.errors) }, 429, origin);
         }
-        if (data.errors && Object.keys(data.errors as object).length > 0) {
+        if (apiFootballErrorText(data.errors).trim()) {
           return json({ error: "api_football_provider_error", details: data.errors }, 502, origin);
         }
         const response = json({
@@ -767,7 +767,7 @@ export default {
           rateLimit: { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
         }, 429, origin);
         if (!upstream.ok) return json({ error: "api_football_enrichment_http_" + upstream.status }, upstream.status, origin);
-        if (payload.errors && Object.keys(payload.errors as object).length > 0) {
+        if (apiFootballErrorText(payload.errors).trim()) {
           return json({ error: "api_football_enrichment_provider_error", details: payload.errors }, 502, origin);
         }
         const result = {
