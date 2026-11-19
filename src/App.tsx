@@ -1036,7 +1036,7 @@ export default function App() {
         unmatched: Math.max(0, requestedIds.length - matchedFixtures),
         ambiguous: 0, snapshots: added, utcDate: fixtureScan.date,
       });
-      setApiFootballOddsNotice(`API-Football Pro: ${requestedIds.length} identyfikatorów, ${quotes.length} kwotowań, ${added} nowych snapshotów 1X2/DC; pominięte identyfikatory ponad limit 20: ${Math.max(0, uniqueIds.length - requestedIds.length)}; mecze bez kwotowań: ${missingQuoteCount}; błędy dostawcy: ${(payload.failedFixtureIds ?? []).length}.`);
+      setApiFootballOddsNotice(`API-Football Pro: ${requestedIds.length} identyfikatorów, ${quotes.length} kwotowań, ${added} nowych snapshotów 1X2/DC; strony API: ${payload.pagesFetched ?? "—"}/${payload.totalPagesAvailable ?? "—"} (maks. 3); pominięte identyfikatory ponad limit 20: ${Math.max(0, uniqueIds.length - requestedIds.length)}; mecze bez kwotowań: ${missingQuoteCount}; błędy dostawcy: ${(payload.failedFixtureIds ?? []).length}.`);
     } catch (error) {
       setApiFootballOddsNotice("API-Football Pro: " + (error instanceof Error ? error.message : "brak kursów") + ". Pozostałe dane i prognozy pozostają bez zmian.");
     } finally {
