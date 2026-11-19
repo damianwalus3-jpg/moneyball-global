@@ -50,4 +50,17 @@ describe("bet settlement",()=>{
     ];
     expect(buildBetSettlementRows(records)).toHaveLength(0);
   });
+
+  it("returns the full stake for a cancelled/void fixture", () => {
+    const records = [
+      row("bet", "selected-void", { fixtureId: "f-void", decision: "SELECTED", selection: "1X", stake: 7, odds: 1.8 }),
+      row("result", "void-result", { fixtureId: "f-void", actual: "VOID" }, "VOID"),
+    ];
+    const settlements = buildBetSettlementRows(records);
+    expect(settlements).toHaveLength(1);
+    expect(settlements[0].status).toBe("VOID");
+    expect(settlements[0].details.profitLoss).toBe(0);
+    expect(settlements[0].details.stake).toBe(7);
+  });
+
 });
