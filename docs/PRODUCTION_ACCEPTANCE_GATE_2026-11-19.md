@@ -70,6 +70,18 @@ Snapshot z `2026-11-19T07:04:06Z`, data Europe/Brussels `2026-11-19`:
 - Nadal obowiązują pozostałe warunki jakości danych sportowych, minimalnej próbki i progu kandydata. Brak historii, składów, kontuzji lub innych wymaganych danych może nadal jawnie odrzucić kandydata — nie wolno tego mylić z brakiem kursu.
 - Kursy Double Chance nie są syntetyzowane z 1X2. Bez bezpośredniego kursu DC kupon DC pozostaje bez wyceny; nie wolno wyliczać fikcyjnej oferty bukmachera.
 
+### Wstępny audyt wcześniejszego eksportu Trackera
+
+- Dostępny w Library backup `moneyball-backup (2).json` ma `exportedAt=2026-11-18T18:43:02Z`; nie jest świeżym eksportem z bieżącego skanu 2026-11-19.
+- 1 086 rekordów: 232 match, 818 prediction, 17 scan, 12 result, 7 coupon; 0 odds, 0 bet i 0 ledger.
+- Dla 2026-11-18: 219 rekordów meczów. Prognozy obejmowały 212 fixture: 1X2 było zapisane dla 212/219, ale prawidłowe wektory prawdopodobieństw miało tylko 104/219. Double Chance było zapisane dla 169/219, a prawidłowe wektory miało 61/219. Odpowiednio 7 meczów nie miało żadnego rekordu prognozy, 50 nie miało rekordu DC, a wiele zapisów miało brakujące prawdopodobieństwa i jawny powód odrzucenia.
+- Dla 2026-11-17: 13 meczów i 13 prawidłowych rekordów 1X2, ale brak osobnych rekordów DC dla wszystkich 13.
+- W starym backupie wykryto 11 par aliasów tego samego meczu z tego samego dnia między różnymi źródłami (Flashscore/FootyNomad). To historyczne zapisy; nie przepisywać ich automatycznie.
+- 7 historycznych kuponów miało po 3 różne mecze w każdym kuponie, ale wszystkie były `PAPER_NO_ODDS`, bez kursu, stawki, potencjalnej wypłaty i EV. Łącznie używały tylko 7 unikalnych fixture; 5 fixture powtarzało się między kuponami. Najczęściej powtarzany fixture wystąpił w 7 kuponach.
+- 12 wyników było powiązanych z typami 1X2 oznaczonymi `ODRZUCONY`; surowy wybór 1/X/2 trafił 5/12 (41,7%). To nie jest skuteczność wybranych kandydatów ani ROI, ponieważ wszystkie te typy były odrzucone i backup nie zawierał kursów ani stawek.
+- Ponieważ backup nie zawiera rekordów zakładów ani ledger, nie można z niego wyliczyć rzeczywistego P/L ani odtworzyć historii salda. Nie dopisywać transakcji na podstawie domysłów.
+- Wyniki tego audytu są wyłącznie bazową kontrolą eksportu z 18 listopada. Wymagają ponownego sprawdzenia na świeżym eksporcie Android po obecnym wdrożeniu.
+
 ## Otwarte bramki — nie ogłaszać ukończenia
 
 1. **Świeży eksport Android Tracker:** potrzebny do porównania każdego rzeczywistego fixture ze skanu z osobnym rekordem 1X2 i DC, walidacji wektorów prawdopodobieństw, uzasadnień ODRZUCONY, braków i duplikatów.
