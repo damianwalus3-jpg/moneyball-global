@@ -984,12 +984,14 @@ export default function App() {
       setLastApiFootballOddsAttemptKey(attemptKey);
       return;
     }
-    try { localStorage.setItem(API_FOOTBALL_ODDS_DAILY_ATTEMPT_KEY, attemptKey); } catch { /* best-effort persistence */ }
-    setLastApiFootballOddsAttemptKey(attemptKey);
     setApiFootballOddsLoading(true);
     try {
       const requestedIds = uniqueIds.slice(0, 20);
       const payload = await fetchApiFootballOdds(fixtureScan.date, requestedIds);
+      // Persist the slot only after the Worker returned a valid provider response.
+      // A timeout, network failure or 429 must remain retryable after reload/rescan.
+      try { localStorage.setItem(API_FOOTBALL_ODDS_DAILY_ATTEMPT_KEY, attemptKey); } catch { /* best-effort persistence */ }
+      setLastApiFootballOddsAttemptKey(attemptKey);
       const quotes = parseApiFootballOdds((payload.odds ?? []).flatMap(row => row.data ?? []));
       const fixtureByApiId = new Map(fixtureScan.fixtures
         .filter(fixture => typeof fixture.apiFootballFixtureId === "string")
@@ -1038,7 +1040,10 @@ export default function App() {
       });
       setApiFootballOddsNotice(`API-Football Pro: ${requestedIds.length} identyfikatorów, ${quotes.length} kwotowań, ${added} nowych snapshotów 1X2/DC; strony API: ${payload.pagesFetched ?? "—"}/${payload.totalPagesAvailable ?? "—"} (maks. 3); pominięte identyfikatory ponad limit 20: ${Math.max(0, uniqueIds.length - requestedIds.length)}; mecze bez kwotowań: ${missingQuoteCount}; błędy dostawcy: ${(payload.failedFixtureIds ?? []).length}.`);
     } catch (error) {
-      setApiFootballOddsNotice("API-Football Pro: " + (error instanceof Error ? error.message : "brak kursów") + ". Pozostałe dane i prognozy pozostają bez zmian.");
+      try {
+        if (localStorage.getItem(API_FOOTBALL_ODDS_DAILY_ATTEMPT_KEY) === attemptKey) localStorage.removeItem(API_FOOTBALL_ODDS_DAILY_ATTEMPT_KEY);
+      } catch { /* storage may be unavailable */ }
+      setApiFootballOddsNotice("API-Football Pro: " + (error instanceof Error ? error.message : "brak kursów") + ". Próba pozostaje możliwa po ponownym skanie; pozostałe dane i prognozy pozostają bez zmian.");
     } finally {
       setApiFootballOddsLoading(false);
     }
