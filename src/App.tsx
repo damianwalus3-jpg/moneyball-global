@@ -890,6 +890,8 @@ export default function App() {
               fixtureId: fixture.id,
               fixtureDate: fixture.date,
               fixtureTime: fixture.time,
+              home: fixture.home,
+              away: fixture.away,
               competition: fixture.competition,
               provider: "StrikerAPI",
               providerGameId: game.gameId,
