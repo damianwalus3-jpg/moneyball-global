@@ -48,7 +48,7 @@ jobs:
             fi
             NS_ID="$(echo "$CREATED" | jq -r '.result.id')"
           fi
-          KV_ID="$NS_ID" node -e 'const fs=require("fs");const p="wrangler.jsonc";const c=JSON.parse(fs.readFileSync(p,"utf8"));c.kv_namespaces=(c.kv_namespaces??[]).filter(x=>x.binding!=="TRACKER_DIAGNOSTICS");c.kv_namespaces.push({binding:"TRACKER_DIAGNOSTICS",id:process.env.KV_ID});fs.writeFileSync(p,JSON.stringify(c,null,2)+"\\n")'
+          KV_ID="$NS_ID" node -e 'const fs=require("fs");const p="wrangler.jsonc";const c=JSON.parse(fs.readFileSync(p,"utf8"));c.kv_namespaces=(c.kv_namespaces??[]).filter(x=>x.binding!=="TRACKER_DIAGNOSTICS");c.kv_namespaces.push({binding:"TRACKER_DIAGNOSTICS",id:process.env.KV_ID});fs.writeFileSync(p,JSON.stringify(c,null,2)+"\n")'
           echo "Durable Cloudflare KV binding configured for this deployment."
       - name: Deploy static app to separate Cloudflare Worker
         run: npx --yes wrangler@4 deploy
