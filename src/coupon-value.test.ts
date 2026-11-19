@@ -89,7 +89,7 @@ describe("three-leg coupon odds valuation", () => {
       date: "2026-11-17", combinedProbability: 0.544, averageProbability: 0.8166666667, oddsAvailable: false,
       legs: [
         { fixtureId: "f1", title: "A vs B", competition: "League", selection: "1X", market: "DOUBLE_CHANCE", probability: 0.8, source: "model", model: "v1" },
-        { fixtureId: "f2", title: "C vs D", competition: "League", selection: "X2", market: "DOUBLE_CHANCE", probability: 0.8, source: "model", model: "v1" },
+        { fixtureId: "f2", title: "C vs D", competition: "League", selection: "X2", market: "DOUBLE_CHANCE", probability: 0.85, source: "model", model: "v1" },
         { fixtureId: "f3", title: "E vs F", competition: "League", selection: "12", market: "DOUBLE_CHANCE", probability: 0.8, source: "model", model: "v1" },
       ],
     };
