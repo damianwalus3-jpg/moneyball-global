@@ -2139,3 +2139,13 @@
 - Read-only live checks did not make a billable OddsPapi odds request. Account quota remains untouched at 250/250 and requestCount 0. The first real OddsPapi quote import remains gated by the owner token stored only in the user's local browser; do not bypass or request that token in chat. StrikerAPI remains behind its separate explicit-consent gate.
 - Prediction provenance is present in `src/prediction-metadata.ts` and integrated into prediction record creation: `modelSourceType`, `modelCoverage`, `xgUsed`, `xgSource`, and separate recent goals/results history provenance. Existing tests cover goals-vs-xG semantics, verified dated xG samples, missing xG and baseline-only models. No duplicate implementation was added.
 - No historical Tracker rows, predictions, coupons, results, settlements or bankroll entries were modified. No Android-local Tracker E2E was possible from CI or the remote Worker. Stage 3 remains OPEN pending authenticated owner-browser quote import and device-local Tracker/coupon/settlement acceptance; do not report full stage closure.
+
+
+## 2026-11-19 — Stage 179: API-Football Pro primary odds; optional paid feeds paused
+
+- User-approved architecture change: API-Football Pro is the primary odds source. OddsPapi and StrikerAPI remain configured as optional fallback integrations, but their automatic daily polling is disabled in the app (OPTIONAL_ODDS_SYNC_MODE = disabled). The automatic fixture scan no longer triggers paid OddsPapi or StrikerAPI synchronization.
+- API-Football Pro odds ingestion remains enabled independently through the existing daily odds fetch and continues to save only verified quotes with provider timestamps and complete markets.
+- Fixture analysis and 1X2 / Double Chance prediction remain independent of bookmaker quote availability. Missing odds are shown as unavailable; no synthetic prices or EV values are generated.
+- Historical Tracker data, predictions, coupons, results, settlements, bankroll and provider secrets are not removed or modified.
+- OddsPapi configuration and its owner-only gate are retained for possible future reactivation. No automatic paid OddsPapi requests are made by the app under this mode. StrikerAPI remains disabled; no separate consent is enabled.
+- This change does not claim complete API-Football odds coverage for every European league or match. Provider 429 limits and missing bookmaker markets remain possible and must be surfaced as data-coverage limitations, not fatal prediction errors.
