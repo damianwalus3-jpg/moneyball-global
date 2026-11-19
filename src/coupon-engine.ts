@@ -63,8 +63,8 @@ function fixturesAlreadyUsedByCoupons(records: TrackerRecord[]): Set<string> {
           title: typeof leg.title === "string" ? leg.title : "",
           details: {
             fixtureId: leg.fixtureId,
-            date: typeof record.details.date === "string" ? record.details.date : record.details.fixtureDate,
-            competition: leg.competition,
+            date: typeof record.details.date === "string" ? record.details.date : typeof record.details.fixtureDate === "string" ? record.details.fixtureDate : null,
+            competition: typeof leg.competition === "string" ? leg.competition : null,
           },
         });
         used.add(rawToIdentity.get(leg.fixtureId) ?? fallback ?? leg.fixtureId);
