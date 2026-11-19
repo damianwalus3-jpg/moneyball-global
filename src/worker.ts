@@ -461,13 +461,18 @@ export default {
           message: "Za mało pozostałych zapytań na bezpieczny dzienny odczyt; prognozy meczów pozostają niezależne od kursów.",
         }, 200, origin);
         const bookmakerEntitlements = account.bookmakerSlugs ?? [];
-        const targetSlugs = new Set([
+        // GET /odds-by-tournaments accepts exactly one bookmaker per request.
+        // Prefer the user's primary Belgian book and fall back only when it is not entitled.
+        const bookmakerPriority = [
           "bwin.be", "unibet.be", "betfirst.be", "bingoal.be", "goldenpalacesports.be",
           "betcenter.be", "scooore.be", "starcasino.be", "napoleonsports.be",
           "bwin", "bwin.de", "bet365", "unibet", "ladbrokes", "betway", "pinnacle",
-        ]);
-        const bookmakers = bookmakerEntitlements.filter(slug => targetSlugs.has(slug.toLowerCase()));
-        if (!bookmakers.length) return json({
+        ];
+        const bookmaker = bookmakerPriority.find(slug =>
+          bookmakerEntitlements.some(entitled => entitled.toLowerCase() === slug)
+        );
+        const bookmakers = bookmaker ? [bookmaker] : [];
+        if (!bookmaker) return json({
           status: "no_target_bookmaker_entitlement", provider: "OddsPapi", requestLimit, requestCount, remaining,
           availableBookmakerSlugs: bookmakerEntitlements,
           message: "Aktywna subskrypcja nie udostępnia żadnego z wybranych źródeł kursów.",
@@ -508,6 +513,21 @@ export default {
           ctx.waitUntil(cache.put(cacheKey, empty.clone()));
           return empty;
         }
+        const tournamentStartTimes = new Map<number, number>();
+        for (const matched of matchAudit.matched) {
+          const providerFixture = validProviderFixtures.find(row => row.fixtureId === matched.providerFixtureId);
+          const kickoff = Date.parse(providerFixture?.startTime ?? "");
+          const prior = tournamentStartTimes.get(matched.tournamentId);
+          if (Number.isFinite(kickoff) && (prior === undefined || kickoff < prior)) {
+            tournamentStartTimes.set(matched.tournamentId, kickoff);
+          }
+        }
+        const tournamentIds = [...new Set(matchAudit.matched.map(row => row.tournamentId))]
+          .sort((a, b) => (tournamentStartTimes.get(a) ?? Number.MAX_SAFE_INTEGER)
+            - (tournamentStartTimes.get(b) ?? Number.MAX_SAFE_INTEGER) || a - b);
+        const fullOddsBatchCount = Math.ceil(tournamentIds.length / 3);
+        const remainingAfterFixtures = Math.max(0, remaining - 1);
+
         let marketDefinitions = DEFAULT_ODDS_PAPI_MARKETS;
         let marketCatalogStatus = "owner_opt_in_required";
         let marketCatalogRequestUsed = false;
@@ -517,13 +537,15 @@ export default {
             const cachedDefinitions = await cachedMarketCatalog.json() as typeof DEFAULT_ODDS_PAPI_MARKETS;
             if (Array.isArray(cachedDefinitions) && cachedDefinitions.some(row => row.marketType === "1X2")) {
               marketDefinitions = cachedDefinitions;
-              marketCatalogStatus = "cached";
+              marketCatalogStatus = cachedDefinitions.some(row => row.marketType === "DOUBLE_CHANCE")
+                ? "cached_with_double_chance" : "cached_1x2_only";
             }
           } catch { /* malformed cache falls back to documented 1X2 market */ }
-        } else if (input.allowBillableMarketCatalogue === true && env.ODDSPAPI_MARKET_CATALOGUE_ENABLED === "true" && remaining >= 3) {
+        } else if (input.allowBillableMarketCatalogue === true && env.ODDSPAPI_MARKET_CATALOGUE_ENABLED === "true"
+          && remainingAfterFixtures >= fullOddsBatchCount + 1) {
           marketCatalogRequestUsed = true;
-          // Market catalogue is billed once per seven-day cache window. If quota is tight,
-          // preserve the 1X2 fetch and defer direct Double Chance discovery.
+          // Market catalogue is billed once per seven-day cache window. Reserve enough quota
+          // for every required odds batch before spending the catalogue request.
           try {
             const marketsUrl = new URL("/v4/markets", ODDSPAPI_API);
             marketsUrl.searchParams.set("language", "en");
@@ -532,7 +554,8 @@ export default {
             const discovered = discoverOddsPapiMarkets(marketsPayload);
             if (discovered.some(row => row.marketType === "1X2")) {
               marketDefinitions = discovered;
-              marketCatalogStatus = discovered.some(row => row.marketType === "DOUBLE_CHANCE") ? "cached_with_double_chance" : "cached_1x2_only";
+              marketCatalogStatus = discovered.some(row => row.marketType === "DOUBLE_CHANCE")
+                ? "cached_with_double_chance" : "cached_1x2_only";
               const marketCacheResponse = json(marketDefinitions, 200, APP_ORIGIN);
               marketCacheResponse.headers.set("Cache-Control", "public, max-age=604800");
               await cache.put(ODDSPAPI_MARKETS_CACHE_KEY, marketCacheResponse);
@@ -544,18 +567,18 @@ export default {
           }
         } else if (input.allowBillableMarketCatalogue === true && env.ODDSPAPI_MARKET_CATALOGUE_ENABLED === "true") {
           marketCatalogStatus = "quota_guard_default_1x2";
-        } else {
-          marketCatalogStatus = "owner_opt_in_required";
         }
-        const tournamentIds = [...new Set(matchAudit.matched.map(row => row.tournamentId))];
-        const oddsUrl = new URL("/v4/odds-by-tournaments", ODDSPAPI_API);
-        oddsUrl.searchParams.set("tournamentIds", tournamentIds.join(","));
-        oddsUrl.searchParams.set("bookmakers", bookmakers.join(","));
-        oddsUrl.searchParams.set("language", "en");
-        oddsUrl.searchParams.set("verbosity", "3");
-        oddsUrl.searchParams.set("oddsFormat", "decimal");
-        const oddsResponse = await fetch(oddsUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
-        const oddsPayload = await readJson(oddsResponse);
+
+        // OddsPapi v4 limits odds-by-tournaments to three competitions and one bookmaker
+        // per billable request. Spend only the remaining monthly quota, prioritizing earliest kickoffs.
+        const availableOddsCalls = Math.max(0, remainingAfterFixtures - (marketCatalogRequestUsed ? 1 : 0));
+        const queriedTournamentIds = tournamentIds.slice(0, availableOddsCalls * 3);
+        const skippedTournamentIds = tournamentIds.slice(queriedTournamentIds.length);
+        const tournamentBatches: number[][] = [];
+        for (let index = 0; index < queriedTournamentIds.length; index += 3) {
+          tournamentBatches.push(queriedTournamentIds.slice(index, index + 3));
+        }
+
         const bookmakerLabels: Record<string, string> = {
           "bwin.be": "Bwin Belgium", "unibet.be": "Unibet Belgium", "betfirst.be": "betFIRST Belgium",
           "bingoal.be": "Bingoal Belgium", "goldenpalacesports.be": "Golden Palace Belgium",
@@ -564,21 +587,40 @@ export default {
           "bwin.de": "Bwin Germany", "pinnacle": "Pinnacle", "bet365": "bet365",
           "unibet": "Unibet", "ladbrokes": "Ladbrokes", "betway": "Betway", "bwin": "Bwin",
         };
-        const bookmakerNames = Object.fromEntries(bookmakers.map(slug => [slug, bookmakerLabels[slug] ?? slug]));
-        const matchedProviderIds = new Set(matchAudit.matched.map(row => row.providerFixtureId));
-        const quotes = parseOddsPapiQuotes(oddsPayload, bookmakerNames, marketDefinitions)
-          .filter(row => matchedProviderIds.has(row.providerFixtureId))
+        const bookmakerNames = { [bookmaker]: bookmakerLabels[bookmaker] ?? bookmaker };
+        const matchedByProviderId = new Map(matchAudit.matched.map(row => [row.providerFixtureId, row]));
+        const selectedProviderIds = new Set(matchAudit.matched
+          .filter(row => queriedTournamentIds.includes(row.tournamentId))
+          .map(row => row.providerFixtureId));
+        const oddsEvents: unknown[] = [];
+        for (let index = 0; index < tournamentBatches.length; index++) {
+          if (index > 0) await new Promise(resolve => setTimeout(resolve, 1_000));
+          const oddsUrl = new URL("/v4/odds-by-tournaments", ODDSPAPI_API);
+          oddsUrl.searchParams.set("tournamentIds", tournamentBatches[index].join(","));
+          oddsUrl.searchParams.set("bookmaker", bookmaker);
+          oddsUrl.searchParams.set("language", "en");
+          oddsUrl.searchParams.set("verbosity", "3");
+          const oddsResponse = await fetch(oddsUrl, {
+            headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+          });
+          const oddsPayload = await readJson(oddsResponse);
+          if (Array.isArray(oddsPayload)) oddsEvents.push(...oddsPayload);
+          else if (oddsPayload && typeof oddsPayload === "object") oddsEvents.push(oddsPayload);
+        }
+        const quotes = parseOddsPapiQuotes(oddsEvents, bookmakerNames, marketDefinitions)
+          .filter(row => selectedProviderIds.has(row.providerFixtureId))
           .map(row => {
-            const match = matchAudit.matched.find(item => item.providerFixtureId === row.providerFixtureId);
+            const match = matchedByProviderId.get(row.providerFixtureId);
             return match ? { ...row, fixtureId: match.fixtureId, kickoffDifferenceMinutes: match.kickoffDifferenceMinutes } : null;
           }).filter((row): row is NonNullable<typeof row> => row !== null);
         const result = {
           status: "ok", provider: "OddsPapi", date, requestLimit, requestCount,
-          remainingBefore: remaining, estimatedRequestsUsed: 2 + (marketCatalogRequestUsed ? 1 : 0), bookmakers, marketCatalogStatus,
-          marketTypes: marketDefinitions.map(row => row.marketType),
+          remainingBefore: remaining,
+          estimatedRequestsUsed: 1 + tournamentBatches.length + (marketCatalogRequestUsed ? 1 : 0),
+          bookmakers, marketCatalogStatus, marketTypes: marketDefinitions.map(row => row.marketType),
           sourceFixtures: validProviderFixtures.length, matched: matchAudit.matched.length,
           unmatched: matchAudit.unmatchedFixtureIds.length, ambiguous: matchAudit.ambiguousFixtureIds.length,
-          tournamentIds, quotes,
+          tournamentIds, queriedTournamentIds, skippedTournamentIds, oddsRequestBatches: tournamentBatches.length, quotes,
           message: "Kursy są niezależne od prognoz. Brak kursu lub dopasowania nie odrzuca meczu.",
         };
         const response = json(result, 200, origin);
