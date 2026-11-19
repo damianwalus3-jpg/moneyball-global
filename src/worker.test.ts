@@ -752,6 +752,70 @@ describe("API-Football Pro secure status proxy", () => {
 });
 
 
+describe("API-Football Pro daily odds route", () => {
+  const env = { ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "private-api-football-secret" };
+  const today = () => new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+
+  it("fetches and caches today's odds for up to 20 fixture IDs using the server-side key", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const fixturePayload = (id: number) => ({
+      results: 1, response: [{ fixture: { id }, update: "2026-11-19T10:00:00Z", bookmakers: [] }],
+    });
+    const upstream = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(fixturePayload(123)), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(fixturePayload(456)), { status: 200 }));
+    vi.stubGlobal("fetch", upstream);
+    const date = today();
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/odds?date=" + date + "&ids=123-456"), env, { waitUntil: vi.fn() });
+    const body = await response.json() as { provider?: string; date?: string; requestedFixtureIds?: string[]; odds?: Array<{ fixtureId: string; status: string }> };
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=10800");
+    expect(body).toMatchObject({ provider: "API-Football Pro", date, requestedFixtureIds: ["123", "456"] });
+    expect(body.odds).toHaveLength(2);
+    expect(body.odds?.every(row => row.status === "ok")).toBe(true);
+    expect(upstream).toHaveBeenCalledTimes(2);
+    expect(String(upstream.mock.calls[0][0])).toContain("/odds?fixture=123");
+    expect(String(upstream.mock.calls[1][0])).toContain("/odds?fixture=456");
+    expect(upstream.mock.calls[0][1].headers).toMatchObject({ "x-apisports-key": "private-api-football-secret" });
+    expect(cache.put).toHaveBeenCalledTimes(3);
+    expect(JSON.stringify(body)).not.toContain("private-api-football-secret");
+  });
+
+  it("rejects non-today dates, invalid IDs and oversized batches before provider calls", async () => {
+    const upstream = vi.fn();
+    vi.stubGlobal("fetch", upstream);
+    const yesterday = new Date(Date.now() - 86400000);
+    const oldDate = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(yesterday);
+    const urls = [
+      "https://moneyball.example/api/api-football/odds?date=" + oldDate + "&ids=123",
+      "https://moneyball.example/api/api-football/odds?date=" + today() + "&ids=bad",
+      "https://moneyball.example/api/api-football/odds?date=" + today() + "&ids=" + Array.from({ length: 21 }, (_, i) => String(i + 1)).join("-"),
+    ];
+    for (const url of urls) {
+      const response = await worker.fetch(new Request(url), env, { waitUntil: vi.fn() });
+      expect(response.status).toBe(400);
+    }
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it("honours the shared API-Football cooldown for odds requests", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      errors: { rateLimit: "Too many requests per minute" }, response: [],
+    }), { status: 429, headers: { "Retry-After": "18" } })));
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/odds?date=" + today() + "&ids=123"), env, { waitUntil: vi.fn() });
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited", retryAfterSeconds: 18 });
+    expect(cache.put).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("API-Football Pro batch enrichment", () => {
   const env = { ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "test-api-football-secret" };
 
