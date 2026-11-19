@@ -170,7 +170,7 @@ describe("three-leg coupon candidates", () => {
   });
 
   it("keeps a model-qualified high-probability prediction out of coupons until evidence is complete", () => {
-    const modelCandidate = {
+    const modelCandidate: TrackerRecord = {
       ...prediction("evidence-pending", 0.96),
       details: { ...prediction("evidence-pending", 0.96).details, couponEligible: false, evidenceComplete: false },
     };
