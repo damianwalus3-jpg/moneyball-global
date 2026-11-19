@@ -756,6 +756,7 @@ export default function App() {
             body: JSON.stringify({
               date: utcDate,
               slot: oddspapiSlot,
+              allowBillableMarketCatalogue: true,
               fixtures: fixtureScan.fixtures.map(fixture => ({
                 id: fixture.id, date: fixture.date, time: fixture.time,
                 home: fixture.home, away: fixture.away,
