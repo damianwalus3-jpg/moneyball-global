@@ -321,15 +321,19 @@ interface ApiFootballFixturePayload {
   league?: { id?: number; name?: string; country?: string };
   teams?: { home?: { name?: string }; away?: { name?: string } };
 }
+function apiFootballProviderErrorText(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) return value.map(apiFootballProviderErrorText).filter(Boolean).join(" ");
+  if (value && typeof value === "object") return Object.values(value as Record<string, unknown>).map(apiFootballProviderErrorText).filter(Boolean).join(" ");
+  return "";
+}
+
 export function parseApiFootballEuropeanFixtures(payload: unknown, targetDate: string, updatedAt: string): FreeFixture[] {
   if (!payload || typeof payload !== "object" || !Array.isArray((payload as { fixtures?: unknown }).fixtures)) {
     throw new Error("API-Football: nieprawidłowa odpowiedź lub brak tablicy fixtures");
   }
   const providerErrors = (payload as { errors?: unknown }).errors;
-  const hasProviderErrors = Array.isArray(providerErrors)
-    ? providerErrors.length > 0
-    : !!providerErrors && typeof providerErrors === "object" && Object.keys(providerErrors).length > 0;
-  if (hasProviderErrors) {
+  if (apiFootballProviderErrorText(providerErrors)) {
     // Keep the diagnostic useful without ever echoing credentials or unbounded provider payloads.
     const diagnostic = JSON.stringify(providerErrors, (key, value) =>
       /token|api[_-]?key|authorization|password/i.test(key) ? "[REDACTED]" : value
@@ -338,17 +342,19 @@ export function parseApiFootballEuropeanFixtures(payload: unknown, targetDate: s
   }
   return ((payload as { fixtures: ApiFootballFixturePayload[] }).fixtures).flatMap(item => {
     const country = (item.league?.country ?? "").trim().toLowerCase();
-    const countryCode = ESPN_COUNTRIES[country];
+    const competition = item.league?.name?.trim() ?? "";
+    const isUefaCompetition = /\\bUEFA\\b|European Championship/i.test(competition);
+    const countryCode = ESPN_COUNTRIES[country] ?? (isUefaCompetition ? "UEFA" : undefined);
     const kickoff = item.fixture?.date ? new Date(item.fixture.date) : new Date(NaN);
     const home = item.teams?.home?.name?.trim();
     const away = item.teams?.away?.name?.trim();
-    if (!countryCode || !EUROPE.has(countryCode) || !Number.isFinite(kickoff.getTime()) || !home || !away || !item.league?.name) return [];
+    if (!countryCode || !EUROPE.has(countryCode) || !Number.isFinite(kickoff.getTime()) || !home || !away || !competition) return [];
     const local = brusselsParts(kickoff);
     if (local.date !== targetDate) return [];
     const fixtureId = item.fixture?.id;
     return [{
-      id: "api-football|" + (fixtureId ?? [targetDate, countryCode, item.league.name, home, away].join("|")),
-      competition: item.league.name,
+      id: "api-football|" + (fixtureId ?? [targetDate, countryCode, competition, home, away].join("|")),
+      competition,
       countryCode,
       leagueFolder: "",
       date: local.date,

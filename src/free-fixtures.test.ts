@@ -22,6 +22,27 @@ describe("API-Football Pro European fixture integration", () => {
     expect(parseApiFootballEuropeanFixtures(response, "2026-11-18", "2026-11-18T22:48:00.000Z")).toHaveLength(1);
     expect(parseApiFootballEuropeanFixtures({ results: 0, fixtures: [] }, "2026-11-18", "now")).toEqual([]);
   });
+
+  it("includes UEFA competitions listed by API-Football as World and excludes other world competitions", () => {
+    const payload = {
+      results: 2,
+      fixtures: [
+        { fixture: { id: 99101, date: "2026-11-19T19:00:00Z" }, league: { id: 2, name: "UEFA Champions League", country: "World" }, teams: { home: { name: "Home" }, away: { name: "Away" } } },
+        { fixture: { id: 99102, date: "2026-11-19T19:00:00Z" }, league: { id: 15, name: "FIFA Club World Cup", country: "World" }, teams: { home: { name: "Home 2" }, away: { name: "Away 2" } } },
+      ],
+    };
+    const fixtures = parseApiFootballEuropeanFixtures(payload, "2026-11-19", "now");
+    expect(fixtures).toHaveLength(1);
+    expect(fixtures[0]).toMatchObject({ id: "api-football|99101", countryCode: "UEFA", competition: "UEFA Champions League" });
+  });
+  it("ignores empty/null provider error fields", () => {
+    const payload = {
+      errors: { rateLimit: null, plan: "" },
+      fixtures: [{ fixture: { id: 99103, date: "2026-11-19T19:00:00Z" }, league: { id: 39, name: "Premier League", country: "England" }, teams: { home: { name: "Home" }, away: { name: "Away" } } }],
+    };
+    expect(parseApiFootballEuropeanFixtures(payload, "2026-11-19", "now")).toHaveLength(1);
+  });
+
   it("preserves sanitized diagnostics for HTTP-200 provider errors", () => {
     expect(() => parseApiFootballEuropeanFixtures({ results: 0, fixtures: [], errors: { plan: "Free plan does not include this endpoint" } }, "2026-11-18", "now")).toThrow(/Free plan does not include this endpoint/);
     expect(() => parseApiFootballEuropeanFixtures({ results: 0, fixtures: [], errors: ["rate limit"] }, "2026-11-18", "now")).toThrow(/rate limit/);
