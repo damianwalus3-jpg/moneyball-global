@@ -584,3 +584,34 @@ describe("API-Football Pro injury batch", () => {
     expect(cache.put).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe("API-Football Pro daily feed and odds ID validation", () => {
+  it("does not cache a rate-limited daily fixture feed", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn() };
+    vi.stubGlobal("caches", { default: cache });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      errors: { rateLimit: "Too many requests. Exceeded requests per minute." }, response: [],
+    }), { status: 200 })));
+    const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/fixtures/2026-11-19"), {
+      ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "private-api-football-key",
+    }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({ error: "api_football_rate_limited" });
+    expect(cache.put).not.toHaveBeenCalled();
+  });
+
+  it("accepts a numeric API-Football fixture ID for the odds endpoint", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ response: [{ bookmakers: [] }], results: 1 }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?apiFootballFixtureId=123", {
+      headers: { Authorization: "Bearer test-pilot-token-0123456789-abcdef" },
+    }), {
+      ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "private-api-football-key",
+      ODDS_PILOT_TOKEN: "test-pilot-token-0123456789-abcdef",
+    }, { waitUntil: vi.fn() });
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0].toString()).toContain("/odds?fixture=123");
+  });
+});
