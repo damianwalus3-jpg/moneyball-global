@@ -37,7 +37,7 @@ export function parseApiFootballFinalResult(
   fixture: ApiFootballFixtureEnrichment,
   expectedDate: string,
 ): ApiFootballVerifiedResult | null {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(expectedDate)) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expectedDate)) return null;
   const status = String(fixture.fixture?.status?.short ?? "").toUpperCase();
   if (!["FT", "AET", "PEN", "AWD", "WO"].includes(status)) return null;
   const kickoff = fixture.fixture?.date;
