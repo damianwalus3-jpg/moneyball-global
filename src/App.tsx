@@ -752,6 +752,7 @@ export default function App() {
           });
           const oddspapiPayload = await oddspapiResponse.json() as {
             status?: string; error?: string; message?: string; matched?: number; unmatched?: number; ambiguous?: number;
+            marketCatalogStatus?: string; marketTypes?: string[]; estimatedRequestsUsed?: number;
             quotes?: Array<{
               fixtureId: string; providerFixtureId: string; market: "1X2" | "DOUBLE_CHANCE";
               bookmaker: string; bookmakerSlug: string;
@@ -809,7 +810,7 @@ export default function App() {
             });
             const addedOddsPapi = addRecordsIfMissing(oddspapiSnapshots, "snapshotKey");
             oddspapiAudit = { ...oddspapiAudit, snapshots: addedOddsPapi };
-            oddspapiSummary = `OddsPapi: dopasowano ${oddspapiPayload.matched ?? 0}, kwotowania ${oddspapiSnapshots.length}, nowe snapshoty ${addedOddsPapi}, niejednoznaczne ${oddspapiPayload.ambiguous ?? 0}.`;
+            oddspapiSummary = `OddsPapi: dopasowano ${oddspapiPayload.matched ?? 0}, snapshoty ${addedOddsPapi}, rynki ${(oddspapiPayload.marketTypes ?? ["1X2"]).join("/")}, katalog ${oddspapiPayload.marketCatalogStatus ?? "nieznany"}, niejednoznaczne ${oddspapiPayload.ambiguous ?? 0}, zapytania ${oddspapiPayload.estimatedRequestsUsed ?? "—"}.`;
             setRecords(readRecords());
           } else {
             oddspapiSummary = `OddsPapi: ${oddspapiPayload.message || oddspapiPayload.status || "brak kwotowań"}.`;
