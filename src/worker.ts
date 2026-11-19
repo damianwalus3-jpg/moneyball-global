@@ -340,7 +340,7 @@ export default {
       const strikerDate = url.searchParams.get("strikerDate")?.trim();
       if (!fixtureId && !apiFootballFixtureId && !strikerGameId && !strikerDate) return json({ error: "fixtureId, apiFootballFixtureId, strikerGameId or strikerDate is required" }, 400, origin);
       if (strikerGameId && strikerDate) return json({ error: "use either strikerGameId or strikerDate, not both" }, 400, origin);
-      if ((fixtureId && !/^[a-zA-Z0-9_-]{3,100}$/.test(fixtureId)) || (apiFootballFixtureId && !/^\\d{1,12}$/.test(apiFootballFixtureId)) || (strikerGameId && !/^[a-zA-Z0-9_-]{1,40}$/.test(strikerGameId)) || (strikerDate && (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(strikerDate) || !Number.isFinite(Date.parse(`${strikerDate}T00:00:00Z`)) || new Date(`${strikerDate}T00:00:00Z`).toISOString().slice(0,10) !== strikerDate))) {
+      if ((fixtureId && !/^[a-zA-Z0-9_-]{3,100}$/.test(fixtureId)) || (apiFootballFixtureId && !/^\d{1,12}$/.test(apiFootballFixtureId)) || (strikerGameId && !/^[a-zA-Z0-9_-]{1,40}$/.test(strikerGameId)) || (strikerDate && (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(strikerDate) || !Number.isFinite(Date.parse(`${strikerDate}T00:00:00Z`)) || new Date(`${strikerDate}T00:00:00Z`).toISOString().slice(0,10) !== strikerDate))) {
         return json({ error: "invalid_fixture_identifier" }, 400, origin);
       }
 
@@ -756,7 +756,7 @@ export default {
         };
         const response = json(result, 200, origin);
         response.headers.set("X-MONEYBALL-SOURCE", "API-Football Pro");
-        response.headers.set("Cache-Control", "public, max-age=21600");
+        response.headers.set("Cache-Control", "public, max-age=900");
         ctx.waitUntil(cache.put(cacheKey, response.clone()));
         return response;
       } catch (error) {
