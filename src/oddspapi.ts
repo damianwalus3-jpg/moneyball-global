@@ -103,7 +103,9 @@ export function parseOddsPapiQuotes(
 ): OddsPapiQuote[] {
   const events = Array.isArray(oddsPayload) ? oddsPayload
     : oddsPayload && typeof oddsPayload === "object" && Array.isArray((oddsPayload as { fixtures?: unknown }).fixtures)
-      ? (oddsPayload as { fixtures: unknown[] }).fixtures : [];
+      ? (oddsPayload as { fixtures: unknown[] }).fixtures
+      : oddsPayload && typeof oddsPayload === "object" && typeof (oddsPayload as { fixtureId?: unknown }).fixtureId === "string"
+        ? [oddsPayload] : [];
   const quotes: OddsPapiQuote[] = [];
   for (const raw of events) {
     if (!raw || typeof raw !== "object") continue;
