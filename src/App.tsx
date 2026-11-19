@@ -519,7 +519,7 @@ export default function App() {
       // one conservative batch (max 20 IDs); provider errors fall through to free feeds.
       const apiIds = [...new Set(prioritizedPending
         .map(row => String(row.details.apiFootballFixtureId ?? ""))
-        .filter(id => /^\\d{1,12}$/.test(id)))].slice(0, 20);
+        .filter(id => /^\d{1,12}$/.test(id)))].slice(0, 20);
       const apiResults = new Map<string, ApiFootballFixtureEnrichment>();
       if (apiIds.length) {
         try {
