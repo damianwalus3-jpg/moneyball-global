@@ -19,7 +19,7 @@ export function valueThreeLegCoupon(
   records: TrackerRecord[],
   bookmaker: string,
   now = new Date().toISOString(),
-  maxAgeMinutes = 360,
+  maxAgeMinutes = 60,
   stake = 4,
 ): ValuedThreeLegCoupon | null {
   if (!bookmaker.trim() || !Number.isFinite(stake) || stake <= 0) return null;
