@@ -34,8 +34,9 @@ export interface OddsPapiFixtureMatch {
   kickoffDifferenceMinutes: number;
 }
 const TARGET_BOOKMAKER_SLUGS = new Set([
-  "bwin.be", "bwin", "bwin.de", "bet365", "unibet", "ladbrokes",
-  "circus", "betfirst", "betway", "pinnacle",
+  "bwin.be", "unibet.be", "betfirst.be", "bingoal.be", "goldenpalacesports.be",
+  "betcenter.be", "scooore.be", "starcasino.be", "napoleonsports.be",
+  "bwin", "bwin.de", "bet365", "unibet", "ladbrokes", "betway", "pinnacle",
 ]);
 
 export function brusselsUtcDayWindow(date: string): { from: string; to: string } {
@@ -139,9 +140,11 @@ export function parseOddsPapiQuotes(
       const marketActive = market.marketActive === true;
       const complete1X2 = bookmakerIsActive && !suspended && marketActive
         && one.price !== null && draw.price !== null && two.price !== null;
-      const priceTimes = [one.timestamp, draw.timestamp, two.timestamp].filter((value): value is string => !!value);
-      const capturedAt = priceTimes.length
-        ? priceTimes.sort((a, b) => Date.parse(b) - Date.parse(a))[0]
+      const priceTimes = [one.timestamp, draw.timestamp, two.timestamp];
+      const allPriceTimesPresent = priceTimes.every((value): value is string => !!value);
+      // Use the oldest price timestamp so a single stale selection makes the whole 1X2 snapshot stale.
+      const capturedAt = allPriceTimesPresent
+        ? priceTimes.sort((a, b) => Date.parse(a) - Date.parse(b))[0]
         : validTimestamp(event.updatedAt);
       quotes.push({
         providerFixtureId,
@@ -150,7 +153,7 @@ export function parseOddsPapiQuotes(
         odds1: one.price, oddsX: draw.price, odds2: two.price,
         complete1X2,
         capturedAt: capturedAt ?? null,
-        timestampBasis: priceTimes.length ? "price_changed_at" : capturedAt ? "fixture_updated_at" : "missing",
+        timestampBasis: allPriceTimesPresent ? "price_changed_at" : capturedAt ? "fixture_updated_at" : "missing",
         bookmakerIsActive, suspended, marketActive,
         fixturePath: typeof book.fixturePath === "string" ? book.fixturePath : null,
       });
