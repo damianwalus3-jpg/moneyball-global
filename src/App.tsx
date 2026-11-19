@@ -12,7 +12,7 @@ import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from ".
 import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
-import { describeHistoryProvenance, hasValidPredictionMarket, shouldAppendPrediction, shouldRetryPredictionWithEvidence, trackerFixtureIdentity } from "./prediction-record";
+import { describeHistoryProvenance, hasValidPredictionMarket, shouldAppendPrediction, shouldRetryPredictionAttempt, shouldRetryPredictionWithEvidence, trackerFixtureIdentity } from "./prediction-record";
 import { filterRecordsToCurrentScan } from "./current-scan-scope";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import { getPredictionDisplayStatus, isEvidenceQualifiedCandidate } from "./prediction-eligibility";
