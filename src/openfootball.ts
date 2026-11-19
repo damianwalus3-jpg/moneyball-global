@@ -99,6 +99,15 @@ const discoveredFeedRegistry = new Map<string, OpenFootballFeed>();
 let discoveredCatalogueCache: { season: string; cachedAt: number; feeds: OpenFootballFeed[] } | null = null;
 let discoveredCatalogueFailures: string[] = [];
 
+export function parseJsDelivrOpenFootballTree(payload: unknown): string[] {
+  if (!payload || typeof payload !== "object" || !Array.isArray((payload as { files?: unknown }).files)) {
+    throw new Error("jsDelivr OpenFootball catalogue: missing files array");
+  }
+  return ((payload as { files: Array<{ name?: unknown }> }).files)
+    .flatMap(file => typeof file?.name === "string" ? [file.name.replace(/^\\/+/, "")] : [])
+    .filter(path => path.length > 0);
+}
+
 export function mergeOpenFootballCatalogueResults(
   results: Array<{ repository: string; feeds: OpenFootballFeed[] } | { repository: string; error: string }>,
 ): { feeds: OpenFootballFeed[]; failed: string[] } {
@@ -174,28 +183,23 @@ async function discoverEuropeanOpenFootballFeeds(date: string): Promise<OpenFoot
   if (discoveredCatalogueCache?.season === season && Date.now() - discoveredCatalogueCache.cachedAt < CACHE_MS) return discoveredCatalogueCache.feeds;
   const repositories = ["europe", ...Object.keys(NATIONAL_OPENFOOTBALL_REPOSITORIES)];
   const settled = await Promise.allSettled(repositories.map(async repository => {
-    const response = await fetch("https://api.github.com/repos/openfootball/" + repository + "/git/trees/master?recursive=1", {
-      headers: {
-        Accept: "application/vnd.github+json",
-        "User-Agent": "MONEYBALL-REBUILT/1.0 (+https://moneyball-global-rebuild.damianwalus3.workers.dev)",
-      },
+    // jsDelivr's public GitHub metadata API exposes a flat file tree without consuming
+    // GitHub's much smaller unauthenticated REST API rate limit.
+    const metadataUrl = "https://data.jsdelivr.com/v1/packages/gh/openfootball/" + repository + "@master?structure=flat";
+    const response = await fetch(metadataUrl, {
+      headers: { Accept: "application/json", "User-Agent": "MONEYBALL-REBUILT/1.0 (+https://moneyball-global-rebuild.damianwalus3.workers.dev)" },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
-    if (!response.ok) {
-      let detail = "";
-      try {
-        const payload = await response.json() as { message?: string };
-        detail = typeof payload.message === "string" ? payload.message.slice(0, 240) : "";
-      } catch { /* response body is diagnostic only */ }
-      const remaining = response.headers.get("x-ratelimit-remaining");
-      const reset = response.headers.get("x-ratelimit-reset");
-      const resetHint = remaining === "0" && reset ? " (rate limit reset " + new Date(Number(reset) * 1000).toISOString() + ")" : "";
-      throw new Error("HTTP " + response.status + (detail ? ": " + detail : "") + resetHint);
-    }
-    const tree = await response.json() as OpenFootballTree;
-    if (!Array.isArray(tree.tree) || tree.truncated) throw new Error("catalogue is incomplete");
-    const paths = tree.tree.filter(entry => entry.type === "blob").map(entry => entry.path);
-    return { repository, feeds: repository === "europe" ? buildEuropeanOpenFootballFeeds(paths, date) : buildNationalOpenFootballFeeds(repository, paths, date) };
+    if (!response.ok) throw new Error("jsDelivr HTTP " + response.status);
+    const payload = await response.json() as unknown;
+    const paths = parseJsDelivrOpenFootballTree(payload);
+    if (!paths.length) throw new Error("jsDelivr catalogue returned no files");
+    return {
+      repository,
+      feeds: repository === "europe"
+        ? buildEuropeanOpenFootballFeeds(paths, date)
+        : buildNationalOpenFootballFeeds(repository, paths, date),
+    };
   }));
   const results = settled.map((result, index) => result.status === "fulfilled"
     ? result.value
@@ -208,6 +212,7 @@ async function discoverEuropeanOpenFootballFeeds(date: string): Promise<OpenFoot
   discoveredCatalogueCache = { season, cachedAt: Date.now(), feeds };
   return feeds;
 }
+
 const MONTHS: Record<string, number> = { Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12 };
 const FETCH_TIMEOUT_MS = 15_000;
 const CACHE_KEY = "moneyball.openfootball.v2:";
