@@ -125,6 +125,38 @@ describe("three-leg coupon candidates", () => {
     const invalidDc = { ...prediction("bad-dc", 0.9), details: { ...prediction("bad-dc", 0.9).details, market: "DOUBLE_CHANCE", selection: "1X", probability: 0.9, p1x: 0.9, px2: 0.9, p12: 0.9, strongCandidate: false, strongDoubleChance: true, couponEligible: true } };
     expect(buildThreeLegCandidates([invalidDc, prediction("b", 0.85), prediction("c", 0.86)], "2026-11-17")).toHaveLength(0);
   });
+  it("deduplicates a match represented by two provider IDs", () => {
+    const same = (id: string, probability: number): TrackerRecord => {
+      const base = prediction(id, probability);
+      return { ...base, title: "2026-11-17 · Club Brugge vs KAA Gent",
+        details: { ...base.details, fixtureId: id, home: "Club Brugge", away: "KAA Gent" } };
+    };
+    const candidates = buildThreeLegCandidates([
+      same("flashscore:1", 0.91), same("footynomad:2", 0.96),
+      prediction("other-b", 0.88), prediction("other-c", 0.87), prediction("other-d", 0.86),
+    ], "2026-11-17", 10);
+    expect(candidates).toHaveLength(1);
+    const legs = candidates.flatMap(candidate => candidate.legs);
+    expect(legs.filter(leg => leg.title.includes("Club Brugge"))).toHaveLength(1);
+    expect(new Set(legs.map(leg => leg.fixtureId)).size).toBe(3);
+  });
+
+  it("does not reuse a historical coupon fixture under another provider ID", () => {
+    const coupon: TrackerRecord = {
+      id: "old-coupon", kind: "coupon", title: "Historical coupon", status: "PAPER_NO_ODDS",
+      createdAt: "2026-11-17T10:00:00.000Z",
+      details: { date: "2026-11-17", legsJson: JSON.stringify([
+        { fixtureId: "flashscore:old", title: "2026-11-17 · Club Brugge vs KAA Gent", competition: "League" },
+      ]) },
+    };
+    const same = prediction("footynomad:new", 0.96);
+    same.title = "2026-11-17 · Club Brugge vs KAA Gent";
+    same.details = { ...same.details, home: "Club Brugge", away: "KAA Gent", competition: "League" };
+    const candidates = buildThreeLegCandidates([
+      coupon, same, prediction("other-b", 0.88), prediction("other-c", 0.87), prediction("other-d", 0.86),
+    ], "2026-11-17", 10);
+    expect(candidates.flatMap(candidate => candidate.legs).some(leg => leg.title.includes("Club Brugge"))).toBe(false);
+  });
   it("blocks records marked coupon-eligible when required evidence is incomplete", () => {
     const legacy = { ...prediction("legacy", 0.95), details: { ...prediction("legacy", 0.95).details, couponEligible: true, evidenceComplete: false } };
     expect(buildThreeLegCandidates([legacy, prediction("b", 0.9), prediction("c", 0.9)], "2026-11-17")).toHaveLength(0);

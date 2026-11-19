@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TrackerRecord } from "./tracker-store";
 import { listFreshOddsSnapshots, listOddsBookmakers, shouldAutoFetchDailyOdds, valueDoubleChanceSelectionFromOdds, valueSelectionFromOdds } from "./odds-value";
+import { canonicalFixtureId } from "./free-fixtures";
 
 const now = "2026-11-17T20:00:00.000Z";
 function odds(overrides: Partial<TrackerRecord["details"]> = {}, status = "COMPLETE_1X2", id = "odds-1"): TrackerRecord {
@@ -70,6 +71,19 @@ describe("verified odds valuation", () => {
       { p1x: 0.8, px2: 0.7, p12: 0.5 }, now)).toBeNull();
     expect(valueDoubleChanceSelectionFromOdds([dc], "fixture-1", "1X", "Book A",
       { p1x: 0.8, px2: 0.7, p12: 0.6 }, now)).toBeNull();
+  });
+  it("matches DC prices by canonical fixture identity across providers", () => {
+    const date = "2026-11-17";
+    const fixtureId = canonicalFixtureId(date, "A", "B", "League");
+    const dc = {
+      ...odds({ market: "DOUBLE_CHANCE", complete1X2: false, completeDoubleChance: true,
+        odds1: null, oddsX: null, odds2: null, odds1x: 1.25, oddsX2: 1.4, odds12: 1.3,
+        fixtureDate: date, home: "A", away: "B", competition: "League" }, "COMPLETE_DOUBLE_CHANCE"),
+      id: "provider-dc", title: `${date} · A vs B · Book A · OddsPapi · DOUBLE_CHANCE`,
+    };
+    expect(valueDoubleChanceSelectionFromOdds([dc], fixtureId, "1X", "Book A",
+      { p1x: 0.8, px2: 0.7, p12: 0.5 }, now)?.decimalOdds).toBe(1.25);
+    expect(listFreshOddsSnapshots([dc], fixtureId, now).map(row => row.id)).toContain("provider-dc");
   });
   it("rejects invalid model probability distributions", () => {
     expect(valueSelectionFromOdds([odds()], "fixture-1", "1", "Book A", { p1: 0.6, px: 0.3, p2: 0.3 }, now)).toBeNull();
