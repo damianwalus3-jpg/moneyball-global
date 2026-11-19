@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { canonicalFixtureId, scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
 import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballInjuriesForDate, fetchApiFootballOdds, parseApiFootballOdds, type ApiFootballFixtureEnrichment, type ApiFootballInjury } from "./api-football";
-import { brusselsKickoffTimestamp, isConfirmedPitchApiLineups, isWithinLineupRefreshWindow } from "./lineup-refresh";
+import { brusselsKickoffTimestamp, getPitchApiLineupStatus, isWithinLineupRefreshWindow } from "./lineup-refresh";
 import { addRecord, addRecords, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, loadRecentTeamFormAcrossCountry, mergeVerifiedTeamForms, loadCalcioItSerieDTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, predictFromPitchApiXgForm, predictFromNeutralPrior, type FormPrediction } from "./form-prediction";
@@ -571,9 +571,9 @@ export default function App() {
         lineupRefreshAttempts.current[match.id] = Date.now();
         try {
           const lineups = await fetchPitchApiMatchLineups(match.pitchApiMatchId!);
-          const confirmed = isConfirmedPitchApiLineups(lineups);
+          const status = getPitchApiLineupStatus(lineups);
+          const confirmed = status === "LINEUP_CONFIRMED";
           const observedAt = new Date().toISOString();
-          const status = confirmed ? "LINEUP_CONFIRMED" : "LINEUP_PENDING";
           const snapshotKey = match.id + "|" + status;
           addRecordsIfMissing([{
             kind: "match",
@@ -588,6 +588,9 @@ export default function App() {
               observedAt,
               homeConfirmed: lineups.home.confirmed,
               awayConfirmed: lineups.away.confirmed,
+              homeLineupType: lineups.home.lineup_type ?? null,
+              awayLineupType: lineups.away.lineup_type ?? null,
+              lineupEvidence: status === "LINEUP_CONFIRMED" ? "CONFIRMED" : status === "LINEUP_PREDICTED" ? "PROVIDER_PROJECTED_XI" : "NOT_PUBLISHED",
               homeStarterCount: lineups.home.starters?.length ?? 0,
               awayStarterCount: lineups.away.starters?.length ?? 0,
               minutesToKickoff: Math.max(0, Math.round(((brusselsKickoffTimestamp(match.date, match.time) ?? Date.now()) - Date.now()) / 60_000)),
