@@ -603,6 +603,7 @@ describe("API-Football Pro daily feed and odds ID validation", () => {
 
   it("accepts a numeric API-Football fixture ID for the odds endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ response: [{ bookmakers: [] }], results: 1 }), { status: 200 }));
+    vi.stubGlobal("caches", { default: { match: vi.fn().mockResolvedValue(undefined), put: vi.fn() } });
     vi.stubGlobal("fetch", fetchMock);
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?apiFootballFixtureId=123", {
       headers: { Authorization: "Bearer test-pilot-token-0123456789-abcdef" },
