@@ -426,7 +426,7 @@ export default {
       const authorization = request.headers.get("Authorization") ?? "";
       const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
       if (!constantTimeEqual(suppliedToken, env.ODDS_PILOT_TOKEN)) return json({ error: "unauthorized" }, 401, origin);
-      let input: { date?: unknown; fixtures?: unknown };
+      let input: { date?: unknown; slot?: unknown; fixtures?: unknown };
       try { input = await request.json() as typeof input; }
       catch { return json({ error: "invalid_json" }, 400, origin); }
       const date = typeof input.date === "string" ? input.date : "";
