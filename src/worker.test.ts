@@ -674,6 +674,34 @@ describe("API-Football Pro daily feed and odds ID validation", () => {
     expect(cache.put).toHaveBeenCalledTimes(1);
   });
 
+  it("shares an API-Football odds rate limit with the fixtures, enrichment and injury routes", async () => {
+    const entries = new Map<string, Response>();
+    const cache = {
+      match: vi.fn(async (key: Request) => entries.get(key.url)?.clone()),
+      put: vi.fn(async (key: Request, response: Response) => { entries.set(key.url, response.clone()); }),
+    };
+    vi.stubGlobal("caches", { default: cache });
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      errors: { rateLimit: "Too many requests per minute" }, response: [],
+    }), { status: 429, headers: { "Retry-After": "23" } }));
+    vi.stubGlobal("fetch", upstream);
+    const odds = await worker.fetch(new Request("https://moneyball.example/api/odds/pilot?apiFootballFixtureId=123", {
+      headers: { Authorization: "Bearer test-pilot-token-0123456789-abcdef" },
+    }), {
+      ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "private-api-football-key",
+      ODDS_PILOT_TOKEN: "test-pilot-token-0123456789-abcdef",
+    }, { waitUntil: vi.fn() });
+    expect(odds.status).toBe(200);
+    await expect(odds.json()).resolves.toMatchObject({ results: { apiFootball: { error: "api_football_rate_limited", retryAfterSeconds: 23 } } });
+
+    const fixtures = await worker.fetch(new Request("https://moneyball.example/api/api-football/fixtures/2026-11-19"), {
+      ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "private-api-football-key",
+    }, { waitUntil: vi.fn() });
+    expect(fixtures.status).toBe(429);
+    expect(fixtures.headers.get("Retry-After")).toBe("23");
+    expect(upstream).toHaveBeenCalledTimes(1);
+  });
+
   it("accepts a numeric API-Football fixture ID for the odds endpoint", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ response: [{ bookmakers: [] }], results: 1 }), { status: 200 }));
     vi.stubGlobal("caches", { default: { match: vi.fn().mockResolvedValue(undefined), put: vi.fn() } });
