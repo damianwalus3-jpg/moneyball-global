@@ -3,6 +3,7 @@ import type { TrackerRecord } from "./tracker-store";
 import type { ThreeLegCandidate } from "./coupon-engine";
 import { valueThreeLegCoupon } from "./coupon-value";
 import { canonicalFixtureId } from "./free-fixtures";
+import { canonicalFixtureId } from "./free-fixtures";
 
 const now = "2026-11-17T20:00:00.000Z";
 const candidate: ThreeLegCandidate = {
@@ -138,6 +139,42 @@ describe("three-leg coupon odds valuation", () => {
     expect(value?.combinedOdds).toBeCloseTo(1.25 * 1.3 * 1.35);
     expect(value?.combinedProbability).toBeCloseTo(0.612);
   });
+  it("prices 1X2 legs when prediction and odds records use different provider fixture IDs", () => {
+    const fixtures = [
+      { predictionId: "flashscore:1", oddsId: "footynomad:101", home: "Club Brugge", away: "KAA Gent", odds: 1.5 },
+      { predictionId: "flashscore:2", oddsId: "footynomad:102", home: "Anderlecht", away: "Genk", odds: 1.6 },
+      { predictionId: "flashscore:3", oddsId: "footynomad:103", home: "Antwerp", away: "Gent", odds: 1.7 },
+    ];
+    const predictions = fixtures.map(item => ({
+      ...row("prediction", item.predictionId, {
+        fixtureDate: "2026-11-17", home: item.home, away: item.away, competition: "League",
+        market: "1X2", model: "v1", selection: "1", p1: 0.8, px: 0.1, p2: 0.1,
+        strongCandidate: true, couponEligible: true, evidenceComplete: true,
+      }, "KANDYDAT"),
+      title: `2026-11-17 · ${item.home} vs ${item.away}`,
+    }));
+    const prices = fixtures.map(item => ({
+      ...row("odds", item.oddsId, {
+        fixtureDate: "2026-11-17", home: item.home, away: item.away, competition: "League",
+        market: "1X2", bookmaker: "Book A", complete1X2: true,
+        odds1: item.odds, oddsX: 4, odds2: 6, capturedAt: "2026-11-17T19:30:00.000Z",
+      }, "COMPLETE_1X2"),
+      title: `${item.home} vs ${item.away} · Book A · OddsPapi · 1X2`,
+    }));
+    const legs = fixtures.map(item => ({
+      fixtureId: canonicalFixtureId("2026-11-17", item.home, item.away, "League"),
+      title: `${item.home} vs ${item.away}`, competition: "League", selection: "1" as const,
+      market: "1X2" as const, probability: 0.8, source: "model", model: "v1",
+    }));
+    const candidate: ThreeLegCandidate = {
+      date: "2026-11-17", legs: legs as ThreeLegCandidate["legs"],
+      combinedProbability: 0.512, averageProbability: 0.8, oddsAvailable: false,
+    };
+    const value = valueThreeLegCoupon(candidate, [...predictions, ...prices], "Book A", now);
+    expect(value?.combinedProbability).toBeCloseTo(0.512);
+    expect(value?.combinedOdds).toBeCloseTo(1.5 * 1.6 * 1.7);
+  });
+
   it("rejects invalid stake and stale price data", () => {
     expect(valueThreeLegCoupon(candidate, fullRecords(), "Book A", now, 360, 0)).toBeNull();
     const stale = fullRecords().map(row => row.kind === "odds"
