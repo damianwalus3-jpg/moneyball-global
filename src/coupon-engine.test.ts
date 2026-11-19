@@ -129,4 +129,28 @@ describe("three-leg coupon candidates", () => {
     const legacy = { ...prediction("legacy", 0.95), details: { ...prediction("legacy", 0.95).details, couponEligible: true, evidenceComplete: false } };
     expect(buildThreeLegCandidates([legacy, prediction("b", 0.9), prediction("c", 0.9)], "2026-11-17")).toHaveLength(0);
   });
+
+  it("returns globally disjoint three-leg coupons rather than overlapping combinations", () => {
+    const candidates = buildThreeLegCandidates([
+      prediction("a", 0.95), prediction("b", 0.94), prediction("c", 0.93),
+      prediction("d", 0.92), prediction("e", 0.91), prediction("f", 0.90),
+    ], "2026-11-17", 10);
+    expect(candidates).toHaveLength(2);
+    const allIds = candidates.flatMap(coupon => coupon.legs.map(leg => leg.fixtureId));
+    expect(allIds).toHaveLength(6);
+    expect(new Set(allIds).size).toBe(6);
+  });
+
+  it("does not reuse a fixture already present in a historical coupon", () => {
+    const historical: TrackerRecord = {
+      id: "old-coupon", kind: "coupon", title: "Historical coupon", status: "PAPER_NO_ODDS",
+      createdAt: "2026-11-16T08:00:00Z",
+      details: { legsJson: JSON.stringify([{ fixtureId: "a", selection: "1" }, { fixtureId: "old-b", selection: "X" }, { fixtureId: "old-c", selection: "2" }]) },
+    };
+    const candidates = buildThreeLegCandidates([
+      historical, prediction("a", 0.99), prediction("b", 0.90), prediction("c", 0.89), prediction("d", 0.88),
+    ], "2026-11-17", 10);
+    expect(candidates).toHaveLength(0);
+  });
+
 });
