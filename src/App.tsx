@@ -1160,7 +1160,7 @@ export default function App() {
         if (Date.now() - lastAttempt < 5 * 60 * 1000) return;
         const kinds = ["scan", "match", "prediction", "coupon", "result", "odds", "bet", "ledger"] as const;
         const counts = Object.fromEntries(kinds.map(kind => [kind === "ledger" ? "ledgerEntries" : kind === "bet" ? "bets" : kind === "scan" ? "scans" : kind === "match" ? "matches" : kind === "prediction" ? "predictions" : kind === "coupon" ? "coupons" : kind === "result" ? "results" : "odds", records.filter(row => row.kind === kind).length]));
-        const lastRecordAt = records.reduce((latest, row) => Date.parse(row.createdAt) > Date.parse(latest) ? row.createdAt : latest, "");
+        const lastRecordAt = records.reduce((latest, row) => !latest || Date.parse(row.createdAt) > Date.parse(latest) ? row.createdAt : latest, "");
         const response = await fetch("/api/owner/tracker-diagnostics", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
