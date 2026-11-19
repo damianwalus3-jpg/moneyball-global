@@ -2149,3 +2149,13 @@
 - Historical Tracker data, predictions, coupons, results, settlements, bankroll and provider secrets are not removed or modified.
 - OddsPapi configuration and its owner-only gate are retained for possible future reactivation. No automatic paid OddsPapi requests are made by the app under this mode. StrikerAPI remains disabled; no separate consent is enabled.
 - This change does not claim complete API-Football odds coverage for every European league or match. Provider 429 limits and missing bookmaker markets remain possible and must be surfaced as data-coverage limitations, not fatal prediction errors.
+
+
+## 2026-11-19 — Stage 180: device Tracker acceptance support
+
+- Added a Tracker record-kind filter so local records can be inspected by type (coupon, bet, result, odds, prediction, etc.) instead of relying on title text search.
+- Added a read-only local financial integrity summary showing saved paper coupons, coupon settlements, open coupons, selected bets, bet settlements and open bets. The summary reads the existing local Tracker records and performs no writes.
+- Existing local storage format, record IDs, records, predictions, coupons, settlements and bankroll are unchanged. No migration or reset is performed.
+- User-provided Android screenshots confirm the local browser currently contains 1,487 records, 15 saved matches, complete 1X2 and Double Chance probability fields for all 15 matches, and zero missing/invalid probability rows. This is device-visible evidence, not a full validation of every record.
+- The user-visible coupon module correctly reports no qualifying three-leg coupon for the 2026-11-19 scan because it has not found three distinct matches meeting the confirmed >=75% selection threshold. This is not treated as an application error and no weak coupon is fabricated.
+- Remaining device acceptance item is to inspect the new read-only coupon/bet settlement summary on the user's device after deployment. Remote CI cannot inspect the device's private localStorage. No claim is made that local coupon/bet settlement counts were verified from the server.
