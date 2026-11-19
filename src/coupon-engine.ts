@@ -15,7 +15,7 @@ function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCand
   if (record.kind !== "prediction" || record.status !== "KANDYDAT" || d.fixtureDate !== date || typeof d.fixtureId !== "string" || !d.fixtureId) return null;
   const fixtureIdentity = trackerFixtureIdentity(record);
   if (!fixtureIdentity) return null;
-  if (d.couponEligible !== true || d.evidenceComplete !== true
+  if (d.couponEligible !== true
     || d.modelSourceType === "baseline_only"
     || d.predictionMethod === "neutral-prior-poisson"
     || d.model === "moneyball:neutral-prior-poisson") return null;
