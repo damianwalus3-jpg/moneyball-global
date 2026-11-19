@@ -246,15 +246,16 @@ function savePredictionRecord(
       : method === "pitchapi-recent-xg-poisson"
         ? (pitchApiXgForms?.home.sampleSize ?? 0) >= 3 && (pitchApiXgForms?.away.sampleSize ?? 0) >= 3
         : false;
-    const couponEligible = !!variant && method !== "neutral-prior-poisson" && modelSampleQualified
+    const modelCandidateEligible = !!variant && method !== "neutral-prior-poisson" && modelSampleQualified
       && hasKnownKickoff(match.date, match.time);
+    const couponEligible = modelCandidateEligible && evidenceAudit.complete;
     const topProbability = variant?.topProbability ?? null;
-    const modelStrongCandidate = couponEligible && typeof topProbability === "number" && topProbability >= 0.75;
+    const modelStrongCandidate = modelCandidateEligible && typeof topProbability === "number" && topProbability >= 0.75;
     const strongCandidate = modelStrongCandidate; // Missing supporting evidence remains a warning, not a probability-qualification veto.
     const dcOptions = [{ selection: "1X", probability: dc?.oneX ?? null }, { selection: "X2", probability: dc?.xTwo ?? null }, { selection: "12", probability: dc?.oneTwo ?? null }];
     const bestDc = dcOptions.filter(item => typeof item.probability === "number").sort((a, b) => (b.probability as number) - (a.probability as number))[0];
     const dcProbability = typeof bestDc?.probability === "number" ? bestDc.probability : null;
-    const modelStrongDoubleChance = couponEligible && dcProbability !== null && dcProbability >= 0.75;
+    const modelStrongDoubleChance = modelCandidateEligible && dcProbability !== null && dcProbability >= 0.75;
     const strongDoubleChance = modelStrongDoubleChance; // Double Chance uses the same independent model/sample threshold.
     const evidenceRejectionReason = evidenceAudit.complete ? null : "WSTĘPNA PROGNOZA: brakuje części danych: " + getEvidenceGaps(evidenceAudit).join(", ");
     const common = {
