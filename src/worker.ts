@@ -543,7 +543,7 @@ export default {
             }
           } catch { /* malformed cache falls back to documented 1X2 market */ }
         } else if (input.allowBillableMarketCatalogue === true && env.ODDSPAPI_MARKET_CATALOGUE_ENABLED === "true"
-          && slotRequestBudget >= fullOddsBatchCount + 2 && remainingAfterFixtures >= fullOddsBatchCount + 1) {
+          && slotRequestBudget >= 3 && remainingAfterFixtures >= 2) {
           marketCatalogRequestUsed = true;
           // Market catalogue is billed once per seven-day cache window. Reserve enough quota
           // for every required odds batch before spending the catalogue request.
