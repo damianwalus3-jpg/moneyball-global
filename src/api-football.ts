@@ -137,6 +137,8 @@ export interface ApiFootballOddsBatch {
   provider: string;
   generatedAt: string;
   requestedFixtureIds: string[];
+  pagesFetched?: number;
+  totalPagesAvailable?: number;
   odds: Array<{ fixtureId: string; status: string; results?: number; data?: unknown[]; error?: string }>;
   failedFixtureIds?: string[];
 }
