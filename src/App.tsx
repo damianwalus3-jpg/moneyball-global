@@ -734,10 +734,6 @@ export default function App() {
       try { localStorage.setItem(STRIKER_DAILY_ATTEMPT_KEY, fixtureScan.date); } catch { /* best-effort persistence */ }
       setLastOddsAttemptDate(fixtureScan.date);
     }
-    if (oddspapiPending) {
-      try { localStorage.setItem(ODDSPAPI_DAILY_ATTEMPT_KEY, fixtureScan.date); } catch { /* best-effort persistence */ }
-      setLastOddsPapiAttemptDate(fixtureScan.date);
-    }
     setOddsLoading(true);
     setOddsNotice("");
     let oddspapiSummary = "";
@@ -790,8 +786,10 @@ export default function App() {
             utcDate,
           };
           if (!oddspapiResponse.ok) throw new Error(oddspapiPayload.message || oddspapiPayload.error || `OddsPapi HTTP ${oddspapiResponse.status}`);
-          if (oddspapiPayload.status === "ok") {
-            const fixtureById = new Map(fixtureScan.fixtures.map(fixture => [fixture.id, fixture]));
+          if (oddspapiPayload.status !== "ok") {
+            throw new Error(oddspapiPayload.message || oddspapiPayload.error || "OddsPapi nie potwierdził poprawnej synchronizacji.");
+          }
+          const fixtureById = new Map(fixtureScan.fixtures.map(fixture => [fixture.id, fixture]));
             const oddspapiSnapshots = (oddspapiPayload.quotes ?? []).flatMap(quote => {
               const fixture = fixtureById.get(quote.fixtureId);
               if (!fixture || hasKickoffPassed(fixture.date, fixture.time)) return [];
@@ -825,15 +823,19 @@ export default function App() {
                 },
               }];
             });
-            const addedOddsPapi = addRecordsIfMissing(oddspapiSnapshots, "snapshotKey");
-            oddspapiAudit = { ...oddspapiAudit, snapshots: addedOddsPapi };
-            oddspapiSummary = `OddsPapi: dopasowano ${oddspapiPayload.matched ?? 0}, snapshoty ${addedOddsPapi}, rynki ${(oddspapiPayload.marketTypes ?? ["1X2"]).join("/")}, katalog ${oddspapiPayload.marketCatalogStatus ?? "nieznany"}, niejednoznaczne ${oddspapiPayload.ambiguous ?? 0}, zapytania ${oddspapiPayload.estimatedRequestsUsed ?? "—"}/${oddspapiPayload.slotRequestBudget ?? "—"}, pominięte rozgrywki z limitu ${oddspapiPayload.skippedTournamentIds?.length ?? 0}.`;
-            setRecords(readRecords());
-          } else {
-            oddspapiSummary = `OddsPapi: ${oddspapiPayload.message || oddspapiPayload.status || "brak kwotowań"}.`;
-          }
+          const addedOddsPapi = addRecordsIfMissing(oddspapiSnapshots, "snapshotKey");
+          oddspapiAudit = { ...oddspapiAudit, snapshots: addedOddsPapi };
+          oddspapiSummary = `OddsPapi: dopasowano ${oddspapiPayload.matched ?? 0}, snapshoty ${addedOddsPapi}, rynki ${(oddspapiPayload.marketTypes ?? ["1X2"]).join("/")}, katalog ${oddspapiPayload.marketCatalogStatus ?? "nieznany"}, niejednoznaczne ${oddspapiPayload.ambiguous ?? 0}, zapytania ${oddspapiPayload.estimatedRequestsUsed ?? "—"}/${oddspapiPayload.slotRequestBudget ?? "—"}, pominięte rozgrywki z limitu ${oddspapiPayload.skippedTournamentIds?.length ?? 0}.`;
+          setRecords(readRecords());
+          // Mark the date/slot only after a valid provider response has been parsed and stored.
+          try { localStorage.setItem(ODDSPAPI_DAILY_ATTEMPT_KEY, oddspapiAttemptKey); } catch { /* best-effort persistence */ }
+          setLastOddsPapiAttemptDate(oddspapiAttemptKey);
         } catch (error) {
-          oddspapiSummary = "OddsPapi: " + (error instanceof Error ? error.message : "błąd dostawcy") + ". Prognozy pozostają bez zmian.";
+          try {
+            if (localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_KEY) === oddspapiAttemptKey) localStorage.removeItem(ODDSPAPI_DAILY_ATTEMPT_KEY);
+          } catch { /* storage may be unavailable */ }
+          setLastOddsPapiAttemptDate("");
+          oddspapiSummary = "OddsPapi: " + (error instanceof Error ? error.message : "błąd dostawcy") + ". Próba pozostaje możliwa po ponownym skanie; prognozy pozostają bez zmian.";
         }
       }
       if (!strikerPending) {
