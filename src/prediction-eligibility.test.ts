@@ -51,7 +51,7 @@ describe("prediction display status", () => {
       details: { evidenceComplete: true, strongCandidate: false, strongDoubleChance: false },
     });
     expect(getPredictionDisplayStatus(notQualified, "1X2", 0.80)).toBe("WYSOKIE PRAWDOPODOBIEŃSTWO · WYMAGA KWALIFIKACJI");
-    expect(getPredictionDisplayStatus(notQualified, "DOUBLE_CHANCE", 0.91)).toBe("WYSOKIE PRAWDOPODOBIEŃSTWO · NIEKWALIFIKOWANE");
+    expect(getPredictionDisplayStatus(notQualified, "DOUBLE_CHANCE", 0.91)).toBe("WYSOKIE PRAWDOPODOBIEŃSTWO · WYMAGA KWALIFIKACJI");
   });
 
   it("shows qualified status only when evidence and market-specific strong flag pass", () => {
