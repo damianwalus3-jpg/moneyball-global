@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TrackerRecord } from "./tracker-store";
-import { listFreshOddsSnapshots, listOddsBookmakers, shouldAutoFetchDailyOdds, valueSelectionFromOdds } from "./odds-value";
+import { listFreshOddsSnapshots, listOddsBookmakers, shouldAutoFetchDailyOdds, valueDoubleChanceSelectionFromOdds, valueSelectionFromOdds } from "./odds-value";
 
 const now = "2026-11-17T20:00:00.000Z";
 function odds(overrides: Partial<TrackerRecord["details"]> = {}, status = "COMPLETE_1X2"): TrackerRecord {
@@ -42,6 +42,35 @@ describe("verified odds valuation", () => {
     expect(valueSelectionFromOdds([odds({ capturedAt: "" })], "fixture-1", "1", "Book A", model, now)).toBeNull();
   });
 
+  it("values direct Double Chance prices without treating overlapping outcomes as a three-way market", () => {
+    const dc = odds({
+      market: "DOUBLE_CHANCE", complete1X2: false, completeDoubleChance: true,
+      odds1: null, oddsX: null, odds2: null, odds1x: 1.25, oddsX2: 1.4, odds12: 1.3,
+    }, "COMPLETE_DOUBLE_CHANCE");
+    const result = valueDoubleChanceSelectionFromOdds(
+      [dc], "fixture-1", "1X", "Book A", { p1x: 0.8, px2: 0.7, p12: 0.5 }, now,
+    );
+    expect(result?.market).toBe("DOUBLE_CHANCE");
+    expect(result?.decimalOdds).toBe(1.25);
+    expect(result?.expectedValue).toBeCloseTo(0);
+    expect(result?.marketProbabilityNoVig).toBeNull();
+  });
+  it("rejects missing, stale, incomplete and mathematically invalid Double Chance prices", () => {
+    const dc = odds({
+      market: "DOUBLE_CHANCE", complete1X2: false, completeDoubleChance: true,
+      odds1: null, oddsX: null, odds2: null, odds1x: 1.25, oddsX2: 1.4, odds12: 1.3,
+    }, "COMPLETE_DOUBLE_CHANCE");
+    expect(valueDoubleChanceSelectionFromOdds([dc], "fixture-1", "1X", "Book A",
+      { p1x: 0.8, px2: 0.7, p12: 0.5 }, now)).not.toBeNull();
+    expect(valueDoubleChanceSelectionFromOdds([odds()], "fixture-1", "1X", "Book A",
+      { p1x: 0.8, px2: 0.7, p12: 0.5 }, now)).toBeNull();
+    expect(valueDoubleChanceSelectionFromOdds([{ ...dc, status: "INCOMPLETE_DOUBLE_CHANCE" }], "fixture-1", "1X", "Book A",
+      { p1x: 0.8, px2: 0.7, p12: 0.5 }, now)).toBeNull();
+    expect(valueDoubleChanceSelectionFromOdds([{ ...dc, details: { ...dc.details, capturedAt: "2026-11-17T18:59:00.000Z" } }], "fixture-1", "1X", "Book A",
+      { p1x: 0.8, px2: 0.7, p12: 0.5 }, now)).toBeNull();
+    expect(valueDoubleChanceSelectionFromOdds([dc], "fixture-1", "1X", "Book A",
+      { p1x: 0.8, px2: 0.7, p12: 0.6 }, now)).toBeNull();
+  });
   it("rejects invalid model probability distributions", () => {
     expect(valueSelectionFromOdds([odds()], "fixture-1", "1", "Book A", { p1: 0.6, px: 0.3, p2: 0.3 }, now)).toBeNull();
   });
