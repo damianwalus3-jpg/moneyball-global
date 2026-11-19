@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballFixturesForDate, fetchApiFootballInjuriesForDate, fetchApiFootballOdds, parseApiFootballOdds, resetApiFootballRequestThrottleForTests } from "./api-football";
+import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballFixturesForDate, fetchApiFootballInjuriesForDate, fetchApiFootballOdds, parseApiFootballFinalResult, parseApiFootballOdds, resetApiFootballRequestThrottleForTests } from "./api-football";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); resetApiFootballRequestThrottleForTests(); });
 
@@ -106,6 +106,31 @@ describe("API-Football daily injury feed", () => {
     vi.stubGlobal("fetch", fetchMock);
     await expect(fetchApiFootballInjuriesForDate("2026-02-31")).rejects.toThrow("Nieprawidłowa data");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("API-Football final result parsing", () => {
+  const base = {
+    fixture: { id: 123, date: "2026-11-18T19:45:00+00:00", status: { short: "FT" } },
+    goals: { home: 2, away: 1 },
+  };
+  it("accepts a verified full-time score on the expected Brussels date", () => {
+    expect(parseApiFootballFinalResult(base, "2026-11-18")).toMatchObject({
+      actual: "1", homeGoals: 2, awayGoals: 1, date: "2026-11-18", source: "API-Football Pro",
+    });
+  });
+  it("rejects non-final fixtures and scores with missing goals", () => {
+    expect(parseApiFootballFinalResult({ ...base, fixture: { ...base.fixture, status: { short: "NS" } } }, "2026-11-18")).toBeNull();
+    expect(parseApiFootballFinalResult({ ...base, goals: { home: null, away: 1 } }, "2026-11-18")).toBeNull();
+  });
+  it("rejects fixtures that fall on a different Brussels-local date", () => {
+    expect(parseApiFootballFinalResult({ ...base, fixture: { ...base.fixture, date: "2026-11-17T23:30:00Z" } }, "2026-11-18")).toBeNull();
+    expect(parseApiFootballFinalResult(base, "2026-11-17")).toBeNull();
+  });
+  it("accepts extra time and penalties as final statuses", () => {
+    expect(parseApiFootballFinalResult({ ...base, fixture: { ...base.fixture, status: { short: "AET" } } }, "2026-11-18")?.actual).toBe("1");
+    expect(parseApiFootballFinalResult({ ...base, fixture: { ...base.fixture, status: { short: "PEN" } } }, "2026-11-18")?.actual).toBe("1");
   });
 });
 
