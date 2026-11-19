@@ -39,7 +39,24 @@ function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCand
   if (d.selection !== ranked[0].selection || ranked[0].probability < 0.75) return null;
   return { ...base, selection: d.selection as "1" | "X" | "2", market: "1X2", probability: ranked[0].probability };
 }
+function fixturesAlreadyUsedByCoupons(records: TrackerRecord[]): Set<string> {
+  const used = new Set<string>();
+  for (const record of records) {
+    if (record.kind !== "coupon" || typeof record.details.legsJson !== "string") continue;
+    try {
+      const legs: unknown = JSON.parse(record.details.legsJson);
+      if (!Array.isArray(legs)) continue;
+      for (const leg of legs) {
+        if (leg && typeof leg === "object" && typeof (leg as Record<string, unknown>).fixtureId === "string") {
+          used.add((leg as Record<string, string>).fixtureId);
+        }
+      }
+    } catch { /* malformed historical coupon is ignored, never rewritten */ }
+  }
+  return used;
+}
 export function buildThreeLegCandidates(records: TrackerRecord[], date: string, limit = 30): ThreeLegCandidate[] {
+  const historicallyUsed = fixturesAlreadyUsedByCoupons(records);
   const newest = new Map<string, TrackerRecord>(), timestamps = new Map<string, number>();
   for (const record of records) {
     const d = record.details;
@@ -51,7 +68,7 @@ export function buildThreeLegCandidates(records: TrackerRecord[], date: string, 
   }
   const bestByFixture = new Map<string, CouponLegCandidate>();
   for (const record of newest.values()) {
-    const candidate = candidateFromRecord(record, date); if (!candidate) continue;
+    const candidate = candidateFromRecord(record, date); if (!candidate || historicallyUsed.has(candidate.fixtureId)) continue;
     const previous = bestByFixture.get(candidate.fixtureId);
     if (!previous || candidate.probability > previous.probability) bestByFixture.set(candidate.fixtureId, candidate);
   }
@@ -63,5 +80,15 @@ export function buildThreeLegCandidates(records: TrackerRecord[], date: string, 
     const combinedProbability = legs.reduce((product, leg) => product * leg.probability, 1);
     output.push({ legs, combinedProbability, averageProbability: legs.reduce((sum, leg) => sum + leg.probability, 0) / 3, date, oddsAvailable: false });
   }
-  return output.sort((a, b) => b.combinedProbability - a.combinedProbability).slice(0, Math.max(0, limit));
+  // A fixture may appear in only one coupon across the entire generated set.
+  // Existing coupons are treated as consumed; their historical rows are never edited.
+  const selected: ThreeLegCandidate[] = [];
+  const used = new Set(historicallyUsed);
+  for (const candidate of output.sort((a, b) => b.combinedProbability - a.combinedProbability)) {
+    if (candidate.legs.some(leg => used.has(leg.fixtureId))) continue;
+    selected.push(candidate);
+    for (const leg of candidate.legs) used.add(leg.fixtureId);
+    if (selected.length >= Math.max(0, limit)) break;
+  }
+  return selected;
 }
