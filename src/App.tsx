@@ -610,12 +610,12 @@ export default function App() {
         if (!fixture || !game || hasKickoffPassed(fixture.date, fixture.time)) return [];
         return (game.bookmakers ?? []).flatMap(book => {
           if (!book.name) return [];
-          const capturedAt = book.capturedAt || striker.capturedAt || new Date().toISOString();
+          const capturedAt = book.capturedAt || striker.capturedAt || ""; // Missing provider timestamps must never be replaced with the local clock.
           const snapshotKey = [fixture.id, "StrikerAPI", book.name, capturedAt].join("|");
           return [{
             kind: "odds" as const,
             title: `${fixture.home} vs ${fixture.away} · ${book.name}`,
-            status: book.complete1X2 ? "COMPLETE_1X2" : "INCOMPLETE_1X2",
+            status: !book.complete1X2 ? "INCOMPLETE_1X2" : capturedAt ? "COMPLETE_1X2" : "UNVERIFIED_TIMESTAMP",
             details: {
               snapshotKey,
               fixtureId: fixture.id,
