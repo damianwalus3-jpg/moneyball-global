@@ -364,7 +364,7 @@ export function parseApiFootballEuropeanFixtures(payload: unknown, targetDate: s
       source: "API-Football Pro",
       sourceUpdatedAt: updatedAt,
       ...(fixtureId ? { apiFootballFixtureId: String(fixtureId) } : {}),
-      ...(item.league.id ? { apiFootballLeagueId: String(item.league.id) } : {}),
+      ...(item.league?.id ? { apiFootballLeagueId: String(item.league.id) } : {}),
     } satisfies FreeFixture];
   });
 }
