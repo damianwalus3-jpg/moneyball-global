@@ -1868,3 +1868,17 @@
 - Historical Tracker records, coupons, settlements and bankroll were not modified.
 - Implementation commits: `48960ce`, `b1b2806`, `d84d682`, `4af8525`.
 - Deployment status: pending CI, production deployment and smoke-test confirmation.
+
+## 2026-11-19 — Stage 158: production odds freshness hardening and scan-integrity audit
+- Confirmed Stage 157 status-label correction is deployed on the isolated rebuild Worker; CI and deploy workflows both completed successfully, including TypeScript, unit tests, build, Worker smoke test and current-day European source reconciliation.
+- Audited the live implementation paths for prediction persistence, 1X2/DC market coverage, odds snapshots, coupon valuation, paper settlement, and Tracker storage.
+- Confirmed bulk scan invokes analysis for every discovered pre-kickoff fixture; each model attempt writes independent 1X2 and Double Chance rows, including explicit rejected/incomplete rows when a usable model distribution is unavailable. Actual completeness still must be checked against the owner's local Tracker export because Tracker data lives in browser localStorage and is not available to CI.
+- Confirmed coupon generation enforces exactly three unique fixtures and only uses latest qualifying prediction per fixture/model/market. Current odds valuation deliberately refuses Double Chance legs because the connected snapshot schema contains only 1X2 prices.
+- Found and fixed a critical provenance defect: when a provider omitted its capture timestamp, the UI previously substituted the local current time, which could falsely make an old/untimestamped quote appear fresh. Missing provider timestamps are now stored as an empty value and marked UNVERIFIED_TIMESTAMP; they cannot enter fresh-odds lists or coupon valuation.
+- Tightened the default coupon quote freshness window from 360 minutes to 60 minutes, matching the app's hourly odds freshness policy. Added regression tests for missing timestamps and quotes just beyond 60 minutes.
+- Confirmed the current odds pilot is StrikerAPI-based and requires the owner-configured Worker secret/token; no direct Bwin Belgium feed has been verified. Do not label bookmaker coverage or Bwin availability as confirmed until a real provider response proves it.
+- Confirmed local Tracker is device/browser-local JSON storage; it is not a shared cloud database. Cross-device state and the actual phone's match/market counts cannot be certified from GitHub CI alone.
+- Confirmed evidence qualification is intentionally strict: xG/xGA, confirmed lineups, injuries, suspensions, shots/chances, tactics, schedule/fatigue and current odds/EV must all be verified before the record can be a coupon-eligible candidate. A raw probability >=75% can therefore remain rejected if the evidence checklist is incomplete; the UI now distinguishes this from a genuinely sub-75% forecast.
+- Remaining acceptance blockers: owner-side Tracker export for the real current scan; live odds provider secret and real bookmaker response (especially Bwin Belgium); verification of DC quote source; audit of historical device records and bankroll ledger; real Android navigation/performance checks. No old coupon, settlement, Tracker or bankroll record was modified by this stage.
+- No paid API, subscription, database or hosting tier was added. Existing main branch and its production Worker remain untouched.
+- Stage 158 code changes are committed; CI and Cloudflare deployment must pass before marking the stage deployed.
