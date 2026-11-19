@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { brusselsUtcDayWindow, discoverOddsPapiMarkets, matchOddsPapiFixtures, parseOddsPapiQuotes, selectOddsPapiBookmakers } from "./oddspapi";
+import { brusselsUtcDayWindow, discoverOddsPapiMarkets, getOddsPapiSlotRequestBudget, matchOddsPapiFixtures, parseOddsPapiQuotes, selectOddsPapiBookmakers } from "./oddspapi";
 describe("OddsPapi adapter", () => {
+  it("budgets both daily sync slots across the remaining monthly quota", () => {
+    expect(getOddsPapiSlotRequestBudget(250, "morning", new Date("2026-12-01T12:00:00Z"))).toBe(4);
+    expect(getOddsPapiSlotRequestBudget(250, "afternoon", new Date("2026-12-01T12:00:00Z"))).toBe(3);
+    expect(getOddsPapiSlotRequestBudget(250, "morning", new Date("2026-11-19T12:00:00Z"))).toBe(10);
+    expect(getOddsPapiSlotRequestBudget(4, "morning", new Date("2026-12-01T12:00:00Z"))).toBe(0);
+  });
   it("converts Brussels local day to the correct UTC window across winter and summer time", () => {
     expect(brusselsUtcDayWindow("2026-11-19")).toEqual({ from: "2026-11-18T23:00:00.000Z", to: "2026-11-19T23:00:00.000Z" });
     expect(brusselsUtcDayWindow("2026-07-19")).toEqual({ from: "2026-07-18T22:00:00.000Z", to: "2026-07-19T22:00:00.000Z" });
