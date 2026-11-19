@@ -8,7 +8,10 @@ export function isEvidenceQualifiedCandidate(
   market: PredictionMarket,
 ): boolean {
   if (!row || row.kind !== "prediction" || row.status !== "KANDYDAT"
-    || row.details.evidenceComplete !== true) return false;
+    || row.details.evidenceComplete !== true
+    || row.details.modelSourceType === "baseline_only"
+    || row.details.predictionMethod === "neutral-prior-poisson"
+    || row.details.model === "moneyball:neutral-prior-poisson") return false;
   return market === "1X2"
     ? row.details.strongCandidate === true
     : row.details.strongDoubleChance === true;

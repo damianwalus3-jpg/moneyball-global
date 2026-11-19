@@ -168,6 +168,12 @@ describe("three-leg coupon candidates", () => {
     const legacy = { ...prediction("legacy", 0.95), details: { ...prediction("legacy", 0.95).details, couponEligible: true, evidenceComplete: false } };
     expect(buildThreeLegCandidates([legacy, prediction("b", 0.9), prediction("c", 0.9)], "2026-11-17")).toHaveLength(0);
   });
+  it("never admits baseline-only records even if candidate flags are accidentally true", () => {
+    const baseline = { ...prediction("baseline", 0.99), details: { ...prediction("baseline", 0.99).details,
+      model: "moneyball:neutral-prior-poisson", modelSourceType: "baseline_only",
+      predictionMethod: "neutral-prior-poisson", couponEligible: true, evidenceComplete: true } };
+    expect(buildThreeLegCandidates([baseline, prediction("b", 0.9), prediction("c", 0.9)], "2026-11-17")).toHaveLength(0);
+  });
 
   it("returns globally disjoint three-leg coupons rather than overlapping combinations", () => {
     const candidates = buildThreeLegCandidates([

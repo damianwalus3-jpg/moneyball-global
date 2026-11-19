@@ -91,8 +91,16 @@ export function hasMissingPredictionMarket(records: TrackerRecord[], fixtureId: 
   return !markets.has("1X2") || !markets.has("DOUBLE_CHANCE");
 }
 
-export interface HistoryProvenanceSide { source?: string; matches?: number; homeMatches?: number; awayMatches?: number; sourceUpdatedAt?: string; }
-export interface HistoryProvenance { home?: HistoryProvenanceSide; away?: HistoryProvenanceSide; cutoffDateExclusive?: string; }
+export interface HistoryMatchProvenance {
+  date: string; opponent: string; venue: "H" | "A"; goalsFor: number; goalsAgainst: number; result: "W" | "D" | "L";
+}
+export interface HistoryProvenanceSide {
+  source?: string; matches?: number; homeMatches?: number; awayMatches?: number; sourceUpdatedAt?: string;
+  recentMatches?: HistoryMatchProvenance[];
+}
+export interface HistoryProvenance {
+  home?: HistoryProvenanceSide; away?: HistoryProvenanceSide; cutoffDateExclusive?: string; semantics?: string;
+}
 export function parseHistoryProvenance(value: unknown): HistoryProvenance | null {
   if (typeof value !== "string" || !value.trim()) return null;
   try {
@@ -107,11 +115,26 @@ export function parseHistoryProvenance(value: unknown): HistoryProvenance | null
       for (const key of ["matches", "homeMatches", "awayMatches"] as const) {
         const n = item[key]; if (typeof n === "number" && Number.isInteger(n) && n >= 0) result[key] = n;
       }
+      if (Array.isArray(item.recentMatches)) {
+        const recentMatches = item.recentMatches.flatMap((raw): HistoryMatchProvenance[] => {
+          if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+          const match = raw as Record<string, unknown>;
+          if (typeof match.date !== "string" || typeof match.opponent !== "string" || !match.opponent.trim()
+            || (match.venue !== "H" && match.venue !== "A")
+            || typeof match.goalsFor !== "number" || !Number.isFinite(match.goalsFor) || match.goalsFor < 0
+            || typeof match.goalsAgainst !== "number" || !Number.isFinite(match.goalsAgainst) || match.goalsAgainst < 0
+            || (match.result !== "W" && match.result !== "D" && match.result !== "L")) return [];
+          return [{ date: match.date, opponent: match.opponent, venue: match.venue,
+            goalsFor: match.goalsFor, goalsAgainst: match.goalsAgainst, result: match.result }];
+        });
+        if (recentMatches.length) result.recentMatches = recentMatches;
+      }
       return result;
     };
     const result: HistoryProvenance = { home: side(data.home), away: side(data.away) };
     if (typeof data.cutoffDateExclusive === "string") result.cutoffDateExclusive = data.cutoffDateExclusive;
-    return result.home || result.away || result.cutoffDateExclusive ? result : null;
+    if (typeof data.semantics === "string") result.semantics = data.semantics;
+    return result.home || result.away || result.cutoffDateExclusive || result.semantics ? result : null;
   } catch { return null; }
 }
 export function describeHistoryProvenance(value: unknown): string {
@@ -122,9 +145,14 @@ export function describeHistoryProvenance(value: unknown): string {
     const sample = typeof side.matches === "number" ? side.matches : "—";
     const home = typeof side.homeMatches === "number" ? side.homeMatches : "—";
     const away = typeof side.awayMatches === "number" ? side.awayMatches : "—";
+    const recent = side.recentMatches?.map(match =>
+      `${match.date} (${match.venue === "H" ? "dom" : "wyjazd"}) ${match.goalsFor}:${match.goalsAgainst} vs ${match.opponent} (${match.result})`,
+    ).join("; ");
     return label + ": " + (side.source ?? "źródło nieznane") + "; wyniki: " + sample + "; u siebie: " + home + "; na wyjeździe: " + away
-      + (side.sourceUpdatedAt ? ", aktualizacja: " + side.sourceUpdatedAt : "");
+      + (side.sourceUpdatedAt ? ", aktualizacja: " + side.sourceUpdatedAt : "")
+      + (recent ? "; ostatnie mecze: " + recent : "");
   };
   return [describe("Gospodarz", data.home), describe("Gość", data.away),
-    data.cutoffDateExclusive ? "Dane wyłącznie sprzed: " + data.cutoffDateExclusive : ""].filter(Boolean).join(" | ");
+    data.cutoffDateExclusive ? "Dane wyłącznie sprzed: " + data.cutoffDateExclusive : "",
+    data.semantics ?? ""].filter(Boolean).join(" | ");
 }

@@ -15,7 +15,10 @@ function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCand
   if (record.kind !== "prediction" || record.status !== "KANDYDAT" || d.fixtureDate !== date || typeof d.fixtureId !== "string" || !d.fixtureId) return null;
   const fixtureIdentity = trackerFixtureIdentity(record);
   if (!fixtureIdentity) return null;
-  if (d.couponEligible !== true || d.evidenceComplete !== true) return null;
+  if (d.couponEligible !== true || d.evidenceComplete !== true
+    || d.modelSourceType === "baseline_only"
+    || d.predictionMethod === "neutral-prior-poisson"
+    || d.model === "moneyball:neutral-prior-poisson") return null;
   if (typeof d.fixtureTime === "string" && hasKickoffPassed(date, d.fixtureTime)) return null;
   const base = { fixtureId: fixtureIdentity, title: record.title,
     competition: typeof d.competition === "string" ? d.competition : "Rozgrywki nieznane",

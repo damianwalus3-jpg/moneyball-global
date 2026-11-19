@@ -116,6 +116,19 @@ describe("history provenance metadata", () => {
     expect(parsed?.away?.source).toBe("OpenFootball");
     expect(describeHistoryProvenance(value)).toContain("Dane wyłącznie sprzed: 2026-11-18");
   });
+  it("preserves the actual recent team matches and labels goals/results as not xG", () => {
+    const value = JSON.stringify({
+      home: { source: "OpenLigaDB", matches: 3, homeMatches: 2, awayMatches: 1,
+        recentMatches: [{ date: "2026-11-16", opponent: "Team B", venue: "H", goalsFor: 2, goalsAgainst: 1, result: "W" }] },
+      away: { source: "ESPN", matches: 3, homeMatches: 1, awayMatches: 2,
+        recentMatches: [{ date: "2026-11-15", opponent: "Team C", venue: "A", goalsFor: 0, goalsAgainst: 1, result: "L" }] },
+      cutoffDateExclusive: "2026-11-18", semantics: "Bramki/wyniki historyczne — nie xG.",
+    });
+    const parsed = parseHistoryProvenance(value);
+    expect(parsed?.home?.recentMatches?.[0]).toMatchObject({ opponent: "Team B", venue: "H", goalsFor: 2, goalsAgainst: 1 });
+    expect(describeHistoryProvenance(value)).toContain("2026-11-16 (dom) 2:1 vs Team B (W)");
+    expect(describeHistoryProvenance(value)).toContain("nie xG");
+  });
   it("handles legacy, empty and malformed Tracker values safely", () => {
     expect(parseHistoryProvenance(null)).toBeNull();
     expect(parseHistoryProvenance("")).toBeNull();

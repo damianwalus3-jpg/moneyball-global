@@ -25,6 +25,12 @@ describe("evidence-qualified candidate gate", () => {
     expect(isEvidenceQualifiedCandidate(row({ kind: "match" }), "1X2")).toBe(false);
     expect(isEvidenceQualifiedCandidate(undefined, "1X2")).toBe(false);
   });
+  it("never qualifies baseline-only rows even when legacy flags are true", () => {
+    const baseline = row({ details: { evidenceComplete: true, strongCandidate: true, strongDoubleChance: true,
+      modelSourceType: "baseline_only", predictionMethod: "neutral-prior-poisson" } });
+    expect(isEvidenceQualifiedCandidate(baseline, "1X2")).toBe(false);
+    expect(isEvidenceQualifiedCandidate(baseline, "DOUBLE_CHANCE")).toBe(false);
+  });
 });
 
 describe("prediction display status", () => {

@@ -23,6 +23,7 @@ import { calculateBankroll, canReserveStake } from "./bankroll";
 import { listFreshOddsSnapshots, listOddsBookmakers, shouldAutoFetchStrikerApi } from "./odds-value";
 import { valueThreeLegCoupon } from "./coupon-value";
 import { buildBaselineEvidenceAudit, getEvidenceGaps, isEvidenceAuditComplete } from "./analysis-evidence";
+import { buildHistoryProvenance, buildPredictionModelMetadata, hasVerifiedXgHistory } from "./prediction-metadata";
 import { getSourceDiagnostics, summarizeFixtureCoverage } from "./source-diagnostics";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
@@ -164,7 +165,7 @@ function savePredictionRecord(
   apiFootballInjuries?: ApiFootballInjury[],
 ): TrackerRecord[] {
   const evidenceAudit = buildBaselineEvidenceAudit();
-  const xgReady = !!pitchApiXgForms && pitchApiXgForms.home.sampleSize >= 3 && pitchApiXgForms.away.sampleSize >= 3;
+  const xgReady = hasVerifiedXgHistory(pitchApiXgForms, match.date);
   if (xgReady) evidenceAudit.areas.xg_xga = { status: "VERIFIED", source: "PitchAPI", observedAt: new Date().toISOString(), note: "Średnie xG/xGA z co najmniej 3 zakończonych, wcześniejszych meczów każdej drużyny." };
   if (xgReady && pitchApiXgForms) {
     const shotsComplete = [pitchApiXgForms.home, pitchApiXgForms.away].every(form => form.shotsForPerMatch != null && form.shotsAgainstPerMatch != null
@@ -227,11 +228,7 @@ function savePredictionRecord(
     pitchApiLineups: pitchApiLineups ? JSON.stringify(pitchApiLineups) : null,
     ...buildApiFootballTrackerDetails(apiFootballFixture, apiFootballInjuries, false, new Date().toISOString()),
     apiFootballFixtureId: apiFootballFixture?.fixture?.id ?? (match.apiFootballFixtureId ? Number(match.apiFootballFixtureId) : null),
-    historyProvenance: homeForm && awayForm ? JSON.stringify({
-      home: { source: homeForm.source, sourceUpdatedAt: homeForm.sourceUpdatedAt, matches: homeForm.matches.length, homeMatches: homeForm.home.length, awayMatches: homeForm.away.length },
-      away: { source: awayForm.source, sourceUpdatedAt: awayForm.sourceUpdatedAt, matches: awayForm.matches.length, homeMatches: awayForm.home.length, awayMatches: awayForm.away.length },
-      cutoffDateExclusive: match.date,
-    }) : null,
+    historyProvenance: buildHistoryProvenance(homeForm, awayForm, match.date),
     evidenceComplete: evidenceAudit.complete, evidenceAudit: JSON.stringify(evidenceAudit),
     evidenceGaps: getEvidenceGaps(evidenceAudit).join(", "),
   };
@@ -239,6 +236,7 @@ function savePredictionRecord(
   const pendingPredictionRecords: Array<Omit<TrackerRecord, "id" | "createdAt">> = [];
   for (const variant of uniqueVariants) {
     const method = variant?.method ?? "unavailable", model = "moneyball:" + method;
+    const modelMetadata = buildPredictionModelMetadata(method, homeForm, awayForm, pitchApiXgForms, match.date);
     const probabilities = variant?.prediction.probabilities, dc = variant?.prediction.doubleChance;
     const modelSampleQualified = method === "recent-form-goals-poisson"
       ? (homeForm?.matches.length ?? 0) >= 3 && (awayForm?.matches.length ?? 0) >= 3
@@ -257,7 +255,7 @@ function savePredictionRecord(
     const strongDoubleChance = modelStrongDoubleChance && evidenceAudit.complete;
     const evidenceRejectionReason = evidenceAudit.complete ? null : "ODRZUCONY: brak wymaganych danych: " + getEvidenceGaps(evidenceAudit).join(", ");
     const common = {
-      ...shared, model, modelName: method, predictionMethod: variant?.method ?? null, modelMethod: variant?.method ?? null,
+      ...shared, ...modelMetadata, model, modelName: method, predictionMethod: variant?.method ?? null, modelMethod: variant?.method ?? null,
       expectedGoalsBasis: method === "pitchapi-recent-xg-poisson" ? "historyczne xG/xGA PitchAPI" : method === "recent-form-goals-poisson" ? "wyniki i gole historyczne (nie xG)" : "brak danych zespołów",
       lambdaProxyHome: variant?.prediction.expectedGoals.home ?? null, lambdaProxyAway: variant?.prediction.expectedGoals.away ?? null,
       sampleCounts: variant ? JSON.stringify(variant.samples) : null,
