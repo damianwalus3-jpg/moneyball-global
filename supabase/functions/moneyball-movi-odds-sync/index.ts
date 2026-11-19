@@ -86,17 +86,10 @@ function apiFootballSelection(bet:any,value:any):{market:string;selection:string
  return null;
 }
 async function syncApiFootballOdds(day:string,matches:any[]){
- const first=await apiFootball("/odds?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels&page=1");
- const totalPages=Math.max(1,Math.min(30,Number(first.paging?.total)||1));
- const pages:any[]=[first];
- for(let page=2;page<=totalPages;page+=4){
-  const batch=await Promise.all(Array.from({length:Math.min(4,totalPages-page+1)},(_,i)=>apiFootball("/odds?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels&page="+(page+i))));
-  pages.push(...batch);
- }
- const fixtures=pages.flatMap(x=>Array.isArray(x.response)?x.response:[]);
- const clean=(v:any)=>norm(v).replace(/\b(fc|cf|sc|ac|afc|club)\b/g," ").replace(/\s+/g," ").trim();
- const aliases:Record<string,string>={"bayern munchen":"bayern munich","atletico de madrid":"atletico madrid","athletic bilbao":"athletic club","paris sg":"paris saint germain","man utd":"manchester united","man city":"manchester city"};
- const teamKey=(v:any)=>aliases[clean(v)]||clean(v);
+ const fixturePayload=await apiFootball("/fixtures?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels");
+ const fixtures=Array.isArray(fixturePayload.response)?fixturePayload.response:[];
+ const aliases:Record<string,string>={"bayern munchen":"bayern munich","cologne":"koln","fc cologne":"koln","le havre ac":"le havre","athletic bilbao":"athletic"};
+ const teamKey=(value:any)=>{const key=norm(value).replace(/\b(fc|cf|sc|ac|afc|club)\b/g," ").replace(/\s+/g," ").trim();return aliases[key]||key;};
  const matched:any[]=[];
  const used=new Set<number>();
  for(const match of matches){
@@ -106,6 +99,8 @@ async function syncApiFootballOdds(day:string,matches:any[]){
   for(const fixture of fixtures){
    const id=Number(fixture.fixture?.id),fh=teamKey(fixture.teams?.home?.name),fa=teamKey(fixture.teams?.away?.name);
    if(!Number.isFinite(id)||used.has(id)||home!==fh||away!==fa)continue;
+   const appCountry=norm(match.country),apiCountry=norm(fixture.league?.country);
+   if(appCountry&&apiCountry&&appCountry!==apiCountry)continue;
    const ft=Date.parse(fixture.fixture?.date||"");
    const delta=Math.abs(ft-kickoff);
    if(!Number.isFinite(ft)||delta>4*60*60*1000)continue;
@@ -115,27 +110,32 @@ async function syncApiFootballOdds(day:string,matches:any[]){
  }
  const allowed=["bwin","unibet","ladbrokes","circus","betfirst"];
  const captured=new Date().toISOString(),rows:any[]=[];
+ let oddsChecked=0,oddsErrors=0;
  for(const pair of matched){
   const {match,fixture}=pair;
-  for(const bookmaker of fixture.bookmakers||[]){
-   const bookmakerName=String(bookmaker.name||"");
-   const bookmakerKey=norm(bookmakerName);
-   if(!allowed.some(name=>bookmakerKey.includes(name)))continue;
-   for(const bet of bookmaker.bets||[]){
-    for(const value of bet.values||[]){
-     const mapped=apiFootballSelection(bet,value),odd=Number(value.odd);
-     if(!mapped||!Number.isFinite(odd)||odd<=1)continue;
-     const ownerId=match.owner_id||match.user_id;
-     if(!ownerId)continue;
-     rows.push({
-      owner_id:ownerId,match_id:match.id,provider:"API-Football",provider_fixture_id:String(fixture.fixture.id),
-      bookmaker:bookmakerName,sport:"soccer",market_group_id:String(bet.id||bet.name),market_id:String(bet.id||bet.name),
-      market_name:String(bet.name||"Unknown"),selection_id:String(value.value||"")+"|"+String(value.handicap||""),
-      selection_label:value.value??null,selection_side:value.value??null,selection_line:value.handicap??null,
-      selection_handicap:value.handicap??null,odds:odd,suspended:value.suspended===true,phase:"prematch",
-      price_timestamp:fixture.update||captured,provider_polled_at:captured,captured_at:captured,raw_quote:{fixture_id:fixture.fixture.id,bookmaker,bet,value},
-      mapped_market:mapped.market,mapped_selection:mapped.selection
-     });
+  let oddsPayload:any;
+  try{oddsPayload=await apiFootball("/odds?fixture="+encodeURIComponent(String(fixture.fixture.id)));oddsChecked++;}
+  catch(_){oddsErrors++;continue;}
+  for(const oddsFixture of oddsPayload.response||[]){
+   for(const bookmaker of oddsFixture.bookmakers||[]){
+    const bookmakerName=String(bookmaker.name||""),bookmakerKey=norm(bookmakerName);
+    if(!allowed.some(name=>bookmakerKey.includes(name)))continue;
+    for(const bet of bookmaker.bets||[]){
+     for(const value of bet.values||[]){
+      const mapped=apiFootballSelection(bet,value),odd=Number(value.odd);
+      if(!mapped||!Number.isFinite(odd)||odd<=1)continue;
+      const ownerId=match.owner_id||match.user_id;
+      if(!ownerId)continue;
+      rows.push({
+       owner_id:ownerId,match_id:match.id,provider:"API-Football",provider_fixture_id:String(fixture.fixture.id),
+       bookmaker:bookmakerName,sport:"soccer",market_group_id:String(bet.id||bet.name),market_id:String(bet.id||bet.name),
+       market_name:String(bet.name||"Unknown"),selection_id:String(value.value||"")+"|"+String(value.handicap||""),
+       selection_label:value.value??null,selection_side:value.value??null,selection_line:value.handicap??null,
+       selection_handicap:value.handicap??null,odds:odd,suspended:value.suspended===true,phase:"prematch",
+       price_timestamp:oddsFixture.update||fixture.fixture.date||captured,provider_polled_at:captured,captured_at:captured,
+       raw_quote:{fixture_id:fixture.fixture.id,bookmaker,bet,value},mapped_market:mapped.market,mapped_selection:mapped.selection
+      });
+     }
     }
    }
   }
@@ -143,9 +143,8 @@ async function syncApiFootballOdds(day:string,matches:any[]){
  for(let i=0;i<rows.length;i+=250){
   await db("provider_odds?on_conflict=provider,provider_fixture_id,market_group_id,market_id,selection_id","POST",rows.slice(i,i+250),"resolution=merge-duplicates,return=minimal");
  }
- return {ok:true,provider:"API-Football",date:day,api_pages:pages.length,api_fixtures:fixtures.length,app_matches:matches.length,matched_fixtures:matched.length,approved_bookmakers:allowed,quotes_saved:rows.length,note:rows.length?"Only fresh API-Football prices from approved Belgian bookmakers were stored.":"No approved Belgian bookmaker quotes were available; no synthetic odds were created."};
+ return {ok:true,provider:"API-Football",date:day,fixture_requests:1,fixtures_found:fixtures.length,app_matches:matches.length,matched_fixtures:matched.length,odds_requests:oddsChecked,odds_errors:oddsErrors,approved_bookmakers:allowed,quotes_saved:rows.length,unmatched_matches:matches.filter(m=>!matched.some(x=>x.match.id===m.id)).map(m=>({home:m.home_team,away:m.away_team,kickoff:m.kickoff_at})),note:rows.length?"Only real API-Football prices from approved Belgian bookmakers were stored.":"No approved Belgian bookmaker quotes were available; no synthetic odds were created."};
 }
-
 Deno.serve(async(req)=>{
  if(req.method==="OPTIONS")return new Response("ok",{headers:CORS});
  if(req.method==="GET")return json({ok:true,service:"Moneyball odds sync",primary_provider:"MoviOdds / bet365",movi_key_configured:!!MOVI_KEY,api_football_key_configured:!!API_FOOTBALL_KEY,mode:"provider fallback diagnostics enabled",note:"No odds are fabricated; missing provider quotes remain missing."});
@@ -155,23 +154,15 @@ Deno.serve(async(req)=>{
   const body=await req.json().catch(()=>({}));
   if(shouldSkipMoviOddsSync(MOVI_KEY)&&API_FOOTBALL_KEY&&body.mode==="diagnostic"){
    const day=String(body.date||new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()));
-   const [status,bookmakers,odds,bwinOdds]=await Promise.all([
+   const [status,bookmakers,fixturePayload]=await Promise.all([
     apiFootball("/status"),
     apiFootball("/odds/bookmakers?search=Bwin"),
-    apiFootball("/odds?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels&page=1"),
-    apiFootball("/odds?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels&bookmaker=6&page=1")
+    apiFootball("/fixtures?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels")
    ]);
-   const bookmakerNames=(bookmakers.response||[]).map((x:any)=>({id:x.id,name:x.name}));
-   const diagnosticPages:any[]=[odds];
-   const diagnosticTotal=Math.max(1,Math.min(30,Number(odds.paging?.total)||1));
-   for(let page=2;page<=diagnosticTotal;page+=4){
-    const batch=await Promise.all(Array.from({length:Math.min(4,diagnosticTotal-page+1)},(_,i)=>apiFootball("/odds?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels&page="+(page+i))));
-    diagnosticPages.push(...batch);
-   }
-   const allOddsFixtures=diagnosticPages.flatMap((x:any)=>Array.isArray(x.response)?x.response:[]);
    const appMatches=await db("matches?select=id,home_team,away_team,kickoff_at,kickoff_date,competition,country&kickoff_date=eq."+encodeURIComponent(day)+"&order=kickoff_at.asc");
-   const fixtureSamples=allOddsFixtures.map((x:any)=>({fixture_id:x.fixture?.id,date:x.fixture?.date,home:x.teams?.home?.name,away:x.teams?.away?.name,bookmakers:(x.bookmakers||[]).map((b:any)=>b.name)}));
-   return json({ok:true,mode:"diagnostic",provider:"API-Football",date:day,key_configured:true,account:status.response?.account?{plan:status.response.account.subscription?.plan,subscription_active:status.response.account.subscription?.active,requests_remaining:status.response.requests?.limit_day!=null?Number(status.response.requests.limit_day)-Number(status.response.requests.current||0):null,requests_today:status.response.requests?.current,requests_limit:status.response.requests?.limit_day}:null,bwin_bookmakers:bookmakerNames,odds_results:odds.results||0,odds_pagination:odds.paging||null,bwin_odds_results:bwinOdds.results||0,bwin_fixtures:(bwinOdds.response||[]).map((x:any)=>({fixture_id:x.fixture?.id,home:x.teams?.home?.name,away:x.teams?.away?.name,bookmakers:(x.bookmakers||[]).map((b:any)=>b.name)})),app_matches:appMatches,api_fixtures:fixtureSamples});
+   const fixtureSamples=(fixturePayload.response||[]).map((x:any)=>({fixture_id:x.fixture?.id,date:x.fixture?.date,home:x.teams?.home?.name,away:x.teams?.away?.name,country:x.league?.country,league:x.league?.name}));
+   const bookmakerNames=(bookmakers.response||[]).map((x:any)=>({id:x.id,name:x.name}));
+   return json({ok:true,mode:"diagnostic",provider:"API-Football",date:day,key_configured:true,requests:status.response?.requests?{current:status.response.requests.current,daily_limit:status.response.requests.limit_day}:null,bwin_bookmakers:bookmakerNames,app_matches,fixtures_found:fixtureSamples.length,api_fixtures:fixtureSamples});
   }
   const now=new Date(),defaultDay=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(now),day=String(body.date||defaultDay);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return json({ok:false,error:"Invalid date; expected YYYY-MM-DD."},400);
