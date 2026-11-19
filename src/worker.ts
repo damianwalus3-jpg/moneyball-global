@@ -507,10 +507,45 @@ export default {
         strikerapi: Boolean(env.STRIKERAPI_API_KEY),
       };
       if (oddsHealth) {
+        let oddspapiAccount: Record<string, unknown> | null = null;
+        if (env.ODDSPAPI_API_KEY) {
+          try {
+            // This endpoint is explicitly unmetered by OddsPapi; never expose api_key or subscription IDs.
+            const accountUrl = new URL("/v4/account", ODDSPAPI_API);
+            accountUrl.searchParams.set("apiKey", env.ODDSPAPI_API_KEY);
+            const accountResponse = await fetch(accountUrl, {
+              headers: { Accept: "application/json" },
+              signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+            });
+            const account = await readJson(accountResponse) as {
+              subscriptions?: Array<{ is_active?: boolean; request_limit?: number; request_count?: number; valid_until?: string | null; bookmakers?: Record<string, unknown> }>;
+            };
+            const subscriptions = account.subscriptions ?? [];
+            const active = subscriptions.filter(row => row.is_active === true);
+            const selected = active.sort((a, b) => Number(b.request_limit ?? 0) - Number(a.request_limit ?? 0))[0];
+            if (selected) {
+              const requestLimit = Number(selected.request_limit ?? 0);
+              const requestCount = Number(selected.request_count ?? 0);
+              oddspapiAccount = {
+                status: "active",
+                requestLimit,
+                requestCount,
+                remaining: Math.max(0, requestLimit - requestCount),
+                validUntil: selected.valid_until ?? null,
+                bookmakerSlugs: Object.keys(selected.bookmakers ?? {}),
+              };
+            } else {
+              oddspapiAccount = { status: "no_active_subscription" };
+            }
+          } catch (error) {
+            oddspapiAccount = { status: "unavailable", error: error instanceof Error ? error.message : "account_check_failed" };
+          }
+        }
         return json({
           providers: configured,
           pilotEnabled: typeof env.ODDS_PILOT_TOKEN === "string" && env.ODDS_PILOT_TOKEN.length >= 32,
-          note: "Only configuration presence is reported; secrets are never returned.",
+          oddspapiAccount,
+          note: "Only configuration presence and sanitized quota metadata are reported; secrets and API key are never returned.",
         }, 200, origin);
       }
 
