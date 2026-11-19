@@ -20,16 +20,15 @@ describe("tracker model audit", () => {
     expect(audit.buckets[0].averageConfidence).toBeCloseTo(0.8);
     expect(audit.buckets[0].observedAccuracy).toBe(1);
   });
-  it("audits Double Chance markets separately from 1X2", () => {
+  it("does not treat embedded Double Chance values as a separate market record", () => {
     const withDoubleChance: TrackerRecord = {
       ...prediction,
       details: { fixtureId: "f1", p1: 0.8, px: 0.1, p2: 0.1, dc1x: 0.9, dcx2: 0.2, dc12: 0.9 },
     };
     const audit = auditTrackerPredictions([withDoubleChance, result]);
     expect(audit.metrics?.count).toBe(1);
-    expect(audit.doubleChance?.count).toBe(3);
-    expect(audit.doubleChance?.accuracy).toBe(1);
-    expect(audit.doubleChance?.brierScore).toBeCloseTo((0.1 ** 2 + 0.2 ** 2 + 0.1 ** 2) / 3);
+    expect(audit.doubleChance).toBeNull();
+    expect(audit.modelComparisons.some(item => item.market === "DOUBLE_CHANCE")).toBe(false);
   });
   it("audits explicit Double Chance records separately from 1X2", () => {
     const oneXTwo = { ...prediction, details: { fixtureId: "f1", model: "goals-poisson", market: "1X2", p1: 0.8, px: 0.1, p2: 0.1 } };
@@ -76,7 +75,7 @@ describe("tracker model audit", () => {
     expect(audit.metrics).toBeNull();
   });
 
-  it("falls back to valid embedded Double Chance when the explicit DC row is malformed", () => {
+  it("does not substitute embedded DC values when a separate DC record is malformed", () => {
     const oneXTwo = {
       ...prediction,
       details: { fixtureId: "f1", model: "goals-poisson", market: "1X2",
@@ -89,8 +88,31 @@ describe("tracker model audit", () => {
     };
     const audit = auditTrackerPredictions([malformedDc, oneXTwo, result]);
     const dc = audit.modelComparisons.find(item => item.model === "goals-poisson" && item.market === "DOUBLE_CHANCE");
-    expect(dc?.count).toBe(3);
-    expect(dc?.sampleMatches).toBe(1);
-    expect(dc?.sampleQualified).toBe(false);
+    expect(dc).toBeUndefined();
+    expect(audit.doubleChance).toBeNull();
   });
+  it("deduplicates cross-provider prediction IDs by canonical date and team identity", () => {
+    const match: TrackerRecord = {
+      id: "m1", kind: "match", title: "2026-11-17 · Home vs Away", status: "SCHEDULED",
+      createdAt: "2026-11-17T07:00:00Z",
+      details: { fixtureId: "flashscore:100", date: "2026-11-17", competition: "League" },
+    };
+    const footy: TrackerRecord = {
+      ...prediction, id: "p-footy", createdAt: "2026-11-17T08:00:00Z",
+      details: { fixtureId: "footynomad:200", fixtureDate: "2026-11-17", home: "Home", away: "Away",
+        competition: "League", model: "goals-poisson", market: "1X2", p1: 0.8, px: 0.1, p2: 0.1 },
+    };
+    const flash: TrackerRecord = {
+      ...prediction, id: "p-flash", createdAt: "2026-11-17T09:00:00Z",
+      details: { ...footy.details, fixtureId: "flashscore:100", p1: 0.7, px: 0.2, p2: 0.1 },
+    };
+    const settled: TrackerRecord = {
+      ...result, details: { fixtureId: "flashscore:100", date: "2026-11-17", actual: "1" },
+    };
+    const audit = auditTrackerPredictions([match, footy, flash, settled]);
+    expect(audit.metrics?.count).toBe(1);
+    expect(audit.settledPredictions).toBe(1);
+    expect(audit.unmatchedPredictions).toBe(0);
+  });
+
 });

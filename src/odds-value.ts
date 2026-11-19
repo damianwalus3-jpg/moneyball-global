@@ -177,3 +177,18 @@ export function shouldAutoFetchDailyOdds(input: {
   if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return false;
   return input.tokenSaved && input.providerReady && input.lastSuccessfulDate !== input.fixtureDate && input.lastAttemptedDate !== input.fixtureDate;
 }
+
+
+/** StrikerAPI is separately billable and is never eligible for an automatic
+ * request unless the user has explicitly enabled its local consent flag. */
+export function shouldAutoFetchStrikerApi(input: {
+  fixtureDate: string;
+  tokenSaved: boolean;
+  providerReady: boolean;
+  explicitConsent: boolean;
+  lastSuccessfulDate: string;
+  lastAttemptedDate: string;
+}): boolean {
+  if (!input.explicitConsent) return false;
+  return shouldAutoFetchDailyOdds(input);
+}

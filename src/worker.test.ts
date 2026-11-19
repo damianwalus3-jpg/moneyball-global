@@ -289,10 +289,10 @@ describe("odds provider pilot proxy", () => {
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/oddspapi/daily", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ date: "2026-11-19", slot: "morning", fixtures: [
+      body: JSON.stringify({ date: "2026-11-19", slot: "morning", allowBillableMarketCatalogue: true, fixtures: [
         { id: "local-1", date: "2026-11-19", time: "19:00", home: "Club Brugge", away: "KAA Gent" },
       ] }),
-    }), { ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "provider-secret", ODDS_PILOT_TOKEN: token }, { waitUntil: vi.fn() });
+    }), { ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "provider-secret", ODDS_PILOT_TOKEN: token, ODDSPAPI_MARKET_CATALOGUE_ENABLED: "true" }, { waitUntil: vi.fn() });
     const body = await response.json() as {
       status?: string; error?: string; message?: string; estimatedRequestsUsed?: number;
       marketCatalogStatus?: string; marketTypes?: string[];
@@ -315,6 +315,41 @@ describe("odds provider pilot proxy", () => {
     expect(String(upstream.mock.calls[2][0])).toContain("/v4/markets?");
     expect(String(upstream.mock.calls[3][0])).toContain("/v4/odds-by-tournaments?");
     expect(String(upstream.mock.calls[3][0])).toContain("tournamentIds=77");
+  });
+
+  it("does not spend a billable market-catalogue request without separate opt-in", async () => {
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const account = { subscriptions: [{ is_active: true, request_limit: 250, request_count: 0, bookmakers: { "bwin.be": {} } }] };
+    const fixtures = [{ fixtureId: "op-1", tournamentId: 77, startTime: "2026-11-19T18:00:00.000Z",
+      participant1Name: "Club Brugge FC", participant2Name: "KAA Gent", hasOdds: true, updatedAt: "2026-11-19T09:00:00.000Z" }];
+    const price = { active: true, price: 2.1, changedAt: "2026-11-19T10:00:00.000Z" };
+    const odds = { fixtureId: "op-1", bookmakerOdds: { "bwin.be": {
+      bookmakerIsActive: true, suspended: false, fixturePath: "https://sports.bwin.be/event",
+      markets: { "101": { marketActive: true, outcomes: {
+        "101": { players: { "0": price } }, "102": { players: { "0": { ...price, price: 3.2 } } },
+        "103": { players: { "0": { ...price, price: 3.5 } } },
+      } } },
+    } } };
+    const upstream = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(account), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(fixtures), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(odds), { status: 200 }));
+    vi.stubGlobal("fetch", upstream);
+    const token = "pilot-secret-0123456789-abcdef-extra";
+    const response = await worker.fetch(new Request("https://moneyball.example/api/odds/oddspapi/daily", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ date: "2026-11-19", slot: "morning", fixtures: [
+        { id: "local-1", date: "2026-11-19", time: "19:00", home: "Club Brugge", away: "KAA Gent" },
+      ] }),
+    }), { ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "provider-secret", ODDS_PILOT_TOKEN: token }, { waitUntil: vi.fn() });
+    const body = await response.json() as { estimatedRequestsUsed?: number; marketCatalogStatus?: string; marketTypes?: string[]; quotes?: Array<{ market: string }> };
+    expect(response.status, JSON.stringify(body)).toBe(200);
+    expect(body).toMatchObject({ estimatedRequestsUsed: 2, marketCatalogStatus: "owner_opt_in_required", marketTypes: ["1X2"] });
+    expect(body.quotes?.map(row => row.market)).toEqual(["1X2"]);
+    expect(upstream).toHaveBeenCalledTimes(3);
+    expect(upstream.mock.calls.some(call => String(call[0]).includes("/v4/markets?"))).toBe(false);
   });
 
   it("fails closed when the owner pilot token is not configured", async () => {

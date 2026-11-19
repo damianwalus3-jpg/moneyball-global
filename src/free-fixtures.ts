@@ -59,7 +59,7 @@ const OPENLIGA = "/api/openligadb";
 const SOURCE = "API-Football Pro + Flashscore + FootyNomad + open-matchday + OpenLigaDB + openfootball + ESPN + timezone.football + PitchAPI catalogue (publiczne terminarze)";
 const EUROPE = EUROPEAN_COUNTRY_CODES;
 const FETCH_TIMEOUT_MS = 15_000;
-const CACHE_KEY = "moneyball.free-fixtures.v14";
+const CACHE_KEY = "moneyball.free-fixtures.v15";
 const CACHE_MS = 15 * 60 * 1000;
 const TIMEZONE_FEED_CACHE_KEY = "moneyball.timezone-football.v1";
 const TIMEZONE_FEED_CACHE_MS = 15 * 60 * 1000;
@@ -307,6 +307,37 @@ export function canonicalFixtureId(date: string, home: string, away: string, com
   return "canonical|" + fixtureKey(date, home, away, competition);
 }
 
+export type FixtureScopeExclusionReason =
+  | "not_european_country" | "uefa_competition" | "domestic_cup" | "non_league_international" | "unknown_competition";
+
+const UEFA_COMPETITION_PATTERN = /\b(?:uefa|ucl|uel|uecl|uwcl|champions league|europa league|conference league|nations league|european championship|euro qualifiers)\b/i;
+const DOMESTIC_CUP_PATTERN = /\b(?:cup|copa|coppa|pokal|puchar|coupe|kupa|beker|taça|taca|trophy|shield|supercup|super cup|supercopa|cupen|cupa|kubok)\b/i;
+const NON_LEAGUE_COMPETITION_PATTERN = /\b(?:world cup|club world cup|fifa|international friendly|friendlies|friendly|olympic|world championship)\b/i;
+
+/** Final app scope: domestic European leagues at every level available from sources.
+ * Women, youth and reserve leagues remain included; cups and UEFA/international
+ * competitions are excluded after source observations have been counted. */
+export function getFixtureScopeExclusionReason(
+  fixture: Pick<FreeFixture, "countryCode" | "competition" | "leagueFolder">,
+): FixtureScopeExclusionReason | null {
+  const countryCode = fixture.countryCode.trim().toUpperCase();
+  if (!countryCode || countryCode === "UEFA" || !EUROPE.has(countryCode)) return "not_european_country";
+  const competitionText = [fixture.competition, fixture.leagueFolder]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0).join(" ");
+  if (!competitionText) return "unknown_competition";
+  if (UEFA_COMPETITION_PATTERN.test(competitionText)) return "uefa_competition";
+  if (DOMESTIC_CUP_PATTERN.test(competitionText)) return "domestic_cup";
+  if (NON_LEAGUE_COMPETITION_PATTERN.test(competitionText)) return "non_league_international";
+  return null;
+}
+
+export function isDomesticLeagueFixture(
+  fixture: Pick<FreeFixture, "countryCode" | "competition" | "leagueFolder">,
+): boolean {
+  return getFixtureScopeExclusionReason(fixture) === null;
+}
+
+
 const ESPN_COUNTRIES: Record<string, string> = {
 albania:"ALB", andorra:"AND", armenia:"ARM", austria:"AUT", azerbaijan:"AZE", belarus:"BLR", belgium:"BEL",
 "bosnia and herzegovina":"BIH", bosnia:"BIH", bulgaria:"BUL", croatia:"CRO", cyprus:"CYP", "czech republic":"CZE", czechia:"CZE",
@@ -402,6 +433,13 @@ export function parseEspnEuropeanFixtures(payload: unknown, targetDate: string):
   }
   return output;
 }
+export interface FixtureScopeAudit {
+  dateAndEuropeFixturesBeforeCompetitionScope: number;
+  eligibleDomesticLeagueFixtures: number;
+  excludedOutOfScopeFixtures: number;
+  excludedByReason: Record<string, number>;
+  excludedCompetitions: Array<{ countryCode: string; competition: string; reason: string; fixtures: number }>;
+}
 export interface FixtureScan {
   date: string;
   generatedAt: string;
@@ -410,16 +448,17 @@ export interface FixtureScan {
   leaguesFailed: string[];
   source: string;
   cache: boolean;
+  scopeAudit?: FixtureScopeAudit;
   coverage: {
-    openMatchday: { cataloguesChecked: number; fixtures: number; errors: number; catalogueGeneratedAt: string };
-    openLigaDB: { competitionsChecked: number; fixtures: number; errors: number };
-    openFootball: { feedsChecked: number; fixtures: number; errors: number };
-    espn: { scoreboardsChecked: number; fixtures: number; errors: number };
-    footyNomad: { pagesChecked: number; pageMatches: number; fixtures: number; skippedNoTimestamp: number; errors: number };
-    timezoneFootball: { feedMatches: number; fixtures: number; generatedAt: string; errors: number };
-    flashscore: { competitionsChecked: number; rawMatches: number; fixtures: number; skippedNonEuropean: number; skippedWrongDate: number; timestampMissing: number; errors: number };
-    apiFootball?: { providerFixtures: number; europeanDateFixtures: number; errors: number };
-    pitchApi?: { fixtures: number; europeanFixtures: number; leaguesResolved: number; catalogueLeagues: number; europeanCatalogueLeagues: number; freeEuropeanCatalogueLeagues: number; skippedNonFreeCatalogueLeagues: number; catalogueUpcomingFixtures: number; catalogueDateFixtures: number; errors: number };
+    openMatchday: { cataloguesChecked: number; fixtures: number; dateQualifiedBeforeScope?: number; errors: number; catalogueGeneratedAt: string };
+    openLigaDB: { competitionsChecked: number; fixtures: number; dateQualifiedBeforeScope?: number; errors: number };
+    openFootball: { feedsChecked: number; fixtures: number; dateQualifiedBeforeScope?: number; errors: number };
+    espn: { scoreboardsChecked: number; fixtures: number; dateQualifiedBeforeScope?: number; errors: number };
+    footyNomad: { pagesChecked: number; pageMatches: number; fixtures: number; dateQualifiedBeforeScope?: number; skippedNoTimestamp: number; errors: number };
+    timezoneFootball: { feedMatches: number; fixtures: number; dateQualifiedBeforeScope?: number; generatedAt: string; errors: number };
+    flashscore: { competitionsChecked: number; rawMatches: number; fixtures: number; dateQualifiedBeforeScope?: number; skippedNonEuropean: number; skippedWrongDate: number; timestampMissing: number; errors: number };
+    apiFootball?: { providerFixtures: number; europeanDateFixtures: number; eligibleFixtures?: number; errors: number };
+    pitchApi?: { fixtures: number; europeanFixtures: number; eligibleFixtures?: number; leaguesResolved: number; catalogueLeagues: number; europeanCatalogueLeagues: number; freeEuropeanCatalogueLeagues: number; skippedNonFreeCatalogueLeagues: number; catalogueUpcomingFixtures: number; catalogueDateFixtures: number; errors: number };
   };
 }
 export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureScan> {
@@ -460,7 +499,7 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
   let flashscoreSkippedWrongDate = 0;
   let flashscoreTimestampMissing = 0;
 
-  // Source 1: every European folder in open-matchday, including cups and youth competitions.
+  // Source 1: inspect every available European folder; final app output is narrowed to domestic leagues after cross-source deduplication.
   try {
     const index = JSON.parse(await fetchText(`${ROOT}/build_summary.json`)) as LeagueIndex;
     openMatchdayCatalogueGeneratedAt = index.generated_utc;
@@ -783,30 +822,54 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     errors.push("Flashscore · " + (error instanceof Error ? error.message : "źródło niedostępne"));
   }
 
-  const fixtures = [...byKey.entries()].map(([key, fixture]) => ({
+  const dateAndEuropeFixturesBeforeCompetitionScope = [...byKey.entries()].map(([key, fixture]) => ({
     ...fixture,
     id: "canonical|" + key,
     providerFixtureIds: [...new Set([...(fixture.providerFixtureIds ?? []), fixture.id])],
-  })).sort((a,b) => a.time.localeCompare(b.time) || a.competition.localeCompare(b.competition));
+  }));
+  const excludedFixtures = dateAndEuropeFixturesBeforeCompetitionScope.filter(fixture => !isDomesticLeagueFixture(fixture));
+  const fixtures = dateAndEuropeFixturesBeforeCompetitionScope.filter(isDomesticLeagueFixture)
+    .sort((a,b) => a.time.localeCompare(b.time) || a.competition.localeCompare(b.competition));
+  const sourceFixtureCount = (sourceName: string) => fixtures.filter(fixture =>
+    fixture.source.split(" + ").some(value => value.trim().toLowerCase() === sourceName.toLowerCase())
+  ).length;
+  const excludedByReason: Record<string, number> = {};
+  const excludedCompetitionCounts = new Map<string, { countryCode: string; competition: string; reason: string; fixtures: number }>();
+  for (const fixture of excludedFixtures) {
+    const reason = getFixtureScopeExclusionReason(fixture) ?? "unknown_competition";
+    excludedByReason[reason] = (excludedByReason[reason] ?? 0) + 1;
+    const key = [fixture.countryCode, fixture.competition, reason].join("|");
+    const entry = excludedCompetitionCounts.get(key) ?? { countryCode: fixture.countryCode, competition: fixture.competition, reason, fixtures: 0 };
+    entry.fixtures++;
+    excludedCompetitionCounts.set(key, entry);
+  }
+  const scopeAudit: FixtureScopeAudit = {
+    dateAndEuropeFixturesBeforeCompetitionScope: dateAndEuropeFixturesBeforeCompetitionScope.length,
+    eligibleDomesticLeagueFixtures: fixtures.length,
+    excludedOutOfScopeFixtures: excludedFixtures.length,
+    excludedByReason,
+    excludedCompetitions: [...excludedCompetitionCounts.values()].sort((a,b) => b.fixtures - a.fixtures || a.countryCode.localeCompare(b.countryCode) || a.competition.localeCompare(b.competition)),
+  };
   generatedAt = new Date().toISOString();
   const result: FixtureScan = {
     date,
     generatedAt,
     fixtures,
+    scopeAudit,
     leaguesChecked: openMatchdayChecked + openLigaChecked + openFootballChecked + espnChecked + footyNomadPagesChecked + (timezoneFootballGeneratedAt ? 1 : 0) + (flashscoreCompetitionsChecked ? 1 : 0),
     leaguesFailed: errors,
     source: SOURCE,
     cache: false,
     coverage: {
-      openMatchday: { cataloguesChecked: openMatchdayChecked, fixtures: openMatchdayFixturesFound, errors: errors.filter(error => error.startsWith("open-matchday ·")).length, catalogueGeneratedAt: openMatchdayCatalogueGeneratedAt },
-      openLigaDB: { competitionsChecked: openLigaChecked, fixtures: openLigaFixturesFound, errors: errors.filter(error => error.startsWith("OpenLigaDB ·")).length },
-      openFootball: { feedsChecked: openFootballChecked, fixtures: openFootballFixturesFound, errors: errors.filter(error => error.startsWith("openfootball ·")).length },
-      espn: { scoreboardsChecked: espnChecked, fixtures: espnFixturesFound, errors: errors.filter(error => error.startsWith("ESPN ·")).length },
-      footyNomad: { pagesChecked: footyNomadPagesChecked, pageMatches: footyNomadPageMatches, fixtures: footyNomadFixturesFound, skippedNoTimestamp: footyNomadSkippedNoTimestamp, errors: errors.filter(error => error.startsWith("FootyNomad ·")).length },
-      timezoneFootball: { feedMatches: timezoneFootballFeedMatches, fixtures: timezoneFootballFixturesFound, generatedAt: timezoneFootballGeneratedAt, errors: errors.filter(error => error.startsWith("timezone.football ·")).length },
-      flashscore: { competitionsChecked: flashscoreCompetitionsChecked, rawMatches: flashscoreRawMatches, fixtures: flashscoreFixturesFound, skippedNonEuropean: flashscoreSkippedNonEuropean, skippedWrongDate: flashscoreSkippedWrongDate, timestampMissing: flashscoreTimestampMissing, errors: errors.filter(error => error.startsWith("Flashscore ·")).length },
-      apiFootball: { providerFixtures: apiFootballProviderFixturesFound, europeanDateFixtures: apiFootballEuropeanFixturesFound, errors: errors.filter(error => error.startsWith("API-Football Pro")).length },
-      pitchApi: { fixtures: pitchApiFixturesFound, europeanFixtures: pitchApiEuropeanFixturesFound, leaguesResolved: pitchApiLeaguesResolved, catalogueLeagues: pitchApiCatalogueLeagues, europeanCatalogueLeagues: pitchApiEuropeanCatalogueLeagues, freeEuropeanCatalogueLeagues: pitchApiFreeEuropeanCatalogueLeagues, skippedNonFreeCatalogueLeagues: pitchApiSkippedNonFreeCatalogueLeagues, catalogueUpcomingFixtures: pitchApiCatalogueUpcomingFixtures, catalogueDateFixtures: pitchApiCatalogueDateFixtures, errors: errors.filter(error => error.startsWith("PitchAPI")).length },
+      openMatchday: { cataloguesChecked: openMatchdayChecked, fixtures: sourceFixtureCount("open-matchday"), dateQualifiedBeforeScope: openMatchdayFixturesFound, errors: errors.filter(error => error.startsWith("open-matchday ·")).length, catalogueGeneratedAt: openMatchdayCatalogueGeneratedAt },
+      openLigaDB: { competitionsChecked: openLigaChecked, fixtures: sourceFixtureCount("OpenLigaDB"), dateQualifiedBeforeScope: openLigaFixturesFound, errors: errors.filter(error => error.startsWith("OpenLigaDB ·")).length },
+      openFootball: { feedsChecked: openFootballChecked, fixtures: sourceFixtureCount("openfootball"), dateQualifiedBeforeScope: openFootballFixturesFound, errors: errors.filter(error => error.startsWith("openfootball ·")).length },
+      espn: { scoreboardsChecked: espnChecked, fixtures: sourceFixtureCount("ESPN"), dateQualifiedBeforeScope: espnFixturesFound, errors: errors.filter(error => error.startsWith("ESPN ·")).length },
+      footyNomad: { pagesChecked: footyNomadPagesChecked, pageMatches: footyNomadPageMatches, fixtures: sourceFixtureCount("FootyNomad"), dateQualifiedBeforeScope: footyNomadFixturesFound, skippedNoTimestamp: footyNomadSkippedNoTimestamp, errors: errors.filter(error => error.startsWith("FootyNomad ·")).length },
+      timezoneFootball: { feedMatches: timezoneFootballFeedMatches, fixtures: sourceFixtureCount("timezone.football"), dateQualifiedBeforeScope: timezoneFootballFixturesFound, generatedAt: timezoneFootballGeneratedAt, errors: errors.filter(error => error.startsWith("timezone.football ·")).length },
+      flashscore: { competitionsChecked: flashscoreCompetitionsChecked, rawMatches: flashscoreRawMatches, fixtures: sourceFixtureCount("Flashscore"), dateQualifiedBeforeScope: flashscoreFixturesFound, skippedNonEuropean: flashscoreSkippedNonEuropean, skippedWrongDate: flashscoreSkippedWrongDate, timestampMissing: flashscoreTimestampMissing, errors: errors.filter(error => error.startsWith("Flashscore ·")).length },
+      apiFootball: { providerFixtures: apiFootballProviderFixturesFound, europeanDateFixtures: apiFootballEuropeanFixturesFound, eligibleFixtures: sourceFixtureCount("API-Football Pro"), errors: errors.filter(error => error.startsWith("API-Football Pro")).length },
+      pitchApi: { fixtures: pitchApiFixturesFound, europeanFixtures: pitchApiEuropeanFixturesFound, eligibleFixtures: sourceFixtureCount("PitchAPI"), leaguesResolved: pitchApiLeaguesResolved, catalogueLeagues: pitchApiCatalogueLeagues, europeanCatalogueLeagues: pitchApiEuropeanCatalogueLeagues, freeEuropeanCatalogueLeagues: pitchApiFreeEuropeanCatalogueLeagues, skippedNonFreeCatalogueLeagues: pitchApiSkippedNonFreeCatalogueLeagues, catalogueUpcomingFixtures: pitchApiCatalogueUpcomingFixtures, catalogueDateFixtures: pitchApiCatalogueDateFixtures, errors: errors.filter(error => error.startsWith("PitchAPI")).length },
     },
   };
   try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ...result, cachedAt: Date.now() })); } catch { /* storage may be full */ }

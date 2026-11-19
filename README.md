@@ -102,3 +102,8 @@ Automated FotMob/Sofascore scraping is intentionally not used: their terms/offic
 - API-Football Pro returned 111 raw provider fixtures, of which 21 were accepted as European fixtures for the Brussels date after domestic-country and UEFA-world competition filtering.
 - This is a dated multi-source snapshot, not proof of exhaustive European senior, youth, women's, amateur or regional coverage.
 - CI, 290 unit tests across 29 test files, production build, Cloudflare Worker deployment, smoke tests and live source reconciliation passed on the latest feature commit. Physical Android interaction testing remains a separate acceptance task.
+
+
+## Final European fixture scope
+
+The live scan uses the current Europe/Brussels date and merges the available public fixture sources. The final app list is restricted to domestic European league competitions at every level the sources provide. National cups, UEFA competitions and international friendlies/tournaments are excluded after source reconciliation. Women's, youth and reserve leagues are retained when they are domestic leagues. Source coverage is not a guarantee that every federation, amateur division or competition is represented; raw counts are reported as unavailable rather than fabricated when an adapter does not expose them.

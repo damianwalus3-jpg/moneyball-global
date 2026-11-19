@@ -1,3 +1,4 @@
+import { isDomesticLeagueFixture } from "./free-fixtures";
 describe("API-Football Pro European fixture integration", () => {
   const response = {
     results: 3,
@@ -350,5 +351,35 @@ describe("ESPN European daily fixture fallback", () => {
 describe("ESPN Brussels-day source window", () => {
   it("checks the prior UTC day as well as the current day to catch after-midnight Brussels kickoffs", () => {
     expect(espnScoreboardDatesForBrusselsDay("2026-11-18")).toEqual(["20261117", "20261118"]);
+  });
+});
+
+
+describe("final European domestic league fixture scope", () => {
+  const fixture = (competition: string, countryCode = "ENG", leagueFolder = "") => ({
+    id: "scope-test", competition, countryCode, leagueFolder, date: "2026-11-19", time: "18:00",
+    home: "Home", away: "Away", source: "test", sourceUpdatedAt: "2026-11-19T08:00:00Z",
+  });
+
+  it("keeps domestic leagues at every tier, including women, youth and reserve leagues", () => {
+    expect(isDomesticLeagueFixture(fixture("National League South"))).toBe(true);
+    expect(isDomesticLeagueFixture(fixture("1. Division", "DEN"))).toBe(true);
+    expect(isDomesticLeagueFixture(fixture("Damallsvenskan Women", "SWE"))).toBe(true);
+    expect(isDomesticLeagueFixture(fixture("U19 League"))).toBe(true);
+    expect(isDomesticLeagueFixture(fixture("Reserve League"))).toBe(true);
+  });
+
+  it("excludes national cups and UEFA competitions from the final app list", () => {
+    for (const competition of ["FA Cup", "Copa de la Reina Women", "DFB-Pokal", "Coupe de France", "League Cup", "Super Cup", "Toto Cup"]) {
+      expect(isDomesticLeagueFixture(fixture(competition))).toBe(false);
+    }
+    for (const competition of ["UEFA Women's Champions League", "Champions League", "Europa League", "Conference League", "Nations League"]) {
+      expect(isDomesticLeagueFixture(fixture(competition))).toBe(false);
+    }
+    expect(isDomesticLeagueFixture(fixture("UEFA Champions League", "UEFA"))).toBe(false);
+  });
+
+  it("rejects non-European country codes", () => {
+    expect(isDomesticLeagueFixture(fixture("Premier League", "USA"))).toBe(false);
   });
 });

@@ -7,6 +7,7 @@ interface Env {
   ODDSPAPI_API_KEY?: string;
   STRIKERAPI_API_KEY?: string;
   ODDS_PILOT_TOKEN?: string;
+  ODDSPAPI_MARKET_CATALOGUE_ENABLED?: string;
 }
 
 const APP_ORIGIN = "https://moneyball-global-rebuild.damianwalus3.workers.dev";
@@ -427,7 +428,7 @@ export default {
       const authorization = request.headers.get("Authorization") ?? "";
       const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
       if (!constantTimeEqual(suppliedToken, env.ODDS_PILOT_TOKEN)) return json({ error: "unauthorized" }, 401, origin);
-      let input: { date?: unknown; slot?: unknown; fixtures?: unknown };
+      let input: { date?: unknown; slot?: unknown; fixtures?: unknown; allowBillableMarketCatalogue?: unknown };
       try { input = await request.json() as typeof input; }
       catch { return json({ error: "invalid_json" }, 400, origin); }
       const date = typeof input.date === "string" ? input.date : "";
@@ -508,7 +509,7 @@ export default {
           return empty;
         }
         let marketDefinitions = DEFAULT_ODDS_PAPI_MARKETS;
-        let marketCatalogStatus = "default_1x2_only";
+        let marketCatalogStatus = "owner_opt_in_required";
         let marketCatalogRequestUsed = false;
         const cachedMarketCatalog = await cache.match(ODDSPAPI_MARKETS_CACHE_KEY);
         if (cachedMarketCatalog) {
@@ -519,7 +520,7 @@ export default {
               marketCatalogStatus = "cached";
             }
           } catch { /* malformed cache falls back to documented 1X2 market */ }
-        } else if (remaining >= 3) {
+        } else if (input.allowBillableMarketCatalogue === true && env.ODDSPAPI_MARKET_CATALOGUE_ENABLED === "true" && remaining >= 3) {
           marketCatalogRequestUsed = true;
           // Market catalogue is billed once per seven-day cache window. If quota is tight,
           // preserve the 1X2 fetch and defer direct Double Chance discovery.
@@ -541,8 +542,10 @@ export default {
           } catch {
             marketCatalogStatus = "catalogue_unavailable_default_1x2";
           }
-        } else {
+        } else if (input.allowBillableMarketCatalogue === true && env.ODDSPAPI_MARKET_CATALOGUE_ENABLED === "true") {
           marketCatalogStatus = "quota_guard_default_1x2";
+        } else {
+          marketCatalogStatus = "owner_opt_in_required";
         }
         const tournamentIds = [...new Set(matchAudit.matched.map(row => row.tournamentId))];
         const oddsUrl = new URL("/v4/odds-by-tournaments", ODDSPAPI_API);

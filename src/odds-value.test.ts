@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TrackerRecord } from "./tracker-store";
-import { listFreshOddsSnapshots, listOddsBookmakers, shouldAutoFetchDailyOdds, valueDoubleChanceSelectionFromOdds, valueSelectionFromOdds } from "./odds-value";
+import { listFreshOddsSnapshots, listOddsBookmakers, shouldAutoFetchDailyOdds, shouldAutoFetchStrikerApi, valueDoubleChanceSelectionFromOdds, valueSelectionFromOdds } from "./odds-value";
 import { canonicalFixtureId } from "./free-fixtures";
 
 const now = "2026-11-17T20:00:00.000Z";
@@ -142,5 +142,18 @@ describe("automatic daily odds fetch guard", () => {
   it("rejects malformed calendar dates", () => {
     expect(shouldAutoFetchDailyOdds({ ...base, fixtureDate: "2026-02-30" })).toBe(false);
     expect(shouldAutoFetchDailyOdds({ ...base, fixtureDate: "not-a-date" })).toBe(false);
+  });
+});
+
+
+describe("StrikerAPI explicit-consent guard", () => {
+  const base = { fixtureDate: "2026-11-19", tokenSaved: true, providerReady: true,
+    explicitConsent: false, lastSuccessfulDate: "", lastAttemptedDate: "" };
+  it("never makes an automatic paid request without separate explicit consent", () => {
+    expect(shouldAutoFetchStrikerApi(base)).toBe(false);
+  });
+  it("allows at most one daily request only after explicit consent", () => {
+    expect(shouldAutoFetchStrikerApi({ ...base, explicitConsent: true })).toBe(true);
+    expect(shouldAutoFetchStrikerApi({ ...base, explicitConsent: true, lastAttemptedDate: "2026-11-19" })).toBe(false);
   });
 });

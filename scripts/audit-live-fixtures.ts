@@ -1,96 +1,91 @@
+import { scanTodayEuropeanFixtures, fixtureKey, isDomesticLeagueFixture } from "../src/free-fixtures.ts";
 import { EUROPEAN_COUNTRY_CODES } from "../src/european-countries.ts";
-import { fixtureKey } from "../src/free-fixtures.ts";
+import { getSourceDiagnostics } from "../src/source-diagnostics.ts";
 
-const WORKER_BASE = "https://moneyball-global-rebuild.damianwalus3.workers.dev";
-const values = new Map<string, string>();
-const storage = {
-  get length() { return values.size; },
-  clear() { values.clear(); },
-  getItem(key: string) { return values.get(key) ?? null; },
-  key(index: number) { return [...values.keys()][index] ?? null; },
-  removeItem(key: string) { values.delete(key); },
-  setItem(key: string, value: string) { values.set(key, String(value)); },
-} as Storage;
-Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
-
-const nativeFetch = globalThis.fetch.bind(globalThis);
-globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-  const raw = input instanceof Request ? input.url : String(input);
-  return nativeFetch(new URL(raw, WORKER_BASE), init);
-}) as typeof fetch;
-
-const { scanTodayEuropeanFixtures } = await import("../src/free-fixtures.ts");
 const scan = await scanTodayEuropeanFixtures(true);
-const countryRows = new Map<string, { fixtures: number; competitions: Set<string>; sources: Set<string> }>();
-for (const fixture of scan.fixtures) {
-  const row = countryRows.get(fixture.countryCode) ?? { fixtures: 0, competitions: new Set<string>(), sources: new Set<string>() };
-  row.fixtures++;
-  row.competitions.add(fixture.competition);
-  for (const source of fixture.source.split(" + ").map(value => value.trim()).filter(Boolean)) row.sources.add(source);
-  countryRows.set(fixture.countryCode, row);
-}
-const countrySummary = [...countryRows.entries()].map(([countryCode, row]) => ({
-  countryCode, fixtures: row.fixtures, competitions: row.competitions.size, sources: [...row.sources].sort(),
-})).sort((a, b) => b.fixtures - a.fixtures || a.countryCode.localeCompare(b.countryCode));
-const sourceHasErrors = (prefix: string) => scan.leaguesFailed.some(error => error.toLowerCase().startsWith(prefix.toLowerCase()));
-const sourceHealth = {
-  openMatchday: scan.coverage.openMatchday.cataloguesChecked > 0 && !sourceHasErrors("open-matchday ·"),
-  openLigaDB: scan.coverage.openLigaDB.competitionsChecked > 0 && !sourceHasErrors("OpenLigaDB ·"),
-  openFootball: scan.coverage.openFootball.feedsChecked > 0 && !sourceHasErrors("openfootball ·"),
-  ESPN: scan.coverage.espn.scoreboardsChecked > 0 && !sourceHasErrors("ESPN "),
-  FootyNomad: scan.coverage.footyNomad.pagesChecked > 0 && !sourceHasErrors("FootyNomad ·"),
-  timezoneFootball: Boolean(scan.coverage.timezoneFootball.generatedAt) && !sourceHasErrors("timezone.football ·"),
-  Flashscore: scan.coverage.flashscore.competitionsChecked > 0 && !sourceHasErrors("Flashscore ·"),
-  PitchAPI: (scan.coverage.pitchApi?.catalogueLeagues ?? 0) > 0 && !sourceHasErrors("PitchAPI"),
-  "API-Football Pro": scan.coverage.apiFootball.errors === 0,
+const fixtures = scan.fixtures;
+const diagnostics = getSourceDiagnostics(scan);
+const scopeAudit = scan.scopeAudit ?? {
+  dateAndEuropeFixturesBeforeCompetitionScope: fixtures.length,
+  eligibleDomesticLeagueFixtures: fixtures.length,
+  excludedOutOfScopeFixtures: 0,
+  excludedByReason: {},
+  excludedCompetitions: [],
 };
-const canonicalKeys = scan.fixtures.map(fixture => fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition));
-const duplicateKeys = canonicalKeys.filter((key, index) => canonicalKeys.indexOf(key) !== index);
-const wrongDate = scan.fixtures.filter(fixture => fixture.date !== scan.date);
-const nonEuropean = scan.fixtures.filter(fixture => !EUROPEAN_COUNTRY_CODES.has(fixture.countryCode) && !["EU", "UEFA"].includes(fixture.countryCode));
-const generatedAtMs = Date.parse(scan.generatedAt);
-const generatedAtAgeSeconds = Math.round((Date.now() - generatedAtMs) / 1000);
-const scanTimestampFresh = Number.isFinite(generatedAtMs) && generatedAtAgeSeconds >= 0 && generatedAtAgeSeconds <= 300;
-const catalogueGeneratedAtMs = Date.parse(scan.coverage.openMatchday.catalogueGeneratedAt);
-const catalogueAgeHours = Number.isFinite(catalogueGeneratedAtMs)
-  ? Math.round((Date.now() - catalogueGeneratedAtMs) / 3_600_000 * 10) / 10 : null;
-const timezoneGeneratedAtMs = Date.parse(scan.coverage.timezoneFootball.generatedAt);
-const timezoneAgeHours = Number.isFinite(timezoneGeneratedAtMs)
-  ? Math.round((Date.now() - timezoneGeneratedAtMs) / 3_600_000 * 10) / 10 : null;
-const openMatchdayCatalogueFresh = catalogueAgeHours !== null && catalogueAgeHours >= 0 && catalogueAgeHours <= 24;
-const timezoneFootballFeedFresh = timezoneAgeHours !== null && timezoneAgeHours >= 0 && timezoneAgeHours <= 24;
-const degradedSources = Object.entries(sourceHealth).filter(([, healthy]) => !healthy).map(([source]) => source);
-const sourceErrorCount = scan.leaguesFailed.length;
-const requiredSourcesHealthy = sourceHealth.Flashscore && sourceHealth.FootyNomad;
+const sourceHealth = Object.fromEntries(diagnostics.map(row => [
+  row.name,
+  row.checked > 0 && row.status !== "ERROR" && row.status !== "BRAK DANYCH",
+]));
+const sourceHealthCount = Object.values(sourceHealth).filter(Boolean).length;
+const requiredSourcesHealthy = sourceHealth["Flashscore"] === true && sourceHealth["FootyNomad"] === true;
+const sourceObservationCountBeforeScope = diagnostics.reduce((sum, row) => sum + (row.preScopeFixtures ?? 0), 0);
+const eligibleSourceObservationCount = diagnostics.reduce((sum, row) => sum + row.acceptedFixtures, 0);
+const duplicateSourceObservationsBeforeScope = Math.max(0, sourceObservationCountBeforeScope - scopeAudit.dateAndEuropeFixturesBeforeCompetitionScope);
+const duplicateSourceObservationsAfterScope = Math.max(0, eligibleSourceObservationCount - fixtures.length);
+const canonicalKeys = fixtures.map(fixture => fixtureKey(fixture.date, fixture.home, fixture.away, fixture.competition));
+const duplicateCanonicalKeys = canonicalKeys.length - new Set(canonicalKeys).size;
+const wrongDateFixtures = fixtures.filter(fixture => fixture.date !== scan.date).length;
+const nonEuropeanFixtures = fixtures.filter(fixture => fixture.countryCode === "UEFA" || !EUROPEAN_COUNTRY_CODES.has(fixture.countryCode)).length;
+const outOfScopeFixtures = fixtures.filter(fixture => !isDomesticLeagueFixture(fixture)).length;
+const countrySummary = [...new Set(fixtures.map(fixture => fixture.countryCode))]
+  .sort()
+  .map(countryCode => ({ countryCode, fixtures: fixtures.filter(fixture => fixture.countryCode === countryCode).length }));
+const competitionMap = new Map<string, { countryCode: string; competition: string; fixtures: number }>();
+for (const fixture of fixtures) {
+  const key = fixture.countryCode + "|" + fixture.competition;
+  const entry = competitionMap.get(key) ?? { countryCode: fixture.countryCode, competition: fixture.competition, fixtures: 0 };
+  entry.fixtures++;
+  competitionMap.set(key, entry);
+}
+const competitionSummary = [...competitionMap.values()].sort((a, b) =>
+  b.fixtures - a.fixtures || a.countryCode.localeCompare(b.countryCode) || a.competition.localeCompare(b.competition));
+const sourceErrorCount = diagnostics.reduce((sum, row) => sum + row.errors, 0);
+const degradedSources = diagnostics.filter(row => row.status === "ERROR" || row.status === "BRAK DANYCH").map(row => row.name);
+const zeroResultSources = diagnostics.filter(row => row.status === "ODPOWIEDŹ · 0 MECZÓW").map(row => row.name);
+const generatedAtAgeSeconds = Math.max(0, Math.round((Date.now() - Date.parse(scan.generatedAt)) / 1000));
+const generatedAtFresh = Number.isFinite(generatedAtAgeSeconds) && generatedAtAgeSeconds <= 300;
+const success = fixtures.length > 0 && sourceHealthCount >= 6 && requiredSourcesHealthy
+  && duplicateCanonicalKeys === 0 && wrongDateFixtures === 0 && nonEuropeanFixtures === 0
+  && outOfScopeFixtures === 0 && generatedAtFresh;
+
 const report = {
-  dateEuropeBrussels: scan.date,
+  success,
+  date: scan.date,
+  timezone: "Europe/Brussels",
   generatedAt: scan.generatedAt,
-  freshness: {
-    scanTimestampFresh,
-    scanAgeSeconds: generatedAtAgeSeconds,
-    openMatchdayCatalogueAgeHours: catalogueAgeHours,
-    openMatchdayCatalogueFresh,
-    timezoneFootballFeedAgeHours: timezoneAgeHours,
-    timezoneFootballFeedFresh,
-  },
-  totalUniqueFixtures: scan.fixtures.length,
+  scope: "Wyłącznie bieżący dzień Brussels; krajowe ligi europejskie wszystkich poziomów udostępnianych przez źródła. Bez krajowych pucharów, UEFA i rozgrywek międzynarodowych. Kobiety, młodzież i rezerwy pozostają, jeśli są ligą krajową i źródło je udostępnia.",
+  totalUniqueFixtures: fixtures.length,
   countries: countrySummary.length,
-  competitions: new Set(scan.fixtures.map(fixture => fixture.countryCode + "|" + fixture.competition)).size,
-  sourceHealth,
-  sourceHealthCount: Object.values(sourceHealth).filter(Boolean).length,
-  degradedSources,
-  sourceErrorCount,
-  requiredSourcesHealthy,
-  sourceCoverage: scan.coverage,
+  competitions: competitionSummary.length,
   countrySummary,
-  errors: scan.leaguesFailed,
-  validation: { duplicateCanonicalKeys: duplicateKeys.length, wrongDateFixtures: wrongDate.length, nonEuropeanFixtures: nonEuropean.length },
-  limitation: "This is a live multi-source snapshot, not proof that every European federation, youth, women's or amateur competition is represented.",
+  competitionSummary,
+  scopeAudit,
+  sourceObservationCountBeforeScope,
+  uniqueDateFixturesBeforeScope: scopeAudit.dateAndEuropeFixturesBeforeCompetitionScope,
+  duplicateSourceObservationsBeforeScope,
+  eligibleSourceObservationCount,
+  duplicateSourceObservationsAfterScope,
+  sourceSummary: diagnostics.map(row => ({
+    source: row.name, checked: row.checked, rawEntries: row.rawRecords,
+    preScopeFixtures: row.preScopeFixtures, eligibleFixtures: row.acceptedFixtures,
+    errors: row.errors, status: row.status, detail: row.detail,
+  })),
+  sourceHealth,
+  sourceHealthCount,
+  requiredSourcesHealthy,
+  degradedSources,
+  zeroResultSources,
+  sourceErrorCount,
+  sourceErrors: scan.leaguesFailed,
+  validation: {
+    duplicateCanonicalKeys, wrongDateFixtures, nonEuropeanFixtures, outOfScopeFixtures,
+    generatedAtAgeSeconds, generatedAtFresh,
+  },
+  completeness: {
+    provenComplete: false,
+    note: "To jest wieloźródłowy snapshot, nie dowód kompletności wszystkich federacji i poziomów. Cztery adaptery nie udostępniają surowej liczby rekordów; N/D pozostaje N/D. Zero meczów z poprawnie sprawdzonego źródła nie jest błędem.",
+  },
 };
-console.log("MONEYBALL REBUILT LIVE EUROPE FIXTURE AUDIT");
+
 console.log(JSON.stringify(report, null, 2));
-if (!scanTimestampFresh || !openMatchdayCatalogueFresh || !timezoneFootballFeedFresh
-  || !requiredSourcesHealthy || Object.values(sourceHealth).filter(Boolean).length < 6
-  || !scan.fixtures.length || duplicateKeys.length || wrongDate.length || nonEuropean.length) {
-  throw new Error("Live fixture audit failed validation; inspect the source and country diagnostics above.");
-}
+if (!success) process.exitCode = 1;

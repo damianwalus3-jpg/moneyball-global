@@ -44,4 +44,14 @@ describe("source diagnostics", () => {
       countries: 2, competitions: 3, countryCodes: ["BE", "NL"],
     });
   });
+  it("does not fabricate raw counts for adapters that only expose filtered fixtures", () => {
+    const rows = getSourceDiagnostics(scan());
+    const openMatchday = rows.find(row => row.name === "OpenMatchday");
+    expect(openMatchday?.rawRecords).toBeNull();
+    expect(openMatchday?.preScopeFixtures).toBe(0);
+    const pitchApi = rows.find(row => row.name === "PitchAPI");
+    expect(pitchApi?.rawRecords).toBe(10);
+    expect(pitchApi?.acceptedFixtures).toBe(2);
+  });
+
 });

@@ -19,7 +19,7 @@ import { brusselsDateToday, getSelectedFixturePredictions } from "./selected-mat
 import { auditMarketCoverage } from "./market-coverage";
 import { buildBetSettlementRows } from "./bet-settlement";
 import { calculateBankroll, canReserveStake } from "./bankroll";
-import { listFreshOddsSnapshots, listOddsBookmakers } from "./odds-value";
+import { listFreshOddsSnapshots, listOddsBookmakers, shouldAutoFetchStrikerApi } from "./odds-value";
 import { valueThreeLegCoupon } from "./coupon-value";
 import { buildBaselineEvidenceAudit, getEvidenceGaps, isEvidenceAuditComplete } from "./analysis-evidence";
 import { getSourceDiagnostics, summarizeFixtureCoverage } from "./source-diagnostics";
@@ -32,6 +32,7 @@ import {
 const ODDS_PILOT_TOKEN_KEY = "moneyball.oddsPilotToken";
 const STRIKER_DAILY_FETCH_KEY = "moneyball.strikerDailyFetchDate";
 const STRIKER_DAILY_ATTEMPT_KEY = "moneyball.strikerDailyOddsAttemptDate";
+const STRIKER_EXPLICIT_CONSENT_KEY = "moneyball.strikerApiExplicitConsent";
 const ODDSPAPI_DAILY_ATTEMPT_KEY = "moneyball.oddspapiDailyOddsAttemptDate";
 const FALLBACK_RETRY_KEY = "moneyball.neutralFallbackRetryAt";
 const FALLBACK_RETRY_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -42,6 +43,11 @@ function currentOddsSyncSlot(now = new Date()): "morning" | "afternoon" {
     timeZone: "Europe/Brussels", hour: "2-digit", hourCycle: "h23",
   }).format(now));
   return hour >= 15 ? "afternoon" : "morning";
+}
+
+function isStrikerExplicitlyEnabled(): boolean {
+  try { return localStorage.getItem(STRIKER_EXPLICIT_CONSENT_KEY) === "true"; }
+  catch { return false; }
 }
 
 function shouldRetryNeutralFallback(fixtureId: string, prior?: TrackerRecord): boolean {
@@ -129,16 +135,16 @@ function SourceDiagnostics({ scan }: { scan: FixtureScan }) {
   const sources = getSourceDiagnostics(scan);
   const coverage = summarizeFixtureCoverage(scan);
   return <section className="panel source-diagnostics">
-    <div className="panel-heading"><div><h3>Audyt źródeł i pokrycia</h3><p>{scan.date} · {coverage.countries} krajów/federacji · {coverage.competitions} rozgrywek · {scan.fixtures.length} unikalnych meczów po scaleniu</p></div><Database size={18}/></div>
+    <div className="panel-heading"><div><h3>Audyt źródeł i pokrycia</h3><p>{scan.date} · {coverage.countries} krajów/federacji · {coverage.competitions} rozgrywek · {scan.fixtures.length} unikalnych meczów po scaleniu · poza zakresem odrzucono {scan.scopeAudit?.excludedOutOfScopeFixtures ?? 0}</p></div><Database size={18}/></div>
     <div className="tracker-table">
       <div className="tracker-head"><span>ŹRÓDŁO</span><span>SPRAWDZONE</span><span>SUROWE</span><span>PRZYJĘTE</span><span>STATUS</span></div>
       {sources.map(source => <div className="tracker-row" key={source.name}>
-        <b>{source.name}</b><span>{source.checked}</span><span>{source.rawRecords}</span><span>{source.acceptedFixtures}</span>
+        <b>{source.name}</b><span>{source.checked}</span><span>{source.rawRecords ?? "N/D"}</span><span>{source.acceptedFixtures}</span>
         <span className={source.status === "ERROR" ? "scan-error" : source.status === "MECZE ZNALEZIONE" ? "status-positive" : "source-note"}>{source.status}</span>
-        <small className="source-note" style={{ gridColumn: "1 / -1" }}>{source.catalogue} · {source.detail}{source.errors ? ` · błędy: ${source.errors}` : ""}</small>
+        <small className="source-note" style={{ gridColumn: "1 / -1" }}>{source.catalogue} · przed zakresem: {source.preScopeFixtures ?? "N/D"} · {source.detail}{source.errors ? ` · błędy: ${source.errors}` : ""}</small>
       </div>)}
     </div>
-    <p className="source-note">„Sprawdzone” oznacza wykonane zapytanie/katalog, „surowe” — wpisy otrzymane od dostawcy, „przyjęte” — rekordy po filtrach danego źródła. Mecz może występować w kilku źródłach; suma „przyjęte” nie jest liczbą unikalnych spotkań. Pokrycie nie dowodzi kompletności wszystkich lig, poziomów regionalnych, kobiecych i młodzieżowych.</p>
+    <p className="source-note">„Sprawdzone” oznacza wykonane zapytanie/katalog, „surowe” — tylko liczbę faktycznie udostępnioną przez adapter (N/D oznacza brak licznika), „przed zakresem” — rekordy po dacie/Europie przed filtrem pucharów i UEFA, a „przyjęte” — krajowe ligi europejskie po scaleniu. Kobiece, młodzieżowe i rezerwowe ligi pozostają w zakresie, jeśli źródło je udostępnia. Suma „przyjęte” nie jest liczbą unikalnych spotkań; źródła nie dowodzą pełnej kompletności.</p>
     <details><summary>Kraje/federacje z wykrytymi meczami</summary><p>{coverage.countryCodes.join(", ") || "Brak"}</p></details>
   </section>;
 }
@@ -699,8 +705,14 @@ export default function App() {
     }
     // Provider attempts are tracked separately: a completed StrikerAPI request must not suppress
     // the first OddsPapi request (and vice versa) for the same Brussels date.
-    let strikerPending = oddsProviderStatus?.strikerapi === true
-      && lastOddsFetchDate !== fixtureScan.date && lastOddsAttemptDate !== fixtureScan.date;
+    let strikerPending = shouldAutoFetchStrikerApi({
+      fixtureDate: fixtureScan.date,
+      tokenSaved: oddsTokenSaved,
+      providerReady: oddsProviderStatus?.strikerapi === true,
+      explicitConsent: isStrikerExplicitlyEnabled(),
+      lastSuccessfulDate: lastOddsFetchDate,
+      lastAttemptedDate: lastOddsAttemptDate,
+    });
     const oddspapiSlot = currentOddsSyncSlot();
     const oddspapiAttemptKey = fixtureScan.date + "|" + oddspapiSlot;
     let oddspapiPending = oddsProviderStatus?.oddspapi === true
@@ -952,8 +964,14 @@ export default function App() {
   }, [fixtureScan]);
   useEffect(() => {
     if (!fixtureScan || !oddsTokenSaved || oddsProviderStatus?.pilotEnabled !== true) return;
-    const strikerPending = oddsProviderStatus.strikerapi === true
-      && lastOddsFetchDate !== fixtureScan.date && lastOddsAttemptDate !== fixtureScan.date;
+    const strikerPending = shouldAutoFetchStrikerApi({
+      fixtureDate: fixtureScan.date,
+      tokenSaved: oddsTokenSaved,
+      providerReady: oddsProviderStatus.strikerapi === true,
+      explicitConsent: isStrikerExplicitlyEnabled(),
+      lastSuccessfulDate: lastOddsFetchDate,
+      lastAttemptedDate: lastOddsAttemptDate,
+    });
     const oddspapiPending = oddsProviderStatus.oddspapi === true
       && lastOddsPapiAttemptKey !== fixtureScan.date + "|" + currentOddsSyncSlot();
     if (strikerPending || oddspapiPending) void fetchDailyOdds();
@@ -1140,9 +1158,9 @@ export default function App() {
               <input type="password" autoComplete="off" value={oddsPilotToken} onChange={event => { setOddsPilotToken(event.target.value); setOddsTokenSaved(false); }} placeholder="ODDS_PILOT_TOKEN · min. 32 znaki" aria-label="Token dostępu do automatycznych kursów"/>
               <button onClick={saveOddsPilotToken}>Zapisz token</button>
               <button onClick={clearOddsPilotToken} disabled={!oddsTokenSaved && !oddsPilotToken}>Usuń</button>
-              <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") && lastOddsFetchDate === fixtureScan?.date ? "OddsPapi i StrikerAPI: próby wykonane dzisiaj" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") ? "OddsPapi: próba wykonana dzisiaj" : lastOddsFetchDate === fixtureScan?.date ? "StrikerAPI: kursy pobrane dzisiaj; OddsPapi osobno" : lastOddsAttemptDate === fixtureScan?.date ? "StrikerAPI: próba wykonana — bez ponawiania kosztownych zapytań" : oddsProviderStatus === null ? "Sprawdzanie konfiguracji dostawców…" : !oddsProviderStatus.oddspapi && !oddsProviderStatus.strikerapi ? "Brak skonfigurowanych źródeł kursów" : !oddsProviderStatus.pilotEnabled ? "Brak sekretu ODDS_PILOT_TOKEN w Workerze" : oddsTokenSaved ? "Oczekiwanie na skan — pobieranie automatyczne" : "Wymagane jednorazowe zapisanie tokenu"}</span>
+              <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") && lastOddsFetchDate === fixtureScan?.date ? "OddsPapi i StrikerAPI: próby wykonane dzisiaj" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") ? "OddsPapi: próba wykonana dzisiaj" : lastOddsFetchDate === fixtureScan?.date ? "StrikerAPI: kursy pobrane dzisiaj; OddsPapi osobno" : lastOddsAttemptDate === fixtureScan?.date ? "StrikerAPI: próba wykonana — bez ponawiania kosztownych zapytań" : oddsProviderStatus === null ? "Sprawdzanie konfiguracji dostawców…" : !oddsProviderStatus.oddspapi && !oddsProviderStatus.strikerapi ? "Brak skonfigurowanych źródeł kursów" : !oddsProviderStatus.pilotEnabled ? "Brak sekretu ODDS_PILOT_TOKEN w Workerze" : oddsTokenSaved ? "OddsPapi: synchronizacja po zapisaniu tokenu; StrikerAPI wyłączony bez osobnej zgody" : "Wymagane jednorazowe zapisanie tokenu"}</span>
             </div>
-            <p className="source-note">Sekret <b>ODDS_PILOT_TOKEN</b> chroni wywołania dostawców i pozostaje wyłącznie w Workerze oraz lokalnej przeglądarce. OddsPapi używa istniejącego <b>ODDSPAPI_API_KEY</b>; Worker sprawdza rzeczywisty limit konta przez bezpłatny endpoint /account, pobiera mecze z kursami i dopasowuje je po nazwach drużyn, dacie i godzinie Europe/Brussels. Dwie synchronizacje OddsPapi dziennie zużywają maksymalnie 4 z 250 obecnie dostępnych zapytań miesięcznych; rzeczywisty pozostały limit jest sprawdzany przed każdym pobraniem. Bwin Belgium (bwin.be) oraz dostępne feedy Unibet BE, betFIRST, Bingoal, Golden Palace, Betcenter, SCOOORE, Starcasino i Napoleon Sports są wybierane tylko wtedy, gdy konto ma do nich dostęp. Kurs nie jest wymagany do utworzenia prognozy 1X2/DC. StrikerAPI pozostaje dodatkowym źródłem i jego kredyty są rozliczane osobno.</p>
+            <p className="source-note">Sekret <b>ODDS_PILOT_TOKEN</b> chroni wywołania dostawców i pozostaje wyłącznie w Workerze oraz lokalnej przeglądarce. OddsPapi używa istniejącego <b>ODDSPAPI_API_KEY</b>; Worker sprawdza rzeczywisty limit konta przez bezpłatny endpoint /account, pobiera mecze z kursami i dopasowuje je po nazwach drużyn, dacie i godzinie Europe/Brussels. Dwie synchronizacje OddsPapi dziennie zużywają maksymalnie 4 z 250 obecnie dostępnych zapytań miesięcznych; rzeczywisty pozostały limit jest sprawdzany przed każdym pobraniem. Bwin Belgium (bwin.be) oraz dostępne feedy Unibet BE, betFIRST, Bingoal, Golden Palace, Betcenter, SCOOORE, Starcasino i Napoleon Sports są wybierane tylko wtedy, gdy konto ma do nich dostęp. Kurs nie jest wymagany do utworzenia prognozy 1X2/DC. StrikerAPI jest skonfigurowany, ale pozostaje zablokowany bez osobnej zgody; aplikacja nie wysyła do niego automatycznych ani ręcznych zapytań. Katalog rynków DC może zużyć dodatkowe zapytanie i jest blokowany, dopóki nie zostanie włączony osobnym parametrem żądania oraz sekretem Workera.</p>
             {oddsProviderStatus?.oddspapiAccount && <p className="source-note">OddsPapi · stan: {oddsProviderStatus.oddspapiAccount.status ?? "nieznany"}{typeof oddsProviderStatus.oddspapiAccount.remaining === "number" ? ` · pozostałe zapytania: ${oddsProviderStatus.oddspapiAccount.remaining}/${oddsProviderStatus.oddspapiAccount.requestLimit ?? "—"}` : ""}{oddsProviderStatus.oddspapiAccount.bookmakerSlugs?.length ? ` · dostępne feedy: ${oddsProviderStatus.oddspapiAccount.bookmakerSlugs.join(", ")}` : ""}</p>}
             {oddsNotice && <div className="tracker-notice">{oddsNotice}</div>}
             {oddsAudit && <p className="source-note">Ostatni audyt · UTC {oddsAudit.utcDate} · dopasowane {oddsAudit.matched} · niejednoznaczne {oddsAudit.ambiguous} · bez dopasowania {oddsAudit.unmatched} · nowe snapshoty {oddsAudit.snapshots}.</p>}
