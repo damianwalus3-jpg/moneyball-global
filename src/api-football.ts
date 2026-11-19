@@ -37,6 +37,41 @@ interface BatchResponse<T> {
   message?: string;
   retryAfterSeconds?: number;
 }
+
+export interface ApiFootballTrackerDetails {
+  apiFootballFixtureId: number | null;
+  apiFootballDataObservedAt: string | null;
+  apiFootballEventsCount: number | null;
+  apiFootballLineupsCount: number | null;
+  apiFootballTeamStatisticsCount: number | null;
+  apiFootballPlayerStatisticsCount: number | null;
+  apiFootballInjuriesCount: number | null;
+  apiFootballFixtureData?: string | null;
+  apiFootballInjuries?: string | null;
+}
+/** Keep summary metadata on every market row, but store the full provider payload only once per fixture. */
+export function buildApiFootballTrackerDetails(
+  fixture?: ApiFootballFixtureEnrichment,
+  injuries?: ApiFootballInjury[],
+  includeFullPayload = false,
+  observedAt = new Date().toISOString(),
+): ApiFootballTrackerDetails {
+  const details: ApiFootballTrackerDetails = {
+    apiFootballFixtureId: fixture?.fixture?.id ?? null,
+    apiFootballDataObservedAt: fixture || injuries !== undefined ? observedAt : null,
+    apiFootballEventsCount: fixture?.events?.length ?? null,
+    apiFootballLineupsCount: fixture?.lineups?.length ?? null,
+    apiFootballTeamStatisticsCount: fixture?.statistics?.length ?? null,
+    apiFootballPlayerStatisticsCount: fixture?.players?.length ?? null,
+    apiFootballInjuriesCount: injuries?.length ?? null,
+  };
+  if (includeFullPayload) {
+    details.apiFootballFixtureData = fixture ? JSON.stringify(fixture) : null;
+    details.apiFootballInjuries = injuries !== undefined ? JSON.stringify(injuries) : null;
+  }
+  return details;
+}
+
 const API_ROOT = "/api/api-football";
 const BATCH_SIZE = 20;
 function delay(ms: number): Promise<void> {

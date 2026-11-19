@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchApiFootballEnrichment, fetchApiFootballInjuriesForDate } from "./api-football";
+import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballInjuriesForDate } from "./api-football";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -49,5 +49,27 @@ describe("API-Football daily injury feed", () => {
     vi.stubGlobal("fetch", fetchMock);
     await expect(fetchApiFootballInjuriesForDate("2026-02-31")).rejects.toThrow("Nieprawidłowa data");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("API-Football Tracker storage", () => {
+  const fixture = {
+    fixture: { id: 123 }, events: [{ type: "Goal" }], lineups: [{ formation: "4-3-3" }],
+    statistics: [{ team: { name: "Home" }, statistics: [{ type: "Shots", value: 10 }] }],
+    players: [{ team: { name: "Home" }, players: [{ player: { name: "Player" } }] }],
+  };
+  const injuries = [{ fixture: { id: 123 }, player: { name: "Player", reason: "Injured" } }];
+  it("stores compact metadata on all prediction rows and the full payload only on one primary row", () => {
+    const compact = buildApiFootballTrackerDetails(fixture, injuries, false, "2026-11-19T04:00:00Z");
+    expect(compact).toMatchObject({
+      apiFootballFixtureId: 123, apiFootballEventsCount: 1, apiFootballLineupsCount: 1,
+      apiFootballTeamStatisticsCount: 1, apiFootballPlayerStatisticsCount: 1,
+      apiFootballInjuriesCount: 1, apiFootballDataObservedAt: "2026-11-19T04:00:00Z",
+    });
+    expect(compact).not.toHaveProperty("apiFootballFixtureData");
+    expect(compact).not.toHaveProperty("apiFootballInjuries");
+    const full = buildApiFootballTrackerDetails(fixture, injuries, true, "2026-11-19T04:00:00Z");
+    expect(JSON.parse(full.apiFootballFixtureData ?? "{}")).toMatchObject({ fixture: { id: 123 }, events: [{ type: "Goal" }] });
+    expect(JSON.parse(full.apiFootballInjuries ?? "[]")).toHaveLength(1);
   });
 });
