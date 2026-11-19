@@ -88,8 +88,8 @@ function apiFootballSelection(bet:any,value:any):{market:string;selection:string
 async function syncApiFootballOdds(day:string,matches:any[]){
  const fixturePayload=await apiFootball("/fixtures?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels");
  const fixtures=Array.isArray(fixturePayload.response)?fixturePayload.response:[];
- const aliases:Record<string,string>={"bayern munchen":"bayern munich","cologne":"koln","fc cologne":"koln","le havre ac":"le havre","athletic bilbao":"athletic"};
- const teamKey=(value:any)=>{const key=norm(value).replace(/\b(fc|cf|sc|ac|afc|club)\b/g," ").replace(/\s+/g," ").trim();return aliases[key]||key;};
+ const aliases:Record<string,string>={"bayern munchen":"bayern munich","cologne":"koln","fc cologne":"koln","estac troyes":"troyes","le havre ac":"le havre","athletic bilbao":"athletic"};
+ const teamKey=(value:any)=>{const key=norm(value).replace(/\b(fc|cf|sc|ac|afc|club)\b/g," ").replace(/\s+/g," ").trim().replace(/^\d+\s*/,"");return aliases[key]||key;};
  const matched:any[]=[];
  const used=new Set<number>();
  for(const match of matches){
