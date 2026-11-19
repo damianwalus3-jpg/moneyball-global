@@ -46,7 +46,8 @@ function freshCompleteSnapshot(
     const d = row.details;
     if (row.kind !== "odds" || trackerFixtureIdentity(row) !== fixtureId || d.bookmaker !== bookmaker
       || (d.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2") !== market) return false;
-    if (!isFresh(d.capturedAt, now, maxAgeMinutes)) return false;
+    const freshnessLimit = d.provider === "API-Football Pro" ? Math.max(maxAgeMinutes, 180) : maxAgeMinutes;
+    if (!isFresh(d.capturedAt, now, freshnessLimit)) return false;
     if (market === "1X2") {
       return row.status === "COMPLETE_1X2" && d.complete1X2 !== false
         && validDecimalOdds(d.odds1) && validDecimalOdds(d.oddsX) && validDecimalOdds(d.odds2);
@@ -124,7 +125,8 @@ export function valueDoubleChanceSelectionFromOdds(
 function validCompleteSnapshotForList(row: TrackerRecord, fixtureIds: Set<string>, now: number, maxAgeMinutes: number): boolean {
   const d = row.details;
   if (row.kind !== "odds" || !fixtureIds.has(trackerFixtureIdentity(row) ?? "")
-    || typeof d.bookmaker !== "string" || !d.bookmaker.trim() || !isFresh(d.capturedAt, now, maxAgeMinutes)) return false;
+    || typeof d.bookmaker !== "string" || !d.bookmaker.trim()
+    || !isFresh(d.capturedAt, now, d.provider === "API-Football Pro" ? Math.max(maxAgeMinutes, 180) : maxAgeMinutes)) return false;
   if (d.market !== "DOUBLE_CHANCE") {
     return row.status === "COMPLETE_1X2" && d.complete1X2 !== false
       && validDecimalOdds(d.odds1) && validDecimalOdds(d.oddsX) && validDecimalOdds(d.odds2);
