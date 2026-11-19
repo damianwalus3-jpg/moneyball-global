@@ -138,6 +138,7 @@ export interface ApiFootballOddsBatch {
   generatedAt: string;
   requestedFixtureIds: string[];
   odds: Array<{ fixtureId: string; status: string; results?: number; data?: unknown[]; error?: string }>;
+  failedFixtureIds?: string[];
 }
 
 export interface ApiFootballTrackerDetails {
@@ -272,18 +273,6 @@ export async function fetchApiFootballEnrichment(
     }
   }
   return output;
-}
-
-/** Fetch cached API-Football odds for up to 20 fixtures; provider keys stay inside the Worker. */
-export async function fetchApiFootballOdds(
-  fixtureIds: string[],
-  minimumIntervalMs = API_FOOTBALL_MIN_INTERVAL_MS,
-): Promise<ApiFootballOddsBatch> {
-  const ids = [...new Set(fixtureIds.map(value => String(value).trim()).filter(value => /^\d{1,12}$/.test(value)))];
-  if (!ids.length || ids.length > 20) throw new Error("API-Football odds wymaga 1–20 poprawnych identyfikatorów meczów.");
-  const query = new URLSearchParams({ ids: ids.join("-") });
-  const response = await pacedApiFootballFetch(API_ROOT + "/odds?" + query.toString(), minimumIntervalMs);
-  return readResponse<ApiFootballOddsBatch>(response);
 }
 
 /** Fetch today's pre-match odds for up to 20 API-Football fixture IDs via the server-side Worker key. */
