@@ -2159,3 +2159,16 @@
 - User-provided Android screenshots confirm the local browser currently contains 1,487 records, 15 saved matches, complete 1X2 and Double Chance probability fields for all 15 matches, and zero missing/invalid probability rows. This is device-visible evidence, not a full validation of every record.
 - The user-visible coupon module correctly reports no qualifying three-leg coupon for the 2026-11-19 scan because it has not found three distinct matches meeting the confirmed >=75% selection threshold. This is not treated as an application error and no weak coupon is fabricated.
 - Remaining device acceptance item is to inspect the new read-only coupon/bet settlement summary on the user's device after deployment. Remote CI cannot inspect the device's private localStorage. No claim is made that local coupon/bet settlement counts were verified from the server.
+
+
+## 2026-11-19 — Stage 181: API-Football Pro result settlement and Tracker audit UI
+
+- Added strict API-Football Pro final-score parsing for FT, AET, PEN, AWD and WO statuses. A score is accepted only when both goals are non-negative integers and the provider kickoff date resolves to the expected Europe/Brussels calendar date.
+- Automatic settlement now prioritizes fixtures referenced by unresolved paper coupons and requests one conservative API-Football enrichment batch of at most 20 fixture IDs per run. Provider 429/network failures are non-fatal and existing OpenMatchday, OpenLigaDB and OpenFootball result sources remain fallbacks.
+- Result records now retain canonical fixture metadata (date, home, away, competition, API-Football fixture ID and source) to improve cross-provider coupon matching. No synthetic score, odds or EV is created.
+- After result ingestion, all coupons with three verified leg results are evaluated and an idempotent PAPER_HIT/PAPER_MISS child record is written. Existing records are never overwritten; unverified or incomplete coupons remain open.
+- Tracker now exposes a dedicated mobile-visible read-only settlement audit panel with counts for coupons, coupon settlements, open coupons, selected bets, bet settlements and open bets, plus a manual “Pobierz wyniki i rozlicz” action.
+- Added unit coverage for final statuses, incomplete scores and Europe/Brussels date boundaries. CI and Rebuild Checks passed; production Cloudflare deployment and smoke test passed on commit cc523b3a8927c341ddba37e25e52ee40e2b933b9.
+- Live production health reports ok:true, service moneyball-global-rebuild, PitchAPI configured and API-Football configured. OddsPapi remains configured but has 250/250 requests remaining and 0 used; no additional paid OddsPapi requests were made. StrikerAPI remains disabled.
+- Device screenshots confirm 1,487 local Tracker records, 7 historical coupons and no RESULT rows matching 2026-11-18 in the filtered view. The latter establishes missing local result records, not absence of real-world scores.
+- Stage 3 remains pending one final owner-device acceptance: open the updated Tracker, run the manual result/settlement action, then inspect the displayed counters and resulting coupon child records. Remote CI cannot access or mutate the phone's private localStorage.
