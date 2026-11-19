@@ -10,8 +10,14 @@ export function selectionWon(selection: string, actual: string): boolean {
 
 export function buildBetSettlementRows(records: TrackerRecord[]): Array<Omit<TrackerRecord, "id" | "createdAt">> {
   const results = new Map<string, "1" | "X" | "2" | "VOID">();
-  const newestFirst = [...records].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
-  for (const row of newestFirst) {
+  const newestFirst = records.map((row, index) => ({ row, index, time: Date.parse(row.createdAt) }))
+    .sort((a, b) => {
+      const aTime = Number.isFinite(a.time) ? a.time : Number.NEGATIVE_INFINITY;
+      const bTime = Number.isFinite(b.time) ? b.time : Number.NEGATIVE_INFINITY;
+      return bTime - aTime || a.index - b.index;
+    });
+  for (const item of newestFirst) {
+    const row = item.row;
     if (row.kind === "result" && typeof row.details.fixtureId === "string"
       && ["1", "X", "2", "VOID"].includes(String(row.details.actual)) && !results.has(row.details.fixtureId)) {
       results.set(row.details.fixtureId, row.details.actual as "1" | "X" | "2" | "VOID");
