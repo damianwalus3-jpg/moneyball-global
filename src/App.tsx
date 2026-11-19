@@ -12,6 +12,7 @@ import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
 import { describeHistoryProvenance, hasValidPredictionMarket, shouldAppendPrediction, shouldRetryPredictionWithEvidence, trackerFixtureIdentity } from "./prediction-record";
+import { filterRecordsToCurrentScan } from "./current-scan-scope";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import { getPredictionDisplayStatus, isEvidenceQualifiedCandidate } from "./prediction-eligibility";
 import { auditOddsFixtureMatches } from "./odds-matching";
@@ -1092,10 +1093,18 @@ export default function App() {
   const fileRef = useRef<HTMLInputElement>(null);
   const modelAudit = useMemo(() => auditTrackerPredictions(records), [records]);
   const bankroll = useMemo(() => calculateBankroll(records), [records]);
+  const eligibleFixtureIds = useMemo(
+    () => new Set(fixtureScan?.fixtures.map(match => match.id) ?? []),
+    [fixtureScan],
+  );
+  const currentScanRecords = useMemo(
+    () => filterRecordsToCurrentScan(records, eligibleFixtureIds),
+    [records, eligibleFixtureIds],
+  );
   const predictionDiagnostics = useMemo(() => {
     const coverageDate = fixtureScan?.date ?? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
     const latestByFixtureMarketModel = new Map<string, TrackerRecord>();
-    for (const row of [...records].filter(item => item.kind === "prediction" && item.details.fixtureDate === coverageDate)
+    for (const row of [...currentScanRecords].filter(item => item.kind === "prediction" && item.details.fixtureDate === coverageDate)
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
       const fixtureId = trackerFixtureIdentity(row);
       if (!fixtureId) continue;
@@ -1107,20 +1116,20 @@ export default function App() {
     const latestRows = [...latestByFixtureMarketModel.values()];
     const oneXTwo = latestRows.filter(row => row.details.market !== "DOUBLE_CHANCE");
     const doubleChance = latestRows.filter(row => row.details.market === "DOUBLE_CHANCE");
-    const coverage = auditMarketCoverage(records, coverageDate);
+    const coverage = auditMarketCoverage(currentScanRecords, coverageDate);
     const candidates = new Set<string>(), dcCandidates = new Set<string>();
     const withProbabilities = new Set<string>(), withDcProbabilities = new Set<string>();
     for (const row of oneXTwo) {
       const id = trackerFixtureIdentity(row);
       if (!id) continue;
       if (isEvidenceQualifiedCandidate(row, "1X2")) candidates.add(id);
-      if (hasValidPredictionMarket(records, id, "1X2")) withProbabilities.add(id);
+      if (hasValidPredictionMarket(currentScanRecords, id, "1X2")) withProbabilities.add(id);
     }
     for (const row of doubleChance) {
       const id = trackerFixtureIdentity(row);
       if (!id) continue;
       if (isEvidenceQualifiedCandidate(row, "DOUBLE_CHANCE")) dcCandidates.add(id);
-      if (hasValidPredictionMarket(records, id, "DOUBLE_CHANCE")) withDcProbabilities.add(id);
+      if (hasValidPredictionMarket(currentScanRecords, id, "DOUBLE_CHANCE")) withDcProbabilities.add(id);
     }
     const latestPerFixture = new Map<string, TrackerRecord>();
     for (const row of oneXTwo.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
@@ -1137,9 +1146,9 @@ export default function App() {
       missing1X2: coverage.missingOneXTwo.length, missingDC: coverage.missingDoubleChance.length,
       reasons: [...reasons.entries()].sort((a, b) => b[1] - a[1]),
       oneXTwoRecords: oneXTwo.length, doubleChanceRecords: doubleChance.length };
-  }, [records, fixtureScan?.date]);
+  }, [currentScanRecords, fixtureScan?.date]);
   const activeFixtureDate = fixtureScan?.date ?? brusselsDateToday();
-  const safestPick = useMemo(() => getSafestPick(records, 0.75, activeFixtureDate), [records, activeFixtureDate]);
+  const safestPick = useMemo(() => getSafestPick(currentScanRecords, 0.75, activeFixtureDate), [currentScanRecords, activeFixtureDate]);
   const visibleRecords = useMemo(() => records.filter(row => (active === "tracker" ? true : row.kind === (active === "matches" ? "match" : active === "coupons" ? "coupon" : active === "pick" ? "prediction" : "scan")) && (row.title.toLowerCase().includes(query.toLowerCase()) || row.status.toLowerCase().includes(query.toLowerCase()))), [records, active, query]);
   const refreshRecords = () => setRecords(readRecords());
   const betInputFor = (prediction: TrackerRecord) => betInputs[String(prediction.details.fixtureId)] ?? {
@@ -1361,7 +1370,7 @@ export default function App() {
           <p>Do puli trafiają wyłącznie typy z najwyższym prawdopodobieństwem co najmniej 75%. Każdy kupon ma trzy różne mecze, bez powtórek.</p>
           <div className="module-status"><span className="status-dot"/> {fixtureScan ? `DATA SKANU: ${fixtureScan.date}` : "NAJPIERW WYKONAJ SKAN MECZÓW"}</div>
           {(() => {
-            const candidates = buildThreeLegCandidates(records, fixtureScan?.date ?? "");
+            const candidates = buildThreeLegCandidates(currentScanRecords, fixtureScan?.date ?? "");
             const bookmakers = listOddsBookmakers(records, candidates.flatMap(item => item.legs.map(leg => leg.fixtureId)));
             return candidates.length ? <div className="coupon-candidates">
               <label className="field-label">Bukmacher do wyceny kuponu
@@ -1443,7 +1452,7 @@ export default function App() {
           <p>Pokazujemy najnowszą zapisaną prognozę każdego rynku dla meczu. Procent jest prawdopodobieństwem przypisanym dokładnie do wskazanego typu, a nie gwarancją wyniku.</p>
           {safestPick && <div className="safest-pick-card"><span className="safest-pick-label">NAJMOCNIEJSZY KANDYDAT · NIE GWARANCJA</span><h3>{safestPick.title}</h3><b className="safest-pick-market">{safestPick.market} · {(safestPick.probability * 100).toFixed(1)}%</b><p>{safestPick.competition} · {safestPick.kickoff} (Europe/Brussels)</p><small>{safestPick.reason}</small></div>}
           {(() => {
-            const ordered = getSelectedFixturePredictions(records, activeFixtureDate);
+            const ordered = getSelectedFixturePredictions(currentScanRecords, activeFixtureDate);
             const chosenProbability = (row: TrackerRecord | undefined, market: "1X2" | "DOUBLE_CHANCE") => {
               if (!row || typeof row.details.selection !== "string") return null;
               const key = market === "1X2" ? ({ "1":"p1", "X":"px", "2":"p2" } as Record<string,string>)[row.details.selection] : ({ "1X":"p1x", "X2":"px2", "12":"p12" } as Record<string,string>)[row.details.selection];
