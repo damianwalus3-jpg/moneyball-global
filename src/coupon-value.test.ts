@@ -59,6 +59,48 @@ describe("three-leg coupon odds valuation", () => {
     expect(valueThreeLegCoupon(candidate, records, "Book A", now)).toBeNull();
   });
 
+  it("prices three direct Double Chance legs from the same bookmaker", () => {
+    const dcCandidate: ThreeLegCandidate = {
+      date: "2026-11-17", combinedProbability: 0.612, averageProbability: 0.85, oddsAvailable: false,
+      legs: [
+        { fixtureId: "f1", title: "A vs B", competition: "League", selection: "1X", market: "DOUBLE_CHANCE", probability: 0.9, source: "model", model: "v1" },
+        { fixtureId: "f2", title: "C vs D", competition: "League", selection: "X2", market: "DOUBLE_CHANCE", probability: 0.85, source: "model", model: "v1" },
+        { fixtureId: "f3", title: "E vs F", competition: "League", selection: "12", market: "DOUBLE_CHANCE", probability: 0.8, source: "model", model: "v1" },
+      ],
+    };
+    const predictions = [
+      row("prediction", "f1", { market: "DOUBLE_CHANCE", model: "v1", p1x: 0.9, px2: 0.6, p12: 0.5, selection: "1X", probability: 0.9, strongDoubleChance: true }, "KANDYDAT"),
+      row("prediction", "f2", { market: "DOUBLE_CHANCE", model: "v1", p1x: 0.6, px2: 0.85, p12: 0.55, selection: "X2", probability: 0.85, strongDoubleChance: true }, "KANDYDAT"),
+      row("prediction", "f3", { market: "DOUBLE_CHANCE", model: "v1", p1x: 0.6, px2: 0.6, p12: 0.8, selection: "12", probability: 0.8, strongDoubleChance: true }, "KANDYDAT"),
+    ];
+    const prices = ["f1", "f2", "f3"].map((id, index) => row("odds", id, {
+      bookmaker: "Book A", market: "DOUBLE_CHANCE", completeDoubleChance: true,
+      odds1x: 1.25, oddsX2: 1.3, odds12: 1.35, capturedAt: "2026-11-17T19:30:00.000Z",
+    }, "COMPLETE_DOUBLE_CHANCE"));
+    const value = valueThreeLegCoupon(dcCandidate, [...predictions, ...prices], "Book A", now);
+    expect(value?.combinedOdds).toBeCloseTo(1.25 * 1.3 * 1.35);
+    expect(value?.combinedProbability).toBeCloseTo(0.612);
+    expect(value?.expectedValue).toBeCloseTo(0.612 * 1.25 * 1.3 * 1.35 - 1);
+    expect(value?.legs.every(leg => leg.market === "DOUBLE_CHANCE" && leg.marketProbabilityNoVig === null)).toBe(true);
+  });
+
+  it("does not price a Double Chance leg from 1X2 quotes or a rejected DC prediction", () => {
+    const dcCandidate: ThreeLegCandidate = {
+      date: "2026-11-17", combinedProbability: 0.512, averageProbability: 0.8, oddsAvailable: false,
+      legs: [
+        { fixtureId: "f1", title: "A vs B", competition: "League", selection: "1X", market: "DOUBLE_CHANCE", probability: 0.8, source: "model", model: "v1" },
+        { fixtureId: "f2", title: "C vs D", competition: "League", selection: "X2", market: "DOUBLE_CHANCE", probability: 0.8, source: "model", model: "v1" },
+        { fixtureId: "f3", title: "E vs F", competition: "League", selection: "12", market: "DOUBLE_CHANCE", probability: 0.8, source: "model", model: "v1" },
+      ],
+    };
+    const dcPredictions = ["f1", "f2", "f3"].map((id, index) => row("prediction", id, {
+      market: "DOUBLE_CHANCE", model: "v1", p1x: 0.8, px2: 0.7, p12: 0.5,
+      selection: ["1X", "X2", "12"][index], probability: 0.8, strongDoubleChance: true,
+    }, "KANDYDAT"));
+    const rejected = { ...dcPredictions[0], status: "ODRZUCONY", details: { ...dcPredictions[0].details, strongDoubleChance: false } };
+    expect(valueThreeLegCoupon(dcCandidate, [...dcPredictions, ...fullRecords().filter(r => r.kind === "odds")], "Book A", now)).toBeNull();
+    expect(valueThreeLegCoupon(dcCandidate, [rejected, ...dcPredictions.slice(1), ...fullRecords().filter(r => r.kind === "odds")], "Book A", now)).toBeNull();
+  });
   it("rejects invalid stake and stale price data", () => {
     expect(valueThreeLegCoupon(candidate, fullRecords(), "Book A", now, 360, 0)).toBeNull();
     const stale = fullRecords().map(row => row.kind === "odds"
