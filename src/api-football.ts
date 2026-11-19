@@ -75,7 +75,7 @@ export function buildApiFootballTrackerDetails(
 const API_ROOT = "/api/api-football";
 const BATCH_SIZE = 20;
 /** Conservative shared pacing for every API-Football call made by this app tab. */
-export const API_FOOTBALL_MIN_INTERVAL_MS = 10_000;
+export const API_FOOTBALL_MIN_INTERVAL_MS = 2_000;
 let lastApiFootballRequestAt = 0;
 let apiFootballBlockedUntil = 0;
 let apiFootballRequestQueue: Promise<void> = Promise.resolve();
@@ -99,7 +99,14 @@ async function pacedApiFootballFetch(path: string, minimumIntervalMs = API_FOOTB
   apiFootballRequestQueue = new Promise<void>(resolve => { release = resolve; });
   await previous;
   try {
-    const nextAllowedAt = Math.max(lastApiFootballRequestAt + Math.max(0, minimumIntervalMs), apiFootballBlockedUntil);
+    // A provider cooldown must not stall the rest of the match analysis for minutes.
+    // Fail fast without sending another provider request; a later user-triggered run
+    // can retry after Retry-After has elapsed.
+    if (apiFootballBlockedUntil > Date.now()) {
+      const retrySeconds = Math.ceil((apiFootballBlockedUntil - Date.now()) / 1000);
+      throw new Error("API-Football limit aktywny (spróbuj ponownie za " + retrySeconds + " s).");
+    }
+    const nextAllowedAt = lastApiFootballRequestAt + Math.max(0, minimumIntervalMs);
     const waitMs = Math.max(0, nextAllowedAt - Date.now());
     if (waitMs > 0) await delay(waitMs);
     lastApiFootballRequestAt = Date.now();
