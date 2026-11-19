@@ -561,8 +561,10 @@ export default {
       if (oddsHealth) {
         let oddspapiAccount: OddsPapiAccountSummary | null = null;
         if (env.ODDSPAPI_API_KEY) {
-          const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
-          oddspapiAccount = await readOddsPapiAccount(env.ODDSPAPI_API_KEY, cache);
+          const cache = (globalThis as unknown as { caches?: { default?: Cache } }).caches?.default;
+          oddspapiAccount = cache
+            ? await readOddsPapiAccount(env.ODDSPAPI_API_KEY, cache)
+            : { status: "unavailable", error: "cache_unavailable" };
           if (oddspapiAccount.bookmakerSlugs) {
             const priority = new Set(["bwin.be", "unibet.be", "betfirst.be", "bingoal.be", "goldenpalacesports.be",
               "betcenter.be", "scooore.be", "starcasino.be", "napoleonsports.be", "pinnacle", "bet365", "unibet", "ladbrokes"]);
