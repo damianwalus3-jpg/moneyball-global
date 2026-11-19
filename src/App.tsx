@@ -753,8 +753,11 @@ export default function App() {
           const oddspapiPayload = await oddspapiResponse.json() as {
             status?: string; error?: string; message?: string; matched?: number; unmatched?: number; ambiguous?: number;
             quotes?: Array<{
-              fixtureId: string; providerFixtureId: string; bookmaker: string; bookmakerSlug: string;
-              odds1: number | null; oddsX: number | null; odds2: number | null; complete1X2: boolean;
+              fixtureId: string; providerFixtureId: string; market: "1X2" | "DOUBLE_CHANCE";
+              bookmaker: string; bookmakerSlug: string;
+              odds1: number | null; oddsX: number | null; odds2: number | null;
+              odds1x: number | null; oddsX2: number | null; odds12: number | null;
+              complete1X2: boolean; completeDoubleChance: boolean;
               capturedAt: string | null; timestampBasis: string; bookmakerIsActive: boolean;
               suspended: boolean; marketActive: boolean; fixturePath: string | null;
               kickoffDifferenceMinutes: number;
@@ -776,19 +779,28 @@ export default function App() {
               if (!fixture || hasKickoffPassed(fixture.date, fixture.time)) return [];
               const capturedAt = quote.capturedAt ?? "";
               const timestampVerified = quote.timestampBasis === "price_changed_at" && !!capturedAt;
-              const complete = quote.complete1X2 && timestampVerified
-                && [quote.odds1, quote.oddsX, quote.odds2].every(value => typeof value === "number" && Number.isFinite(value) && value > 1);
-              const snapshotKey = [fixture.id, "OddsPapi", quote.bookmakerSlug, capturedAt || "NO_TIMESTAMP"].join("|");
+              const marketComplete = quote.market === "1X2" ? quote.complete1X2 : quote.completeDoubleChance;
+              const marketPrices = quote.market === "1X2"
+                ? [quote.odds1, quote.oddsX, quote.odds2]
+                : [quote.odds1x, quote.oddsX2, quote.odds12];
+              const complete = marketComplete && timestampVerified
+                && marketPrices.every(value => typeof value === "number" && Number.isFinite(value) && value > 1);
+              const status = complete ? `COMPLETE_${quote.market}`
+                : marketComplete ? "UNVERIFIED_TIMESTAMP" : `INCOMPLETE_${quote.market}`;
+              const snapshotKey = [fixture.id, "OddsPapi", quote.bookmakerSlug, quote.market, capturedAt || "NO_TIMESTAMP"].join("|");
               return [{
                 kind: "odds" as const,
-                title: `${fixture.home} vs ${fixture.away} · ${quote.bookmaker} · OddsPapi`,
-                status: complete ? "COMPLETE_1X2" : quote.complete1X2 ? "UNVERIFIED_TIMESTAMP" : "INCOMPLETE_1X2",
+                title: `${fixture.home} vs ${fixture.away} · ${quote.bookmaker} · OddsPapi · ${quote.market}`,
+                status,
                 details: {
                   snapshotKey, fixtureId: fixture.id, fixtureDate: fixture.date, fixtureTime: fixture.time,
                   competition: fixture.competition, provider: "OddsPapi", providerGameId: quote.providerFixtureId,
-                  bookmaker: quote.bookmaker, bookmakerSlug: quote.bookmakerSlug, market: "1X2",
+                  bookmaker: quote.bookmaker, bookmakerSlug: quote.bookmakerSlug, market: quote.market,
                   odds1: quote.odds1, oddsX: quote.oddsX, odds2: quote.odds2,
-                  complete1X2: complete, capturedAt, timestampBasis: quote.timestampBasis,
+                  odds1x: quote.odds1x, oddsX2: quote.oddsX2, odds12: quote.odds12,
+                  complete1X2: quote.market === "1X2" && complete,
+                  completeDoubleChance: quote.market === "DOUBLE_CHANCE" && complete,
+                  capturedAt, timestampBasis: quote.timestampBasis,
                   bookmakerIsActive: quote.bookmakerIsActive, suspended: quote.suspended,
                   marketActive: quote.marketActive, fixturePath: quote.fixturePath,
                   kickoffDifferenceMinutes: quote.kickoffDifferenceMinutes, utcDate,
