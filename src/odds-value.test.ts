@@ -100,6 +100,14 @@ describe("verified odds valuation", () => {
     expect(valueSelectionFromOdds([odds()], "fixture-1", "1", "Book A", { p1: 0.6, px: 0.3, p2: 0.3 }, now)).toBeNull();
   });
 
+  it("allows API-Football snapshots within its documented three-hour update cycle", () => {
+    const apiFootball = odds({ provider: "API-Football Pro", capturedAt: "2026-11-17T18:00:00.000Z" }, "COMPLETE_1X2", "api-football");
+    const oddsPapi = odds({ provider: "OddsPapi", capturedAt: "2026-11-17T18:00:00.000Z" }, "COMPLETE_1X2", "oddspapi");
+    expect(listFreshOddsSnapshots([apiFootball], "fixture-1", now).map(row => row.id)).toContain("api-football");
+    expect(listFreshOddsSnapshots([oddsPapi], "fixture-1", now).map(row => row.id)).not.toContain("oddspapi");
+    expect(valueSelectionFromOdds([apiFootball], "fixture-1", "1", "Book A", model, now)?.decimalOdds).toBe(2.2);
+  });
+
   it("shows only complete odds captured within the 60-minute provider refresh window", () => {
     const rows = [
       odds({ capturedAt: "2026-11-17T19:55:00.000Z" }),
