@@ -3,7 +3,6 @@ import type { TrackerRecord } from "./tracker-store";
 import type { ThreeLegCandidate } from "./coupon-engine";
 import { valueThreeLegCoupon } from "./coupon-value";
 import { canonicalFixtureId } from "./free-fixtures";
-import { canonicalFixtureId } from "./free-fixtures";
 
 const now = "2026-11-17T20:00:00.000Z";
 const candidate: ThreeLegCandidate = {
