@@ -704,7 +704,7 @@ export default {
         try { payload = JSON.parse(raw); } catch { return json({ error: "api_football_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
         if (!upstream.ok) return json({ error: "api_football_upstream_http_" + upstream.status, upstreamStatus: upstream.status }, upstream.status, origin);
         const data = payload as { response?: unknown[]; errors?: unknown; results?: number; paging?: unknown };
-        const errorText = JSON.stringify(data.errors ?? "").toLowerCase();
+        const errorText = apiFootballErrorText(data.errors);
         if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429) {
           return json({ error: "api_football_rate_limited", provider: "API-Football Pro", retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60, message: "Dostawca ograniczył liczbę zapytań; terminarz nie został zapisany w cache.", providerError: safeApiFootballErrorDetails(data.errors) }, 429, origin);
         }
