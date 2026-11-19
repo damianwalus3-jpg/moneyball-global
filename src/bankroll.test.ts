@@ -51,6 +51,20 @@ describe("virtual bankroll protection", () => {
     expect(value.settledBets).toBe(2);
   });
 
+  it("reserves priced paper coupons and applies their settled P/L", () => {
+    const coupon = row("coupon", "PAPER_WITH_ODDS", { stake: 4, odds: 2.5 }, "coupon-1");
+    const open = calculateBankroll([coupon]);
+    expect(open.openExposure).toBe(4);
+    expect(open.availableBalance).toBeCloseTo(87.60);
+    expect(open.openCoupons).toBe(1);
+    const hit = row("coupon", "PAPER_HIT", { parentCouponId: "coupon-1", stake: 4, odds: 2.5, profitLoss: 6 }, "coupon-settlement");
+    const settled = calculateBankroll([coupon, hit]);
+    expect(settled.openExposure).toBe(0);
+    expect(settled.settledProfitLoss).toBe(6);
+    expect(settled.availableBalance).toBeCloseTo(97.60);
+    expect(settled.settledCoupons).toBe(1);
+  });
+
   it("ignores rejected paper decisions and rejects invalid stakes", () => {
     const rejected = row("bet", "ODRZUCONY", { decision: "REJECTED", stake: 0 }, "rejected");
     expect(calculateBankroll([rejected]).availableBalance).toBe(91.60);
