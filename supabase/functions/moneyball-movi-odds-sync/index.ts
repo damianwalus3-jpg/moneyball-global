@@ -162,7 +162,7 @@ Deno.serve(async(req)=>{
    const appMatches=await db("matches?select=id,home_team,away_team,kickoff_at,kickoff_date,competition,country&kickoff_date=eq."+encodeURIComponent(day)+"&order=kickoff_at.asc");
    const fixtureSamples=(fixturePayload.response||[]).map((x:any)=>({fixture_id:x.fixture?.id,date:x.fixture?.date,home:x.teams?.home?.name,away:x.teams?.away?.name,country:x.league?.country,league:x.league?.name}));
    const bookmakerNames=(bookmakers.response||[]).map((x:any)=>({id:x.id,name:x.name}));
-   return json({ok:true,mode:"diagnostic",provider:"API-Football",date:day,key_configured:true,requests:status.response?.requests?{current:status.response.requests.current,daily_limit:status.response.requests.limit_day}:null,bwin_bookmakers:bookmakerNames,app_matches,fixtures_found:fixtureSamples.length,api_fixtures:fixtureSamples});
+   return json({ok:true,mode:"diagnostic",provider:"API-Football",date:day,key_configured:true,requests:status.response?.requests?{current:status.response.requests.current,daily_limit:status.response.requests.limit_day}:null,bwin_bookmakers:bookmakerNames,app_matches:appMatches,fixtures_found:fixtureSamples.length,api_fixtures:fixtureSamples});
   }
   const now=new Date(),defaultDay=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(now),day=String(body.date||defaultDay);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return json({ok:false,error:"Invalid date; expected YYYY-MM-DD."},400);
