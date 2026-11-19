@@ -1,4 +1,4 @@
-import { isDomesticLeagueFixture } from "./free-fixtures";
+import { getFixtureScopeExclusionReason, isDomesticLeagueFixture } from "./free-fixtures";
 describe("API-Football Pro European fixture integration", () => {
   const response = {
     results: 3,
@@ -377,6 +377,9 @@ describe("final European domestic league fixture scope", () => {
       expect(isDomesticLeagueFixture(fixture(competition))).toBe(false);
     }
     expect(isDomesticLeagueFixture(fixture("UEFA Champions League", "UEFA"))).toBe(false);
+    expect(getFixtureScopeExclusionReason(fixture("UEFA Champions League", "UEFA"))).toBe("uefa_competition");
+    expect(getFixtureScopeExclusionReason(fixture("World Cup", "ENG"))).toBe("non_league_international");
+    expect(getFixtureScopeExclusionReason(fixture("FA Cup", "ENG"))).toBe("domestic_cup");
   });
 
   it("rejects non-European country codes", () => {

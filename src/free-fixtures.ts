@@ -321,13 +321,14 @@ export function getFixtureScopeExclusionReason(
   fixture: Pick<FreeFixture, "countryCode" | "competition" | "leagueFolder">,
 ): FixtureScopeExclusionReason | null {
   const countryCode = fixture.countryCode.trim().toUpperCase();
-  if (!countryCode || countryCode === "UEFA" || !EUROPE.has(countryCode)) return "not_european_country";
+  if (countryCode === "UEFA") return "uefa_competition";
+  if (!countryCode || !EUROPE.has(countryCode)) return "not_european_country";
   const competitionText = [fixture.competition, fixture.leagueFolder]
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0).join(" ");
   if (!competitionText) return "unknown_competition";
   if (UEFA_COMPETITION_PATTERN.test(competitionText)) return "uefa_competition";
-  if (DOMESTIC_CUP_PATTERN.test(competitionText)) return "domestic_cup";
   if (NON_LEAGUE_COMPETITION_PATTERN.test(competitionText)) return "non_league_international";
+  if (DOMESTIC_CUP_PATTERN.test(competitionText)) return "domestic_cup";
   return null;
 }
 

@@ -1,6 +1,17 @@
 import { scanTodayEuropeanFixtures, fixtureKey, isDomesticLeagueFixture } from "../src/free-fixtures.ts";
 import { EUROPEAN_COUNTRY_CODES } from "../src/european-countries.ts";
 import { getSourceDiagnostics } from "../src/source-diagnostics.ts";
+import { resolveWorkerFetchUrl } from "../src/worker-url.ts";
+
+const WORKER_BASE = "https://moneyball-global-rebuild.damianwalus3.workers.dev";
+const nativeFetch = globalThis.fetch.bind(globalThis);
+globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+  const raw = input instanceof Request ? input.url : input instanceof URL ? input.toString() : String(input);
+  const target = resolveWorkerFetchUrl(raw, WORKER_BASE);
+  const request = input instanceof Request ? new Request(target, input) : target;
+  return nativeFetch(request, init);
+};
+
 
 const scan = await scanTodayEuropeanFixtures(true);
 const fixtures = scan.fixtures;
