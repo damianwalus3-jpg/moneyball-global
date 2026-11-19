@@ -50,7 +50,7 @@ export function valueThreeLegCoupon(
     }
     if (leg.market !== "1X2" || (leg.selection !== "1" && leg.selection !== "X" && leg.selection !== "2")) return null;
     const fixturePredictions = records
-      .filter(row => row.kind === "prediction" && row.details.fixtureId === leg.fixtureId && row.details.market !== "DOUBLE_CHANCE"
+      .filter(row => row.kind === "prediction" && trackerFixtureIdentity(row) === leg.fixtureId && row.details.market !== "DOUBLE_CHANCE"
         && (row.details.model === leg.model || typeof row.details.model !== "string"))
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
     // Never price a coupon against a stale/overridden prediction. The newest
