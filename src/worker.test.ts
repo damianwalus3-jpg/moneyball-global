@@ -277,8 +277,8 @@ describe("odds provider pilot proxy", () => {
         { id: "local-1", date: "2026-11-19", time: "19:00", home: "Club Brugge", away: "KAA Gent" },
       ] }),
     }), { ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "provider-secret", ODDS_PILOT_TOKEN: token }, { waitUntil: vi.fn() });
-    const body = await response.json() as { status: string; estimatedRequestsUsed: number; quotes: Array<{ fixtureId: string; bookmaker: string; odds1: number; oddsX: number; odds2: number; complete1X2: boolean }> };
-    expect(response.status).toBe(200);
+    const body = await response.json() as { status?: string; error?: string; message?: string; estimatedRequestsUsed?: number; quotes?: Array<{ fixtureId: string; bookmaker: string; odds1: number; oddsX: number; odds2: number; complete1X2: boolean }> };
+    expect(response.status, JSON.stringify(body)).toBe(200);
     expect(body).toMatchObject({ status: "ok", estimatedRequestsUsed: 2 });
     expect(body.quotes).toEqual([expect.objectContaining({
       fixtureId: "local-1", bookmaker: "Bwin Belgium", odds1: 2.1, oddsX: 3.2, odds2: 3.5, complete1X2: true,
