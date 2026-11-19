@@ -27,6 +27,13 @@ describe("prediction record refresh policy", () => {
     expect(shouldAppendPrediction([prior], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "1X2", true, "")).toBe(true);
   });
 
+  it("re-runs immutable prediction when qualification policy version changes", () => {
+    const prior = { ...row("old-policy", [0.3, 0.2, 0.5]), details: { ...row("old-policy", [0.3, 0.2, 0.5]).details, qualificationPolicyVersion: 1 } };
+    expect(shouldAppendPrediction([prior], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "1X2", false, "składy", 2)).toBe(true);
+    const current = { ...prior, details: { ...prior.details, qualificationPolicyVersion: 2 } };
+    expect(shouldAppendPrediction([current], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "1X2", false, "składy", 2)).toBe(false);
+  });
+
   it("allows an evidence-backed forecast to supersede a neutral-prior placeholder", () => {
     const fallback = { ...row("fallback", [0.34, 0.32, 0.34]), details: { ...row("fallback", [0.34, 0.32, 0.34]).details, predictionMethod: "neutral-prior-poisson" } };
     expect(shouldAppendPrediction([fallback], "fixture-1", "model-v1", true, "recent-form-goals-poisson")).toBe(true);
