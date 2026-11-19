@@ -343,7 +343,7 @@ export function parseApiFootballEuropeanFixtures(payload: unknown, targetDate: s
   return ((payload as { fixtures: ApiFootballFixturePayload[] }).fixtures).flatMap(item => {
     const country = (item.league?.country ?? "").trim().toLowerCase();
     const competition = item.league?.name?.trim() ?? "";
-    const isUefaCompetition = /\\bUEFA\\b|European Championship/i.test(competition);
+    const isUefaCompetition = /\bUEFA\b|European Championship/i.test(competition);
     const countryCode = ESPN_COUNTRIES[country] ?? (isUefaCompetition ? "UEFA" : undefined);
     const kickoff = item.fixture?.date ? new Date(item.fixture.date) : new Date(NaN);
     const home = item.teams?.home?.name?.trim();
