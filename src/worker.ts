@@ -355,6 +355,52 @@ export default {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
+
+    // Owner-only, aggregate-only Tracker diagnostics. No row contents, IDs, titles,
+    // selections, odds, stakes or bankroll values are uploaded or returned.
+    if (url.pathname === "/api/owner/tracker-diagnostics") {
+      if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
+      if (typeof env.ODDS_PILOT_TOKEN !== "string" || env.ODDS_PILOT_TOKEN.length < 32) {
+        return json({ error: "owner_auth_not_configured" }, 503, origin);
+      }
+      const authorization = request.headers.get("Authorization") ?? "";
+      const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+      if (!constantTimeEqual(suppliedToken, env.ODDS_PILOT_TOKEN)) return json({ error: "unauthorized" }, 401, origin);
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      const cacheKey = new Request(APP_ORIGIN + "/api/owner/tracker-diagnostics/latest", { method: "GET" });
+      if (request.method === "GET") {
+        const saved = await cache.match(cacheKey);
+        if (!saved) return json({ available: false, message: "No owner Tracker diagnostic has been received from this browser yet." }, 200, origin);
+        return saved;
+      }
+      if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, origin);
+      let input: Record<string, unknown>;
+      try { input = await request.json() as Record<string, unknown>; }
+      catch { return json({ error: "invalid_json" }, 400, origin); }
+      const integerFields = ["totalRecords", "scans", "matches", "predictions", "coupons", "results", "odds", "bets", "ledgerEntries"];
+      for (const field of integerFields) {
+        const value = input[field];
+        if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 1_000_000) {
+          return json({ error: "invalid_aggregate_field", field }, 400, origin);
+        }
+      }
+      if (typeof input.lastRecordAt !== "string" || (input.lastRecordAt && !Number.isFinite(Date.parse(input.lastRecordAt)))) {
+        return json({ error: "invalid_last_record_date" }, 400, origin);
+      }
+      const result = {
+        available: true,
+        receivedAt: new Date().toISOString(),
+        source: "owner_browser_local_tracker",
+        totalRecords: input.totalRecords,
+        counts: Object.fromEntries(integerFields.slice(1).map(field => [field, input[field]])),
+        lastRecordAt: input.lastRecordAt || null,
+      };
+      const response = json(result, 200, origin);
+      response.headers.set("Cache-Control", "private, max-age=0");
+      await cache.put(cacheKey, response.clone());
+      return response;
+    }
+
     // Read-only production health check. Exposes configuration presence only,
     // never credentials, so CI can verify the server-side free xG provider.
     if (url.pathname === "/api/health") {
