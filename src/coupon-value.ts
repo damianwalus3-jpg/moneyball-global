@@ -1,6 +1,8 @@
 import type { TrackerRecord } from "./tracker-store";
 import type { ThreeLegCandidate } from "./coupon-engine";
-import { valueSelectionFromOdds, type OddsValuation } from "./odds-value";
+import {
+  valueDoubleChanceSelectionFromOdds, valueSelectionFromOdds, type OddsValuation,
+} from "./odds-value";
 
 export interface ValuedThreeLegCoupon {
   bookmaker: string;
@@ -13,7 +15,7 @@ export interface ValuedThreeLegCoupon {
   potentialProfit: number;
 }
 
-/** Values a three-leg model coupon only when all legs have fresh prices from one bookmaker. */
+/** Values a three-leg coupon only when every leg has a fresh direct price from the same bookmaker. */
 export function valueThreeLegCoupon(
   candidate: ThreeLegCandidate,
   records: TrackerRecord[],
@@ -25,7 +27,26 @@ export function valueThreeLegCoupon(
   if (!bookmaker.trim() || !Number.isFinite(stake) || stake <= 0) return null;
   if (new Set(candidate.legs.map(leg => leg.fixtureId)).size !== 3) return null;
   const valuations = candidate.legs.map(leg => {
-    // Current bookmaker snapshots contain only 1X2 prices. Never price DC legs as 1X2.
+    const isDoubleChance = leg.market === "DOUBLE_CHANCE";
+    if (isDoubleChance) {
+      if (leg.selection !== "1X" && leg.selection !== "X2" && leg.selection !== "12") return null;
+      const fixturePredictions = records
+        .filter(row => row.kind === "prediction" && row.details.fixtureId === leg.fixtureId
+          && row.details.market === "DOUBLE_CHANCE"
+          && (row.details.model === leg.model || typeof row.details.model !== "string"))
+        .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+      const prediction = fixturePredictions[0];
+      if (!prediction || prediction.status !== "KANDYDAT" || prediction.details.strongDoubleChance !== true
+        || prediction.details.selection !== leg.selection) return null;
+      const { p1x, px2, p12 } = prediction.details;
+      if (typeof p1x !== "number" || typeof px2 !== "number" || typeof p12 !== "number") return null;
+      const probabilities = [p1x, px2, p12];
+      if (probabilities.some(value => !Number.isFinite(value) || value < 0 || value > 1)
+        || Math.abs(p1x + px2 + p12 - 2) > 0.0001) return null;
+      const selectedProbability = leg.selection === "1X" ? p1x : leg.selection === "X2" ? px2 : p12;
+      if (selectedProbability < 0.75 || Math.abs(selectedProbability - leg.probability) > 0.0001) return null;
+      return valueDoubleChanceSelectionFromOdds(records, leg.fixtureId, leg.selection, bookmaker, { p1x, px2, p12 }, now, maxAgeMinutes);
+    }
     if (leg.market !== "1X2" || (leg.selection !== "1" && leg.selection !== "X" && leg.selection !== "2")) return null;
     const fixturePredictions = records
       .filter(row => row.kind === "prediction" && row.details.fixtureId === leg.fixtureId && row.details.market !== "DOUBLE_CHANCE"
