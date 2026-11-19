@@ -25,6 +25,7 @@ import { valueThreeLegCoupon } from "./coupon-value";
 import { buildBaselineEvidenceAudit, getEvidenceGaps, isEvidenceAuditComplete } from "./analysis-evidence";
 import { buildHistoryProvenance, buildPredictionModelMetadata, hasVerifiedXgHistory } from "./prediction-metadata";
 import { getSourceDiagnostics, summarizeFixtureCoverage } from "./source-diagnostics";
+import { clearOddsSyncFailure, isOddsSyncCompleted, markOddsSyncCompleted, oddsSyncAttemptKey, ODDSPAPI_DAILY_ATTEMPT_STORAGE_KEY } from "./odds-sync-retry";
 import {
   Activity, BarChart3, Bell, CalendarDays, ChevronRight, CircleDot,
   ClipboardList, Database, Gauge, LayoutDashboard, Menu, Plus, Search,
@@ -35,7 +36,6 @@ const ODDS_PILOT_TOKEN_KEY = "moneyball.oddsPilotToken";
 const STRIKER_DAILY_FETCH_KEY = "moneyball.strikerDailyFetchDate";
 const STRIKER_DAILY_ATTEMPT_KEY = "moneyball.strikerDailyOddsAttemptDate";
 const STRIKER_EXPLICIT_CONSENT_KEY = "moneyball.strikerApiExplicitConsent";
-const ODDSPAPI_DAILY_ATTEMPT_KEY = "moneyball.oddspapiDailyOddsAttemptDate";
 const API_FOOTBALL_ODDS_DAILY_ATTEMPT_KEY = "moneyball.apiFootballOddsDailyAttemptKey";
 const FALLBACK_RETRY_KEY = "moneyball.neutralFallbackRetryAt";
 const FALLBACK_RETRY_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -307,7 +307,7 @@ export default function App() {
   const [oddsTokenSaved, setOddsTokenSaved] = useState(() => { try { return Boolean(localStorage.getItem(ODDS_PILOT_TOKEN_KEY)); } catch { return false; } });
   const [lastOddsFetchDate, setLastOddsFetchDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_FETCH_KEY) ?? ""; } catch { return ""; } });
   const [lastOddsAttemptDate, setLastOddsAttemptDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
-  const [lastOddsPapiAttemptKey, setLastOddsPapiAttemptDate] = useState(() => { try { return localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
+  const [lastOddsPapiAttemptKey, setLastOddsPapiAttemptDate] = useState(() => { try { return localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_STORAGE_KEY) ?? ""; } catch { return ""; } });
   const [lastApiFootballOddsAttemptKey, setLastApiFootballOddsAttemptKey] = useState(() => { try { return localStorage.getItem(API_FOOTBALL_ODDS_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
   const [apiFootballOddsLoading, setApiFootballOddsLoading] = useState(false);
   const [apiFootballOddsNotice, setApiFootballOddsNotice] = useState("");
@@ -717,15 +717,15 @@ export default function App() {
       lastAttemptedDate: lastOddsAttemptDate,
     });
     const oddspapiSlot = currentOddsSyncSlot();
-    const oddspapiAttemptKey = fixtureScan.date + "|" + oddspapiSlot;
+    const oddspapiAttemptKey = oddsSyncAttemptKey(fixtureScan.date, oddspapiSlot);
     let oddspapiPending = oddsProviderStatus?.oddspapi === true
       && lastOddsPapiAttemptKey !== oddspapiAttemptKey;
     let strikerAttemptedDate = "";
     let oddspapiAttemptedKey = "";
     try { strikerAttemptedDate = localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { /* storage may be unavailable */ }
-    try { oddspapiAttemptedKey = localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_KEY) ?? ""; } catch { /* storage may be unavailable */ }
+    try { oddspapiAttemptedKey = localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_STORAGE_KEY) ?? ""; } catch { /* storage may be unavailable */ }
     if (strikerAttemptedDate === fixtureScan.date) strikerPending = false;
-    if (oddspapiAttemptedKey === oddspapiAttemptKey) oddspapiPending = false;
+    if (isOddsSyncCompleted(fixtureScan.date, oddspapiSlot, oddspapiAttemptedKey)) oddspapiPending = false;
     if (!strikerPending && !oddspapiPending) {
       setOddsNotice(`Dzisiejsze próby dostawców kursów dla ${fixtureScan.date} zostały już wykonane.`);
       return;
@@ -828,11 +828,11 @@ export default function App() {
           oddspapiSummary = `OddsPapi: dopasowano ${oddspapiPayload.matched ?? 0}, snapshoty ${addedOddsPapi}, rynki ${(oddspapiPayload.marketTypes ?? ["1X2"]).join("/")}, katalog ${oddspapiPayload.marketCatalogStatus ?? "nieznany"}, niejednoznaczne ${oddspapiPayload.ambiguous ?? 0}, zapytania ${oddspapiPayload.estimatedRequestsUsed ?? "—"}/${oddspapiPayload.slotRequestBudget ?? "—"}, pominięte rozgrywki z limitu ${oddspapiPayload.skippedTournamentIds?.length ?? 0}.`;
           setRecords(readRecords());
           // Mark the date/slot only after a valid provider response has been parsed and stored.
-          try { localStorage.setItem(ODDSPAPI_DAILY_ATTEMPT_KEY, oddspapiAttemptKey); } catch { /* best-effort persistence */ }
+          try { markOddsSyncCompleted(localStorage, fixtureScan.date, oddspapiSlot); } catch { /* best-effort persistence */ }
           setLastOddsPapiAttemptDate(oddspapiAttemptKey);
         } catch (error) {
           try {
-            if (localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_KEY) === oddspapiAttemptKey) localStorage.removeItem(ODDSPAPI_DAILY_ATTEMPT_KEY);
+            clearOddsSyncFailure(localStorage, fixtureScan.date, oddspapiSlot);
           } catch { /* storage may be unavailable */ }
           setLastOddsPapiAttemptDate("");
           oddspapiSummary = "OddsPapi: " + (error instanceof Error ? error.message : "błąd dostawcy") + ". Próba pozostaje możliwa po ponownym skanie; prognozy pozostają bez zmian.";
