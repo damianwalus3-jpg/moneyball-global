@@ -2072,3 +2072,9 @@
 - Post-deployment live Worker checks: `/api/health` returned `ok:true`, service `moneyball-global-rebuild`, PitchAPI configured and API-Football configured. `/api/odds/status` returned OddsPapi active with 250/250 monthly requests remaining, and the owner-only pilot gate enabled. Invalid API-Football odds input returned HTTP 400 before any upstream request. No real OddsPapi or API-Football odds call was made during this verification.
 - API-Football's account/status endpoint previously returned HTTP 429 during live inspection, so the exact remaining daily/per-minute API-Football quota is still unconfirmed. The new date-paged odds route limits uncached work to three pages per sync and caches each date/page for three hours; live quote import from the user's Android browser remains to be confirmed.
 - Overall project status remains OPEN: source scan/deployment and CI are healthy, but device-local Tracker coverage, real quote import, and authenticated coupon/settlement E2E have not yet been verified.
+
+
+## 2026-11-19 — Stage 173: retry failed API-Football odds syncs safely
+- Found a client reliability issue: the app persisted the date/slot attempt marker before calling the Worker, so a transient network failure or API-Football 429 could suppress retry after reopening the app.
+- Changed the client to persist the date/slot marker only after the Worker returns a valid response. Failed calls now clear any matching marker and remain retryable after a new scan or app reload; successful responses are still deduplicated per Brussels date and sync slot.
+- No additional provider calls were made. The odds importer continues to preserve real provider timestamps, partial markets and missing quotes without fabricating prices.
