@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballFixturesForDate, fetchApiFootballInjuriesForDate } from "./api-football";
+import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballFixturesForDate, fetchApiFootballInjuriesForDate, resetApiFootballRequestThrottleForTests } from "./api-football";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); resetApiFootballRequestThrottleForTests(); });
 
 describe("API-Football Pro batch client", () => {
   it("deduplicates IDs and fetches at most 20 fixtures per request", async () => {

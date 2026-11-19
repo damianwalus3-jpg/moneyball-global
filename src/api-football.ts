@@ -80,6 +80,14 @@ let lastApiFootballRequestAt = 0;
 let apiFootballBlockedUntil = 0;
 let apiFootballRequestQueue: Promise<void> = Promise.resolve();
 
+/** Reset only the in-memory limiter between unit tests; never called by the app. */
+export function resetApiFootballRequestThrottleForTests(): void {
+  lastApiFootballRequestAt = 0;
+  apiFootballBlockedUntil = 0;
+  apiFootballRequestQueue = Promise.resolve();
+}
+
+
 function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
