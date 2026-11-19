@@ -82,7 +82,7 @@ function Kupony() {
   // A strong model pick without a live Belgian price is kept visible as waiting,
   // but is not silently inserted into a coupon with an invented payout.
   const candidates = modelCandidates.filter((prediction) => hasFreshConfirmedOdds(prediction, Date.now()));
-  const awaitingOddsCount = modelCandidates.length - candidates.length;
+  const awaitingOddsCount = new Set(modelCandidates.filter((prediction) => !hasFreshConfirmedOdds(prediction, Date.now())).map((prediction) => prediction.match_id)).size;
 
   const detailsCoupon = coupons.find((coupon) => coupon.id === detailsCouponId) ?? null;
   const detailsLegs = detailsCoupon ? legs.filter((leg) => leg.coupon_id === detailsCoupon.id) : [];
