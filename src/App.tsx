@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { canonicalFixtureId, scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
-import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballInjuriesForDate, type ApiFootballFixtureEnrichment, type ApiFootballInjury } from "./api-football";
+import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballInjuriesForDate, fetchApiFootballOdds, parseApiFootballOdds, type ApiFootballFixtureEnrichment, type ApiFootballInjury } from "./api-football";
 import { brusselsKickoffTimestamp, isConfirmedPitchApiLineups, isWithinLineupRefreshWindow } from "./lineup-refresh";
 import { addRecord, addRecords, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, loadRecentTeamFormAcrossCountry, mergeVerifiedTeamForms, loadCalcioItSerieDTeamForm, type TeamForm } from "./team-form";
@@ -34,6 +34,7 @@ const STRIKER_DAILY_FETCH_KEY = "moneyball.strikerDailyFetchDate";
 const STRIKER_DAILY_ATTEMPT_KEY = "moneyball.strikerDailyOddsAttemptDate";
 const STRIKER_EXPLICIT_CONSENT_KEY = "moneyball.strikerApiExplicitConsent";
 const ODDSPAPI_DAILY_ATTEMPT_KEY = "moneyball.oddspapiDailyOddsAttemptDate";
+const API_FOOTBALL_ODDS_DAILY_ATTEMPT_KEY = "moneyball.apiFootballOddsDailyAttemptKey";
 const FALLBACK_RETRY_KEY = "moneyball.neutralFallbackRetryAt";
 const FALLBACK_RETRY_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const XG_RETRY_KEY = "moneyball.xgModelRetryAt";
@@ -308,6 +309,9 @@ export default function App() {
   const [lastOddsFetchDate, setLastOddsFetchDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_FETCH_KEY) ?? ""; } catch { return ""; } });
   const [lastOddsAttemptDate, setLastOddsAttemptDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
   const [lastOddsPapiAttemptKey, setLastOddsPapiAttemptDate] = useState(() => { try { return localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
+  const [lastApiFootballOddsAttemptKey, setLastApiFootballOddsAttemptKey] = useState(() => { try { return localStorage.getItem(API_FOOTBALL_ODDS_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
+  const [apiFootballOddsLoading, setApiFootballOddsLoading] = useState(false);
+  const [apiFootballOddsNotice, setApiFootballOddsNotice] = useState("");
   const [oddsProviderStatus, setOddsProviderStatus] = useState<{ strikerapi: boolean; oddspapi: boolean; pilotEnabled: boolean; oddspapiAccount?: { status?: string; requestLimit?: number; requestCount?: number; remaining?: number; bookmakerSlugs?: string[] } | null } | null>(null);
   const [oddsLoading, setOddsLoading] = useState(false);
   const [oddsNotice, setOddsNotice] = useState("");
@@ -964,6 +968,90 @@ export default function App() {
     const lineupRefreshId = window.setInterval(() => void refreshUpcomingLineups(), 60 * 1000);
     return () => window.clearInterval(lineupRefreshId);
   }, [fixtureScan]);
+  const fetchApiFootballDailyOdds = async () => {
+    if (!fixtureScan || apiFootballOddsLoading) return;
+    const uniqueIds = [...new Set(fixtureScan.fixtures
+      .map(fixture => fixture.apiFootballFixtureId)
+      .filter((id): id is string => typeof id === "string" && /^\d{1,12}$/.test(id)))];
+    if (!uniqueIds.length) {
+      setApiFootballOddsNotice("API-Football Pro: brak dopasowanych identyfikatorów meczów do pobrania kursów.");
+      return;
+    }
+    const attemptKey = fixtureScan.date + "|" + currentOddsSyncSlot();
+    if (lastApiFootballOddsAttemptKey === attemptKey) return;
+    let savedAttempt = "";
+    try { savedAttempt = localStorage.getItem(API_FOOTBALL_ODDS_DAILY_ATTEMPT_KEY) ?? ""; } catch { /* storage may be unavailable */ }
+    if (savedAttempt === attemptKey) {
+      setLastApiFootballOddsAttemptKey(attemptKey);
+      return;
+    }
+    try { localStorage.setItem(API_FOOTBALL_ODDS_DAILY_ATTEMPT_KEY, attemptKey); } catch { /* best-effort persistence */ }
+    setLastApiFootballOddsAttemptKey(attemptKey);
+    setApiFootballOddsLoading(true);
+    try {
+      const requestedIds = uniqueIds.slice(0, 20);
+      const payload = await fetchApiFootballOdds(fixtureScan.date, requestedIds);
+      const quotes = parseApiFootballOdds((payload.odds ?? []).flatMap(row => row.data ?? []));
+      const fixtureByApiId = new Map(fixtureScan.fixtures
+        .filter(fixture => typeof fixture.apiFootballFixtureId === "string")
+        .map(fixture => [String(fixture.apiFootballFixtureId), fixture]));
+      const snapshots = quotes.flatMap(quote => {
+        const fixture = fixtureByApiId.get(quote.fixtureId);
+        if (!fixture || hasKickoffPassed(fixture.date, fixture.time)) return [];
+        const capturedAt = quote.capturedAt ?? "";
+        const timestampVerified = quote.timestampBasis === "provider_update_at" && !!capturedAt;
+        const marketComplete = quote.market === "1X2" ? quote.complete1X2 : quote.completeDoubleChance;
+        const prices = quote.market === "1X2"
+          ? [quote.odds1, quote.oddsX, quote.odds2]
+          : [quote.odds1x, quote.oddsX2, quote.odds12];
+        const complete = marketComplete && timestampVerified
+          && prices.every(value => typeof value === "number" && Number.isFinite(value) && value > 1);
+        const status = complete ? `COMPLETE_${quote.market}`
+          : marketComplete ? "UNVERIFIED_TIMESTAMP" : `INCOMPLETE_${quote.market}`;
+        const snapshotKey = [fixture.id, "API-Football Pro", quote.bookmakerSlug, quote.market, capturedAt || "NO_TIMESTAMP"].join("|");
+        return [{
+          kind: "odds" as const,
+          title: `${fixture.home} vs ${fixture.away} · ${quote.bookmaker} · API-Football Pro · ${quote.market}`,
+          status,
+          details: {
+            snapshotKey, fixtureId: fixture.id, fixtureDate: fixture.date, fixtureTime: fixture.time,
+            home: fixture.home, away: fixture.away, competition: fixture.competition,
+            provider: "API-Football Pro", providerGameId: quote.fixtureId,
+            bookmaker: quote.bookmaker, bookmakerSlug: quote.bookmakerSlug, market: quote.market,
+            odds1: quote.odds1, oddsX: quote.oddsX, odds2: quote.odds2,
+            odds1x: quote.odds1x, oddsX2: quote.oddsX2, odds12: quote.odds12,
+            complete1X2: quote.market === "1X2" && complete,
+            completeDoubleChance: quote.market === "DOUBLE_CHANCE" && complete,
+            capturedAt, timestampBasis: quote.timestampBasis,
+            fixturePath: null, kickoffDifferenceMinutes: 0, utcDate: fixtureScan.date,
+          },
+        }];
+      });
+      const added = addRecordsIfMissing(snapshots, "snapshotKey");
+      const matchedFixtures = new Set(snapshots.map(row => String(row.details.fixtureId))).size;
+      setRecords(readRecords());
+      setOddsAudit({
+        matched: matchedFixtures,
+        unmatched: Math.max(0, requestedIds.length - matchedFixtures),
+        ambiguous: 0, snapshots: added, utcDate: fixtureScan.date,
+      });
+      setApiFootballOddsNotice(`API-Football Pro: ${requestedIds.length} identyfikatorów, ${quotes.length} kwotowań, ${added} nowych snapshotów 1X2/DC; pominięte identyfikatory ponad limit 20: ${Math.max(0, uniqueIds.length - requestedIds.length)}; bez kursów: ${(payload.failedFixtureIds ?? []).length}.`);
+    } catch (error) {
+      setApiFootballOddsNotice("API-Football Pro: " + (error instanceof Error ? error.message : "brak kursów") + ". Pozostałe dane i prognozy pozostają bez zmian.");
+    } finally {
+      setApiFootballOddsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!fixtureScan) return;
+    const apiFootballIds = fixtureScan.fixtures.filter(fixture =>
+      typeof fixture.apiFootballFixtureId === "string" && /^\d{1,12}$/.test(fixture.apiFootballFixtureId)
+    );
+    if (!apiFootballIds.length || lastApiFootballOddsAttemptKey === fixtureScan.date + "|" + currentOddsSyncSlot()) return;
+    void fetchApiFootballDailyOdds();
+  }, [fixtureScan, lastApiFootballOddsAttemptKey]);
+
   useEffect(() => {
     if (!fixtureScan || !oddsTokenSaved || oddsProviderStatus?.pilotEnabled !== true) return;
     const strikerPending = shouldAutoFetchStrikerApi({
@@ -1155,14 +1243,15 @@ export default function App() {
           <div className="module-icon"><Ticket/></div><h2>Bilans wybranych zakładów</h2>
           <div className="audit-metrics bet-metrics"><DetailMetric label="Saldo początkowe" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.openingBalance)} detail="Wirtualny bankroll startowy €91,60; można go nadpisać wpisem OPENING_BALANCE w lokalnym Trackerze."/><DetailMetric label="Saldo dostępne" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.availableBalance)} valueClass={bankroll.availableBalance >= 0 ? "profit-positive" : "profit-negative"} detail="Saldo początkowe + zysk/strata rozliczonych zakładów − stawki zarezerwowane w otwartych zakładach."/><DetailMetric label="Otwarte stawki" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.openExposure)} detail="Kwota zarezerwowana przez wybrane, nierozliczone zakłady. Nie jest liczona jako strata."/><DetailMetric label="Rozliczone P/L" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.settledProfitLoss)} detail="Suma rzeczywistego zysku/straty z rekordów rozliczeń; odrzucone typy nie zmieniają salda."/></div>
           <article className="panel">
-            <div className="panel-heading"><div><h3>Automatyczne kursy · OddsPapi + StrikerAPI</h3><p>OddsPapi: synchronizacja przed i po 15:00 czasu belgijskiego · do 4 zapytań dziennie · StrikerAPI: jeden dodatkowy odczyt dziennie</p></div><ShieldCheck size={18}/></div>
+            <div className="panel-heading"><div><h3>Automatyczne kursy · API-Football Pro + OddsPapi + StrikerAPI</h3><p>API-Football Pro: automatyczne kursy 1X2/DC dla dostępnych meczów · OddsPapi: dwie synchronizacje z budżetem miesięcznym · StrikerAPI: tylko po osobnej zgodzie</p></div><ShieldCheck size={18}/></div>
             <div className="tracker-form">
               <input type="password" autoComplete="off" value={oddsPilotToken} onChange={event => { setOddsPilotToken(event.target.value); setOddsTokenSaved(false); }} placeholder="ODDS_PILOT_TOKEN · min. 32 znaki" aria-label="Token dostępu do automatycznych kursów"/>
               <button onClick={saveOddsPilotToken}>Zapisz token</button>
               <button onClick={clearOddsPilotToken} disabled={!oddsTokenSaved && !oddsPilotToken}>Usuń</button>
               <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") && lastOddsFetchDate === fixtureScan?.date ? "OddsPapi i StrikerAPI: próby wykonane dzisiaj" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") ? "OddsPapi: próba wykonana dzisiaj" : lastOddsFetchDate === fixtureScan?.date ? "StrikerAPI: kursy pobrane dzisiaj; OddsPapi osobno" : lastOddsAttemptDate === fixtureScan?.date ? "StrikerAPI: próba wykonana — bez ponawiania kosztownych zapytań" : oddsProviderStatus === null ? "Sprawdzanie konfiguracji dostawców…" : !oddsProviderStatus.oddspapi && !oddsProviderStatus.strikerapi ? "Brak skonfigurowanych źródeł kursów" : !oddsProviderStatus.pilotEnabled ? "Brak sekretu ODDS_PILOT_TOKEN w Workerze" : oddsTokenSaved ? "OddsPapi: synchronizacja po zapisaniu tokenu; StrikerAPI wyłączony bez osobnej zgody" : "Wymagane jednorazowe zapisanie tokenu"}</span>
             </div>
-            <p className="source-note">Sekret <b>ODDS_PILOT_TOKEN</b> chroni wywołania dostawców i pozostaje wyłącznie w Workerze oraz lokalnej przeglądarce. OddsPapi używa istniejącego <b>ODDSPAPI_API_KEY</b>; Worker sprawdza rzeczywisty limit konta przez bezpłatny endpoint /account, pobiera mecze z kursami i dopasowuje je po nazwach drużyn, dacie i godzinie Europe/Brussels. Dwie synchronizacje OddsPapi dziennie zużywają maksymalnie 4 z 250 obecnie dostępnych zapytań miesięcznych; rzeczywisty pozostały limit jest sprawdzany przed każdym pobraniem. Bwin Belgium (bwin.be) oraz dostępne feedy Unibet BE, betFIRST, Bingoal, Golden Palace, Betcenter, SCOOORE, Starcasino i Napoleon Sports są wybierane tylko wtedy, gdy konto ma do nich dostęp. Kurs nie jest wymagany do utworzenia prognozy 1X2/DC. StrikerAPI jest skonfigurowany, ale pozostaje zablokowany bez osobnej zgody; aplikacja nie wysyła do niego automatycznych ani ręcznych zapytań. Katalog rynków DC może zużyć dodatkowe zapytanie i jest blokowany, dopóki nie zostanie włączony osobnym parametrem żądania oraz sekretem Workera.</p>
+            <p className="source-note">{apiFootballOddsLoading ? "API-Football Pro: pobieranie kursów…" : apiFootballOddsNotice}</p>
+            <p className="source-note">API-Football Pro pobiera automatycznie kursy przedmeczowe dla dopasowanych identyfikatorów meczów. Dostępność zależy od pokrycia ligi i bukmachera; dostawca aktualizuje ten endpoint co 3 godziny i udostępnia kursy w oknie 1–14 dni przed meczem. Znaczniki czasu pochodzą z pola aktualizacji dostawcy — brak czasu lub brak rynku nie jest uzupełniany sztucznie. OddsPapi używa istniejącego <b>ODDSPAPI_API_KEY</b>; Worker sprawdza rzeczywisty limit przez bezpłatny endpoint /account, preferuje Bwin.be i wysyła jednego bukmachera oraz maksymalnie trzy rozgrywki na zapytanie. Budżet 250 zapytań miesięcznych jest rozkładany na pozostałe dni miesiąca i dwa okna synchronizacji; pominięte rozgrywki są raportowane. Katalog rynków Double Chance jest odkrywany najwyżej raz na 7 dni, jeśli budżet pozwala; brak kursu nie blokuje prognozy. Sekret <b>ODDS_PILOT_TOKEN</b> jest potrzebny wyłącznie do dodatkowego OddsPapi i StrikerAPI i pozostaje w Workerze oraz lokalnej przeglądarce. StrikerAPI jest wyłączony bez osobnej zgody.</p>
             {oddsProviderStatus?.oddspapiAccount && <p className="source-note">OddsPapi · stan: {oddsProviderStatus.oddspapiAccount.status ?? "nieznany"}{typeof oddsProviderStatus.oddspapiAccount.remaining === "number" ? ` · pozostałe zapytania: ${oddsProviderStatus.oddspapiAccount.remaining}/${oddsProviderStatus.oddspapiAccount.requestLimit ?? "—"}` : ""}{oddsProviderStatus.oddspapiAccount.bookmakerSlugs?.length ? ` · dostępne feedy: ${oddsProviderStatus.oddspapiAccount.bookmakerSlugs.join(", ")}` : ""}</p>}
             {oddsNotice && <div className="tracker-notice">{oddsNotice}</div>}
             {oddsAudit && <p className="source-note">Ostatni audyt · UTC {oddsAudit.utcDate} · dopasowane {oddsAudit.matched} · niejednoznaczne {oddsAudit.ambiguous} · bez dopasowania {oddsAudit.unmatched} · nowe snapshoty {oddsAudit.snapshots}.</p>}
