@@ -38,5 +38,9 @@ describe("projected lineup evidence", () => {
     expect(getPitchApiLineupStatus({ home: projectedSide, away: projectedSide })).toBe("LINEUP_PREDICTED");
     expect(getPitchApiLineupStatus({ home: confirmedSide, away: confirmedSide })).toBe("LINEUP_CONFIRMED");
     expect(getPitchApiLineupStatus({ home: projectedSide, away: { confirmed: false, starters: [] } })).toBe("LINEUP_PENDING");
+    const untypedEleven = { confirmed: false, starters: Array.from({ length: 11 }, () => ({})) };
+    expect(isProjectedPitchApiLineups({ home: untypedEleven, away: untypedEleven })).toBe(false);
+    expect(getPitchApiLineupStatus({ home: untypedEleven, away: untypedEleven })).toBe("LINEUP_PENDING");
+    expect(isProjectedPitchApiLineups({ home: projectedSide, away: untypedEleven })).toBe(true);
   });
 });
