@@ -150,7 +150,8 @@ describe("three-leg coupon candidates", () => {
     const candidates = buildThreeLegCandidates([
       historical, prediction("a", 0.99), prediction("b", 0.90), prediction("c", 0.89), prediction("d", 0.88),
     ], "2026-11-17", 10);
-    expect(candidates).toHaveLength(0);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].legs.some(leg => leg.fixtureId === "a")).toBe(false);
   });
 
 });
