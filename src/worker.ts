@@ -526,7 +526,6 @@ export default {
         const tournamentIds = [...new Set(matchAudit.matched.map(row => row.tournamentId))]
           .sort((a, b) => (tournamentStartTimes.get(a) ?? Number.MAX_SAFE_INTEGER)
             - (tournamentStartTimes.get(b) ?? Number.MAX_SAFE_INTEGER) || a - b);
-        const fullOddsBatchCount = Math.ceil(tournamentIds.length / 3);
         const remainingAfterFixtures = Math.max(0, remaining - 1);
 
         let marketDefinitions = DEFAULT_ODDS_PAPI_MARKETS;
