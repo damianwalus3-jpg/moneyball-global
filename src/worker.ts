@@ -33,6 +33,27 @@ function safeApiFootballErrorDetails(value: unknown): unknown {
 
 const API_FOOTBALL_COOLDOWN_KEY = new Request(APP_ORIGIN + "/api/api-football/_provider-cooldown", { method: "GET" });
 
+/** Serialize Pro requests in each Worker isolate to avoid burst traffic from parallel app routes. */
+const API_FOOTBALL_MIN_INTERVAL_MS = 2_500;
+let apiFootballLastRequestAt = 0;
+let apiFootballRequestQueue: Promise<void> = Promise.resolve();
+
+async function pacedApiFootballFetch(input: string | URL, init: RequestInit): Promise<Response> {
+  let release!: () => void;
+  const previous = apiFootballRequestQueue;
+  apiFootballRequestQueue = new Promise<void>(resolve => { release = resolve; });
+  await previous;
+  try {
+    const waitMs = Math.max(0, apiFootballLastRequestAt + API_FOOTBALL_MIN_INTERVAL_MS - Date.now());
+    if (waitMs > 0) await new Promise<void>(resolve => setTimeout(resolve, waitMs));
+    apiFootballLastRequestAt = Date.now();
+    return await fetch(input, init);
+  } finally {
+    release();
+  }
+}
+
+
 function apiFootballRetryAfterSeconds(value: string | null): number {
   if (!value) return 60;
   const numeric = Number(value);
@@ -702,7 +723,7 @@ export default {
               } else {
                 const apiUrl = new URL("https://v3.football.api-sports.io/odds");
                 apiUrl.searchParams.set("fixture", apiFootballFixtureId);
-                const upstream = await fetch(apiUrl, {
+                const upstream = await pacedApiFootballFetch(apiUrl, {
                   headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
                   signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
                 });
@@ -1014,7 +1035,7 @@ export default {
             apiUrl.searchParams.set("date", date);
             apiUrl.searchParams.set("timezone", "Europe/Brussels");
             apiUrl.searchParams.set("page", String(page));
-            const upstream = await fetch(apiUrl, {
+            const upstream = await pacedApiFootballFetch(apiUrl, {
               headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
               signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
             });
@@ -1090,7 +1111,7 @@ export default {
       const providerCooldown = await cache.match(API_FOOTBALL_COOLDOWN_KEY);
       if (providerCooldown) return providerCooldown;
       try {
-        const upstream = await fetch("https://v3.football.api-sports.io/status", {
+        const upstream = await pacedApiFootballFetch("https://v3.football.api-sports.io/status", {
           headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         });
@@ -1146,7 +1167,7 @@ export default {
       const providerCooldown = await cache.match(API_FOOTBALL_COOLDOWN_KEY);
       if (providerCooldown) return providerCooldown;
       try {
-        const upstream = await fetch("https://v3.football.api-sports.io/fixtures?date=" + date + "&timezone=Europe%2FBrussels", {
+        const upstream = await pacedApiFootballFetch("https://v3.football.api-sports.io/fixtures?date=" + date + "&timezone=Europe%2FBrussels", {
           headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         });
@@ -1202,7 +1223,7 @@ export default {
       const providerCooldown = await cache.match(API_FOOTBALL_COOLDOWN_KEY);
       if (providerCooldown) return providerCooldown;
       try {
-        const upstream = await fetch("https://v3.football.api-sports.io/fixtures?ids=" + ids.join("-") + "&timezone=Europe%2FBrussels", {
+        const upstream = await pacedApiFootballFetch("https://v3.football.api-sports.io/fixtures?ids=" + ids.join("-") + "&timezone=Europe%2FBrussels", {
           headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         });
@@ -1265,7 +1286,7 @@ export default {
       const providerCooldown = await cache.match(API_FOOTBALL_COOLDOWN_KEY);
       if (providerCooldown) return providerCooldown;
       try {
-        const upstream = await fetch("https://v3.football.api-sports.io/injuries?" + injuryQuery + "&timezone=Europe%2FBrussels", {
+        const upstream = await pacedApiFootballFetch("https://v3.football.api-sports.io/injuries?" + injuryQuery + "&timezone=Europe%2FBrussels", {
           headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         });
