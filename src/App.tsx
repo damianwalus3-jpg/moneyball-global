@@ -37,6 +37,13 @@ const FALLBACK_RETRY_KEY = "moneyball.neutralFallbackRetryAt";
 const FALLBACK_RETRY_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const XG_RETRY_KEY = "moneyball.xgModelRetryAt";
 
+function currentOddsSyncSlot(now = new Date()): "morning" | "afternoon" {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Brussels", hour: "2-digit", hourCycle: "h23",
+  }).format(now));
+  return hour >= 15 ? "afternoon" : "morning";
+}
+
 function shouldRetryNeutralFallback(fixtureId: string, prior?: TrackerRecord): boolean {
   if (prior?.details.predictionMethod !== "neutral-prior-poisson") return false;
   try {
@@ -294,7 +301,7 @@ export default function App() {
   const [oddsTokenSaved, setOddsTokenSaved] = useState(() => { try { return Boolean(localStorage.getItem(ODDS_PILOT_TOKEN_KEY)); } catch { return false; } });
   const [lastOddsFetchDate, setLastOddsFetchDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_FETCH_KEY) ?? ""; } catch { return ""; } });
   const [lastOddsAttemptDate, setLastOddsAttemptDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
-  const [lastOddsPapiAttemptDate, setLastOddsPapiAttemptDate] = useState(() => { try { return localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
+  const [lastOddsPapiAttemptKey, setLastOddsPapiAttemptDate] = useState(() => { try { return localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
   const [oddsProviderStatus, setOddsProviderStatus] = useState<{ strikerapi: boolean; oddspapi: boolean; pilotEnabled: boolean; oddspapiAccount?: { status?: string; requestLimit?: number; requestCount?: number; remaining?: number; bookmakerSlugs?: string[] } | null } | null>(null);
   const [oddsLoading, setOddsLoading] = useState(false);
   const [oddsNotice, setOddsNotice] = useState("");
@@ -694,14 +701,16 @@ export default function App() {
     // the first OddsPapi request (and vice versa) for the same Brussels date.
     let strikerPending = oddsProviderStatus?.strikerapi === true
       && lastOddsFetchDate !== fixtureScan.date && lastOddsAttemptDate !== fixtureScan.date;
+    const oddspapiSlot = currentOddsSyncSlot();
+    const oddspapiAttemptKey = fixtureScan.date + "|" + oddspapiSlot;
     let oddspapiPending = oddsProviderStatus?.oddspapi === true
-      && lastOddsPapiAttemptDate !== fixtureScan.date;
+      && lastOddsPapiAttemptKey !== oddspapiAttemptKey;
     let strikerAttemptedDate = "";
-    let oddspapiAttemptedDate = "";
+    let oddspapiAttemptedKey = "";
     try { strikerAttemptedDate = localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { /* storage may be unavailable */ }
-    try { oddspapiAttemptedDate = localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_KEY) ?? ""; } catch { /* storage may be unavailable */ }
+    try { oddspapiAttemptedKey = localStorage.getItem(ODDSPAPI_DAILY_ATTEMPT_KEY) ?? ""; } catch { /* storage may be unavailable */ }
     if (strikerAttemptedDate === fixtureScan.date) strikerPending = false;
-    if (oddspapiAttemptedDate === fixtureScan.date) oddspapiPending = false;
+    if (oddspapiAttemptedKey === oddspapiAttemptKey) oddspapiPending = false;
     if (!strikerPending && !oddspapiPending) {
       setOddsNotice(`Dzisiejsze próby dostawców kursów dla ${fixtureScan.date} zostały już wykonane.`);
       return;
@@ -734,6 +743,7 @@ export default function App() {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify({
               date: utcDate,
+              slot: oddspapiSlot,
               fixtures: fixtureScan.fixtures.map(fixture => ({
                 id: fixture.id, date: fixture.date, time: fixture.time,
                 home: fixture.home, away: fixture.away,
@@ -930,9 +940,9 @@ export default function App() {
     const strikerPending = oddsProviderStatus.strikerapi === true
       && lastOddsFetchDate !== fixtureScan.date && lastOddsAttemptDate !== fixtureScan.date;
     const oddspapiPending = oddsProviderStatus.oddspapi === true
-      && lastOddsPapiAttemptDate !== fixtureScan.date;
+      && lastOddsPapiAttemptKey !== fixtureScan.date + "|" + currentOddsSyncSlot();
     if (strikerPending || oddspapiPending) void fetchDailyOdds();
-  }, [fixtureScan, oddsTokenSaved, oddsProviderStatus, lastOddsFetchDate, lastOddsAttemptDate, lastOddsPapiAttemptDate]);
+  }, [fixtureScan, oddsTokenSaved, oddsProviderStatus, lastOddsFetchDate, lastOddsAttemptDate, lastOddsPapiAttemptKey]);
   useEffect(() => {
     let active = true;
     void fetch("/api/odds/status").then(async response => {
@@ -1105,7 +1115,7 @@ export default function App() {
               <input type="password" autoComplete="off" value={oddsPilotToken} onChange={event => { setOddsPilotToken(event.target.value); setOddsTokenSaved(false); }} placeholder="ODDS_PILOT_TOKEN · min. 32 znaki" aria-label="Token dostępu do automatycznych kursów"/>
               <button onClick={saveOddsPilotToken}>Zapisz token</button>
               <button onClick={clearOddsPilotToken} disabled={!oddsTokenSaved && !oddsPilotToken}>Usuń</button>
-              <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsPapiAttemptDate === fixtureScan?.date && lastOddsFetchDate === fixtureScan?.date ? "OddsPapi i StrikerAPI: próby wykonane dzisiaj" : lastOddsPapiAttemptDate === fixtureScan?.date ? "OddsPapi: próba wykonana dzisiaj" : lastOddsFetchDate === fixtureScan?.date ? "StrikerAPI: kursy pobrane dzisiaj; OddsPapi osobno" : lastOddsAttemptDate === fixtureScan?.date ? "StrikerAPI: próba wykonana — bez ponawiania kosztownych zapytań" : oddsProviderStatus === null ? "Sprawdzanie konfiguracji dostawców…" : !oddsProviderStatus.oddspapi && !oddsProviderStatus.strikerapi ? "Brak skonfigurowanych źródeł kursów" : !oddsProviderStatus.pilotEnabled ? "Brak sekretu ODDS_PILOT_TOKEN w Workerze" : oddsTokenSaved ? "Oczekiwanie na skan — pobieranie automatyczne" : "Wymagane jednorazowe zapisanie tokenu"}</span>
+              <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") && lastOddsFetchDate === fixtureScan?.date ? "OddsPapi i StrikerAPI: próby wykonane dzisiaj" : lastOddsPapiAttemptKey.startsWith((fixtureScan?.date ?? "") + "|") ? "OddsPapi: próba wykonana dzisiaj" : lastOddsFetchDate === fixtureScan?.date ? "StrikerAPI: kursy pobrane dzisiaj; OddsPapi osobno" : lastOddsAttemptDate === fixtureScan?.date ? "StrikerAPI: próba wykonana — bez ponawiania kosztownych zapytań" : oddsProviderStatus === null ? "Sprawdzanie konfiguracji dostawców…" : !oddsProviderStatus.oddspapi && !oddsProviderStatus.strikerapi ? "Brak skonfigurowanych źródeł kursów" : !oddsProviderStatus.pilotEnabled ? "Brak sekretu ODDS_PILOT_TOKEN w Workerze" : oddsTokenSaved ? "Oczekiwanie na skan — pobieranie automatyczne" : "Wymagane jednorazowe zapisanie tokenu"}</span>
             </div>
             <p className="source-note">Sekret <b>ODDS_PILOT_TOKEN</b> chroni wywołania dostawców i pozostaje wyłącznie w Workerze oraz lokalnej przeglądarce. OddsPapi używa istniejącego <b>ODDSPAPI_API_KEY</b>; Worker sprawdza rzeczywisty limit konta przez bezpłatny endpoint /account, pobiera mecze z kursami i dopasowuje je po nazwach drużyn, dacie i godzinie Europe/Brussels. Bwin Belgium (bwin.be) jest sprawdzany jako osobny feed; inne dostępne bukmachery służą jako porównanie. Kurs nie jest wymagany do utworzenia prognozy 1X2/DC. StrikerAPI pozostaje dodatkowym źródłem i jego kredyty są rozliczane osobno.</p>
             {oddsProviderStatus?.oddspapiAccount && <p className="source-note">OddsPapi · stan: {oddsProviderStatus.oddspapiAccount.status ?? "nieznany"}{typeof oddsProviderStatus.oddspapiAccount.remaining === "number" ? ` · pozostałe zapytania: ${oddsProviderStatus.oddspapiAccount.remaining}/${oddsProviderStatus.oddspapiAccount.requestLimit ?? "—"}` : ""}{oddsProviderStatus.oddspapiAccount.bookmakerSlugs?.length ? ` · dostępne feedy: ${oddsProviderStatus.oddspapiAccount.bookmakerSlugs.join(", ")}` : ""}</p>}
