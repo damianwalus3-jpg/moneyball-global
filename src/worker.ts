@@ -1005,7 +1005,7 @@ export default {
         // A hard three-page ceiling limits each uncached sync to at most three billable calls.
         for (let page = 1; page <= 3; page++) {
           const pageCacheKey = new Request(`${APP_ORIGIN}/api/api-football/odds/page?date=${date}&page=${page}`, { method: "GET" });
-          let pagePayload: { response?: unknown[]; results?: number; paging?: { current?: number; total?: number }; errors?: unknown } | null = null;
+          let pagePayload: { response?: unknown[]; results?: number; paging?: { current?: number; total?: number }; errors?: unknown } = {};
           const pageCached = await cache.match(pageCacheKey);
           if (pageCached) {
             pagePayload = await pageCached.json() as typeof pagePayload;
