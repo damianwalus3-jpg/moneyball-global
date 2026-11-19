@@ -57,6 +57,8 @@ describe("virtual bankroll protection", () => {
     expect(open.openExposure).toBe(4);
     expect(open.availableBalance).toBeCloseTo(87.60);
     expect(open.openCoupons).toBe(1);
+    expect(canReserveStake([coupon], 87.60)).toBe(true);
+    expect(canReserveStake([coupon], 87.61)).toBe(false);
     const hit = row("coupon", "PAPER_HIT", { parentCouponId: "coupon-1", stake: 4, odds: 2.5, profitLoss: 6 }, "coupon-settlement");
     const settled = calculateBankroll([coupon, hit]);
     expect(settled.openExposure).toBe(0);
