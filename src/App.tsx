@@ -766,6 +766,14 @@ export default function App() {
           oddspapiSummary = "OddsPapi: " + (error instanceof Error ? error.message : "błąd dostawcy") + ". Prognozy pozostają bez zmian.";
         }
       }
+      if (oddsProviderStatus?.strikerapi !== true) {
+        try { localStorage.setItem(STRIKER_DAILY_FETCH_KEY, utcDate); } catch { /* quota guard is best-effort */ }
+        setLastOddsFetchDate(utcDate);
+        setRecords(readRecords());
+        setOddsNotice(oddspapiSummary || "OddsPapi: brak dostępnych kursów. Prognozy i rekordy 1X2/DC pozostają zapisane.");
+        setOddsAudit({ matched: 0, unmatched: fixtureScan.fixtures.length, ambiguous: 0, snapshots: 0, utcDate });
+        return;
+      }
       const response = await fetch(`/api/odds/pilot?strikerDate=${encodeURIComponent(utcDate)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
