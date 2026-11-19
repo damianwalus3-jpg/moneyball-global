@@ -168,6 +168,16 @@ describe("three-leg coupon candidates", () => {
     const legacy = { ...prediction("legacy", 0.95), details: { ...prediction("legacy", 0.95).details, couponEligible: true, evidenceComplete: false } };
     expect(buildThreeLegCandidates([legacy, prediction("b", 0.9), prediction("c", 0.9)], "2026-11-17")).toHaveLength(0);
   });
+
+  it("keeps a model-qualified high-probability prediction out of coupons until evidence is complete", () => {
+    const modelCandidate = {
+      ...prediction("evidence-pending", 0.96),
+      details: { ...prediction("evidence-pending", 0.96).details, couponEligible: false, evidenceComplete: false },
+    };
+    expect(modelCandidate.status).toBe("KANDYDAT");
+    expect(modelCandidate.details.strongCandidate).toBe(true);
+    expect(buildThreeLegCandidates([modelCandidate, prediction("b", 0.9), prediction("c", 0.9)], "2026-11-17")).toHaveLength(0);
+  });
   it("never admits baseline-only records even if candidate flags are accidentally true", () => {
     const baseline = { ...prediction("baseline", 0.99), details: { ...prediction("baseline", 0.99).details,
       model: "moneyball:neutral-prior-poisson", modelSourceType: "baseline_only",
