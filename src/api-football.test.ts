@@ -125,7 +125,7 @@ describe("API-Football final result parsing", () => {
     expect(parseApiFootballFinalResult({ ...base, goals: { home: null, away: 1 } }, "2026-11-18")).toBeNull();
   });
   it("rejects fixtures that fall on a different Brussels-local date", () => {
-    expect(parseApiFootballFinalResult({ ...base, fixture: { ...base.fixture, date: "2026-11-17T23:30:00Z" } }, "2026-11-18")).toBeNull();
+    expect(parseApiFootballFinalResult({ ...base, fixture: { ...base.fixture, date: "2026-11-18T23:30:00Z" } }, "2026-11-18")).toBeNull();
     expect(parseApiFootballFinalResult(base, "2026-11-17")).toBeNull();
   });
   it("accepts extra time and penalties as final statuses", () => {
