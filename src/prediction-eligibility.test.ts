@@ -40,7 +40,7 @@ describe("prediction display status", () => {
     expect(getPredictionDisplayStatus(rejected, "1X2", 0.755)).toBe("WSTĘPNA PROGNOZA · BRAK DANYCH UZUPEŁNIAJĄCYCH");
     const candidate = row({ details: { evidenceComplete: false, strongCandidate: true, strongDoubleChance: true } });
     expect(getPredictionDisplayStatus(candidate, "1X2", 0.832)).toBe("KANDYDAT MODELU ≥75%");
-    expect(getPredictionDisplayStatus(rejected, "DOUBLE_CHANCE", 0.909)).toBe("WSTĘPNA PROGNOZA · NIEKWALIFIKOWANA");
+    expect(getPredictionDisplayStatus(rejected, "DOUBLE_CHANCE", 0.909)).toBe("WSTĘPNA PROGNOZA · BRAK DANYCH UZUPEŁNIAJĄCYCH");
     expect(isEvidenceQualifiedCandidate(rejected, "1X2")).toBe(false);
     expect(isEvidenceQualifiedCandidate(rejected, "DOUBLE_CHANCE")).toBe(false);
   });
@@ -50,12 +50,12 @@ describe("prediction display status", () => {
       status: "ODRZUCONY",
       details: { evidenceComplete: true, strongCandidate: false, strongDoubleChance: false },
     });
-    expect(getPredictionDisplayStatus(notQualified, "1X2", 0.80)).toBe("WYSOKIE PRAWDOPODOBIEŃSTWO · NIEKWALIFIKOWANE");
+    expect(getPredictionDisplayStatus(notQualified, "1X2", 0.80)).toBe("WYSOKIE PRAWDOPODOBIEŃSTWO · WYMAGA KWALIFIKACJI");
     expect(getPredictionDisplayStatus(notQualified, "DOUBLE_CHANCE", 0.91)).toBe("WYSOKIE PRAWDOPODOBIEŃSTWO · NIEKWALIFIKOWANE");
   });
 
   it("shows qualified status only when evidence and market-specific strong flag pass", () => {
-    expect(getPredictionDisplayStatus(row(), "1X2", 0.80)).toBe("KANDYDAT ≥75%");
+    expect(getPredictionDisplayStatus(row(), "1X2", 0.80)).toBe("KANDYDAT MODELU ≥75%");
   });
 
   it("shows below-threshold only for probabilities actually below 75%", () => {
