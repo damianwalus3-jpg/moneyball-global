@@ -1,5 +1,6 @@
 import type { TrackerRecord } from "./tracker-store";
 import type { ThreeLegCandidate } from "./coupon-engine";
+import { trackerFixtureIdentity } from "./prediction-record";
 import {
   valueDoubleChanceSelectionFromOdds, valueSelectionFromOdds, type OddsValuation,
 } from "./odds-value";
@@ -31,7 +32,7 @@ export function valueThreeLegCoupon(
     if (isDoubleChance) {
       if (leg.selection !== "1X" && leg.selection !== "X2" && leg.selection !== "12") return null;
       const fixturePredictions = records
-        .filter(row => row.kind === "prediction" && row.details.fixtureId === leg.fixtureId
+        .filter(row => row.kind === "prediction" && trackerFixtureIdentity(row) === leg.fixtureId
           && row.details.market === "DOUBLE_CHANCE"
           && (row.details.model === leg.model || typeof row.details.model !== "string"))
         .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));

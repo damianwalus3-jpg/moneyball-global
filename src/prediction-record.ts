@@ -16,7 +16,7 @@ export function trackerFixtureIdentity(row: Pick<TrackerRecord, "title" | "detai
   let home = typeof details.home === "string" ? details.home.trim() : "";
   let away = typeof details.away === "string" ? details.away.trim() : "";
   if ((!home || !away) && typeof row.title === "string") {
-    const matchup = row.title.split(" · ").pop() ?? row.title;
+    const matchup = row.title.split(" · ").find(part => part.includes(" vs ")) ?? row.title;
     const separator = matchup.indexOf(" vs ");
     if (separator > 0) {
       if (!home) home = matchup.slice(0, separator).trim();

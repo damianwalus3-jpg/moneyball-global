@@ -1,5 +1,6 @@
 import type { TrackerRecord } from "./tracker-store";
 import { hasKickoffPassed } from "./safest-pick";
+import { trackerFixtureIdentity } from "./prediction-record";
 export interface CouponLegCandidate {
   fixtureId: string; title: string; competition: string;
   selection: "1" | "X" | "2" | "1X" | "X2" | "12";
@@ -12,9 +13,11 @@ export interface ThreeLegCandidate {
 function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCandidate | null {
   const d = record.details;
   if (record.kind !== "prediction" || record.status !== "KANDYDAT" || d.fixtureDate !== date || typeof d.fixtureId !== "string" || !d.fixtureId) return null;
+  const fixtureIdentity = trackerFixtureIdentity(record);
+  if (!fixtureIdentity) return null;
   if (d.couponEligible !== true || d.evidenceComplete !== true) return null;
   if (typeof d.fixtureTime === "string" && hasKickoffPassed(date, d.fixtureTime)) return null;
-  const base = { fixtureId: d.fixtureId, title: record.title,
+  const base = { fixtureId: fixtureIdentity, title: record.title,
     competition: typeof d.competition === "string" ? d.competition : "Rozgrywki nieznane",
     source: typeof d.source === "string" ? d.source : "unknown", model: typeof d.model === "string" ? d.model : "unknown" };
   if (d.market === "DOUBLE_CHANCE") {
@@ -41,15 +44,30 @@ function candidateFromRecord(record: TrackerRecord, date: string): CouponLegCand
 }
 function fixturesAlreadyUsedByCoupons(records: TrackerRecord[]): Set<string> {
   const used = new Set<string>();
+  const rawToIdentity = new Map<string, string>();
+  for (const row of records) {
+    const rawId = typeof row.details.fixtureId === "string" ? row.details.fixtureId : "";
+    const identity = trackerFixtureIdentity(row);
+    if (rawId && identity) rawToIdentity.set(rawId, identity);
+  }
   for (const record of records) {
     if (record.kind !== "coupon" || typeof record.details.legsJson !== "string") continue;
     try {
       const legs: unknown = JSON.parse(record.details.legsJson);
       if (!Array.isArray(legs)) continue;
-      for (const leg of legs) {
-        if (leg && typeof leg === "object" && typeof (leg as Record<string, unknown>).fixtureId === "string") {
-          used.add((leg as Record<string, string>).fixtureId);
-        }
+      for (const rawLeg of legs) {
+        if (!rawLeg || typeof rawLeg !== "object") continue;
+        const leg = rawLeg as Record<string, unknown>;
+        if (typeof leg.fixtureId !== "string" || !leg.fixtureId) continue;
+        const fallback = trackerFixtureIdentity({
+          title: typeof leg.title === "string" ? leg.title : "",
+          details: {
+            fixtureId: leg.fixtureId,
+            date: typeof record.details.date === "string" ? record.details.date : record.details.fixtureDate,
+            competition: leg.competition,
+          },
+        });
+        used.add(rawToIdentity.get(leg.fixtureId) ?? fallback ?? leg.fixtureId);
       }
     } catch { /* malformed historical coupon is ignored, never rewritten */ }
   }
@@ -61,7 +79,9 @@ export function buildThreeLegCandidates(records: TrackerRecord[], date: string, 
   for (const record of records) {
     const d = record.details;
     if (record.kind !== "prediction" || d.fixtureDate !== date || typeof d.fixtureId !== "string" || !d.fixtureId) continue;
-    const key = [d.fixtureId, typeof d.model === "string" ? d.model : "legacy", d.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2"].join("|");
+    const identity = trackerFixtureIdentity(record);
+    if (!identity) continue;
+    const key = [identity, typeof d.model === "string" ? d.model : "legacy", d.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2"].join("|");
     const time = Date.parse(record.createdAt);
     if (!Number.isFinite(time)) continue;
     if (!timestamps.has(key) || time > timestamps.get(key)!) { timestamps.set(key, time); newest.set(key, record); }

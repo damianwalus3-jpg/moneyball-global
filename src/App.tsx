@@ -795,7 +795,7 @@ export default function App() {
                 status,
                 details: {
                   snapshotKey, fixtureId: fixture.id, fixtureDate: fixture.date, fixtureTime: fixture.time,
-                  competition: fixture.competition, provider: "OddsPapi", providerGameId: quote.providerFixtureId,
+                  home: fixture.home, away: fixture.away, competition: fixture.competition, provider: "OddsPapi", providerGameId: quote.providerFixtureId,
                   bookmaker: quote.bookmaker, bookmakerSlug: quote.bookmakerSlug, market: quote.market,
                   odds1: quote.odds1, oddsX: quote.oddsX, odds2: quote.odds2,
                   odds1x: quote.odds1x, oddsX2: quote.oddsX2, odds12: quote.odds12,

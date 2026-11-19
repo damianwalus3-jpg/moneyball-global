@@ -1,4 +1,5 @@
 import type { TrackerRecord } from "./tracker-store";
+import { trackerFixtureIdentity } from "./prediction-record";
 
 export type OddsMarket = "1X2" | "DOUBLE_CHANCE";
 export type OddsSelection = "1" | "X" | "2" | "1X" | "X2" | "12";
@@ -43,7 +44,7 @@ function freshCompleteSnapshot(
 ): TrackerRecord | undefined {
   const eligible = records.filter(row => {
     const d = row.details;
-    if (row.kind !== "odds" || d.fixtureId !== fixtureId || d.bookmaker !== bookmaker
+    if (row.kind !== "odds" || trackerFixtureIdentity(row) !== fixtureId || d.bookmaker !== bookmaker
       || (d.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2") !== market) return false;
     if (!isFresh(d.capturedAt, now, maxAgeMinutes)) return false;
     if (market === "1X2") {
@@ -122,7 +123,7 @@ export function valueDoubleChanceSelectionFromOdds(
 
 function validCompleteSnapshotForList(row: TrackerRecord, fixtureIds: Set<string>, now: number, maxAgeMinutes: number): boolean {
   const d = row.details;
-  if (row.kind !== "odds" || typeof d.fixtureId !== "string" || !fixtureIds.has(d.fixtureId)
+  if (row.kind !== "odds" || !fixtureIds.has(trackerFixtureIdentity(row) ?? "")
     || typeof d.bookmaker !== "string" || !d.bookmaker.trim() || !isFresh(d.capturedAt, now, maxAgeMinutes)) return false;
   if (d.market !== "DOUBLE_CHANCE") {
     return row.status === "COMPLETE_1X2" && d.complete1X2 !== false
