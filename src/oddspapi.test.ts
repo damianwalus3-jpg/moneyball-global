@@ -39,7 +39,7 @@ describe("OddsPapi adapter", () => {
         "102": { players: { "0": price(3.2, "2026-11-19T09:20:00.000Z") } },
         "103": { players: { "0": price(3.5, "2026-11-19T10:02:00.000Z") } },
       } },
-    } } }];
+    } } } }];
     expect(parseOddsPapiQuotes(payload, {}).map(row => row.capturedAt)).toEqual(["2026-11-19T09:20:00.000Z"]);
   });
   it("does not treat a missing or invalid price timestamp as current", () => {
