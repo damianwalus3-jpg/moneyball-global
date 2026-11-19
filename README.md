@@ -92,7 +92,7 @@ Automated FotMob/Sofascore scraping is intentionally not used: their terms/offic
 - GET /api/api-football/injuries?date=YYYY-MM-DD retrieves the daily injury/suspension feed. An empty response is not proof that every league has complete injury coverage or that no player is unavailable.
 - GET /api/api-football/status exposes only safe subscription and quota metadata; account PII and API credentials are never returned. Add ?fresh=1 to bypass the short status cache for diagnostics.
 - Worker cache policy: date fixtures 15 minutes, fixture enrichment 15 minutes, daily injuries 24 hours, status metadata 60 seconds. Provider 429 responses are surfaced with sanitized diagnostic details and are never cached as successful data.
-- API-Football Pro fixture data is stored with prediction Tracker records when available. PitchAPI remains the xG/xGA source; missing xG is not inferred from ordinary shot statistics.
+- API-Football Pro fixture data is stored with prediction Tracker records when available. The full payload is stored once per fixture in the primary 1X2 record, while other model/market rows retain compact counts and provenance to avoid unnecessary localStorage growth. The match analysis panel has an expandable full-data view. PitchAPI remains the xG/xGA source; missing xG is not inferred from ordinary shot statistics.
 - API-Football Pro is a paid service. Its per-minute and daily quotas are controlled by the active account plan; a temporary HTTP 429 is a provider limit, not proof that the subscription is inactive.
 
 ### Live Europe/Brussels audit — 2026-11-19

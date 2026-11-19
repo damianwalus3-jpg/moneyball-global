@@ -1920,3 +1920,12 @@
 - Latest CI: TypeScript, unit tests and production build passed; 290 tests passed across 29 files. Cloudflare deployment to the separate REBUILT Worker, production smoke tests and full live European source reconciliation all passed. Feature commit: 4404b769e9ef6331362538051adf972464674e8b; deployment run: 44460654084; validation run: 44460654085.
 - A temporary API-Football per-minute 429 was observed during repeated development/deployment smoke tests. The workflow now treats a correctly identified provider throttle as a safe upstream limitation rather than a failed application deployment. No paid plan was purchased or upgraded by this work.
 - No historical Tracker rows, coupons, settlement records or bankroll entries were rewritten. The Tracker remains browser-local and requires JSON export/import between devices. Physical Android interaction/performance acceptance remains unverified.
+
+
+## 2026-11-19 — Stage 161: compact Tracker storage and full API detail view
+- Prevented duplication of the full API-Football fixture and injury payload across every model and market row. Compact provenance and counts remain on all rows; the complete JSON is stored once per fixture on the primary 1X2 row.
+- Added an expandable match-analysis panel showing the full available API-Football Pro payload: events, lineups, team statistics, player statistics and injury/suspension entries.
+- Added tests for compact versus full Tracker metadata. Latest validation: 291 tests passed across 29 files; TypeScript and production build passed.
+- Latest feature commit: 96755818fc9b980887c7e16ed85acc4fb5abc923. Deployment run: 44461128461; validation run: 44461128261.
+- Live source reconciliation at 2026-11-19T04:52:48Z remained healthy: 48 unique fixtures, 15 countries/federations, 27 competitions; all 9 sources healthy; API-Football Pro 111 raw / 21 accepted European fixtures; zero errors, duplicates, wrong-date or non-European fixtures.
+- Full physical Android testing is still outstanding; the CI/build and production endpoint checks are not represented as a device test.
