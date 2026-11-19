@@ -25,6 +25,8 @@ export interface FreeFixture {
   pitchApiSeason?: string;
   apiFootballFixtureId?: string;
   apiFootballLeagueId?: string;
+  /** All provider IDs retained for audit/result crosswalk; never used as analytical identity. */
+  providerFixtureIds?: string[];
 }
 interface LeagueIndex {
   generated_utc: string;
@@ -242,6 +244,7 @@ export function openLigaCountryCode(league: OpenLigaLeague): string {
 
 /** Merge provider provenance and all available history identifiers onto one canonical fixture. */
 export function mergeFixtureSource(existing: FreeFixture, incoming: FreeFixture): FreeFixture {
+  existing.providerFixtureIds = [...new Set([...(existing.providerFixtureIds ?? []), existing.id, ...(incoming.providerFixtureIds ?? []), incoming.id])];
   const sources = new Set([...existing.source.split(" + "), ...incoming.source.split(" + ")].map(value => value.trim()).filter(Boolean));
   existing.source = [...sources].join(" + ");
   if (!existing.leagueFolder && incoming.leagueFolder) existing.leagueFolder = incoming.leagueFolder;
@@ -299,6 +302,10 @@ export function fixtureKey(date: string, home: string, away: string, competition
   };
   return `${date}|${gender}|${normalize(home)}|${normalize(away)}`;
 }
+export function canonicalFixtureId(date: string, home: string, away: string, competition = ""): string {
+  return "canonical|" + fixtureKey(date, home, away, competition);
+}
+
 const ESPN_COUNTRIES: Record<string, string> = {
 albania:"ALB", andorra:"AND", armenia:"ARM", austria:"AUT", azerbaijan:"AZE", belarus:"BLR", belgium:"BEL",
 "bosnia and herzegovina":"BIH", bosnia:"BIH", bulgaria:"BUL", croatia:"CRO", cyprus:"CYP", "czech republic":"CZE", czechia:"CZE",
@@ -769,7 +776,11 @@ export async function scanTodayEuropeanFixtures(force = false): Promise<FixtureS
     errors.push("Flashscore · " + (error instanceof Error ? error.message : "źródło niedostępne"));
   }
 
-  const fixtures = [...byKey.values()].sort((a,b) => a.time.localeCompare(b.time) || a.competition.localeCompare(b.competition));
+  const fixtures = [...byKey.entries()].map(([key, fixture]) => ({
+    ...fixture,
+    id: "canonical|" + key,
+    providerFixtureIds: [...new Set([...(fixture.providerFixtureIds ?? []), fixture.id])],
+  })).sort((a,b) => a.time.localeCompare(b.time) || a.competition.localeCompare(b.competition));
   generatedAt = new Date().toISOString();
   const result: FixtureScan = {
     date,
