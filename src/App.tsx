@@ -293,7 +293,7 @@ export default function App() {
   const [oddsTokenSaved, setOddsTokenSaved] = useState(() => { try { return Boolean(localStorage.getItem(ODDS_PILOT_TOKEN_KEY)); } catch { return false; } });
   const [lastOddsFetchDate, setLastOddsFetchDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_FETCH_KEY) ?? ""; } catch { return ""; } });
   const [lastOddsAttemptDate, setLastOddsAttemptDate] = useState(() => { try { return localStorage.getItem(STRIKER_DAILY_ATTEMPT_KEY) ?? ""; } catch { return ""; } });
-  const [oddsProviderStatus, setOddsProviderStatus] = useState<{ strikerapi: boolean; pilotEnabled: boolean } | null>(null);
+  const [oddsProviderStatus, setOddsProviderStatus] = useState<{ strikerapi: boolean; oddspapi: boolean; pilotEnabled: boolean; oddspapiAccount?: { status?: string; requestLimit?: number; requestCount?: number; remaining?: number; bookmakerSlugs?: string[] } | null } | null>(null);
   const [oddsLoading, setOddsLoading] = useState(false);
   const [oddsNotice, setOddsNotice] = useState("");
   const [oddsAudit, setOddsAudit] = useState<{ matched: number; unmatched: number; ambiguous: number; snapshots: number; utcDate: string } | null>(null);
@@ -701,8 +701,71 @@ export default function App() {
     setLastOddsAttemptDate(fixtureScan.date);
     setOddsLoading(true);
     setOddsNotice("");
+    let oddspapiSummary = "";
     try {
       const utcDate = fixtureScan.date;
+      // OddsPapi is a separate price layer. Missing quotes never remove a fixture or its 1X2/DC prediction.
+      if (oddsProviderStatus?.oddspapi === true) {
+        try {
+          const oddspapiResponse = await fetch("/api/odds/oddspapi/daily", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({
+              date: utcDate,
+              fixtures: fixtureScan.fixtures.map(fixture => ({
+                id: fixture.id, date: fixture.date, time: fixture.time,
+                home: fixture.home, away: fixture.away,
+              })),
+            }),
+          });
+          const oddspapiPayload = await oddspapiResponse.json() as {
+            status?: string; error?: string; message?: string; matched?: number; unmatched?: number; ambiguous?: number;
+            quotes?: Array<{
+              fixtureId: string; providerFixtureId: string; bookmaker: string; bookmakerSlug: string;
+              odds1: number | null; oddsX: number | null; odds2: number | null; complete1X2: boolean;
+              capturedAt: string | null; timestampBasis: string; bookmakerIsActive: boolean;
+              suspended: boolean; marketActive: boolean; fixturePath: string | null;
+              kickoffDifferenceMinutes: number;
+            }>;
+            remaining?: number;
+          };
+          if (!oddspapiResponse.ok) throw new Error(oddspapiPayload.message || oddspapiPayload.error || `OddsPapi HTTP ${oddspapiResponse.status}`);
+          if (oddspapiPayload.status === "ok") {
+            const fixtureById = new Map(fixtureScan.fixtures.map(fixture => [fixture.id, fixture]));
+            const oddspapiSnapshots = (oddspapiPayload.quotes ?? []).flatMap(quote => {
+              const fixture = fixtureById.get(quote.fixtureId);
+              if (!fixture || hasKickoffPassed(fixture.date, fixture.time)) return [];
+              const capturedAt = quote.capturedAt ?? "";
+              const timestampVerified = quote.timestampBasis === "price_changed_at" && !!capturedAt;
+              const complete = quote.complete1X2 && timestampVerified
+                && [quote.odds1, quote.oddsX, quote.odds2].every(value => typeof value === "number" && Number.isFinite(value) && value > 1);
+              const snapshotKey = [fixture.id, "OddsPapi", quote.bookmakerSlug, capturedAt || "NO_TIMESTAMP"].join("|");
+              return [{
+                kind: "odds" as const,
+                title: `${fixture.home} vs ${fixture.away} · ${quote.bookmaker} · OddsPapi`,
+                status: complete ? "COMPLETE_1X2" : quote.complete1X2 ? "UNVERIFIED_TIMESTAMP" : "INCOMPLETE_1X2",
+                details: {
+                  snapshotKey, fixtureId: fixture.id, fixtureDate: fixture.date, fixtureTime: fixture.time,
+                  competition: fixture.competition, provider: "OddsPapi", providerGameId: quote.providerFixtureId,
+                  bookmaker: quote.bookmaker, bookmakerSlug: quote.bookmakerSlug, market: "1X2",
+                  odds1: quote.odds1, oddsX: quote.oddsX, odds2: quote.odds2,
+                  complete1X2: complete, capturedAt, timestampBasis: quote.timestampBasis,
+                  bookmakerIsActive: quote.bookmakerIsActive, suspended: quote.suspended,
+                  marketActive: quote.marketActive, fixturePath: quote.fixturePath,
+                  kickoffDifferenceMinutes: quote.kickoffDifferenceMinutes, utcDate,
+                },
+              }];
+            });
+            const addedOddsPapi = addRecordsIfMissing(oddspapiSnapshots, "snapshotKey");
+            oddspapiSummary = `OddsPapi: dopasowano ${oddspapiPayload.matched ?? 0}, kwotowania ${oddspapiSnapshots.length}, nowe snapshoty ${addedOddsPapi}, niejednoznaczne ${oddspapiPayload.ambiguous ?? 0}.`;
+            setRecords(readRecords());
+          } else {
+            oddspapiSummary = `OddsPapi: ${oddspapiPayload.message || oddspapiPayload.status || "brak kwotowań"}.`;
+          }
+        } catch (error) {
+          oddspapiSummary = "OddsPapi: " + (error instanceof Error ? error.message : "błąd dostawcy") + ". Prognozy pozostają bez zmian.";
+        }
+      }
       const response = await fetch(`/api/odds/pilot?strikerDate=${encodeURIComponent(utcDate)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -804,7 +867,7 @@ export default function App() {
         snapshots: added,
         utcDate,
       });
-      setOddsNotice(`Pobrano ${games.length} meczów z StrikerAPI. Dopasowano ${audit.matched.length}; niejednoznaczne ${audit.ambiguousFixtureIds.length}; zapisano ${added} nowych snapshotów kursów. Nie dopasowane mecze nie są zgadywane.`);
+      setOddsNotice([`StrikerAPI: pobrano ${games.length} meczów, dopasowano ${audit.matched.length}, nowe snapshoty ${added}.`, oddspapiSummary].filter(Boolean).join(" "));
     } catch (error) {
       setOddsNotice(error instanceof Error ? error.message : "Nie udało się pobrać dziennych kursów.");
     } finally {
@@ -831,7 +894,7 @@ export default function App() {
     if (shouldAutoFetchDailyOdds({
       fixtureDate: fixtureScan.date,
       tokenSaved: oddsTokenSaved,
-      providerReady: oddsProviderStatus?.strikerapi === true && oddsProviderStatus.pilotEnabled === true,
+      providerReady: (oddsProviderStatus?.strikerapi === true || oddsProviderStatus?.oddspapi === true) && oddsProviderStatus.pilotEnabled === true,
       lastSuccessfulDate: lastOddsFetchDate,
       lastAttemptedDate: lastOddsAttemptDate,
     })) void fetchDailyOdds();
@@ -840,11 +903,11 @@ export default function App() {
     let active = true;
     void fetch("/api/odds/status").then(async response => {
       if (!response.ok) throw new Error("odds_status_unavailable");
-      return response.json() as Promise<{ providers?: { strikerapi?: boolean }; pilotEnabled?: boolean }>;
+      return response.json() as Promise<{ providers?: { strikerapi?: boolean; oddspapi?: boolean }; pilotEnabled?: boolean; oddspapiAccount?: { status?: string; requestLimit?: number; requestCount?: number; remaining?: number; bookmakerSlugs?: string[] } | null }>;
     }).then(payload => {
-      if (active) setOddsProviderStatus({ strikerapi: payload.providers?.strikerapi === true, pilotEnabled: payload.pilotEnabled === true });
+      if (active) setOddsProviderStatus({ strikerapi: payload.providers?.strikerapi === true, oddspapi: payload.providers?.oddspapi === true, pilotEnabled: payload.pilotEnabled === true, oddspapiAccount: payload.oddspapiAccount ?? null });
     }).catch(() => {
-      if (active) setOddsProviderStatus({ strikerapi: false, pilotEnabled: false });
+      if (active) setOddsProviderStatus({ strikerapi: false, oddspapi: false, pilotEnabled: false, oddspapiAccount: null });
     });
     return () => { active = false; };
   }, []);
@@ -1003,14 +1066,14 @@ export default function App() {
           <div className="module-icon"><Ticket/></div><h2>Bilans wybranych zakładów</h2>
           <div className="audit-metrics bet-metrics"><DetailMetric label="Saldo początkowe" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.openingBalance)} detail="Wirtualny bankroll startowy €91,60; można go nadpisać wpisem OPENING_BALANCE w lokalnym Trackerze."/><DetailMetric label="Saldo dostępne" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.availableBalance)} valueClass={bankroll.availableBalance >= 0 ? "profit-positive" : "profit-negative"} detail="Saldo początkowe + zysk/strata rozliczonych zakładów − stawki zarezerwowane w otwartych zakładach."/><DetailMetric label="Otwarte stawki" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.openExposure)} detail="Kwota zarezerwowana przez wybrane, nierozliczone zakłady. Nie jest liczona jako strata."/><DetailMetric label="Rozliczone P/L" value={new Intl.NumberFormat("pl-BE",{style:"currency",currency:"EUR"}).format(bankroll.settledProfitLoss)} detail="Suma rzeczywistego zysku/straty z rekordów rozliczeń; odrzucone typy nie zmieniają salda."/></div>
           <article className="panel">
-            <div className="panel-heading"><div><h3>Automatyczne kursy · StrikerAPI</h3><p>Uruchomienie po skanie · maksymalnie 1 odczyt dziennie · 10 kredytów</p></div><ShieldCheck size={18}/></div>
+            <div className="panel-heading"><div><h3>Automatyczne kursy · OddsPapi + StrikerAPI</h3><p>OddsPapi: dzienny pakiet kursów dla dopasowanych rozgrywek · StrikerAPI: opcjonalny dodatkowy snapshot</p></div><ShieldCheck size={18}/></div>
             <div className="tracker-form">
               <input type="password" autoComplete="off" value={oddsPilotToken} onChange={event => { setOddsPilotToken(event.target.value); setOddsTokenSaved(false); }} placeholder="ODDS_PILOT_TOKEN · min. 32 znaki" aria-label="Token dostępu do automatycznych kursów"/>
               <button onClick={saveOddsPilotToken}>Zapisz token</button>
               <button onClick={clearOddsPilotToken} disabled={!oddsTokenSaved && !oddsPilotToken}>Usuń</button>
-              <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsFetchDate === fixtureScan?.date ? "Kursy pobrane dzisiaj" : lastOddsAttemptDate === fixtureScan?.date ? "Dzisiejsza próba wykonana — bez ponownego obciążania limitu" : oddsProviderStatus === null ? "Sprawdzanie konfiguracji dostawcy…" : !oddsProviderStatus.strikerapi ? "Brak STRIKERAPI_API_KEY w Workerze" : !oddsProviderStatus.pilotEnabled ? "Brak sekretu ODDS_PILOT_TOKEN w Workerze" : oddsTokenSaved ? "Oczekiwanie na skan — pobieranie automatyczne" : "Wymagane jednorazowe zapisanie tokenu"}</span>
+              <span className="source-note">{oddsLoading ? "Pobieranie kursów…" : lastOddsFetchDate === fixtureScan?.date ? "Dzisiejszy pakiet kursów sprawdzony" : lastOddsAttemptDate === fixtureScan?.date ? "Dzisiejsza próba wykonana — bez ponawiania kosztownych zapytań" : oddsProviderStatus === null ? "Sprawdzanie konfiguracji dostawców…" : !oddsProviderStatus.oddspapi && !oddsProviderStatus.strikerapi ? "Brak skonfigurowanych źródeł kursów" : !oddsProviderStatus.pilotEnabled ? "Brak sekretu ODDS_PILOT_TOKEN w Workerze" : oddsTokenSaved ? "Oczekiwanie na skan — pobieranie automatyczne" : "Wymagane jednorazowe zapisanie tokenu"}</span>
             </div>
-            <p className="source-note">Ustaw identyczny sekret <b>ODDS_PILOT_TOKEN</b> w Cloudflare Workerze <b>moneyball-global-rebuild</b> i zapisz go tutaj tylko raz. Token pozostaje lokalnie w tej przeglądarce; nie wklejaj go do czatu. Po skanie dzisiejszych meczów aplikacja automatycznie pobierze dzienny pakiet kursów. Limit aplikacji to jedna próba na datę, aby chronić darmowe kredyty. StrikerAPI daje 500 darmowych kredytów miesięcznie; jeden odczyt dzienny kosztuje 10 (około 300 na 30 dni). Dostawca obejmuje tylko wybrane ligi, nie całą Europę. Daty dostawcy są UTC; dopasowanie meczu odbywa się po nazwach drużyn, dacie i godzinie Europe/Brussels.</p>
+            <p className="source-note">Sekret <b>ODDS_PILOT_TOKEN</b> chroni wywołania dostawców i pozostaje wyłącznie w Workerze oraz lokalnej przeglądarce. OddsPapi używa istniejącego <b>ODDSPAPI_API_KEY</b>; Worker sprawdza rzeczywisty limit konta przez bezpłatny endpoint /account, pobiera mecze z kursami i dopasowuje je po nazwach drużyn, dacie i godzinie Europe/Brussels. Bwin Belgium (bwin.be) jest sprawdzany jako osobny feed; inne dostępne bukmachery służą jako porównanie. Kurs nie jest wymagany do utworzenia prognozy 1X2/DC. StrikerAPI pozostaje dodatkowym źródłem i jego kredyty są rozliczane osobno.</p>
             {oddsNotice && <div className="tracker-notice">{oddsNotice}</div>}
             {oddsAudit && <p className="source-note">Ostatni audyt · UTC {oddsAudit.utcDate} · dopasowane {oddsAudit.matched} · niejednoznaczne {oddsAudit.ambiguous} · bez dopasowania {oddsAudit.unmatched} · nowe snapshoty {oddsAudit.snapshots}.</p>}
             <h3>Ostatnie snapshoty kursów</h3><p className="source-note">Historia zachowuje starsze odczyty, ale tylko snapshoty do 60 minut są oznaczane jako świeże. Starsze ceny są archiwalne i nie mogą potwierdzać aktualnego kuponu.</p>
