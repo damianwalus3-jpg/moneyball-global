@@ -286,6 +286,20 @@ export async function fetchApiFootballOdds(
   return readResponse<ApiFootballOddsBatch>(response);
 }
 
+/** Fetch today's pre-match odds for up to 20 API-Football fixture IDs via the server-side Worker key. */
+export async function fetchApiFootballOdds(
+  date: string,
+  fixtureIds: string[],
+  minimumIntervalMs = API_FOOTBALL_MIN_INTERVAL_MS,
+): Promise<ApiFootballOddsBatch> {
+  assertBrusselsDate(date, "odds");
+  const ids = [...new Set(fixtureIds.map(value => String(value).trim()).filter(value => /^\d{1,12}$/.test(value)))];
+  if (!ids.length || ids.length > 20) throw new Error("API-Football odds wymaga 1–20 poprawnych identyfikatorów meczów.");
+  const query = new URLSearchParams({ date, ids: ids.join("-") });
+  const response = await pacedApiFootballFetch(API_ROOT + "/odds?" + query.toString(), minimumIntervalMs);
+  return readResponse<ApiFootballOddsBatch>(response);
+}
+
 /** One daily date query returns injury/suspension rows for every fixture supported by the provider. */
 export async function fetchApiFootballInjuriesForDate(
   date: string,
