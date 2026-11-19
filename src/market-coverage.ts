@@ -1,4 +1,5 @@
 import type { TrackerRecord } from "./tracker-store";
+import { trackerFixtureIdentity } from "./prediction-record";
 export interface MarketCoverage {
   fixtureCount: number;
   oneXTwoFixtureCount: number;
@@ -10,14 +11,16 @@ export interface MarketCoverage {
 /** Compares today's fixture register against independent 1X2 and Double Chance prediction rows. */
 export function auditMarketCoverage(records: TrackerRecord[], date?: string): MarketCoverage {
   const fixtures = new Set(records.filter(row => row.kind === "match"
-    && (date === undefined || row.details.date === date)
-    && typeof row.details.fixtureId === "string").map(row => String(row.details.fixtureId)));
+    && (date === undefined || row.details.date === date))
+    .map(row => trackerFixtureIdentity(row)).filter((id): id is string => Boolean(id)));
   const oneXTwo = new Set<string>(), doubleChance = new Set<string>();
   for (const row of records) {
-    if (row.kind !== "prediction" || typeof row.details.fixtureId !== "string") continue;
+    if (row.kind !== "prediction") continue;
     if (date !== undefined && row.details.fixtureDate !== date) continue;
-    if (row.details.market === "DOUBLE_CHANCE") doubleChance.add(row.details.fixtureId);
-    else oneXTwo.add(row.details.fixtureId); // legacy rows without a market field are 1X2
+    const identity = trackerFixtureIdentity(row);
+    if (!identity) continue;
+    if (row.details.market === "DOUBLE_CHANCE") doubleChance.add(identity);
+    else oneXTwo.add(identity); // legacy rows without a market field are 1X2
   }
   const expected = fixtures.size ? fixtures : new Set([...oneXTwo, ...doubleChance]);
   const missingOneXTwo = [...expected].filter(id => !oneXTwo.has(id)).sort();

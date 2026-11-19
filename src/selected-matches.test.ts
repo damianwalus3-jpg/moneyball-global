@@ -51,6 +51,19 @@ describe("selected fixture predictions", () => {
     expect(rows[0].one?.id).toBe("xg-new");
   });
 
+  it("pairs markets across different source fixture IDs for the same canonical match", () => {
+    const one = prediction("flash-one", "flashscore:100", "2026-11-18", "19:00");
+    const dc = prediction("footy-dc", "footynomad:200", "2026-11-18", "19:00", "DOUBLE_CHANCE");
+    const withIdentity = (row: TrackerRecord): TrackerRecord => ({
+      ...row,
+      title: "2026-11-18 · Club Brugge vs KAA Gent",
+      details: { ...row.details, home: "Club Brugge", away: "KAA Gent", competition: "Belgian Pro League" },
+    });
+    const rows = getSelectedFixturePredictions([withIdentity(one), withIdentity(dc)], "2026-11-18");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].one?.id).toBe("flash-one");
+    expect(rows[0].dc?.id).toBe("footy-dc");
+  });
   it("returns no records for an invalid scan date", () => {
     expect(getSelectedFixturePredictions([prediction("one", "match", "2026-11-18", "18:00")], "18-11-2026")).toEqual([]);
   });

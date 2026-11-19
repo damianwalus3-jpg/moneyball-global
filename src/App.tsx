@@ -11,7 +11,7 @@ import { findOpenFootballFixtureResult, loadOpenFootballRecentTeamForm } from ".
 import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-settlement";
 import { uniquePendingPredictions } from "./pending-settlement";
 import { auditTrackerPredictions } from "./model-audit";
-import { describeHistoryProvenance, hasValidPredictionMarket, shouldAppendPrediction, shouldRetryPredictionWithEvidence } from "./prediction-record";
+import { describeHistoryProvenance, hasValidPredictionMarket, shouldAppendPrediction, shouldRetryPredictionWithEvidence, trackerFixtureIdentity } from "./prediction-record";
 import { getSafestPick, hasKickoffPassed, hasKnownKickoff } from "./safest-pick";
 import { getPredictionDisplayStatus, isEvidenceQualifiedCandidate } from "./prediction-eligibility";
 import { auditOddsFixtureMatches } from "./odds-matching";
@@ -972,8 +972,8 @@ export default function App() {
     const latestByFixtureMarketModel = new Map<string, TrackerRecord>();
     for (const row of [...records].filter(item => item.kind === "prediction" && item.details.fixtureDate === coverageDate)
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
-      const fixtureId = row.details.fixtureId;
-      if (typeof fixtureId !== "string") continue;
+      const fixtureId = trackerFixtureIdentity(row);
+      if (!fixtureId) continue;
       const market = row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2";
       const model = typeof row.details.model === "string" ? row.details.model : "legacy";
       const key = fixtureId + "|" + market + "|" + model;
@@ -983,17 +983,26 @@ export default function App() {
     const oneXTwo = latestRows.filter(row => row.details.market !== "DOUBLE_CHANCE");
     const doubleChance = latestRows.filter(row => row.details.market === "DOUBLE_CHANCE");
     const coverage = auditMarketCoverage(records, coverageDate);
-    const candidates = new Set(oneXTwo.filter(row => isEvidenceQualifiedCandidate(row, "1X2")).map(row => String(row.details.fixtureId)));
-    const dcCandidates = new Set(doubleChance.filter(row => isEvidenceQualifiedCandidate(row, "DOUBLE_CHANCE")).map(row => String(row.details.fixtureId)));
-    const withProbabilities = new Set(oneXTwo.filter(row => hasValidPredictionMarket(records, String(row.details.fixtureId), "1X2"))
-      .map(row => String(row.details.fixtureId)));
-    const withDcProbabilities = new Set(doubleChance.filter(row => hasValidPredictionMarket(records, String(row.details.fixtureId), "DOUBLE_CHANCE"))
-      .map(row => String(row.details.fixtureId)));
+    const candidates = new Set<string>(), dcCandidates = new Set<string>();
+    const withProbabilities = new Set<string>(), withDcProbabilities = new Set<string>();
+    for (const row of oneXTwo) {
+      const id = trackerFixtureIdentity(row);
+      if (!id) continue;
+      if (isEvidenceQualifiedCandidate(row, "1X2")) candidates.add(id);
+      if (hasValidPredictionMarket(records, id, "1X2")) withProbabilities.add(id);
+    }
+    for (const row of doubleChance) {
+      const id = trackerFixtureIdentity(row);
+      if (!id) continue;
+      if (isEvidenceQualifiedCandidate(row, "DOUBLE_CHANCE")) dcCandidates.add(id);
+      if (hasValidPredictionMarket(records, id, "DOUBLE_CHANCE")) withDcProbabilities.add(id);
+    }
     const latestPerFixture = new Map<string, TrackerRecord>();
     for (const row of oneXTwo.sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
-      const id = String(row.details.fixtureId); if (!latestPerFixture.has(id)) latestPerFixture.set(id, row);
+      const id = trackerFixtureIdentity(row);
+      if (id && !latestPerFixture.has(id)) latestPerFixture.set(id, row);
     }
-    const rejected = [...latestPerFixture.values()].filter(row => !candidates.has(String(row.details.fixtureId)));
+    const rejected = [...latestPerFixture.entries()].filter(([id]) => !candidates.has(id)).map(([, row]) => row);
     const reasons = new Map<string, number>();
     for (const row of rejected) { const reason = String(row.details.reason ?? "Nie zapisano konkretnego powodu"); reasons.set(reason, (reasons.get(reason) ?? 0) + 1); }
     return { total: coverage.fixtureCount, rejected: Math.max(rejected.length, coverage.fixtureCount - candidates.size),

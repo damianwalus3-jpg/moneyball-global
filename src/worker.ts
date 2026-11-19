@@ -124,7 +124,7 @@ async function readOddsPapiAccount(apiKey: string, cache: Cache): Promise<OddsPa
   let response = await fetchAccount();
   if (response.status === 429) {
     const retryAfter = Number(response.headers.get("Retry-After"));
-    const waitMs = Math.min(3000, Math.max(1100, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 1100));
+    const waitMs = Math.min(3000, Math.max(2100, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2100));
     await new Promise(resolve => setTimeout(resolve, waitMs));
     response = await fetchAccount();
   }
@@ -144,7 +144,7 @@ async function readOddsPapiAccount(apiKey: string, cache: Cache): Promise<OddsPa
     bookmakerSlugs: Object.keys(selected.bookmakers ?? {}),
   } : { status: "no_active_subscription" };
   const cacheResponse = json(summary, 200, APP_ORIGIN);
-  cacheResponse.headers.set("Cache-Control", "public, max-age=60");
+  cacheResponse.headers.set("Cache-Control", "public, max-age=300");
   await cache.put(ODDSPAPI_ACCOUNT_CACHE_KEY, cacheResponse);
   return summary;
 }

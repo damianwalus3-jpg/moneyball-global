@@ -7,6 +7,27 @@ function recordFixtureId(details: TrackerRecord["details"]): string | undefined 
   }
   return typeof details.fixtureId === "string" ? details.fixtureId : undefined;
 }
+
+/** Canonical analytical identity shared by match, prediction and result rows, even when provider IDs differ. */
+export function trackerFixtureIdentity(row: Pick<TrackerRecord, "title" | "details">): string | undefined {
+  const details = row.details;
+  const date = typeof details.fixtureDate === "string" ? details.fixtureDate
+    : typeof details.date === "string" ? details.date : undefined;
+  let home = typeof details.home === "string" ? details.home.trim() : "";
+  let away = typeof details.away === "string" ? details.away.trim() : "";
+  if ((!home || !away) && typeof row.title === "string") {
+    const matchup = row.title.split(" · ").pop() ?? row.title;
+    const separator = matchup.indexOf(" vs ");
+    if (separator > 0) {
+      if (!home) home = matchup.slice(0, separator).trim();
+      if (!away) away = matchup.slice(separator + 4).trim();
+    }
+  }
+  if (date && home && away) {
+    return canonicalFixtureId(date, home, away, typeof details.competition === "string" ? details.competition : "");
+  }
+  return typeof details.fixtureId === "string" ? details.fixtureId : undefined;
+}
 function hasValidProbabilities(details: TrackerRecord["details"], market: string): boolean {
   const values = market === "DOUBLE_CHANCE" ? [details.p1x, details.px2, details.p12] : [details.p1, details.px, details.p2];
   if (values.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) return false;

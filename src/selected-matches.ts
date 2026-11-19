@@ -1,4 +1,5 @@
 import type { TrackerRecord } from "./tracker-store";
+import { trackerFixtureIdentity } from "./prediction-record";
 
 export interface SelectedFixturePredictions {
   fixtureId: string;
@@ -32,10 +33,11 @@ export function getSelectedFixturePredictions(
       : row.details.predictionMethod === "recent-form-goals-poisson" ? 2 : 1;
 
   for (const row of records) {
-    if (row.kind !== "prediction" || typeof row.details.fixtureId !== "string"
-      || row.details.fixtureDate !== targetDate) continue;
+    if (row.kind !== "prediction" || row.details.fixtureDate !== targetDate) continue;
+    const fixtureIdentity = trackerFixtureIdentity(row);
+    if (!fixtureIdentity) continue;
     const market = row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2";
-    const key = String(row.details.fixtureId) + "|" + market;
+    const key = fixtureIdentity + "|" + market;
     const previous = latest.get(key);
     if (!previous || priority(row) > priority(previous)
       || (priority(row) === priority(previous) && Date.parse(row.createdAt) > Date.parse(previous.createdAt))) {
@@ -45,7 +47,8 @@ export function getSelectedFixturePredictions(
 
   const fixtures = new Map<string, SelectedFixturePredictions>();
   for (const row of latest.values()) {
-    const id = String(row.details.fixtureId);
+    const id = trackerFixtureIdentity(row);
+    if (!id) continue;
     const item = fixtures.get(id) ?? { fixtureId: id };
     if (row.details.market === "DOUBLE_CHANCE") item.dc = row;
     else item.one = row;

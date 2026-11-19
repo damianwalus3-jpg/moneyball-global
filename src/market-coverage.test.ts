@@ -27,6 +27,24 @@ describe("daily market coverage", () => {
     ];
     expect(auditMarketCoverage(records, "2026-11-18").complete).toBe(true);
   });
+  it("matches predictions to the same fixture across different provider IDs", () => {
+    const match = {
+      ...row("match", "flashscore:100"),
+      title: "2026-11-18 · Club Brugge vs KAA Gent",
+      details: { fixtureId: "flashscore:100", date: "2026-11-18", competition: "Belgian Pro League" },
+    };
+    const one = row("prediction", "footynomad:200", {
+      market: "1X2", fixtureDate: "2026-11-18", home: "Club Brugge", away: "KAA Gent", competition: "Belgian Pro League",
+    });
+    const dc = row("prediction", "flashscore:300", {
+      market: "DOUBLE_CHANCE", fixtureDate: "2026-11-18", home: "Club Brugge", away: "KAA Gent", competition: "Belgian Pro League",
+    });
+    const audit = auditMarketCoverage([match, one, dc], "2026-11-18");
+    expect(audit.fixtureCount).toBe(1);
+    expect(audit.oneXTwoFixtureCount).toBe(1);
+    expect(audit.doubleChanceFixtureCount).toBe(1);
+    expect(audit.complete).toBe(true);
+  });
   it("ignores fixtures from another day", () => {
     const records = [row("match", "today"), { ...row("match", "tomorrow"), details: { fixtureId: "tomorrow", date: "2026-11-19" } }];
     expect(auditMarketCoverage(records, "2026-11-18").fixtureCount).toBe(1);
