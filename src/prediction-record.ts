@@ -1,4 +1,12 @@
 import type { TrackerRecord } from "./tracker-store";
+import { canonicalFixtureId } from "./free-fixtures";
+
+function recordFixtureId(details: TrackerRecord["details"]): string | undefined {
+  if (typeof details.fixtureDate === "string" && typeof details.home === "string" && typeof details.away === "string") {
+    return canonicalFixtureId(details.fixtureDate, details.home, details.away, typeof details.competition === "string" ? details.competition : "");
+  }
+  return typeof details.fixtureId === "string" ? details.fixtureId : undefined;
+}
 function hasValidProbabilities(details: TrackerRecord["details"], market: string): boolean {
   const values = market === "DOUBLE_CHANCE" ? [details.p1x, details.px2, details.p12] : [details.p1, details.px, details.p2];
   if (values.some(value => typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1)) return false;
@@ -25,7 +33,7 @@ export function shouldRetryPredictionWithEvidence(
 export function shouldAppendPrediction(records: TrackerRecord[], fixtureId: string, model: string,
   nextProbabilitiesAvailable: boolean, nextMethod?: string, market = "1X2",
   nextEvidenceComplete?: boolean, nextEvidenceGaps?: string): boolean {
-  const existing = records.filter(row => row.kind === "prediction" && row.details.fixtureId === fixtureId
+  const existing = records.filter(row => row.kind === "prediction" && recordFixtureId(row.details) === fixtureId
     && row.details.model === model && (typeof row.details.market === "string" ? row.details.market : "1X2") === market);
   const latestValid = existing.filter(row => hasValidProbabilities(row.details, market))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
@@ -43,7 +51,7 @@ export function shouldAppendPrediction(records: TrackerRecord[], fixtureId: stri
 /** True when a scanned fixture has no independent record for either market. */
 /** Returns whether the newest record for a fixture/model/market has a mathematically valid probability vector. */
 export function hasValidPredictionMarket(records: TrackerRecord[], fixtureId: string, market: string, model?: string): boolean {
-  const rows = records.filter(row => row.kind === "prediction" && row.details.fixtureId === fixtureId
+  const rows = records.filter(row => row.kind === "prediction" && recordFixtureId(row.details) === fixtureId
     && (row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2") === market
     && (model === undefined || row.details.model === model))
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
@@ -57,7 +65,7 @@ export function hasValidPredictionMarket(records: TrackerRecord[], fixtureId: st
 }
 
 export function hasMissingPredictionMarket(records: TrackerRecord[], fixtureId: string): boolean {
-  const markets = new Set(records.filter(row => row.kind === "prediction" && row.details.fixtureId === fixtureId)
+  const markets = new Set(records.filter(row => row.kind === "prediction" && recordFixtureId(row.details) === fixtureId)
     .map(row => row.details.market === "DOUBLE_CHANCE" ? "DOUBLE_CHANCE" : "1X2"));
   return !markets.has("1X2") || !markets.has("DOUBLE_CHANCE");
 }
