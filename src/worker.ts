@@ -407,31 +407,45 @@ export default {
             if (cached) {
               results.apiFootball = await cached.json();
             } else {
-              const apiUrl = new URL("https://v3.football.api-sports.io/odds");
-              apiUrl.searchParams.set("fixture", apiFootballFixtureId);
-              const upstream = await fetch(apiUrl, {
-                headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
-                signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-              });
-              const raw = await upstream.text();
-              let payload: { response?: unknown[]; results?: number; errors?: unknown; paging?: unknown };
-              try { payload = JSON.parse(raw) as typeof payload; }
-              catch { throw new Error("api_football_odds_invalid_json"); }
-              if (!upstream.ok) throw new Error(`api_football_odds_http_${upstream.status}`);
-              const result = {
-                status: apiFootballErrorText(payload.errors).trim() ? "provider_error" : "ok",
-                provider: "API-Football Pro",
-                fixtureId: apiFootballFixtureId,
-                capturedAt: new Date().toISOString(),
-                results: payload.results ?? payload.response?.length ?? 0,
-                paging: payload.paging ?? null,
-                errors: payload.errors ?? null,
-                data: Array.isArray(payload.response) ? payload.response : [],
-              };
-              const cacheResponse = json(result, 200, origin);
-              cacheResponse.headers.set("Cache-Control", "public, max-age=900");
-              ctx.waitUntil(cache.put(cacheKey, cacheResponse.clone()));
-              results.apiFootball = result;
+              const providerCooldown = await cache.match(API_FOOTBALL_COOLDOWN_KEY);
+              if (providerCooldown) {
+                results.apiFootball = { status: "error", ...await providerCooldown.json() as Record<string, unknown> };
+              } else {
+                const apiUrl = new URL("https://v3.football.api-sports.io/odds");
+                apiUrl.searchParams.set("fixture", apiFootballFixtureId);
+                const upstream = await fetch(apiUrl, {
+                  headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
+                  signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+                });
+                const raw = await upstream.text();
+                let payload: { response?: unknown[]; results?: number; errors?: unknown; paging?: unknown };
+                try { payload = JSON.parse(raw) as typeof payload; }
+                catch { throw new Error("api_football_odds_invalid_json"); }
+                const rateLimited = /too many requests|rate.?limit|requests per minute|quota exceeded/.test(apiFootballErrorText(payload.errors)) || upstream.status === 429;
+                if (rateLimited) {
+                  const cooldown = cacheApiFootballCooldown(ctx, cache, buildApiFootballRateLimitResponse(
+                    origin, upstream.headers.get("Retry-After"), "Dostawca ograniczył liczbę zapytań przy pobieraniu kursów.", payload.errors,
+                    { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
+                  ));
+                  results.apiFootball = { status: "error", ...await cooldown.json() as Record<string, unknown> };
+                } else {
+                  if (!upstream.ok) throw new Error(`api_football_odds_http_${upstream.status}`);
+                  const result = {
+                    status: apiFootballErrorText(payload.errors).trim() ? "provider_error" : "ok",
+                    provider: "API-Football Pro",
+                    fixtureId: apiFootballFixtureId,
+                    capturedAt: new Date().toISOString(),
+                    results: payload.results ?? payload.response?.length ?? 0,
+                    paging: payload.paging ?? null,
+                    errors: payload.errors ?? null,
+                    data: Array.isArray(payload.response) ? payload.response : [],
+                  };
+                  const cacheResponse = json(result, 200, origin);
+                  cacheResponse.headers.set("Cache-Control", "public, max-age=900");
+                  ctx.waitUntil(cache.put(cacheKey, cacheResponse.clone()));
+                  results.apiFootball = result;
+                }
+              }
             }
           } catch (error) {
             results.apiFootball = { status: "error", error: error instanceof Error ? error.message : "upstream_error" };
