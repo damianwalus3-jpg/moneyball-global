@@ -33,13 +33,25 @@ describe("OddsPapi adapter", () => {
   });
   it("uses the oldest of all three price timestamps for market freshness", () => {
     const price = (value: number, changedAt: string) => ({ active: true, price: value, changedAt });
-    const payload = [{ fixtureId: "op-2", bookmakerOdds: { "bwin.be": { bookmakerIsActive: true, suspended: false, markets: {
-      "101": { marketActive: true, outcomes: {
-        "101": { players: { "0": price(2.1, "2026-11-19T10:05:00.000Z") } },
-        "102": { players: { "0": price(3.2, "2026-11-19T09:20:00.000Z") } },
-        "103": { players: { "0": price(3.5, "2026-11-19T10:02:00.000Z") } },
-      } },
-    } } } }];
+    const payload = [{
+      fixtureId: "op-2",
+      bookmakerOdds: {
+        "bwin.be": {
+          bookmakerIsActive: true,
+          suspended: false,
+          markets: {
+            "101": {
+              marketActive: true,
+              outcomes: {
+                "101": { players: { "0": price(2.1, "2026-11-19T10:05:00.000Z") } },
+                "102": { players: { "0": price(3.2, "2026-11-19T09:20:00.000Z") } },
+                "103": { players: { "0": price(3.5, "2026-11-19T10:02:00.000Z") } },
+              },
+            },
+          },
+        },
+      },
+    }];
     expect(parseOddsPapiQuotes(payload, {}).map(row => row.capturedAt)).toEqual(["2026-11-19T09:20:00.000Z"]);
   });
   it("does not treat a missing or invalid price timestamp as current", () => {
