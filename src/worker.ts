@@ -28,6 +28,43 @@ function safeApiFootballErrorDetails(value: unknown): unknown {
   } catch { return "provider_error_details_unavailable"; }
 }
 
+const API_FOOTBALL_COOLDOWN_KEY = new Request(APP_ORIGIN + "/api/api-football/_provider-cooldown", { method: "GET" });
+
+function apiFootballRetryAfterSeconds(value: string | null): number {
+  if (!value) return 60;
+  const numeric = Number(value);
+  const seconds = Number.isFinite(numeric) && numeric > 0
+    ? numeric
+    : Math.ceil((Date.parse(value) - Date.now()) / 1000);
+  return Math.min(300, Math.max(1, Number.isFinite(seconds) && seconds > 0 ? seconds : 60));
+}
+
+function buildApiFootballRateLimitResponse(
+  origin: string | null | undefined,
+  retryAfterHeader: string | null,
+  message: string,
+  providerError?: unknown,
+  rateLimit?: unknown,
+): Response {
+  const retryAfterSeconds = apiFootballRetryAfterSeconds(retryAfterHeader);
+  const response = json({
+    error: "api_football_rate_limited",
+    provider: "API-Football Pro",
+    message,
+    retryAfterSeconds,
+    ...(providerError === undefined ? {} : { providerError: safeApiFootballErrorDetails(providerError) }),
+    ...(rateLimit === undefined ? {} : { rateLimit }),
+  }, 429, origin);
+  response.headers.set("Retry-After", String(retryAfterSeconds));
+  response.headers.set("Cache-Control", "public, max-age=" + retryAfterSeconds);
+  return response;
+}
+
+function cacheApiFootballCooldown(ctx: ExecutionContext, cache: Cache, response: Response): Response {
+  ctx.waitUntil(cache.put(API_FOOTBALL_COOLDOWN_KEY, response.clone()));
+  return response;
+}
+
 
 function corsHeaders(origin?: string | null): Headers {
   const headers = new Headers({
@@ -640,6 +677,8 @@ export default {
       const forceRefresh = url.searchParams.get("fresh") === "1";
       const cached = forceRefresh ? null : await cache.match(cacheKey);
       if (cached) return cached;
+      const providerCooldown = await cache.match(API_FOOTBALL_COOLDOWN_KEY);
+      if (providerCooldown) return providerCooldown;
       try {
         const upstream = await fetch("https://v3.football.api-sports.io/status", {
           headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
@@ -651,7 +690,7 @@ export default {
         const data = payload as { errors?: unknown; response?: { subscription?: { plan?: string; active?: boolean; end?: string }; requests?: { current?: number; limit_day?: number } } };
         const statusError = apiFootballErrorText(data.errors);
         if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(statusError) || upstream.status === 429) {
-          return json({ provider: "API-Football Pro", error: "api_football_rate_limited", message: "Dostawca ograniczył liczbę zapytań; status planu i limitów nie jest obecnie dostępny.", providerError: safeApiFootballErrorDetails(data.errors), retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60 }, 429, origin);
+          return cacheApiFootballCooldown(ctx, cache, buildApiFootballRateLimitResponse(origin, upstream.headers.get("Retry-After"), "Dostawca ograniczył liczbę zapytań; status planu i limitów nie jest obecnie dostępny.", data.errors));
         }
         if (!upstream.ok) return json({ error: "api_football_status_http_" + upstream.status }, upstream.status, origin);
         const result = {
@@ -694,6 +733,8 @@ export default {
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
       const cached = await cache.match(cacheKey);
       if (cached) return cached;
+      const providerCooldown = await cache.match(API_FOOTBALL_COOLDOWN_KEY);
+      if (providerCooldown) return providerCooldown;
       try {
         const upstream = await fetch("https://v3.football.api-sports.io/fixtures?date=" + date + "&timezone=Europe%2FBrussels", {
           headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
@@ -705,7 +746,7 @@ export default {
         const data = payload as { response?: unknown[]; errors?: unknown; results?: number; paging?: unknown };
         const errorText = apiFootballErrorText(data.errors);
         if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429) {
-          return json({ error: "api_football_rate_limited", provider: "API-Football Pro", retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60, message: "Dostawca ograniczył liczbę zapytań; terminarz nie został zapisany w cache.", providerError: safeApiFootballErrorDetails(data.errors) }, 429, origin);
+          return cacheApiFootballCooldown(ctx, cache, buildApiFootballRateLimitResponse(origin, upstream.headers.get("Retry-After"), "Dostawca ograniczył liczbę zapytań; terminarz nie został zapisany w cache.", data.errors));
         }
         if (apiFootballErrorText(data.errors).trim()) {
           return json({ error: "api_football_provider_error", details: data.errors }, 502, origin);
@@ -748,6 +789,8 @@ export default {
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
       const cached = await cache.match(cacheKey);
       if (cached) return cached;
+      const providerCooldown = await cache.match(API_FOOTBALL_COOLDOWN_KEY);
+      if (providerCooldown) return providerCooldown;
       try {
         const upstream = await fetch("https://v3.football.api-sports.io/fixtures?ids=" + ids.join("-") + "&timezone=Europe%2FBrussels", {
           headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
@@ -759,13 +802,12 @@ export default {
         catch { return json({ error: "api_football_enrichment_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
         const errorText = apiFootballErrorText(payload.errors);
         const rateLimited = /too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429;
-        if (rateLimited) return json({
-          error: "api_football_rate_limited", provider: "API-Football Pro",
-          retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60,
-          message: "Dostawca ograniczył liczbę zapytań. Dane nie zostały oznaczone jako pobrane.",
-          providerError: safeApiFootballErrorDetails(payload.errors),
-          rateLimit: { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
-        }, 429, origin);
+        if (rateLimited) return cacheApiFootballCooldown(ctx, cache, buildApiFootballRateLimitResponse(
+          origin, upstream.headers.get("Retry-After"),
+          "Dostawca ograniczył liczbę zapytań. Dane nie zostały oznaczone jako pobrane.",
+          payload.errors,
+          { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
+        ));
         if (!upstream.ok) return json({ error: "api_football_enrichment_http_" + upstream.status }, upstream.status, origin);
         if (apiFootballErrorText(payload.errors).trim()) {
           return json({ error: "api_football_enrichment_provider_error", details: payload.errors }, 502, origin);
@@ -810,6 +852,8 @@ export default {
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
       const cached = await cache.match(cacheKey);
       if (cached) return cached;
+      const providerCooldown = await cache.match(API_FOOTBALL_COOLDOWN_KEY);
+      if (providerCooldown) return providerCooldown;
       try {
         const upstream = await fetch("https://v3.football.api-sports.io/injuries?" + injuryQuery + "&timezone=Europe%2FBrussels", {
           headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
@@ -821,13 +865,12 @@ export default {
         catch { return json({ error: "api_football_injuries_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
         const errorText = apiFootballErrorText(payload.errors);
         const rateLimited = /too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429;
-        if (rateLimited) return json({
-          error: "api_football_rate_limited", provider: "API-Football Pro",
-          retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60,
-          message: "Dostawca ograniczył liczbę zapytań. Dane nie zostały oznaczone jako pobrane.",
-          providerError: safeApiFootballErrorDetails(payload.errors),
-          rateLimit: { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
-        }, 429, origin);
+        if (rateLimited) return cacheApiFootballCooldown(ctx, cache, buildApiFootballRateLimitResponse(
+          origin, upstream.headers.get("Retry-After"),
+          "Dostawca ograniczył liczbę zapytań. Dane nie zostały oznaczone jako pobrane.",
+          payload.errors,
+          { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
+        ));
         if (!upstream.ok) return json({ error: "api_football_injuries_http_" + upstream.status }, upstream.status, origin);
         if (apiFootballErrorText(payload.errors).trim()) {
           return json({ error: "api_football_injuries_provider_error", details: payload.errors }, 502, origin);
