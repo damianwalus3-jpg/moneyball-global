@@ -55,32 +55,34 @@ function isStrikerExplicitlyEnabled(): boolean {
   catch { return false; }
 }
 
-function shouldRetryNeutralFallback(fixtureId: string, prior?: TrackerRecord): boolean {
-  if (prior?.details.predictionMethod !== "neutral-prior-poisson") return false;
+function readRetryAttempts(key: string): Record<string, unknown> {
   try {
-    const raw = localStorage.getItem(FALLBACK_RETRY_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : {};
-    const attempts = parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown> : {};
-    const lastAttempt = attempts[fixtureId];
-    if (typeof lastAttempt === "number" && Number.isFinite(lastAttempt)
-      && Date.now() - lastAttempt < FALLBACK_RETRY_INTERVAL_MS) return false;
-    localStorage.setItem(FALLBACK_RETRY_KEY, JSON.stringify({ ...attempts, [fixtureId]: Date.now() }));
-    return true;
-  } catch { return false; }
+    const parsed: unknown = JSON.parse(localStorage.getItem(key) ?? "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch { return {}; }
 }
 
+function shouldRetryNeutralFallback(fixtureId: string, prior?: TrackerRecord): boolean {
+  if (prior?.details.predictionMethod !== "neutral-prior-poisson") return false;
+  return shouldRetryPredictionAttempt(readRetryAttempts(FALLBACK_RETRY_KEY)[fixtureId], Date.now(), FALLBACK_RETRY_INTERVAL_MS);
+}
+
+function markNeutralFallbackAttempt(fixtureId: string): void {
+  try {
+    const attempts = readRetryAttempts(FALLBACK_RETRY_KEY);
+    localStorage.setItem(FALLBACK_RETRY_KEY, JSON.stringify({ ...attempts, [fixtureId]: Date.now() }));
+  } catch { /* Retry bookkeeping must never block analysis. */ }
+}
 
 function shouldRetryMissingXg(fixtureId: string): boolean {
+  return shouldRetryPredictionAttempt(readRetryAttempts(XG_RETRY_KEY)[fixtureId], Date.now(), FALLBACK_RETRY_INTERVAL_MS);
+}
+
+function markMissingXgAttempt(fixtureId: string): void {
   try {
-    const raw = localStorage.getItem(XG_RETRY_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : {};
-    const attempts = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
-    const lastAttempt = attempts[fixtureId];
-    if (typeof lastAttempt === "number" && Number.isFinite(lastAttempt) && Date.now() - lastAttempt < FALLBACK_RETRY_INTERVAL_MS) return false;
+    const attempts = readRetryAttempts(XG_RETRY_KEY);
     localStorage.setItem(XG_RETRY_KEY, JSON.stringify({ ...attempts, [fixtureId]: Date.now() }));
-    return true;
-  } catch { return false; }
+  } catch { /* Retry bookkeeping must never block analysis. */ }
 }
 
 
@@ -425,6 +427,8 @@ export default function App() {
       if (!latestByFixtureMarket.has(key)) latestByFixtureMarket.set(key, row);
     }
     const retryMarketByFixture = new Map<string, { oneXTwo: boolean; doubleChance: boolean }>();
+    const retryFallbackByFixture = new Set<string>();
+    const retryXgByFixture = new Set<string>();
     const matches = [...new Map(sourceMatches.map(match => [match.id, match])).values()].filter(match => {
       if (hasKickoffPassed(match.date, match.time)) return false;
       const prior = latestByFixtureMarket.get(match.id + "|1X2");
@@ -433,13 +437,15 @@ export default function App() {
       const retryDoubleChance = shouldRetryIncompletePrediction(match.id, priorDc, "DOUBLE_CHANCE");
       retryMarketByFixture.set(match.id, { oneXTwo: retryOneXTwo, doubleChance: retryDoubleChance });
       const missingProbabilities = retryOneXTwo || retryDoubleChance;
+      const retryFallback = shouldRetryNeutralFallback(match.id, prior);
+      if (retryFallback) retryFallbackByFixture.add(match.id);
       const xgModel = "moneyball:pitchapi-recent-xg-poisson";
       const xgModelComplete = hasValidPredictionMarket(currentRecords, match.id, "1X2", xgModel)
         && hasValidPredictionMarket(currentRecords, match.id, "DOUBLE_CHANCE", xgModel);
-      const missingXgModel = !!(match.pitchApiLeagueId && match.pitchApiHomeTeamId && match.pitchApiAwayTeamId)
+      const retryXg = !!(match.pitchApiLeagueId && match.pitchApiHomeTeamId && match.pitchApiAwayTeamId)
         && !xgModelComplete && shouldRetryMissingXg(match.id);
-      // Cooldown is committed only after the analysis has actually run, never when queued.
-      return missingProbabilities || shouldRetryNeutralFallback(match.id, prior) || missingXgModel;
+      if (retryXg) retryXgByFixture.add(match.id);
+      return missingProbabilities || retryFallback || retryXg;
     });
     if (!matches.length) { setRecords(readRecords()); return; }
     bulkAnalysisLock.current = true;
@@ -483,6 +489,8 @@ export default function App() {
           const retry = retryMarketByFixture.get(match.id);
           if (retry?.oneXTwo) markIncompletePredictionAttempt(match.id, "1X2");
           if (retry?.doubleChance) markIncompletePredictionAttempt(match.id, "DOUBLE_CHANCE");
+          if (retryFallbackByFixture.has(match.id)) markNeutralFallbackAttempt(match.id);
+          if (retryXgByFixture.has(match.id)) markMissingXgAttempt(match.id);
         }));
         setBulkProgress(Math.min(index + batch.length, matches.length));
       }
