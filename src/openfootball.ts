@@ -93,8 +93,6 @@ turkey:{code:"TUR",label:"Turkey",timeZone:"Europe/Istanbul"},
 ukraine:{code:"UKR",label:"Ukraine",timeZone:"Europe/Kyiv"},
 wales:{code:"WAL",label:"Wales",timeZone:"Europe/London"},
 };
-interface OpenFootballTreeEntry { path: string; type: string }
-interface OpenFootballTree { tree?: OpenFootballTreeEntry[]; truncated?: boolean }
 const discoveredFeedRegistry = new Map<string, OpenFootballFeed>();
 let discoveredCatalogueCache: { season: string; cachedAt: number; feeds: OpenFootballFeed[] } | null = null;
 let discoveredCatalogueFailures: string[] = [];
