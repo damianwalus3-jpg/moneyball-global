@@ -39,6 +39,7 @@ describe("verified odds valuation", () => {
     expect(valueSelectionFromOdds([odds({ capturedAt: "2026-11-17T21:00:00.000Z" })], "fixture-1", "1", "Book A", model, now)).toBeNull();
     expect(valueSelectionFromOdds([odds({ capturedAt: "2026-11-17T18:59:00.000Z" })], "fixture-1", "1", "Book A", model, now)).toBeNull();
     expect(valueSelectionFromOdds([odds({ oddsX: null })], "fixture-1", "1", "Book A", model, now)).toBeNull();
+    expect(valueSelectionFromOdds([odds({ capturedAt: "" })], "fixture-1", "1", "Book A", model, now)).toBeNull();
   });
 
   it("rejects invalid model probability distributions", () => {
