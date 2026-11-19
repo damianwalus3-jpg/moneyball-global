@@ -74,14 +74,15 @@ Deno.serve(async(req)=>{
   const body=await req.json().catch(()=>({}));
   if(shouldSkipMoviOddsSync(MOVI_KEY)&&API_FOOTBALL_KEY&&body.mode==="diagnostic"){
    const day=String(body.date||new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date()));
-   const [status,bookmakers,odds]=await Promise.all([
+   const [status,bookmakers,odds,bwinOdds]=await Promise.all([
     apiFootball("/status"),
     apiFootball("/odds/bookmakers?search=Bwin"),
-    apiFootball("/odds?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels&page=1")
+    apiFootball("/odds?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels&page=1"),
+    apiFootball("/odds?date="+encodeURIComponent(day)+"&timezone=Europe/Brussels&bookmaker=6&page=1")
    ]);
    const bookmakerNames=(bookmakers.response||[]).map((x:any)=>({id:x.id,name:x.name}));
    const fixtureSamples=(odds.response||[]).slice(0,10).map((x:any)=>({fixture_id:x.fixture?.id,date:x.fixture?.date,home:x.teams?.home?.name,away:x.teams?.away?.name,bookmakers:(x.bookmakers||[]).map((b:any)=>b.name),markets:(x.bookmakers||[]).flatMap((b:any)=>(b.bets||[]).map((m:any)=>m.name)).slice(0,12)}));
-   return json({ok:true,mode:"diagnostic",provider:"API-Football",date:day,key_configured:true,account:status.response?.account?{plan:status.response.account.subscription?.plan,subscription_active:status.response.account.subscription?.active,requests_remaining:status.response.requests?.limit_day!=null?Number(status.response.requests.limit_day)-Number(status.response.requests.current||0):null,requests_today:status.response.requests?.current,requests_limit:status.response.requests?.limit_day}:null,bwin_bookmakers:bookmakerNames,odds_results:odds.results||0,odds_pagination:odds.paging||null,fixtures:fixtureSamples});
+   return json({ok:true,mode:"diagnostic",provider:"API-Football",date:day,key_configured:true,account:status.response?.account?{plan:status.response.account.subscription?.plan,subscription_active:status.response.account.subscription?.active,requests_remaining:status.response.requests?.limit_day!=null?Number(status.response.requests.limit_day)-Number(status.response.requests.current||0):null,requests_today:status.response.requests?.current,requests_limit:status.response.requests?.limit_day}:null,bwin_bookmakers:bookmakerNames,odds_results:odds.results||0,odds_pagination:odds.paging||null,bwin_odds_results:bwinOdds.results||0,bwin_fixtures:(bwinOdds.response||[]).map((x:any)=>({fixture_id:x.fixture?.id,home:x.teams?.home?.name,away:x.teams?.away?.name,bookmakers:(x.bookmakers||[]).map((b:any)=>b.name)})),fixtures:fixtureSamples});
   }
   if(shouldSkipMoviOddsSync(MOVI_KEY))return json({ok:true,skipped:true,reason:API_FOOTBALL_KEY?"MOVIODDS_API_KEY is not configured; API-Football fallback is available but requires a diagnostic/sync request.":"Neither MOVIODDS_API_KEY nor API_FOOTBALL_KEY is configured.",provider:"MoviOdds",api_football_key_configured:!!API_FOOTBALL_KEY,provider_requests:0,key_configured:false},200);
   const now=new Date(),day=new Intl.DateTimeFormat("en-CA",{timeZone:"Europe/Brussels",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
