@@ -26,5 +26,6 @@ export function getPredictionDisplayStatus(
     return "WSTĘPNA PROGNOZA · NIEKWALIFIKOWANA";
   }
   if (probability === null) return "BRAK POPRAWNEGO TYPU";
+  if (probability >= 0.75) return "WYSOKIE PRAWDOPODOBIEŃSTWO · NIEKWALIFIKOWANE";
   return "PONIŻEJ PROGU 75%";
 }
