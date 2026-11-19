@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
 import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballInjuriesForDate, type ApiFootballFixtureEnrichment, type ApiFootballInjury } from "./api-football";
+import { isConfirmedPitchApiLineups, isWithinLineupRefreshWindow } from "./lineup-refresh";
 import { addRecord, addRecords, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, loadRecentTeamFormAcrossCountry, mergeVerifiedTeamForms, loadCalcioItSerieDTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, predictFromPitchApiXgForm, predictFromNeutralPrior, type FormPrediction } from "./form-prediction";
@@ -305,6 +306,9 @@ export default function App() {
   const [settling, setSettling] = useState(false);
   const settlementLock = useRef(false);
   const bulkAnalysisLock = useRef(false);
+  const lineupRefreshAttempts = useRef<Record<string, number>>({});
+  const lineupRefreshInFlight = useRef(new Set<string>());
+  const lineupConfirmedFixtures = useRef(new Set<string>());
   const [settleProgress, setSettleProgress] = useState(0);
   const [scanError, setScanError] = useState("");
   const [teamForms, setTeamForms] = useState<Record<string, { home?: TeamForm; away?: TeamForm; pitchApiXgForms?: { home: PitchApiXgForm; away: PitchApiXgForm }; pitchApiLineups?: PitchApiLineups; apiFootballFixture?: ApiFootballFixtureEnrichment; apiFootballInjuries?: ApiFootballInjury[]; prediction?: FormPrediction; predictionError?: string; loading: boolean; error?: string }>>({});
@@ -513,6 +517,93 @@ export default function App() {
       setSettling(false);
       settlementLock.current = false;
       setRecords(readRecords());
+    }
+  };
+  const refreshUpcomingLineups = async () => {
+    const scan = fixtureScan;
+    if (!scan) return;
+    const now = Date.now();
+    const recordsNow = readRecords();
+    const due = scan.fixtures
+      .filter(match => !!match.pitchApiMatchId && hasKnownKickoff(match.date, match.time)
+        && isWithinLineupRefreshWindow(match.date, match.time, now))
+      .filter(match => {
+        if (lineupConfirmedFixtures.current.has(match.id) || lineupRefreshInFlight.current.has(match.id)) return false;
+        const confirmedSnapshot = recordsNow.find(row => row.kind === "match"
+          && row.status === "LINEUP_CONFIRMED" && row.details.fixtureId === match.id
+          && row.details.fixtureDate === match.date);
+        if (confirmedSnapshot) {
+          lineupConfirmedFixtures.current.add(match.id);
+          return false;
+        }
+        return now - (lineupRefreshAttempts.current[match.id] ?? 0) >= 5 * 60 * 1000;
+      })
+      .sort((a, b) => {
+        const kickoffA = new Date(a.date + "T" + a.time + ":00").getTime();
+        const kickoffB = new Date(b.date + "T" + b.time + ":00").getTime();
+        return kickoffA - kickoffB;
+      })
+      .slice(0, 6);
+
+    for (let index = 0; index < due.length; index += 2) {
+      await Promise.all(due.slice(index, index + 2).map(async match => {
+        if (lineupRefreshInFlight.current.has(match.id)) return;
+        lineupRefreshInFlight.current.add(match.id);
+        lineupRefreshAttempts.current[match.id] = Date.now();
+        try {
+          const lineups = await fetchPitchApiMatchLineups(match.pitchApiMatchId!);
+          const confirmed = isConfirmedPitchApiLineups(lineups);
+          const observedAt = new Date().toISOString();
+          const status = confirmed ? "LINEUP_CONFIRMED" : "LINEUP_PENDING";
+          const snapshotKey = match.id + "|" + status;
+          addRecordsIfMissing([{
+            kind: "match",
+            title: match.date + " · " + match.home + " vs " + match.away + " · kontrola składów",
+            status,
+            details: {
+              lineupSnapshotKey: snapshotKey,
+              fixtureId: match.id,
+              fixtureDate: match.date,
+              fixtureTime: match.time,
+              pitchApiMatchId: match.pitchApiMatchId!,
+              observedAt,
+              homeConfirmed: lineups.home.confirmed,
+              awayConfirmed: lineups.away.confirmed,
+              homeStarterCount: lineups.home.starters?.length ?? 0,
+              awayStarterCount: lineups.away.starters?.length ?? 0,
+              minutesToKickoff: Math.max(0, Math.round((new Date(match.date + "T" + match.time + ":00").getTime() - Date.now()) / 60_000)),
+              lineupsJson: JSON.stringify(lineups),
+              source: "PitchAPI",
+            },
+          }], "lineupSnapshotKey");
+          if (confirmed) lineupConfirmedFixtures.current.add(match.id);
+          setTeamForms(current => ({
+            ...current,
+            [match.id]: { ...current[match.id], pitchApiLineups: lineups, loading: current[match.id]?.loading ?? false },
+          }));
+          setRecords(readRecords());
+        } catch (error) {
+          const snapshotKey = match.id + "|LINEUP_ERROR";
+          addRecordsIfMissing([{
+            kind: "match",
+            title: match.date + " · " + match.home + " vs " + match.away + " · błąd kontroli składów",
+            status: "LINEUP_ERROR",
+            details: {
+              lineupSnapshotKey: snapshotKey,
+              fixtureId: match.id,
+              fixtureDate: match.date,
+              fixtureTime: match.time,
+              pitchApiMatchId: match.pitchApiMatchId!,
+              observedAt: new Date().toISOString(),
+              error: error instanceof Error ? error.message : "Nieznany błąd źródła składów",
+              source: "PitchAPI",
+            },
+          }], "lineupSnapshotKey");
+          setRecords(readRecords());
+        } finally {
+          lineupRefreshInFlight.current.delete(match.id);
+        }
+      }));
     }
   };
   const runFixtureScan = async (force = false) => {
@@ -729,6 +820,12 @@ export default function App() {
     }, 15 * 60 * 1000);
     return () => window.clearInterval(refreshId);
   }, []);
+  useEffect(() => {
+    if (!fixtureScan) return;
+    void refreshUpcomingLineups();
+    const lineupRefreshId = window.setInterval(() => void refreshUpcomingLineups(), 60 * 1000);
+    return () => window.clearInterval(lineupRefreshId);
+  }, [fixtureScan]);
   useEffect(() => {
     if (!fixtureScan) return;
     if (shouldAutoFetchDailyOdds({
