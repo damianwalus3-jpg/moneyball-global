@@ -2,6 +2,7 @@ import { brusselsUtcDayWindow, DEFAULT_ODDS_PAPI_MARKETS, discoverOddsPapiMarket
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
+  TRACKER_DIAGNOSTICS?: { get(key: string): Promise<string | null>; put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void> };
   PITCHAPI_API_KEY?: string;
   API_FOOTBALL_KEY?: string;
   ODDSPAPI_API_KEY?: string;
@@ -369,8 +370,14 @@ export default {
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
       const cacheKey = new Request(APP_ORIGIN + "/api/owner/tracker-diagnostics/latest", { method: "GET" });
       if (request.method === "GET") {
+        if (env.TRACKER_DIAGNOSTICS) {
+          const saved = await env.TRACKER_DIAGNOSTICS.get("latest");
+          if (!saved) return json({ available: false, message: "No owner Tracker diagnostic has been received from this browser yet." }, 200, origin);
+          try { return json(JSON.parse(saved), 200, origin); }
+          catch { return json({ error: "stored_diagnostic_invalid" }, 500, origin); }
+        }
         const saved = await cache.match(cacheKey);
-        if (!saved) return json({ available: false, message: "No owner Tracker diagnostic has been received from this browser yet." }, 200, origin);
+        if (!saved) return json({ available: false, message: "No owner Tracker diagnostic has been received from this browser yet.", storage: "temporary_cache_fallback" }, 200, origin);
         return saved;
       }
       if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, origin);
@@ -395,10 +402,14 @@ export default {
         counts: Object.fromEntries(integerFields.slice(1).map(field => [field, input[field]])),
         lastRecordAt: input.lastRecordAt || null,
       };
-      const response = json(result, 200, origin);
-      response.headers.set("Cache-Control", "public, max-age=86400");
-      await cache.put(cacheKey, response.clone());
-      return response;
+      if (env.TRACKER_DIAGNOSTICS) {
+        await env.TRACKER_DIAGNOSTICS.put("latest", JSON.stringify(result), { expirationTtl: 60 * 60 * 24 * 30 });
+      } else {
+        const response = json({ ...result, storage: "temporary_cache_fallback" }, 200, origin);
+        await cache.put(cacheKey, response.clone());
+        return response;
+      }
+      return json({ ...result, storage: "cloudflare_kv", retentionDays: 30 }, 200, origin);
     }
 
     // Read-only production health check. Exposes configuration presence only,
