@@ -1158,6 +1158,7 @@ export default function App() {
       try {
         const lastAttempt = Number(localStorage.getItem("moneyball.trackerDiagnosticsLastSentAt") ?? "0");
         if (Date.now() - lastAttempt < 5 * 60 * 1000) return;
+        localStorage.setItem("moneyball.trackerDiagnosticsLastSentAt", String(Date.now()));
         const kinds = ["scan", "match", "prediction", "coupon", "result", "odds", "bet", "ledger"] as const;
         const counts = Object.fromEntries(kinds.map(kind => [kind === "ledger" ? "ledgerEntries" : kind === "bet" ? "bets" : kind === "scan" ? "scans" : kind === "match" ? "matches" : kind === "prediction" ? "predictions" : kind === "coupon" ? "coupons" : kind === "result" ? "results" : "odds", records.filter(row => row.kind === kind).length]));
         const lastRecordAt = records.reduce((latest, row) => !latest || Date.parse(row.createdAt) > Date.parse(latest) ? row.createdAt : latest, "");
@@ -1167,7 +1168,6 @@ export default function App() {
           body: JSON.stringify({ totalRecords: records.length, ...counts, lastRecordAt }),
         });
         if (!response.ok) throw new Error(response.status === 401 ? "Autoryzacja diagnostyki odrzucona" : "Serwer diagnostyczny HTTP " + response.status);
-        localStorage.setItem("moneyball.trackerDiagnosticsLastSentAt", String(Date.now()));
         if (!cancelled) setTrackerDiagnosticsStatus("Połączono · wysłano wyłącznie bezpieczne statystyki Trackera");
       } catch (error) {
         if (!cancelled) setTrackerDiagnosticsStatus(error instanceof Error ? error.message : "Diagnostyka chwilowo niedostępna");
