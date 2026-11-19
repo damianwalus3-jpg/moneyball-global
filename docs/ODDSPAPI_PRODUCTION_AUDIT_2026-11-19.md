@@ -1,9 +1,9 @@
 # MONEYBALL GLOBAL REBUILT — production OddsPapi and European source audit
 **Audit date:** 2026-11-19  
-**Repository:** \`damianwalus3-jpg/moneyball-global\`  
-**Branch:** \`moneyball-rebuild\`  
+**Repository:** `damianwalus3-jpg/moneyball-global`  
+**Branch:** `moneyball-rebuild`  
 **Production Worker:** https://moneyball-global-rebuild.damianwalus3.workers.dev/  
-**Validated commit:** \`a874f04f7027122c23046df98ac7129387c68a56\`
+**Validated commit:** `a874f04f7027122c23046df98ac7129387c68a56`
 
 ## 1. Production verification
 
@@ -25,21 +25,21 @@ Live production account response:
 - Secrets are not returned by the status endpoint.
 
 Belgium-specific bookmaker feeds entitled by the account:
-1. Bwin Belgium — \`bwin.be\`
-2. Unibet Belgium — \`unibet.be\`
-3. Betcenter Belgium — \`betcenter.be\`
-4. Bingoal Belgium — \`bingoal.be\`
-5. betFIRST Belgium — \`betfirst.be\`
-6. Golden Palace Sports Belgium — \`goldenpalacesports.be\`
-7. Starcasino Belgium — \`starcasino.be\`
-8. Scooore Belgium — \`scooore.be\`
-9. Napoleon Sports Belgium — \`napoleonsports.be\`
+1. Bwin Belgium — `bwin.be`
+2. Unibet Belgium — `unibet.be`
+3. Betcenter Belgium — `betcenter.be`
+4. Bingoal Belgium — `bingoal.be`
+5. betFIRST Belgium — `betfirst.be`
+6. Golden Palace Sports Belgium — `goldenpalacesports.be`
+7. Starcasino Belgium — `starcasino.be`
+8. Scooore Belgium — `scooore.be`
+9. Napoleon Sports Belgium — `napoleonsports.be`
 
 Separate international comparison feeds:
-- \`unibet\`
-- \`ladbrokes\`
-- \`bet365\`
-- \`pinnacle\`
+- `unibet`
+- `ladbrokes`
+- `bet365`
+- `pinnacle`
 
 An entitlement means the account may request that feed; it does not guarantee a price for every fixture. The app must continue to verify the actual quote, bookmaker active/suspended state, price and timestamp per match.
 
@@ -55,7 +55,7 @@ The production app is connected to the OddsPapi daily flow:
 
 Each morning/afternoon slot uses two billable calls (fixtures + odds-by-tournaments). The app has separate idempotent morning and afternoon slots and refreshes its scan every 15 minutes while open. Two slots per day therefore use approximately four billable calls per day. StrikerAPI remains a separate optional source, limited to one attempt per date.
 
-The \`/v4/account\` endpoint is unmetered but has a 1-second cooldown. Worker account caching is now 300 seconds, with retry delay of at least 2.1 seconds. This prevents repeated status checks from needlessly hitting the provider.
+The `/v4/account` endpoint is unmetered but has a 1-second cooldown. Worker account caching is now 300 seconds, with retry delay of at least 2.1 seconds. This prevents repeated status checks from needlessly hitting the provider.
 
 **Important:** the live account still reports 0 requests used. The account connection is verified, but no real odds-by-tournaments import has yet been triggered from the user's Android-local app session. The local pilot token must be saved in the app and must never be pasted into chat.
 
@@ -110,7 +110,7 @@ This is a historical export, not the current Android state:
 - 24 cross-source duplicate groups.
 - Seven raw match rows appeared to have no predictions, but their canonical fixture had predictions under another provider ID.
 - Seven old coupons, each with three DC legs: 21 legs across only 7 distinct fixtures. The same fixtures were reused across coupons; one appeared in 7 coupons and another in 5.
-- All seven coupons were \`PAPER_NO_ODDS\`; they were not real placed bets.
+- All seven coupons were `PAPER_NO_ODDS`; they were not real placed bets.
 - Twelve result rows; no duplicate settlement rows found.
 - No odds rows, bet rows or bankroll ledger rows in the export. The configured opening bankroll was €91.60; realized P/L cannot be reconstructed without ledger transactions.
 
@@ -126,7 +126,7 @@ A historical example with an 84.16% displayed probability was not a strong candi
 
 Static production checks:
 - Manifest served and declares standalone display mode and portrait orientation.
-- Service worker served at \`/sw.js\`.
+- Service worker served at `/sw.js`.
 - App shell and static assets are cacheable; API data remains network-driven.
 - Viewport includes mobile safe-area support.
 - Responsive CSS includes mobile breakpoints down to approximately 390 px.

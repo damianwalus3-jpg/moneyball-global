@@ -120,17 +120,17 @@ Oficjalne źródła:
 The earlier research statement that no account-backed query had been made is superseded only for account metadata: the REBUILT Worker successfully queried the user's configured OddsPapi account. The account is active with a limit of 250, count 0 and 250 remaining. The account endpoint is unmetered, but the provider documents a 1-second cooldown; the Worker now caches account metadata for 300 seconds and retries after at least 2.1 seconds.
 
 The live account exposes these Belgium-specific feeds:
-- \`bwin.be\`
-- \`unibet.be\`
-- \`betcenter.be\`
-- \`bingoal.be\`
-- \`betfirst.be\`
-- \`goldenpalacesports.be\`
-- \`starcasino.be\`
-- \`scooore.be\`
-- \`napoleonsports.be\`
+- `bwin.be`
+- `unibet.be`
+- `betcenter.be`
+- `bingoal.be`
+- `betfirst.be`
+- `goldenpalacesports.be`
+- `starcasino.be`
+- `scooore.be`
+- `napoleonsports.be`
 
-Additional international comparison feeds are available separately: \`unibet\`, \`ladbrokes\`, \`bet365\`, \`pinnacle\`. A feed entitlement is not proof that a bookmaker quotes every fixture; per-match availability, active status, timestamps and event matching must still be checked.
+Additional international comparison feeds are available separately: `unibet`, `ladbrokes`, `bet365`, `pinnacle`. A feed entitlement is not proof that a bookmaker quotes every fixture; per-match availability, active status, timestamps and event matching must still be checked.
 
 The production daily integration uses bulk fixture and tournament-odds endpoints. Each morning/afternoon slot uses two billable requests; the account endpoint is unmetered. The app stores source-specific 1X2 prices and timestamp provenance. Missing odds do not reject or delete the match or its prediction.
 

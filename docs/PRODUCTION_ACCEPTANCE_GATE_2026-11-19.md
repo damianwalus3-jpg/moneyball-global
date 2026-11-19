@@ -107,12 +107,12 @@ Snapshot z `2026-11-19T07:04:06Z`, data Europe/Brussels `2026-11-19`:
 ## Update 2026-11-19 — Stage 162 production verification
 
 ### Newly passed gates
-- Commit \`a874f04f7027122c23046df98ac7129387c68a56\`: TypeScript passed; 310 tests across 31 files passed; production build passed.
+- Commit `a874f04f7027122c23046df98ac7129387c68a56`: TypeScript passed; 310 tests across 31 files passed; production build passed.
 - Cloudflare deployment to the REBUILT Worker passed. Production smoke test passed. Full current-day European source reconciliation passed.
 - Live source snapshot: 48 unique fixtures, 15 countries/federations, 27 competitions; all 9 sources healthy; 0 errors, 0 duplicate canonical keys, 0 wrong-date fixtures, 0 non-European fixtures.
 - OddsPapi account metadata live-verified: active, limit 250, count 0, remaining 250; 9 Belgian feeds and 4 international comparison feeds are entitled.
 - The app's OddsPapi daily flow, separate morning/afternoon slots, 1X2 timestamp validation, no-odds/non-rejection rule and canonical cross-provider Tracker identity are deployed.
-- PWA manifest and \`/sw.js\` are served; standalone/portrait mode and responsive breakpoints are present.
+- PWA manifest and `/sw.js` are served; standalone/portrait mode and responsive breakpoints are present.
 
 ### Still open — do not call the whole project complete
 1. **First real odds import:** the account is active, but 0 billable odds requests have been used. The user must have the pilot token saved locally in the Android app and run the sync. Do not request the token in chat.
