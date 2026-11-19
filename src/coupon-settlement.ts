@@ -37,9 +37,7 @@ export function evaluatePaperCoupon(coupon: TrackerRecord, records: TrackerRecor
     const mapped = rawToIdentity.get(leg.fixtureId);
     if (mapped) return mapped;
     return trackerFixtureIdentity({
-      id: "coupon-leg-" + leg.fixtureId, kind: "match",
       title: typeof leg.title === "string" ? leg.title : "",
-      status: "LEG", createdAt: coupon.createdAt,
       details: {
         fixtureId: leg.fixtureId,
         date: typeof coupon.details.date === "string" ? coupon.details.date : null,
