@@ -702,6 +702,13 @@ export default function App() {
     setOddsLoading(true);
     setOddsNotice("");
     let oddspapiSummary = "";
+    let oddspapiAudit = {
+      matched: 0,
+      unmatched: fixtureScan.fixtures.length,
+      ambiguous: 0,
+      snapshots: 0,
+      utcDate: fixtureScan.date,
+    };
     try {
       const utcDate = fixtureScan.date;
       // OddsPapi is a separate price layer. Missing quotes never remove a fixture or its 1X2/DC prediction.
@@ -728,6 +735,13 @@ export default function App() {
               kickoffDifferenceMinutes: number;
             }>;
             remaining?: number;
+          };
+          oddspapiAudit = {
+            matched: oddspapiPayload.matched ?? 0,
+            unmatched: oddspapiPayload.unmatched ?? fixtureScan.fixtures.length,
+            ambiguous: oddspapiPayload.ambiguous ?? 0,
+            snapshots: 0,
+            utcDate,
           };
           if (!oddspapiResponse.ok) throw new Error(oddspapiPayload.message || oddspapiPayload.error || `OddsPapi HTTP ${oddspapiResponse.status}`);
           if (oddspapiPayload.status === "ok") {
@@ -757,6 +771,7 @@ export default function App() {
               }];
             });
             const addedOddsPapi = addRecordsIfMissing(oddspapiSnapshots, "snapshotKey");
+            oddspapiAudit = { ...oddspapiAudit, snapshots: addedOddsPapi };
             oddspapiSummary = `OddsPapi: dopasowano ${oddspapiPayload.matched ?? 0}, kwotowania ${oddspapiSnapshots.length}, nowe snapshoty ${addedOddsPapi}, niejednoznaczne ${oddspapiPayload.ambiguous ?? 0}.`;
             setRecords(readRecords());
           } else {
@@ -771,7 +786,7 @@ export default function App() {
         setLastOddsFetchDate(utcDate);
         setRecords(readRecords());
         setOddsNotice(oddspapiSummary || "OddsPapi: brak dostępnych kursów. Prognozy i rekordy 1X2/DC pozostają zapisane.");
-        setOddsAudit({ matched: 0, unmatched: fixtureScan.fixtures.length, ambiguous: 0, snapshots: 0, utcDate });
+        setOddsAudit(oddspapiAudit);
         return;
       }
       const response = await fetch(`/api/odds/pilot?strikerDate=${encodeURIComponent(utcDate)}`, {
