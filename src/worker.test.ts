@@ -250,25 +250,39 @@ describe("odds provider pilot proxy", () => {
   });
 
 
-  it("fetches a Brussels-day OddsPapi batch with only two billable calls and maps real Bwin prices", async () => {
+  it("fetches a Brussels-day OddsPapi batch, discovers direct DC markets and maps real Bwin prices", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
     const account = { subscriptions: [{ is_active: true, request_limit: 250, request_count: 0,
       bookmakers: { "bwin.be": {}, "unibet.be": {} } }] };
     const fixtures = [{ fixtureId: "op-1", tournamentId: 77, startTime: "2026-11-19T18:00:00.000Z",
       participant1Name: "Club Brugge FC", participant2Name: "KAA Gent", hasOdds: true, updatedAt: "2026-11-19T09:00:00.000Z" }];
+    const markets = [
+      { marketId: 101, marketName: "Full Time Result", marketType: "1x2", sportId: 10, period: "fulltime", playerProp: false,
+        outcomes: [{ outcomeId: 101, outcomeName: "1" }, { outcomeId: 102, outcomeName: "X" }, { outcomeId: 103, outcomeName: "2" }] },
+      { marketId: 202, marketName: "Double Chance", marketType: "double_chance", sportId: 10, period: "fulltime", playerProp: false,
+        outcomes: [{ outcomeId: 201, outcomeName: "1X" }, { outcomeId: 202, outcomeName: "X2" }, { outcomeId: 203, outcomeName: "12" }] },
+    ];
     const price = (value: number) => ({ active: true, price: value, changedAt: "2026-11-19T10:00:00.000Z" });
     const odds = { fixtureId: "op-1", bookmakerOdds: { "bwin.be": {
       bookmakerIsActive: true, suspended: false, fixturePath: "https://sports.bwin.be/event",
-      markets: { "101": { marketActive: true, outcomes: {
-        "101": { players: { "0": price(2.1) } },
-        "102": { players: { "0": price(3.2) } },
-        "103": { players: { "0": price(3.5) } },
-      } } },
+      markets: {
+        "101": { marketActive: true, outcomes: {
+          "101": { players: { "0": price(2.1) } },
+          "102": { players: { "0": price(3.2) } },
+          "103": { players: { "0": price(3.5) } },
+        } },
+        "202": { marketActive: true, outcomes: {
+          "201": { players: { "0": price(1.25) } },
+          "202": { players: { "0": price(1.4) } },
+          "203": { players: { "0": price(1.3) } },
+        } },
+      },
     } } };
     const upstream = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(account), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(fixtures), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(markets), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify(odds), { status: 200 }));
     vi.stubGlobal("fetch", upstream);
     const token = "pilot-secret-0123456789-abcdef-extra";
@@ -279,16 +293,28 @@ describe("odds provider pilot proxy", () => {
         { id: "local-1", date: "2026-11-19", time: "19:00", home: "Club Brugge", away: "KAA Gent" },
       ] }),
     }), { ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: "provider-secret", ODDS_PILOT_TOKEN: token }, { waitUntil: vi.fn() });
-    const body = await response.json() as { status?: string; error?: string; message?: string; estimatedRequestsUsed?: number; quotes?: Array<{ fixtureId: string; bookmaker: string; odds1: number; oddsX: number; odds2: number; complete1X2: boolean }> };
+    const body = await response.json() as {
+      status?: string; error?: string; message?: string; estimatedRequestsUsed?: number;
+      marketCatalogStatus?: string; marketTypes?: string[];
+      quotes?: Array<{ fixtureId: string; bookmaker: string; market: string; odds1?: number; oddsX?: number; odds2?: number;
+        odds1x?: number; oddsX2?: number; odds12?: number; complete1X2: boolean; completeDoubleChance: boolean }>;
+    };
     expect(response.status, JSON.stringify(body)).toBe(200);
-    expect(body).toMatchObject({ status: "ok", estimatedRequestsUsed: 2 });
-    expect(body.quotes).toEqual([expect.objectContaining({
-      fixtureId: "local-1", bookmaker: "Bwin Belgium", odds1: 2.1, oddsX: 3.2, odds2: 3.5, complete1X2: true,
-    })]);
-    expect(upstream).toHaveBeenCalledTimes(3);
+    expect(body).toMatchObject({
+      status: "ok", estimatedRequestsUsed: 3, marketCatalogStatus: "cached_with_double_chance",
+      marketTypes: ["1X2", "DOUBLE_CHANCE"],
+    });
+    expect(body.quotes).toEqual([
+      expect.objectContaining({ fixtureId: "local-1", bookmaker: "Bwin Belgium", market: "1X2",
+        odds1: 2.1, oddsX: 3.2, odds2: 3.5, complete1X2: true }),
+      expect.objectContaining({ fixtureId: "local-1", bookmaker: "Bwin Belgium", market: "DOUBLE_CHANCE",
+        odds1x: 1.25, oddsX2: 1.4, odds12: 1.3, completeDoubleChance: true }),
+    ]);
+    expect(upstream).toHaveBeenCalledTimes(4);
     expect(String(upstream.mock.calls[1][0])).toContain("/v4/fixtures?");
-    expect(String(upstream.mock.calls[2][0])).toContain("/v4/odds-by-tournaments?");
-    expect(String(upstream.mock.calls[2][0])).toContain("tournamentIds=77");
+    expect(String(upstream.mock.calls[2][0])).toContain("/v4/markets?");
+    expect(String(upstream.mock.calls[3][0])).toContain("/v4/odds-by-tournaments?");
+    expect(String(upstream.mock.calls[3][0])).toContain("tournamentIds=77");
   });
 
   it("fails closed when the owner pilot token is not configured", async () => {
