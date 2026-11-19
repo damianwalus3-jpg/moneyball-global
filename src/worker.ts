@@ -14,6 +14,21 @@ const ODDSPAPI_API = "https://api.oddspapi.io";
 const STRIKER_API = "https://mcp.strikerapi.com";
 const UPSTREAM_TIMEOUT_MS = 10_000;
 
+function apiFootballErrorText(value: unknown): string {
+  if (typeof value === "string") return value.toLowerCase();
+  if (Array.isArray(value)) return value.map(apiFootballErrorText).join(" ");
+  if (value && typeof value === "object") return Object.values(value as Record<string, unknown>).map(apiFootballErrorText).join(" ");
+  return "";
+}
+function safeApiFootballErrorDetails(value: unknown): unknown {
+  try {
+    return JSON.parse(JSON.stringify(value, (key, item) =>
+      /token|api[_-]?key|authorization|password|email/i.test(key) ? "[REDACTED]" : item
+    ).slice(0, 1000));
+  } catch { return "provider_error_details_unavailable"; }
+}
+
+
 function corsHeaders(origin?: string | null): Headers {
   const headers = new Headers({
     "Cache-Control": "no-store",
@@ -622,7 +637,8 @@ export default {
       if (!env.API_FOOTBALL_KEY) return json({ error: "api_football_not_configured" }, 503, origin);
       const cacheKey = new Request(`${APP_ORIGIN}/api/api-football/status`, { method: "GET" });
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
-      const cached = await cache.match(cacheKey);
+      const forceRefresh = url.searchParams.get("fresh") === "1";
+      const cached = forceRefresh ? null : await cache.match(cacheKey);
       if (cached) return cached;
       try {
         const upstream = await fetch("https://v3.football.api-sports.io/status", {
@@ -634,9 +650,9 @@ export default {
         try { payload = JSON.parse(raw); } catch { return json({ error: "api_football_status_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
         if (!upstream.ok) return json({ error: "api_football_status_http_" + upstream.status }, upstream.status, origin);
         const data = payload as { errors?: unknown; response?: { subscription?: { plan?: string; active?: boolean; end?: string }; requests?: { current?: number; limit_day?: number } } };
-        const statusError = JSON.stringify(data.errors ?? "").toLowerCase();
+        const statusError = apiFootballErrorText(data.errors);
         if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(statusError) || upstream.status === 429) {
-          return json({ provider: "API-Football Pro", error: "api_football_rate_limited", message: "Dostawca ograniczył liczbę zapytań; status planu i limitów nie jest obecnie dostępny.", retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60 }, 429, origin);
+          return json({ provider: "API-Football Pro", error: "api_football_rate_limited", message: "Dostawca ograniczył liczbę zapytań; status planu i limitów nie jest obecnie dostępny.", providerError: safeApiFootballErrorDetails(data.errors), retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60 }, 429, origin);
         }
         const result = {
           provider: "API-Football Pro",
@@ -656,7 +672,7 @@ export default {
           },
         };
         const response = json(result, 200, origin);
-        response.headers.set("Cache-Control", "public, max-age=300");
+        response.headers.set("Cache-Control", "public, max-age=60");
         ctx.waitUntil(cache.put(cacheKey, response.clone()));
         return response;
       } catch (error) {
@@ -690,7 +706,7 @@ export default {
         const data = payload as { response?: unknown[]; errors?: unknown; results?: number; paging?: unknown };
         const errorText = JSON.stringify(data.errors ?? "").toLowerCase();
         if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429) {
-          return json({ error: "api_football_rate_limited", provider: "API-Football Pro", retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60, message: "Dostawca ograniczył liczbę zapytań; terminarz nie został zapisany w cache." }, 429, origin);
+          return json({ error: "api_football_rate_limited", provider: "API-Football Pro", retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60, message: "Dostawca ograniczył liczbę zapytań; terminarz nie został zapisany w cache.", providerError: safeApiFootballErrorDetails(data.errors) }, 429, origin);
         }
         if (data.errors && Object.keys(data.errors as object).length > 0) {
           return json({ error: "api_football_provider_error", details: data.errors }, 502, origin);
@@ -741,12 +757,13 @@ export default {
         let payload: { response?: unknown[]; results?: number; errors?: unknown; paging?: unknown };
         try { payload = JSON.parse(raw) as typeof payload; }
         catch { return json({ error: "api_football_enrichment_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
-        const errorText = JSON.stringify(payload.errors ?? "").toLowerCase();
+        const errorText = apiFootballErrorText(payload.errors);
         const rateLimited = /too many requests|rate.?limit|requests per minute|quota exceeded/.test(errorText) || upstream.status === 429;
         if (rateLimited) return json({
           error: "api_football_rate_limited", provider: "API-Football Pro",
           retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60,
           message: "Dostawca ograniczył liczbę zapytań. Dane nie zostały oznaczone jako pobrane.",
+          providerError: safeApiFootballErrorDetails(payload.errors),
           rateLimit: { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
         }, 429, origin);
         if (!upstream.ok) return json({ error: "api_football_enrichment_http_" + upstream.status }, upstream.status, origin);
