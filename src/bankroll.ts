@@ -20,6 +20,17 @@ function validAmount(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
+function newestByParent(records: TrackerRecord[], kind: "bet" | "coupon", parentField: "parentBetId" | "parentCouponId", statuses: string[]): Map<string, TrackerRecord> {
+  const latest = new Map<string, TrackerRecord>();
+  for (const row of records) {
+    const parent = row.details[parentField];
+    if (row.kind !== kind || typeof parent !== "string" || !statuses.includes(row.status)) continue;
+    const previous = latest.get(parent);
+    if (!previous || Date.parse(row.createdAt) > Date.parse(previous.createdAt)) latest.set(parent, row);
+  }
+  return latest;
+}
+
 export function calculateBankroll(
   records: TrackerRecord[],
   fallbackOpeningBalance = DEFAULT_OPENING_BANKROLL_EUR,
@@ -33,25 +44,10 @@ export function calculateBankroll(
 
   const bets = records.filter(row => row.kind === "bet"
     && row.details.decision === "SELECTED" && typeof row.details.parentBetId !== "string");
-  const settlements = new Map<string, TrackerRecord>();
-  for (const row of records) {
-    if (row.kind === "bet" && typeof row.details.parentBetId === "string"
-      && ["WON", "LOST", "VOID"].includes(row.status)) {
-      const parent = String(row.details.parentBetId);
-      const previous = settlements.get(parent);
-      if (!previous || Date.parse(row.createdAt) > Date.parse(previous.createdAt)) settlements.set(parent, row);
-    }
-  }
-
-  const couponSettlements = new Map<string, TrackerRecord>();
-  for (const row of records) {
-    if (row.kind === "coupon" && typeof row.details.parentCouponId === "string"
-      && ["PAPER_HIT", "PAPER_MISS"].includes(row.status)) {
-      const parent = String(row.details.parentCouponId);
-      const previous = couponSettlements.get(parent);
-      if (!previous || Date.parse(row.createdAt) > Date.parse(previous.createdAt)) couponSettlements.set(parent, row);
-    }
-  }
+  const betSettlements = newestByParent(records, "bet", "parentBetId", ["WON", "LOST", "VOID"]);
+  const couponSettlements = newestByParent(records, "coupon", "parentCouponId", ["PAPER_HIT", "PAPER_MISS"]);
+  const coupons = records.filter(row => row.kind === "coupon" && row.status === "PAPER_WITH_ODDS"
+    && typeof row.details.parentCouponId !== "string");
 
   let settledProfitLoss = 0;
   let openExposure = 0;
@@ -59,8 +55,9 @@ export function calculateBankroll(
   let openBets = 0;
   let settledCoupons = 0;
   let openCoupons = 0;
+
   for (const bet of bets) {
-    const settlement = settlements.get(bet.id);
+    const settlement = betSettlements.get(bet.id);
     if (settlement) {
       settledBets++;
       const pnl = settlement.details.profitLoss;
@@ -72,18 +69,23 @@ export function calculateBankroll(
     }
   }
 
-  for (const settlement of couponSettlements.values()) {
-    const pnl = settlement.details.profitLoss;
-    if (typeof pnl === "number" && Number.isFinite(pnl)) settledProfitLoss += pnl;
-    settledCoupons++;
-  }
-  const coupons = records.filter(row => row.kind === "coupon" && row.status === "PAPER_WITH_ODDS"
-    && typeof row.details.parentCouponId !== "string");
+  // Only a real, priced parent coupon can affect the bankroll. Orphan settlement
+  // rows and settlements of PAPER_NO_ODDS coupons must never change the balance.
   for (const coupon of coupons) {
-    if (couponSettlements.has(coupon.id)) continue;
-    openCoupons++;
     const stake = coupon.details.stake;
-    if (typeof stake === "number" && Number.isFinite(stake) && stake > 0) openExposure += stake;
+    const odds = coupon.details.odds;
+    const priced = typeof stake === "number" && Number.isFinite(stake) && stake > 0
+      && typeof odds === "number" && Number.isFinite(odds) && odds > 1;
+    if (!priced) continue;
+    const settlement = couponSettlements.get(coupon.id);
+    if (settlement) {
+      settledCoupons++;
+      const pnl = settlement.details.profitLoss;
+      if (typeof pnl === "number" && Number.isFinite(pnl)) settledProfitLoss += pnl;
+    } else {
+      openCoupons++;
+      openExposure += stake;
+    }
   }
 
   return {
