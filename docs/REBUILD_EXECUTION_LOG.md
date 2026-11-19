@@ -2038,3 +2038,11 @@
 - Complete authenticated browser/Android E2E for odds import, three-leg coupon pricing, both-market settlement and append-only/idempotent Tracker behavior.
 - Resolve the Cloudflare GitHub App association outside this Rebuild code path; do not deploy this branch to MAIN.
 - Keep the project status OPEN. The production deploy and source audit pass do not constitute full model, Tracker or coupon E2E acceptance.
+
+
+## 2026-11-19 — Stage 169: enforce men's domestic-league-only scope
+
+- Latest pre-fix Rebuild deployment on commit `a4855d44db4155bf0d4b76300896d70eb1b3035f` passed CI/Rebuild Checks and deployed Worker version `82d28eec-9e4f-48a0-9302-683dad479049`. The 08:16:37Z live source audit still reported 19 fixtures across 9 countries and 12 competitions. Two were out of the requested scope: HUN `NB I Women` and SWE `Damallsvenskan`. The audit description and source code explicitly retained women's/youth/reserve leagues; the regression test asserted that behavior. This is a confirmed production scope defect, not a feed error.
+- Fix in this commit: final scope filtering now excludes women (competition and team markers), youth/academy (U7–U23, youth, academy, junior, Primavera and known development-league labels) and reserve/B/II/III/IV sides, while preserving genuine senior second tiers such as `Liga II`. Domestic cups, UEFA/international fixtures and non-European entries remain excluded. Raw source observations are retained for audit; no Tracker history is changed.
+- The live audit now requires all eight specifically requested public sources to return a checked response: FootyNomad, Flashscore, open-matchday, OpenLigaDB, OpenFootball, ESPN, timezone.football and PitchAPI. A valid zero-result response is not treated as an error. API-Football Pro remains an additional source and its 429 is reported separately. The report scope and completeness note now match the men-only policy.
+- Post-fix live audit, CI and deployment results will be appended after the branch workflows complete. No historical Tracker row or coupon is modified.

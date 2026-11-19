@@ -308,17 +308,23 @@ export function canonicalFixtureId(date: string, home: string, away: string, com
 }
 
 export type FixtureScopeExclusionReason =
-  | "not_european_country" | "uefa_competition" | "domestic_cup" | "non_league_international" | "unknown_competition";
+  | "not_european_country" | "uefa_competition" | "domestic_cup" | "non_league_international"
+  | "women_competition" | "youth_competition" | "reserve_team" | "unknown_competition";
 
 const UEFA_COMPETITION_PATTERN = /\b(?:uefa|ucl|uel|uecl|uwcl|champions league|europa league|conference league|nations league|european championship|euro qualifiers)\b/i;
 const DOMESTIC_CUP_PATTERN = /\b(?:cup|copa|coppa|pokal|puchar|coupe|kupa|beker|taça|taca|trophy|shield|supercup|super cup|supercopa|cupen|cupa|kubok)\b/i;
 const NON_LEAGUE_COMPETITION_PATTERN = /\b(?:world cup|club world cup|fifa|international friendly|friendlies|friendly|olympic|world championship)\b/i;
+const WOMEN_COMPETITION_PATTERN = /\b(?:women(?:'s)?|woman|womens|wsl|swpl|frauen|femmes|femenin[oa]|femminile|feminile|damen|vrouwen|kvinn\w*|kvindeliga\w*|kvenna|kobiet\w*|ženy|zeny|toppserien|damallsvenskan|elitettan|liga\s*f|liga\s*bpi|d1\s*arkema|serie\s*a\s*femminile)\b/i;
+const WOMEN_TEAM_SUFFIX_PATTERN = /(?:\s|[-(])w\)?$/i;
+const YOUTH_COMPETITION_PATTERN = /\b(?:u[\s-]?(?:[7-9]|1[0-9]|2[0-3])|under[\s-]?(?:[7-9]|1[0-9]|2[0-3])|youth|academy|junior(?:s)?|juvenil(?:es)?|primavera|next\s*gen|jeugd|juniores|sub[\s-]?(?:[7-9]|1[0-9]|2[0-3])|premier\s*league\s*2|liga\s*revela[cç][aã]o)\b/i;
+const RESERVE_COMPETITION_PATTERN = /\b(?:reserve(?:s)?|res\.?\s*team|b[\s-]*team|team[\s-]*b|second\s*team|second\s*eleven|castilla)\b/i;
+const RESERVE_TEAM_SUFFIX_PATTERN = /(?:\s|[-])(?:b|ii|iii|iv|reserves?)$/i;
 
-/** Final app scope: domestic European leagues at every level available from sources.
- * Women, youth and reserve leagues remain included; cups and UEFA/international
- * competitions are excluded after source observations have been counted. */
+/** Final app scope: men's domestic European leagues at every level available from sources.
+ * Domestic cups, UEFA/international events, women's, youth, academy and reserve teams
+ * are excluded after raw source observations have been counted. */
 export function getFixtureScopeExclusionReason(
-  fixture: Pick<FreeFixture, "countryCode" | "competition" | "leagueFolder">,
+  fixture: Pick<FreeFixture, "countryCode" | "competition" | "leagueFolder"> & Partial<Pick<FreeFixture, "home" | "away">>,
 ): FixtureScopeExclusionReason | null {
   const countryCode = fixture.countryCode.trim().toUpperCase();
   if (countryCode === "UEFA") return "uefa_competition";
@@ -329,11 +335,19 @@ export function getFixtureScopeExclusionReason(
   if (UEFA_COMPETITION_PATTERN.test(competitionText)) return "uefa_competition";
   if (NON_LEAGUE_COMPETITION_PATTERN.test(competitionText)) return "non_league_international";
   if (DOMESTIC_CUP_PATTERN.test(competitionText)) return "domestic_cup";
+  const home = fixture.home ?? "";
+  const away = fixture.away ?? "";
+  const fullScopeText = competitionText + " " + home + " " + away;
+  if (WOMEN_COMPETITION_PATTERN.test(fullScopeText)
+    || WOMEN_TEAM_SUFFIX_PATTERN.test(home) || WOMEN_TEAM_SUFFIX_PATTERN.test(away)) return "women_competition";
+  if (YOUTH_COMPETITION_PATTERN.test(fullScopeText)) return "youth_competition";
+  if (RESERVE_COMPETITION_PATTERN.test(competitionText)
+    || RESERVE_TEAM_SUFFIX_PATTERN.test(home) || RESERVE_TEAM_SUFFIX_PATTERN.test(away)) return "reserve_team";
   return null;
 }
 
 export function isDomesticLeagueFixture(
-  fixture: Pick<FreeFixture, "countryCode" | "competition" | "leagueFolder">,
+  fixture: Pick<FreeFixture, "countryCode" | "competition" | "leagueFolder"> & Partial<Pick<FreeFixture, "home" | "away">>,
 ): boolean {
   return getFixtureScopeExclusionReason(fixture) === null;
 }

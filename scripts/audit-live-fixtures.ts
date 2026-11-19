@@ -34,7 +34,9 @@ const sourceHealth = Object.fromEntries(diagnostics.map(row => [
   row.checked > 0 && row.status !== "ERROR" && row.status !== "BRAK DANYCH",
 ]));
 const sourceHealthCount = Object.values(sourceHealth).filter(Boolean).length;
-const requiredSourcesHealthy = sourceHealth["Flashscore"] === true && sourceHealth["FootyNomad"] === true;
+const requiredPublicSources = ["FootyNomad", "Flashscore", "OpenMatchday", "OpenLigaDB", "OpenFootball", "ESPN", "timezone.football", "PitchAPI"];
+const missingRequiredSources = requiredPublicSources.filter(name => sourceHealth[name] !== true);
+const requiredSourcesHealthy = missingRequiredSources.length === 0;
 const sourceObservationCountBeforeScope = diagnostics.reduce((sum, row) => sum + (row.preScopeFixtures ?? 0), 0);
 const eligibleSourceObservationCount = diagnostics.reduce((sum, row) => sum + row.acceptedFixtures, 0);
 const duplicateSourceObservationsBeforeScope = Math.max(0, sourceObservationCountBeforeScope - scopeAudit.dateAndEuropeFixturesBeforeCompetitionScope);
@@ -61,16 +63,17 @@ const degradedSources = diagnostics.filter(row => row.status === "ERROR" || row.
 const zeroResultSources = diagnostics.filter(row => row.status === "ODPOWIEDŹ · 0 MECZÓW").map(row => row.name);
 const generatedAtAgeSeconds = Math.max(0, Math.round((Date.now() - Date.parse(scan.generatedAt)) / 1000));
 const generatedAtFresh = Number.isFinite(generatedAtAgeSeconds) && generatedAtAgeSeconds <= 300;
-const success = fixtures.length > 0 && sourceHealthCount >= 6 && requiredSourcesHealthy
+const success = fixtures.length > 0 && requiredSourcesHealthy
   && duplicateCanonicalKeys === 0 && wrongDateFixtures === 0 && nonEuropeanFixtures === 0
-  && outOfScopeFixtures === 0 && generatedAtFresh;
+  && outOfScopeFixtures === 0 && scopeAudit.eligibleDomesticLeagueFixtures === fixtures.length
+  && generatedAtFresh;
 
 const report = {
   success,
   date: scan.date,
   timezone: "Europe/Brussels",
   generatedAt: scan.generatedAt,
-  scope: "Wyłącznie bieżący dzień Brussels; krajowe ligi europejskie wszystkich poziomów udostępnianych przez źródła. Bez krajowych pucharów, UEFA i rozgrywek międzynarodowych. Kobiety, młodzież i rezerwy pozostają, jeśli są ligą krajową i źródło je udostępnia.",
+  scope: "Wyłącznie bieżący dzień Europe/Brussels; męskie krajowe ligi europejskie wszystkich poziomów udostępnianych przez źródła. Bez krajowych pucharów, UEFA, reprezentacji i rozgrywek międzynarodowych, kobiet, młodzieży, akademii i rezerw.",
   totalUniqueFixtures: fixtures.length,
   countries: countrySummary.length,
   competitions: competitionSummary.length,
@@ -90,6 +93,7 @@ const report = {
   sourceHealth,
   sourceHealthCount,
   requiredSourcesHealthy,
+  missingRequiredSources,
   degradedSources,
   zeroResultSources,
   sourceErrorCount,
@@ -100,7 +104,7 @@ const report = {
   },
   completeness: {
     provenComplete: false,
-    note: "To jest wieloźródłowy snapshot, nie dowód kompletności wszystkich federacji i poziomów. Cztery adaptery nie udostępniają surowej liczby rekordów; N/D pozostaje N/D. Zero meczów z poprawnie sprawdzonego źródła nie jest błędem.",
+    note: "To jest wieloźródłowy snapshot męskich lig krajowych, nie dowód kompletności wszystkich federacji, lig regionalnych i poziomów amatorskich. Adaptery bez surowego licznika raportują N/D, nigdy wartość szacowaną. Zero meczów z poprawnie sprawdzonego źródła nie jest błędem.",
   },
 };
 

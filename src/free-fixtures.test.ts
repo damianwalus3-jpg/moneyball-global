@@ -355,18 +355,22 @@ describe("ESPN Brussels-day source window", () => {
 });
 
 
-describe("final European domestic league fixture scope", () => {
-  const fixture = (competition: string, countryCode = "ENG", leagueFolder = "") => ({
+describe("final European men's domestic league fixture scope", () => {
+  const fixture = (competition: string, countryCode = "ENG", leagueFolder = "", home = "Home", away = "Away") => ({
     id: "scope-test", competition, countryCode, leagueFolder, date: "2026-11-19", time: "18:00",
-    home: "Home", away: "Away", source: "test", sourceUpdatedAt: "2026-11-19T08:00:00Z",
+    home, away, source: "test", sourceUpdatedAt: "2026-11-19T08:00:00Z",
   });
 
-  it("keeps domestic leagues at every tier, including women, youth and reserve leagues", () => {
+  it("keeps senior men's domestic leagues at every tier and excludes women, youth and reserve teams", () => {
     expect(isDomesticLeagueFixture(fixture("National League South"))).toBe(true);
     expect(isDomesticLeagueFixture(fixture("1. Division", "DEN"))).toBe(true);
-    expect(isDomesticLeagueFixture(fixture("Damallsvenskan Women", "SWE"))).toBe(true);
-    expect(isDomesticLeagueFixture(fixture("U19 League"))).toBe(true);
-    expect(isDomesticLeagueFixture(fixture("Reserve League"))).toBe(true);
+    expect(isDomesticLeagueFixture(fixture("Liga II", "ROU"))).toBe(true);
+    for (const competition of ["Damallsvenskan", "NB I Women", "Frauen-Bundesliga", "Toppserien", "U19 League", "Premier League 2", "Reserve League"]) {
+      expect(isDomesticLeagueFixture(fixture(competition))).toBe(false);
+    }
+    expect(isDomesticLeagueFixture(fixture("Eredivisie", "NED", "", "Ajax U21", "PSV U21"))).toBe(false);
+    expect(isDomesticLeagueFixture(fixture("Eredivisie", "NED", "", "Ajax II", "PSV"))).toBe(false);
+    expect(isDomesticLeagueFixture(fixture("Eredivisie", "NED", "", "Ajax", "PSV Women"))).toBe(false);
   });
 
   it("excludes national cups and UEFA competitions from the final app list", () => {
