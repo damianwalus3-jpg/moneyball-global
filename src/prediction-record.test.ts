@@ -30,7 +30,7 @@ describe("prediction record refresh policy", () => {
   it("re-runs immutable prediction when qualification policy version changes", () => {
     const prior = { ...row("old-policy", [0.3, 0.2, 0.5]), details: { ...row("old-policy", [0.3, 0.2, 0.5]).details, qualificationPolicyVersion: 1 } };
     expect(shouldAppendPrediction([prior], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "1X2", false, "składy", 2)).toBe(true);
-    const current = { ...prior, details: { ...prior.details, qualificationPolicyVersion: 2 } };
+    const current = { ...prior, details: { ...prior.details, qualificationPolicyVersion: 2, evidenceComplete: false, evidenceGaps: "składy" } };
     expect(shouldAppendPrediction([current], "fixture-1", "model-v1", true, "recent-form-goals-poisson", "1X2", false, "składy", 2)).toBe(false);
   });
 
@@ -63,7 +63,7 @@ describe("incomplete market retry cooldown", () => {
     expect(shouldRetryPredictionAttempt(1000, 5999, 5000)).toBe(false);
   });
   it("retries valid probability rows when evidence is incomplete, but respects cooldown", () => {
-    const prior = { ...row("valid", [0.6, 0.2, 0.2]), details: { ...row("valid", [0.6, 0.2, 0.2]).details, evidenceComplete: false } };
+    const prior = { ...row("valid", [0.6, 0.2, 0.2]), details: { ...row("valid", [0.6, 0.2, 0.2]).details, evidenceComplete: false, qualificationPolicyVersion: 2 } };
     expect(shouldRetryPredictionWithEvidence(prior, "1X2", undefined, 10000, 5000)).toBe(true);
     expect(shouldRetryPredictionWithEvidence(prior, "1X2", 9000, 10000, 5000)).toBe(false);
     expect(shouldRetryPredictionWithEvidence({ ...prior, details: { ...prior.details, evidenceComplete: true } }, "1X2", undefined, 10000, 5000)).toBe(false);
