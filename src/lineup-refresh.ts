@@ -31,7 +31,7 @@ export function isWithinLineupRefreshWindow(
   date: string,
   time: string,
   now = Date.now(),
-  windowMinutes = 70,
+  windowMinutes = 360,
 ): boolean {
   const kickoff = brusselsKickoffTimestamp(date, time);
   if (kickoff === null) return false;
@@ -43,4 +43,18 @@ export function isConfirmedPitchApiLineups(lineups: PitchApiLineupCheck | null |
   return !!lineups
     && lineups.home?.confirmed === true && lineups.away?.confirmed === true
     && lineups.home.starters?.length === 11 && lineups.away.starters?.length === 11;
+}
+
+
+/** A provider-supplied projected XI is useful evidence, but is not a confirmed lineup. */
+export function isProjectedPitchApiLineups(lineups: PitchApiLineupCheck | null | undefined): boolean {
+  const homeCount = lineups?.home?.starters?.length ?? 0;
+  const awayCount = lineups?.away?.starters?.length ?? 0;
+  return !isConfirmedPitchApiLineups(lineups) && homeCount > 0 && awayCount > 0;
+}
+
+export function getPitchApiLineupStatus(lineups: PitchApiLineupCheck | null | undefined): "LINEUP_CONFIRMED" | "LINEUP_PREDICTED" | "LINEUP_PENDING" {
+  if (isConfirmedPitchApiLineups(lineups)) return "LINEUP_CONFIRMED";
+  if (isProjectedPitchApiLineups(lineups)) return "LINEUP_PREDICTED";
+  return "LINEUP_PENDING";
 }
