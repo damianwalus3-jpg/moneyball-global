@@ -3,6 +3,8 @@ import { buildPaperCouponSettlementRecord, evaluatePaperCoupon } from "./coupon-
 import { canonicalFixtureId } from "./free-fixtures";
 import type { TrackerRecord } from "./tracker-store";
 
+const now = "2026-11-17T20:00:00.000Z";
+
 const coupon: TrackerRecord = {
   id: "c1", kind: "coupon", title: "Paper coupon", status: "PAPER_NO_ODDS", createdAt: "2026-11-17T08:00:00Z",
   details: { legsJson: JSON.stringify([
