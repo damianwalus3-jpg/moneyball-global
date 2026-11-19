@@ -1,4 +1,4 @@
-import { brusselsUtcDayWindow, matchOddsPapiFixtures, parseOddsPapiQuotes } from "./oddspapi";
+import { brusselsUtcDayWindow, DEFAULT_ODDS_PAPI_MARKETS, discoverOddsPapiMarkets, matchOddsPapiFixtures, parseOddsPapiQuotes } from "./oddspapi";
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -110,6 +110,7 @@ interface OddsPapiAccountSummary {
   error?: string;
 }
 const ODDSPAPI_ACCOUNT_CACHE_KEY = new Request(APP_ORIGIN + "/api/odds/_account-cache", { method: "GET" });
+const ODDSPAPI_MARKETS_CACHE_KEY = new Request(APP_ORIGIN + "/api/odds/_markets-cache", { method: "GET" });
 async function readOddsPapiAccount(apiKey: string, cache: Cache): Promise<OddsPapiAccountSummary> {
   const cached = await cache.match(ODDSPAPI_ACCOUNT_CACHE_KEY);
   if (cached) {
@@ -506,6 +507,41 @@ export default {
           ctx.waitUntil(cache.put(cacheKey, empty.clone()));
           return empty;
         }
+        let marketDefinitions = DEFAULT_ODDS_PAPI_MARKETS;
+        let marketCatalogStatus = "default_1x2_only";
+        const cachedMarketCatalog = await cache.match(ODDSPAPI_MARKETS_CACHE_KEY);
+        if (cachedMarketCatalog) {
+          try {
+            const cachedDefinitions = await cachedMarketCatalog.json() as typeof DEFAULT_ODDS_PAPI_MARKETS;
+            if (Array.isArray(cachedDefinitions) && cachedDefinitions.some(row => row.marketType === "1X2")) {
+              marketDefinitions = cachedDefinitions;
+              marketCatalogStatus = "cached";
+            }
+          } catch { /* malformed cache falls back to documented 1X2 market */ }
+        } else if (remaining >= 3) {
+          // Market catalogue is billed once per seven-day cache window. If quota is tight,
+          // preserve the 1X2 fetch and defer direct Double Chance discovery.
+          try {
+            const marketsUrl = new URL("/v4/markets", ODDSPAPI_API);
+            marketsUrl.searchParams.set("language", "en");
+            const marketsResponse = await fetch(marketsUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+            const marketsPayload = await readJson(marketsResponse);
+            const discovered = discoverOddsPapiMarkets(marketsPayload);
+            if (discovered.some(row => row.marketType === "1X2")) {
+              marketDefinitions = discovered;
+              marketCatalogStatus = discovered.some(row => row.marketType === "DOUBLE_CHANCE") ? "cached_with_double_chance" : "cached_1x2_only";
+              const marketCacheResponse = json(marketDefinitions, 200, APP_ORIGIN);
+              marketCacheResponse.headers.set("Cache-Control", "public, max-age=604800");
+              await cache.put(ODDSPAPI_MARKETS_CACHE_KEY, marketCacheResponse);
+            } else {
+              marketCatalogStatus = "catalogue_without_supported_markets";
+            }
+          } catch {
+            marketCatalogStatus = "catalogue_unavailable_default_1x2";
+          }
+        } else {
+          marketCatalogStatus = "quota_guard_default_1x2";
+        }
         const tournamentIds = [...new Set(matchAudit.matched.map(row => row.tournamentId))];
         const oddsUrl = new URL("/v4/odds-by-tournaments", ODDSPAPI_API);
         oddsUrl.searchParams.set("tournamentIds", tournamentIds.join(","));
@@ -525,7 +561,7 @@ export default {
         };
         const bookmakerNames = Object.fromEntries(bookmakers.map(slug => [slug, bookmakerLabels[slug] ?? slug]));
         const matchedProviderIds = new Set(matchAudit.matched.map(row => row.providerFixtureId));
-        const quotes = parseOddsPapiQuotes(oddsPayload, bookmakerNames)
+        const quotes = parseOddsPapiQuotes(oddsPayload, bookmakerNames, marketDefinitions)
           .filter(row => matchedProviderIds.has(row.providerFixtureId))
           .map(row => {
             const match = matchAudit.matched.find(item => item.providerFixtureId === row.providerFixtureId);
@@ -533,7 +569,8 @@ export default {
           }).filter((row): row is NonNullable<typeof row> => row !== null);
         const result = {
           status: "ok", provider: "OddsPapi", date, requestLimit, requestCount,
-          remainingBefore: remaining, estimatedRequestsUsed: 2, bookmakers,
+          remainingBefore: remaining, estimatedRequestsUsed: 2 + (marketCatalogStatus.startsWith("cached") ? 1 : 0), bookmakers, marketCatalogStatus,
+          marketTypes: marketDefinitions.map(row => row.marketType),
           sourceFixtures: validProviderFixtures.length, matched: matchAudit.matched.length,
           unmatched: matchAudit.unmatchedFixtureIds.length, ambiguous: matchAudit.ambiguousFixtureIds.length,
           tournamentIds, quotes,
