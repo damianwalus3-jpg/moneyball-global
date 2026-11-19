@@ -100,6 +100,55 @@ function constantTimeEqual(a: string, b: string): boolean {
   return difference === 0;
 }
 
+interface OddsPapiAccountSummary {
+  status: "active" | "no_active_subscription" | "unavailable";
+  requestLimit?: number;
+  requestCount?: number;
+  remaining?: number;
+  validUntil?: string | null;
+  bookmakerSlugs?: string[];
+  error?: string;
+}
+const ODDSPAPI_ACCOUNT_CACHE_KEY = new Request(APP_ORIGIN + "/api/odds/_account-cache", { method: "GET" });
+async function readOddsPapiAccount(apiKey: string, cache: Cache): Promise<OddsPapiAccountSummary> {
+  const cached = await cache.match(ODDSPAPI_ACCOUNT_CACHE_KEY);
+  if (cached) {
+    try { return await cached.json() as OddsPapiAccountSummary; } catch { /* discard malformed cache */ }
+  }
+  const accountUrl = new URL("/v4/account", ODDSPAPI_API);
+  accountUrl.searchParams.set("apiKey", apiKey);
+  const fetchAccount = () => fetch(accountUrl, {
+    headers: { Accept: "application/json" },
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+  });
+  let response = await fetchAccount();
+  if (response.status === 429) {
+    const retryAfter = Number(response.headers.get("Retry-After"));
+    const waitMs = Math.min(3000, Math.max(1100, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 1100));
+    await new Promise(resolve => setTimeout(resolve, waitMs));
+    response = await fetchAccount();
+  }
+  if (!response.ok) return { status: "unavailable", error: "upstream_http_" + response.status };
+  let account: { subscriptions?: Array<{ is_active?: boolean; request_limit?: number; request_count?: number; valid_until?: string | null; bookmakers?: Record<string, unknown> }> };
+  try { account = await response.json() as typeof account; }
+  catch { return { status: "unavailable", error: "account_invalid_json" }; }
+  const active = (account.subscriptions ?? []).filter(row => row.is_active === true)
+    .sort((a, b) => Number(b.request_limit ?? 0) - Number(a.request_limit ?? 0));
+  const selected = active[0];
+  const summary: OddsPapiAccountSummary = selected ? {
+    status: "active",
+    requestLimit: Number(selected.request_limit ?? 0),
+    requestCount: Number(selected.request_count ?? 0),
+    remaining: Math.max(0, Number(selected.request_limit ?? 0) - Number(selected.request_count ?? 0)),
+    validUntil: selected.valid_until ?? null,
+    bookmakerSlugs: Object.keys(selected.bookmakers ?? {}),
+  } : { status: "no_active_subscription" };
+  const cacheResponse = json(summary, 200, APP_ORIGIN);
+  cacheResponse.headers.set("Cache-Control", "public, max-age=60");
+  await cache.put(ODDSPAPI_ACCOUNT_CACHE_KEY, cacheResponse);
+  return summary;
+}
+
 async function readJson(response: Response): Promise<unknown> {
   const text = await response.text();
   if (!response.ok) throw new Error(`upstream_http_${response.status}`);
@@ -397,24 +446,21 @@ export default {
       if (cached) return cached;
       try {
         // /account is unmetered and returns the actual plan quota. Never guess the free-tier allowance.
-        const accountUrl = new URL("/v4/account", ODDSPAPI_API);
-        accountUrl.searchParams.set("apiKey", env.ODDSPAPI_API_KEY);
-        const accountResponse = await fetch(accountUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
-        const account = await readJson(accountResponse) as {
-          subscriptions?: Array<{ is_active?: boolean; request_limit?: number; request_count?: number; bookmakers?: Record<string, unknown> }>;
-        };
-        const subscription = (account.subscriptions ?? []).filter(row => row.is_active === true)
-          .sort((a, b) => Number(b.request_limit ?? 0) - Number(a.request_limit ?? 0))[0];
-        if (!subscription) return json({ error: "oddspapi_no_active_subscription" }, 503, origin);
-        const requestLimit = Number(subscription.request_limit ?? 0);
-        const requestCount = Number(subscription.request_count ?? 0);
-        const remaining = Math.max(0, requestLimit - requestCount);
+        const account = await readOddsPapiAccount(env.ODDSPAPI_API_KEY, cache);
+        if (account.status !== "active") throw new Error(account.error ?? "oddspapi_no_active_subscription");
+        const requestLimit = account.requestLimit ?? 0;
+        const requestCount = account.requestCount ?? 0;
+        const remaining = account.remaining ?? 0;
         if (remaining < 2) return json({
           status: "quota_insufficient", provider: "OddsPapi", requestLimit, requestCount, remaining,
           message: "Za mało pozostałych zapytań na bezpieczny dzienny odczyt; prognozy meczów pozostają niezależne od kursów.",
         }, 200, origin);
-        const bookmakerEntitlements = Object.keys(subscription.bookmakers ?? {});
-        const targetSlugs = new Set(["bwin.be", "bwin", "bwin.de", "bet365", "unibet", "ladbrokes", "circus", "betfirst", "betway", "pinnacle"]);
+        const bookmakerEntitlements = account.bookmakerSlugs ?? [];
+        const targetSlugs = new Set([
+          "bwin.be", "unibet.be", "betfirst.be", "bingoal.be", "goldenpalacesports.be",
+          "betcenter.be", "scooore.be", "starcasino.be", "napoleonsports.be",
+          "bwin", "bwin.de", "bet365", "unibet", "ladbrokes", "betway", "pinnacle",
+        ]);
         const bookmakers = bookmakerEntitlements.filter(slug => targetSlugs.has(slug.toLowerCase()));
         if (!bookmakers.length) return json({
           status: "no_target_bookmaker_entitlement", provider: "OddsPapi", requestLimit, requestCount, remaining,
@@ -466,9 +512,15 @@ export default {
         oddsUrl.searchParams.set("oddsFormat", "decimal");
         const oddsResponse = await fetch(oddsUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
         const oddsPayload = await readJson(oddsResponse);
-        const bookmakerNames = Object.fromEntries(bookmakers.map(slug => [slug,
-          slug === "bwin.be" ? "Bwin Belgium" : slug === "bwin.de" ? "Bwin Germany" : slug.toUpperCase(),
-        ]));
+        const bookmakerLabels: Record<string, string> = {
+          "bwin.be": "Bwin Belgium", "unibet.be": "Unibet Belgium", "betfirst.be": "betFIRST Belgium",
+          "bingoal.be": "Bingoal Belgium", "goldenpalacesports.be": "Golden Palace Belgium",
+          "betcenter.be": "Betcenter Belgium", "scooore.be": "SCOOORE Belgium",
+          "starcasino.be": "Starcasino Belgium", "napoleonsports.be": "Napoleon Sports Belgium",
+          "bwin.de": "Bwin Germany", "pinnacle": "Pinnacle", "bet365": "bet365",
+          "unibet": "Unibet", "ladbrokes": "Ladbrokes", "betway": "Betway", "bwin": "Bwin",
+        };
+        const bookmakerNames = Object.fromEntries(bookmakers.map(slug => [slug, bookmakerLabels[slug] ?? slug]));
         const matchedProviderIds = new Set(matchAudit.matched.map(row => row.providerFixtureId));
         const quotes = parseOddsPapiQuotes(oddsPayload, bookmakerNames)
           .filter(row => matchedProviderIds.has(row.providerFixtureId))
@@ -507,38 +559,15 @@ export default {
         strikerapi: Boolean(env.STRIKERAPI_API_KEY),
       };
       if (oddsHealth) {
-        let oddspapiAccount: Record<string, unknown> | null = null;
+        let oddspapiAccount: OddsPapiAccountSummary | null = null;
         if (env.ODDSPAPI_API_KEY) {
-          try {
-            // This endpoint is explicitly unmetered by OddsPapi; never expose api_key or subscription IDs.
-            const accountUrl = new URL("/v4/account", ODDSPAPI_API);
-            accountUrl.searchParams.set("apiKey", env.ODDSPAPI_API_KEY);
-            const accountResponse = await fetch(accountUrl, {
-              headers: { Accept: "application/json" },
-              signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
-            });
-            const account = await readJson(accountResponse) as {
-              subscriptions?: Array<{ is_active?: boolean; request_limit?: number; request_count?: number; valid_until?: string | null; bookmakers?: Record<string, unknown> }>;
-            };
-            const subscriptions = account.subscriptions ?? [];
-            const active = subscriptions.filter(row => row.is_active === true);
-            const selected = active.sort((a, b) => Number(b.request_limit ?? 0) - Number(a.request_limit ?? 0))[0];
-            if (selected) {
-              const requestLimit = Number(selected.request_limit ?? 0);
-              const requestCount = Number(selected.request_count ?? 0);
-              oddspapiAccount = {
-                status: "active",
-                requestLimit,
-                requestCount,
-                remaining: Math.max(0, requestLimit - requestCount),
-                validUntil: selected.valid_until ?? null,
-                bookmakerSlugs: Object.keys(selected.bookmakers ?? {}),
-              };
-            } else {
-              oddspapiAccount = { status: "no_active_subscription" };
-            }
-          } catch (error) {
-            oddspapiAccount = { status: "unavailable", error: error instanceof Error ? error.message : "account_check_failed" };
+          const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+          oddspapiAccount = await readOddsPapiAccount(env.ODDSPAPI_API_KEY, cache);
+          if (oddspapiAccount.bookmakerSlugs) {
+            const priority = new Set(["bwin.be", "unibet.be", "betfirst.be", "bingoal.be", "goldenpalacesports.be",
+              "betcenter.be", "scooore.be", "starcasino.be", "napoleonsports.be", "pinnacle", "bet365", "unibet", "ladbrokes"]);
+            oddspapiAccount.bookmakerSlugs = oddspapiAccount.bookmakerSlugs.filter(slug =>
+              slug.endsWith(".be") || priority.has(slug)).slice(0, 30);
           }
         }
         return json({
