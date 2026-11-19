@@ -86,17 +86,18 @@ describe("three-leg coupon odds valuation", () => {
 
   it("does not price a Double Chance leg from 1X2 quotes or a rejected DC prediction", () => {
     const dcCandidate: ThreeLegCandidate = {
-      date: "2026-11-17", combinedProbability: 0.512, averageProbability: 0.8, oddsAvailable: false,
+      date: "2026-11-17", combinedProbability: 0.544, averageProbability: 0.8166666667, oddsAvailable: false,
       legs: [
         { fixtureId: "f1", title: "A vs B", competition: "League", selection: "1X", market: "DOUBLE_CHANCE", probability: 0.8, source: "model", model: "v1" },
         { fixtureId: "f2", title: "C vs D", competition: "League", selection: "X2", market: "DOUBLE_CHANCE", probability: 0.8, source: "model", model: "v1" },
         { fixtureId: "f3", title: "E vs F", competition: "League", selection: "12", market: "DOUBLE_CHANCE", probability: 0.8, source: "model", model: "v1" },
       ],
     };
-    const dcPredictions = ["f1", "f2", "f3"].map((id, index) => row("prediction", id, {
-      market: "DOUBLE_CHANCE", model: "v1", p1x: 0.8, px2: 0.7, p12: 0.5,
-      selection: ["1X", "X2", "12"][index], probability: 0.8, strongDoubleChance: true,
-    }, "KANDYDAT"));
+    const dcPredictions = [
+      row("prediction", "f1", { market: "DOUBLE_CHANCE", model: "v1", p1x: 0.8, px2: 0.7, p12: 0.5, selection: "1X", probability: 0.8, strongDoubleChance: true }, "KANDYDAT"),
+      row("prediction", "f2", { market: "DOUBLE_CHANCE", model: "v1", p1x: 0.6, px2: 0.85, p12: 0.55, selection: "X2", probability: 0.85, strongDoubleChance: true }, "KANDYDAT"),
+      row("prediction", "f3", { market: "DOUBLE_CHANCE", model: "v1", p1x: 0.6, px2: 0.6, p12: 0.8, selection: "12", probability: 0.8, strongDoubleChance: true }, "KANDYDAT"),
+    ];
     const rejected = { ...dcPredictions[0], status: "ODRZUCONY", details: { ...dcPredictions[0].details, strongDoubleChance: false } };
     expect(valueThreeLegCoupon(dcCandidate, [...dcPredictions, ...fullRecords().filter(r => r.kind === "odds")], "Book A", now)).toBeNull();
     expect(valueThreeLegCoupon(dcCandidate, [rejected, ...dcPredictions.slice(1), ...fullRecords().filter(r => r.kind === "odds")], "Book A", now)).toBeNull();
