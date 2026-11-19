@@ -829,7 +829,7 @@ export default {
           rateLimit: { perMinuteLimit: upstream.headers.get("X-RateLimit-Limit"), perMinuteRemaining: upstream.headers.get("X-RateLimit-Remaining"), dailyRemaining: upstream.headers.get("x-ratelimit-requests-remaining") },
         }, 429, origin);
         if (!upstream.ok) return json({ error: "api_football_injuries_http_" + upstream.status }, upstream.status, origin);
-        if (payload.errors && Object.keys(payload.errors as object).length > 0) {
+        if (apiFootballErrorText(payload.errors).trim()) {
           return json({ error: "api_football_injuries_provider_error", details: payload.errors }, 502, origin);
         }
         const response = json({
