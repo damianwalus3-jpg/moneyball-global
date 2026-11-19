@@ -532,7 +532,6 @@ describe("API-Football Pro secure status proxy", () => {
 
 
 describe("API-Football Pro batch enrichment", () => {
-  const origin = "https://moneyball-global-rebuild.damianwalus3.workers.dev";
   const env = { ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "test-api-football-secret" };
 
   it("fetches up to 20 fixture IDs in one request and caches the complete fixture payload", async () => {
@@ -544,7 +543,7 @@ describe("API-Football Pro batch enrichment", () => {
     const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/enrichment?ids=123-456"), env, { waitUntil: vi.fn() });
     expect(upstream).toHaveBeenCalledWith("https://v3.football.api-sports.io/fixtures?ids=123-456&timezone=Europe%2FBrussels", expect.objectContaining({ headers: expect.objectContaining({ "x-apisports-key": "test-api-football-secret" }) }));
     expect(response.status).toBe(200);
-    expect(response.headers.get("Cache-Control")).toBe("public, max-age=21600");
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=900");
     await expect(response.json()).resolves.toMatchObject({ provider: "API-Football Pro", requestedFixtureIds: ["123","456"], fixtures: payload.response, includes: ["events","lineups","fixture_statistics","player_statistics"] });
     expect(cache.put).toHaveBeenCalledTimes(1);
   });
@@ -571,6 +570,7 @@ describe("API-Football Pro batch enrichment", () => {
 });
 
 describe("API-Football Pro injury batch", () => {
+  const env = { ASSETS: { fetch: vi.fn() }, API_FOOTBALL_KEY: "test-api-football-secret" };
   it("fetches injury/suspension records for up to 20 fixture IDs and caches successful responses", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
