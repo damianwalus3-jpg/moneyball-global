@@ -213,8 +213,21 @@ describe("odds provider pilot proxy", () => {
     expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://moneyball-global-rebuild.damianwalus3.workers.dev");
   });
 
-  it("reports only whether secrets are configured and never exposes their values", async () => {
+  it("reports sanitized provider quota and bookmaker metadata without exposing secrets", async () => {
     const secret = "do-not-return-this";
+    const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
+    vi.stubGlobal("caches", { default: cache });
+    const account = {
+      subscriptions: [{
+        is_active: true, request_limit: 250, request_count: 37,
+        valid_until: "2026-12-31T00:00:00.000Z",
+        bookmakers: { "bwin.be": {}, "unibet.be": {} },
+      }],
+    };
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify(account), {
+      status: 200, headers: { "Content-Type": "application/json" },
+    }));
+    vi.stubGlobal("fetch", upstream);
     const response = await worker.fetch(new Request("https://moneyball.example/api/odds/status"), {
       ASSETS: { fetch: vi.fn() }, ODDSPAPI_API_KEY: secret, STRIKERAPI_API_KEY: secret, ODDS_PILOT_TOKEN: "pilot-secret-0123456789-abcdef-extra",
     }, { waitUntil: vi.fn() });
@@ -222,7 +235,15 @@ describe("odds provider pilot proxy", () => {
     expect(body).toContain('"oddspapi":true');
     expect(body).toContain('"strikerapi":true');
     expect(body).toContain('"pilotEnabled":true');
+    expect(body).toContain('"requestLimit":250');
+    expect(body).toContain('"requestCount":37');
+    expect(body).toContain('"remaining":213');
+    expect(body).toContain('"bwin.be"');
+    expect(body).toContain('"unibet.be"');
     expect(body).not.toContain(secret);
+    expect(body).not.toContain("pilot-secret");
+    expect(upstream).toHaveBeenCalledTimes(1);
+    expect(cache.put).toHaveBeenCalledTimes(1);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
