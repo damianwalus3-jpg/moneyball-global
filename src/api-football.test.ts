@@ -1,7 +1,53 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballFixturesForDate, fetchApiFootballInjuriesForDate, resetApiFootballRequestThrottleForTests } from "./api-football";
+import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballFixturesForDate, fetchApiFootballInjuriesForDate, fetchApiFootballOdds, parseApiFootballOdds, resetApiFootballRequestThrottleForTests } from "./api-football";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); resetApiFootballRequestThrottleForTests(); });
+
+describe("API-Football Pro odds parsing and client", () => {
+  it("parses timestamped 1X2 and Double Chance prices without inventing missing outcomes", () => {
+    const quotes = parseApiFootballOdds([{
+      fixture: { id: 123 }, update: "2026-11-19T10:00:00Z",
+      bookmakers: [{ name: "Bwin", bets: [
+        { name: "Match Winner", values: [
+          { value: "Home", odd: "2.10" }, { value: "Draw", odd: "3.20" }, { value: "Away", odd: "3.50" },
+        ] },
+        { name: "Double Chance", values: [
+          { value: "Home/Draw", odd: "1.30" }, { value: "Draw/Away", odd: "1.65" }, { value: "Home/Away", odd: "1.25" },
+        ] },
+        { name: "Over/Under", values: [{ value: "Over 2.5", odd: "1.90" }] },
+      ] }],
+    }]);
+    expect(quotes).toHaveLength(2);
+    expect(quotes[0]).toMatchObject({
+      fixtureId: "123", bookmaker: "Bwin", bookmakerSlug: "bwin", market: "1X2",
+      odds1: 2.1, oddsX: 3.2, odds2: 3.5, complete1X2: true,
+      capturedAt: "2026-11-19T10:00:00.000Z", timestampBasis: "provider_update_at",
+    });
+    expect(quotes[1]).toMatchObject({
+      market: "DOUBLE_CHANCE", odds1x: 1.3, oddsX2: 1.65, odds12: 1.25, completeDoubleChance: true,
+    });
+  });
+
+  it("keeps partial markets partial and rejects invalid or absent provider timestamps", () => {
+    const quotes = parseApiFootballOdds([{
+      fixture: { id: 124 }, update: "not-a-date",
+      bookmakers: [{ name: "Unibet", bets: [{ name: "Match Winner", values: [
+        { value: "Home", odd: "1.8" }, { value: "Draw", odd: "3.4" },
+      ] }] }],
+    }]);
+    expect(quotes).toHaveLength(1);
+    expect(quotes[0]).toMatchObject({ complete1X2: false, odds1: 1.8, oddsX: 3.4, odds2: null, capturedAt: null, timestampBasis: "missing" });
+  });
+
+  it("fetches today's odds through the same paced Worker client", async () => {
+    const payload = { provider: "API-Football Pro", generatedAt: "2026-11-19T10:00:00Z",
+      requestedFixtureIds: ["123"], odds: [{ fixtureId: "123", status: "ok", results: 1, data: [] }] };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(payload), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(fetchApiFootballOdds("2026-11-19", ["123"], 0)).resolves.toMatchObject({ requestedFixtureIds: ["123"], odds: [{ fixtureId: "123" }] });
+    expect(String(fetchMock.mock.calls[0][0])).toBe("/api/api-football/odds?date=2026-11-19&ids=123");
+  });
+});
 
 describe("API-Football Pro batch client", () => {
   it("deduplicates IDs and fetches at most 20 fixtures per request", async () => {
