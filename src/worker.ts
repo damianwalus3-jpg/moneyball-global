@@ -430,7 +430,9 @@ export default {
       try { input = await request.json() as typeof input; }
       catch { return json({ error: "invalid_json" }, 400, origin); }
       const date = typeof input.date === "string" ? input.date : "";
+      const slot = input.slot === "morning" || input.slot === "afternoon" ? input.slot : "";
       if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return json({ error: "invalid_date" }, 400, origin);
+      if (!slot) return json({ error: "invalid_odds_sync_slot" }, 400, origin);
       const localFixtures = Array.isArray(input.fixtures) ? input.fixtures : [];
       if (!localFixtures.length || localFixtures.length > 250) return json({ error: "fixtures_required", message: "Provide 1–250 scanned fixtures." }, 400, origin);
       const normalizedFixtures = localFixtures.flatMap((item) => {
@@ -441,7 +443,7 @@ export default {
       });
       if (!normalizedFixtures.length) return json({ error: "no_valid_scanned_fixtures" }, 400, origin);
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
-      const cacheKey = new Request(`${APP_ORIGIN}/api/odds/oddspapi/daily?date=${date}`, { method: "GET" });
+      const cacheKey = new Request(`${APP_ORIGIN}/api/odds/oddspapi/daily?date=${date}&slot=${slot}`, { method: "GET" });
       const cached = await cache.match(cacheKey);
       if (cached) return cached;
       try {
@@ -494,7 +496,7 @@ export default {
         const matchAudit = matchOddsPapiFixtures(normalizedFixtures, validProviderFixtures);
         if (!matchAudit.matched.length) {
           const empty = json({
-            status: "ok", provider: "OddsPapi", date, requestLimit, requestCount, remainingBefore: remaining,
+            status: "ok", provider: "OddsPapi", date, slot, requestLimit, requestCount, remainingBefore: remaining,
             sourceFixtures: validProviderFixtures.length, matched: 0, unmatched: matchAudit.unmatchedFixtureIds.length,
             ambiguous: matchAudit.ambiguousFixtureIds.length, quotes: [],
             message: "Brak jednoznacznych dopasowań kursów. Żaden mecz ani prognoza nie został odrzucony.",
