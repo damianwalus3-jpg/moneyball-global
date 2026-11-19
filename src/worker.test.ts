@@ -759,28 +759,31 @@ describe("API-Football Pro daily odds route", () => {
     timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit",
   }).format(new Date());
 
-  it("fetches and caches today's odds for up to 20 fixture IDs using the server-side key", async () => {
+  it("fetches today's date-scoped odds in cached pages and returns only requested fixture IDs", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
-    const fixturePayload = (id: number) => ({
-      results: 1, response: [{ fixture: { id }, update: "2026-11-19T10:00:00Z", bookmakers: [] }],
-    });
+    const event = (id: number) => ({ fixture: { id }, update: "2026-11-19T10:00:00Z", bookmakers: [] });
     const upstream = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(fixturePayload(123)), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(fixturePayload(456)), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ results: 10, paging: { current: 1, total: 2 }, response: [event(123), ...Array.from({ length: 9 }, (_, i) => event(900 + i))] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ results: 1, paging: { current: 2, total: 2 }, response: [event(456)] }), { status: 200 }));
     vi.stubGlobal("fetch", upstream);
     const date = today();
     const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/odds?date=" + date + "&ids=123-456"), env, { waitUntil: vi.fn() });
-    const body = await response.json() as { provider?: string; date?: string; requestedFixtureIds?: string[]; odds?: Array<{ fixtureId: string; status: string }> };
+    const body = await response.json() as { provider?: string; date?: string; requestedFixtureIds?: string[]; pagesFetched?: number; odds?: Array<{ fixtureId: string; status: string }> };
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("public, max-age=10800");
-    expect(body).toMatchObject({ provider: "API-Football Pro", date, requestedFixtureIds: ["123", "456"] });
+    expect(body).toMatchObject({ provider: "API-Football Pro", date, requestedFixtureIds: ["123", "456"], pagesFetched: 2 });
     expect(body.odds).toHaveLength(2);
-    expect(body.odds?.every(row => row.status === "ok")).toBe(true);
+    expect(body.odds?.map(row => [row.fixtureId, row.status])).toEqual([["123", "ok"], ["456", "ok"]]);
     expect(upstream).toHaveBeenCalledTimes(2);
-    expect(String(upstream.mock.calls[0][0])).toContain("/odds?fixture=123");
-    expect(String(upstream.mock.calls[1][0])).toContain("/odds?fixture=456");
-    expect(upstream.mock.calls[0][1].headers).toMatchObject({ "x-apisports-key": "private-api-football-secret" });
+    for (const [index, call] of upstream.mock.calls.entries()) {
+      const url = new URL(String(call[0]));
+      expect(url.pathname).toBe("/odds");
+      expect(url.searchParams.get("date")).toBe(date);
+      expect(url.searchParams.get("timezone")).toBe("Europe/Brussels");
+      expect(url.searchParams.get("page")).toBe(String(index + 1));
+      expect(call[1].headers).toMatchObject({ "x-apisports-key": "private-api-football-secret" });
+    }
     expect(cache.put).toHaveBeenCalledTimes(3);
     expect(JSON.stringify(body)).not.toContain("private-api-football-secret");
   });
