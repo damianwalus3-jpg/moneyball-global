@@ -523,7 +523,7 @@ describe("API-Football Pro secure status proxy", () => {
     expect(cache.put).toHaveBeenCalledTimes(1);
   });
 
-  it("bypasses cached quota metadata when fresh=1 is requested", async () => {
+  it("bypasses cached quota metadata when fresh=1 is requested but still checks provider cooldown", async () => {
     const cache = { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) };
     vi.stubGlobal("caches", { default: cache });
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
@@ -532,7 +532,8 @@ describe("API-Football Pro secure status proxy", () => {
     vi.stubGlobal("fetch", fetchMock);
     const response = await worker.fetch(new Request("https://moneyball.example/api/api-football/status?fresh=1"), env, { waitUntil: vi.fn() });
     expect(response.status).toBe(200);
-    expect(cache.match).not.toHaveBeenCalled();
+    expect(cache.match).toHaveBeenCalledTimes(1);
+    expect(String(cache.match.mock.calls[0][0])).toContain("/api/api-football/_provider-cooldown");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
