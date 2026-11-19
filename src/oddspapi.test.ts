@@ -28,8 +28,19 @@ describe("OddsPapi adapter", () => {
       "bwin.fr": { bookmakerIsActive: false, suspended: true, markets: { "101": { marketActive: true, outcomes: { "101": { players: { "0": player(2.1) } }, "102": { players: { "0": player(3.2) } }, "103": { players: { "0": player(3.5) } } } } } },
     } }];
     const rows = parseOddsPapiQuotes(payload, { "bwin.be": "Bwin BE", "bwin.fr": "Bwin FR" });
-    expect(rows[0]).toMatchObject({ bookmaker: "Bwin BE", complete1X2: true, odds1: 2.1, oddsX: 3.2, odds2: 3.5, timestampBasis: "price_changed_at" });
+    expect(rows[0]).toMatchObject({ bookmaker: "Bwin BE", complete1X2: true, odds1: 2.1, oddsX: 3.2, odds2: 3.5, timestampBasis: "price_changed_at", capturedAt: "2026-11-19T10:00:00.000Z" });
     expect(rows[1].complete1X2).toBe(false);
+  });
+  it("uses the oldest of all three price timestamps for market freshness", () => {
+    const price = (value: number, changedAt: string) => ({ active: true, price: value, changedAt });
+    const payload = [{ fixtureId: "op-2", bookmakerOdds: { "bwin.be": { bookmakerIsActive: true, suspended: false, markets: {
+      "101": { marketActive: true, outcomes: {
+        "101": { players: { "0": price(2.1, "2026-11-19T10:05:00.000Z") } },
+        "102": { players: { "0": price(3.2, "2026-11-19T09:20:00.000Z") } },
+        "103": { players: { "0": price(3.5, "2026-11-19T10:02:00.000Z") } },
+      } },
+    } } }];
+    expect(parseOddsPapiQuotes(payload, {}).map(row => row.capturedAt)).toEqual(["2026-11-19T09:20:00.000Z"]);
   });
   it("does not treat a missing or invalid price timestamp as current", () => {
     const payload = [{ fixtureId: "op-1", updatedAt: "invalid", bookmakerOdds: { "bwin.be": { bookmakerIsActive: true, suspended: false, markets: {
@@ -40,5 +51,7 @@ describe("OddsPapi adapter", () => {
   it("limits selected bookmakers to both target feeds and account entitlements", () => {
     const catalog = [{ bookmakerName: "Bwin BE", slug: "bwin.be" }, { bookmakerName: "Bwin FR", slug: "bwin.fr" }, { bookmakerName: "Pinnacle", slug: "pinnacle" }];
     expect(selectOddsPapiBookmakers(catalog, ["bwin.be", "pinnacle", "bwin.fr"]).map(row => row.slug)).toEqual(["bwin.be", "pinnacle"]);
+    const belgianCatalog = [{ bookmakerName: "Unibet BE", slug: "unibet.be" }, { bookmakerName: "Bingoal", slug: "bingoal.be" }];
+    expect(selectOddsPapiBookmakers(belgianCatalog, ["unibet.be", "bingoal.be"]).map(row => row.slug)).toEqual(["unibet.be", "bingoal.be"]);
   });
 });
