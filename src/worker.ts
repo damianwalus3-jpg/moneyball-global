@@ -1,3 +1,5 @@
+import { brusselsUtcDayWindow, matchOddsPapiFixtures, parseOddsPapiQuotes } from "./oddspapi";
+
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
   PITCHAPI_API_KEY?: string;
@@ -70,7 +72,7 @@ function corsHeaders(origin?: string | null): Headers {
   const headers = new Headers({
     "Cache-Control": "no-store",
     "Vary": "Origin",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
   });
   if (origin === APP_ORIGIN) headers.set("Access-Control-Allow-Origin", APP_ORIGIN);
@@ -361,6 +363,138 @@ export default {
         return new Response(html, { status: 200, headers });
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "calcio_it_upstream_error" }, 502, origin);
+      }
+    }
+
+    const oddspapiDaily = url.pathname === "/api/odds/oddspapi/daily";
+    if (oddspapiDaily) {
+      if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, origin);
+      if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
+      if (!env.ODDSPAPI_API_KEY) return json({ error: "oddspapi_not_configured" }, 503, origin);
+      if (typeof env.ODDS_PILOT_TOKEN !== "string" || env.ODDS_PILOT_TOKEN.length < 32) {
+        return json({ error: "pilot_disabled", message: "Owner token is not configured." }, 503, origin);
+      }
+      const authorization = request.headers.get("Authorization") ?? "";
+      const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+      if (!constantTimeEqual(suppliedToken, env.ODDS_PILOT_TOKEN)) return json({ error: "unauthorized" }, 401, origin);
+      let input: { date?: unknown; fixtures?: unknown };
+      try { input = await request.json() as typeof input; }
+      catch { return json({ error: "invalid_json" }, 400, origin); }
+      const date = typeof input.date === "string" ? input.date : "";
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) return json({ error: "invalid_date" }, 400, origin);
+      const localFixtures = Array.isArray(input.fixtures) ? input.fixtures : [];
+      if (!localFixtures.length || localFixtures.length > 250) return json({ error: "fixtures_required", message: "Provide 1–250 scanned fixtures." }, 400, origin);
+      const normalizedFixtures = localFixtures.flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const row = item as Record<string, unknown>;
+        if (row.date !== date || typeof row.id !== "string" || typeof row.home !== "string" || typeof row.away !== "string" || typeof row.time !== "string") return [];
+        return [{ id: row.id, date, time: row.time, home: row.home, away: row.away }];
+      });
+      if (!normalizedFixtures.length) return json({ error: "no_valid_scanned_fixtures" }, 400, origin);
+      const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
+      const cacheKey = new Request(`${APP_ORIGIN}/api/odds/oddspapi/daily?date=${date}`, { method: "GET" });
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+      try {
+        // /account is unmetered and returns the actual plan quota. Never guess the free-tier allowance.
+        const accountUrl = new URL("/v4/account", ODDSPAPI_API);
+        accountUrl.searchParams.set("apiKey", env.ODDSPAPI_API_KEY);
+        const accountResponse = await fetch(accountUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+        const account = await readJson(accountResponse) as {
+          subscriptions?: Array<{ is_active?: boolean; request_limit?: number; request_count?: number; bookmakers?: Record<string, unknown> }>;
+        };
+        const subscription = (account.subscriptions ?? []).filter(row => row.is_active === true)
+          .sort((a, b) => Number(b.request_limit ?? 0) - Number(a.request_limit ?? 0))[0];
+        if (!subscription) return json({ error: "oddspapi_no_active_subscription" }, 503, origin);
+        const requestLimit = Number(subscription.request_limit ?? 0);
+        const requestCount = Number(subscription.request_count ?? 0);
+        const remaining = Math.max(0, requestLimit - requestCount);
+        if (remaining < 2) return json({
+          status: "quota_insufficient", provider: "OddsPapi", requestLimit, requestCount, remaining,
+          message: "Za mało pozostałych zapytań na bezpieczny dzienny odczyt; prognozy meczów pozostają niezależne od kursów.",
+        }, 200, origin);
+        const bookmakerEntitlements = Object.keys(subscription.bookmakers ?? {});
+        const targetSlugs = new Set(["bwin.be", "bwin", "bwin.de", "bet365", "unibet", "ladbrokes", "circus", "betfirst", "betway", "pinnacle"]);
+        const bookmakers = bookmakerEntitlements.filter(slug => targetSlugs.has(slug.toLowerCase()));
+        if (!bookmakers.length) return json({
+          status: "no_target_bookmaker_entitlement", provider: "OddsPapi", requestLimit, requestCount, remaining,
+          availableBookmakerSlugs: bookmakerEntitlements,
+          message: "Aktywna subskrypcja nie udostępnia żadnego z wybranych źródeł kursów.",
+        }, 200, origin);
+        const window = brusselsUtcDayWindow(date);
+        const fixturesUrl = new URL("/v4/fixtures", ODDSPAPI_API);
+        fixturesUrl.searchParams.set("sportId", "10");
+        fixturesUrl.searchParams.set("from", window.from);
+        fixturesUrl.searchParams.set("to", window.to);
+        fixturesUrl.searchParams.set("statusId", "0");
+        fixturesUrl.searchParams.set("hasOdds", "true");
+        fixturesUrl.searchParams.set("bookmakers", bookmakers.join(","));
+        fixturesUrl.searchParams.set("language", "en");
+        const fixturesResponse = await fetch(fixturesUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+        const providerFixtures = await readJson(fixturesResponse);
+        if (!Array.isArray(providerFixtures)) throw new Error("oddspapi_fixtures_invalid_payload");
+        const validProviderFixtures = providerFixtures.flatMap((item) => {
+          if (!item || typeof item !== "object") return [];
+          const row = item as Record<string, unknown>;
+          if (typeof row.fixtureId !== "string" || typeof row.startTime !== "string"
+            || typeof row.participant1Name !== "string" || typeof row.participant2Name !== "string"
+            || typeof row.tournamentId !== "number" || row.hasOdds !== true) return [];
+          return [{
+            fixtureId: row.fixtureId, tournamentId: row.tournamentId, startTime: row.startTime,
+            participant1Name: row.participant1Name, participant2Name: row.participant2Name,
+            updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : null,
+          }];
+        });
+        const matchAudit = matchOddsPapiFixtures(normalizedFixtures, validProviderFixtures);
+        if (!matchAudit.matched.length) {
+          const empty = json({
+            status: "ok", provider: "OddsPapi", date, requestLimit, requestCount, remainingBefore: remaining,
+            sourceFixtures: validProviderFixtures.length, matched: 0, unmatched: matchAudit.unmatchedFixtureIds.length,
+            ambiguous: matchAudit.ambiguousFixtureIds.length, quotes: [],
+            message: "Brak jednoznacznych dopasowań kursów. Żaden mecz ani prognoza nie został odrzucony.",
+          }, 200, origin);
+          empty.headers.set("Cache-Control", "public, max-age=1800");
+          ctx.waitUntil(cache.put(cacheKey, empty.clone()));
+          return empty;
+        }
+        const tournamentIds = [...new Set(matchAudit.matched.map(row => row.tournamentId))];
+        const oddsUrl = new URL("/v4/odds-by-tournaments", ODDSPAPI_API);
+        oddsUrl.searchParams.set("tournamentIds", tournamentIds.join(","));
+        oddsUrl.searchParams.set("bookmakers", bookmakers.join(","));
+        oddsUrl.searchParams.set("language", "en");
+        oddsUrl.searchParams.set("verbosity", "3");
+        oddsUrl.searchParams.set("oddsFormat", "decimal");
+        const oddsResponse = await fetch(oddsUrl, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS) });
+        const oddsPayload = await readJson(oddsResponse);
+        const bookmakerNames = Object.fromEntries(bookmakers.map(slug => [slug,
+          slug === "bwin.be" ? "Bwin Belgium" : slug === "bwin.de" ? "Bwin Germany" : slug.toUpperCase(),
+        ]));
+        const matchedProviderIds = new Set(matchAudit.matched.map(row => row.providerFixtureId));
+        const quotes = parseOddsPapiQuotes(oddsPayload, bookmakerNames)
+          .filter(row => matchedProviderIds.has(row.providerFixtureId))
+          .map(row => {
+            const match = matchAudit.matched.find(item => item.providerFixtureId === row.providerFixtureId);
+            return match ? { ...row, fixtureId: match.fixtureId, kickoffDifferenceMinutes: match.kickoffDifferenceMinutes } : null;
+          }).filter((row): row is NonNullable<typeof row> => row !== null);
+        const result = {
+          status: "ok", provider: "OddsPapi", date, requestLimit, requestCount,
+          remainingBefore: remaining, estimatedRequestsUsed: 2, bookmakers,
+          sourceFixtures: validProviderFixtures.length, matched: matchAudit.matched.length,
+          unmatched: matchAudit.unmatchedFixtureIds.length, ambiguous: matchAudit.ambiguousFixtureIds.length,
+          tournamentIds, quotes,
+          message: "Kursy są niezależne od prognoz. Brak kursu lub dopasowania nie odrzuca meczu.",
+        };
+        const response = json(result, 200, origin);
+        response.headers.set("Cache-Control", "public, max-age=1800");
+        response.headers.set("X-MONEYBALL-SOURCE", "OddsPapi");
+        ctx.waitUntil(cache.put(cacheKey, response.clone()));
+        return response;
+      } catch (error) {
+        return json({
+          status: "error", provider: "OddsPapi",
+          error: error instanceof Error ? error.message : "oddspapi_upstream_error",
+          message: "Nie udało się pobrać kursów; rekordy prognoz pozostają bez zmian.",
+        }, 502, origin);
       }
     }
 
