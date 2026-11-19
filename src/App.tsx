@@ -1145,7 +1145,7 @@ export default function App() {
             {oddsAudit && <p className="source-note">Ostatni audyt · UTC {oddsAudit.utcDate} · dopasowane {oddsAudit.matched} · niejednoznaczne {oddsAudit.ambiguous} · bez dopasowania {oddsAudit.unmatched} · nowe snapshoty {oddsAudit.snapshots}.</p>}
             <h3>Ostatnie snapshoty kursów</h3><p className="source-note">Historia zachowuje starsze odczyty, ale tylko snapshoty do 60 minut są oznaczane jako świeże. Starsze ceny są archiwalne i nie mogą potwierdzać aktualnego kuponu.</p>
             <div className="tracker-table">
-              <div className="tracker-head"><span>BUKMACHER</span><span>MECZ</span><span>1</span><span>X</span><span>2</span></div>
+              <div className="tracker-head"><span>BUKMACHER</span><span>MECZ / RYNEK</span><span>1 / 1X</span><span>X / X2</span><span>2 / 12</span></div>
               {records.filter(row => row.kind === "odds").slice(0, 20).map(row => {
                 const price = (value: unknown) => typeof value === "number" && value > 1 ? value.toFixed(2) : "—";
                 const capturedAt = typeof row.details.capturedAt === "string" ? Date.parse(row.details.capturedAt) : NaN;
