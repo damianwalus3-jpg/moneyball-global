@@ -113,3 +113,29 @@ Oficjalne źródła:
 - API-Football homepage/pricing: https://www.api-football.com/
 - StrikerAPI pricing and coverage: https://strikerapi.com/
 - StrikerAPI get_odds: https://strikerapi.com/docs/get-odds
+
+
+## 2026-11-19 — live OddsPapi account verification and production integration
+
+The earlier research statement that no account-backed query had been made is superseded only for account metadata: the REBUILT Worker successfully queried the user's configured OddsPapi account. The account is active with a limit of 250, count 0 and 250 remaining. The account endpoint is unmetered, but the provider documents a 1-second cooldown; the Worker now caches account metadata for 300 seconds and retries after at least 2.1 seconds.
+
+The live account exposes these Belgium-specific feeds:
+- \`bwin.be\`
+- \`unibet.be\`
+- \`betcenter.be\`
+- \`bingoal.be\`
+- \`betfirst.be\`
+- \`goldenpalacesports.be\`
+- \`starcasino.be\`
+- \`scooore.be\`
+- \`napoleonsports.be\`
+
+Additional international comparison feeds are available separately: \`unibet\`, \`ladbrokes\`, \`bet365\`, \`pinnacle\`. A feed entitlement is not proof that a bookmaker quotes every fixture; per-match availability, active status, timestamps and event matching must still be checked.
+
+The production daily integration uses bulk fixture and tournament-odds endpoints. Each morning/afternoon slot uses two billable requests; the account endpoint is unmetered. The app stores source-specific 1X2 prices and timestamp provenance. Missing odds do not reject or delete the match or its prediction.
+
+The documented 1X2 market is market 101 with outcomes 101/102/103. Double Chance market support is not confirmed by the public documentation or a live market-catalogue query. The catalogue endpoint is billable and has not yet been queried; no DC prices are inferred from 1X2.
+
+Important distinction: account metadata is live-verified, but no billable odds-by-tournaments request has yet been made from the user's Android-local app session. The live account still reports 0 requests used. The local pilot token must be saved inside the app; it must never be shared in chat.
+
+Official documentation: https://docs.oddspapi.io/

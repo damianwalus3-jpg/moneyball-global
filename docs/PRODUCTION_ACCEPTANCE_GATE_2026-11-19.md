@@ -102,3 +102,23 @@ Snapshot z `2026-11-19T07:04:06Z`, data Europe/Brussels `2026-11-19`:
 6. Dopiero wtedy sporządzić końcowy raport produkcyjny i ewentualnie zamknąć projekt.
 
 **Status projektu: W TRAKCIE — nieukończony.**
+
+
+## Update 2026-11-19 — Stage 162 production verification
+
+### Newly passed gates
+- Commit \`a874f04f7027122c23046df98ac7129387c68a56\`: TypeScript passed; 310 tests across 31 files passed; production build passed.
+- Cloudflare deployment to the REBUILT Worker passed. Production smoke test passed. Full current-day European source reconciliation passed.
+- Live source snapshot: 48 unique fixtures, 15 countries/federations, 27 competitions; all 9 sources healthy; 0 errors, 0 duplicate canonical keys, 0 wrong-date fixtures, 0 non-European fixtures.
+- OddsPapi account metadata live-verified: active, limit 250, count 0, remaining 250; 9 Belgian feeds and 4 international comparison feeds are entitled.
+- The app's OddsPapi daily flow, separate morning/afternoon slots, 1X2 timestamp validation, no-odds/non-rejection rule and canonical cross-provider Tracker identity are deployed.
+- PWA manifest and \`/sw.js\` are served; standalone/portrait mode and responsive breakpoints are present.
+
+### Still open — do not call the whole project complete
+1. **First real odds import:** the account is active, but 0 billable odds requests have been used. The user must have the pilot token saved locally in the Android app and run the sync. Do not request the token in chat.
+2. **DC pricing:** market 101 1X2 is documented and supported. Double Chance market ID/outcomes are not verified; no synthetic DC prices are allowed. A separate billable market-catalogue check remains optional/pending.
+3. **Fresh Tracker export:** the available backup is from 18 November. A fresh JSON/CSV after the first live odds sync is required to verify actual 1X2/DC pairs, prices, coupon values, bankroll and settlements.
+4. **Physical Android test:** PWA installability and responsive source checks passed, but touch/navigation/export/import must still be exercised on the user's actual Samsung device.
+5. **Coverage limitation:** the live source audit is a multi-source snapshot, not proof of every European federation, youth, women's or amateur competition.
+
+The previous API-Football 429 was not reproduced in the latest live reconciliation: API-Football Pro was healthy and contributed 21 accepted European fixtures from 111 provider fixtures. Continue conservative retry behavior.
