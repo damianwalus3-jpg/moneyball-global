@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { scanTodayEuropeanFixtures, type FixtureScan, type FreeFixture } from "./free-fixtures";
 import { buildApiFootballTrackerDetails, fetchApiFootballEnrichment, fetchApiFootballInjuriesForDate, type ApiFootballFixtureEnrichment, type ApiFootballInjury } from "./api-football";
-import { isConfirmedPitchApiLineups, isWithinLineupRefreshWindow } from "./lineup-refresh";
+import { brusselsKickoffTimestamp, isConfirmedPitchApiLineups, isWithinLineupRefreshWindow } from "./lineup-refresh";
 import { addRecord, addRecords, addRecordsIfMissing, exportBackup, exportCsv, importBackup, readRecords, type TrackerKind, type TrackerRecord } from "./tracker-store";
 import { findOpenLigaFixtureResult, findOpenMatchdayResult, loadEspnRecentTeamForm, loadOpenLigaRecentTeamForm, loadRecentTeamForm, loadRecentTeamFormAcrossCountry, mergeVerifiedTeamForms, loadCalcioItSerieDTeamForm, type TeamForm } from "./team-form";
 import { predictFromRecentForm, predictFromPitchApiXgForm, predictFromNeutralPrior, type FormPrediction } from "./form-prediction";
@@ -539,8 +539,8 @@ export default function App() {
         return now - (lineupRefreshAttempts.current[match.id] ?? 0) >= 5 * 60 * 1000;
       })
       .sort((a, b) => {
-        const kickoffA = new Date(a.date + "T" + a.time + ":00").getTime();
-        const kickoffB = new Date(b.date + "T" + b.time + ":00").getTime();
+        const kickoffA = brusselsKickoffTimestamp(a.date, a.time) ?? Number.MAX_SAFE_INTEGER;
+        const kickoffB = brusselsKickoffTimestamp(b.date, b.time) ?? Number.MAX_SAFE_INTEGER;
         return kickoffA - kickoffB;
       })
       .slice(0, 6);
@@ -571,7 +571,7 @@ export default function App() {
               awayConfirmed: lineups.away.confirmed,
               homeStarterCount: lineups.home.starters?.length ?? 0,
               awayStarterCount: lineups.away.starters?.length ?? 0,
-              minutesToKickoff: Math.max(0, Math.round((new Date(match.date + "T" + match.time + ":00").getTime() - Date.now()) / 60_000)),
+              minutesToKickoff: Math.max(0, Math.round(((brusselsKickoffTimestamp(match.date, match.time) ?? Date.now()) - Date.now()) / 60_000)),
               lineupsJson: JSON.stringify(lineups),
               source: "PitchAPI",
             },
