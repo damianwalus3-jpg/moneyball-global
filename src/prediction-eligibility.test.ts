@@ -35,7 +35,21 @@ describe("prediction display status", () => {
     expect(isEvidenceQualifiedCandidate(rejected, "1X2")).toBe(false);
     expect(isEvidenceQualifiedCandidate(rejected, "DOUBLE_CHANCE")).toBe(false);
   });
+
+  it("does not call a high probability below threshold when evidence is complete but market qualification fails", () => {
+    const notQualified = row({
+      status: "ODRZUCONY",
+      details: { evidenceComplete: true, strongCandidate: false, strongDoubleChance: false },
+    });
+    expect(getPredictionDisplayStatus(notQualified, "1X2", 0.80)).toBe("WYSOKIE PRAWDOPODOBIEŃSTWO · NIEKWALIFIKOWANE");
+    expect(getPredictionDisplayStatus(notQualified, "DOUBLE_CHANCE", 0.91)).toBe("WYSOKIE PRAWDOPODOBIEŃSTWO · NIEKWALIFIKOWANE");
+  });
+
   it("shows qualified status only when evidence and market-specific strong flag pass", () => {
     expect(getPredictionDisplayStatus(row(), "1X2", 0.80)).toBe("KANDYDAT ≥75%");
+  });
+
+  it("shows below-threshold only for probabilities actually below 75%", () => {
+    expect(getPredictionDisplayStatus(row({ details: { evidenceComplete: true, strongCandidate: false } }), "1X2", 0.74)).toBe("PONIŻEJ PROGU 75%");
   });
 });
