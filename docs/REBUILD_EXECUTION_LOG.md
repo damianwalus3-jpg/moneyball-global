@@ -2078,3 +2078,17 @@
 - Found a client reliability issue: the app persisted the date/slot attempt marker before calling the Worker, so a transient network failure or API-Football 429 could suppress retry after reopening the app.
 - Changed the client to persist the date/slot marker only after the Worker returns a valid response. Failed calls now clear any matching marker and remain retryable after a new scan or app reload; successful responses are still deduplicated per Brussels date and sync slot.
 - No additional provider calls were made. The odds importer continues to preserve real provider timestamps, partial markets and missing quotes without fabricating prices.
+
+
+## 2026-11-19 — Stage 174: success-only OddsPapi retry markers and production rebuild
+
+- Extended the Stage 173 retry guarantee to the OddsPapi browser sync. The app no longer writes a date/slot attempt marker before the provider responds. It now records `YYYY-MM-DD|morning/afternoon` only after a valid `status: "ok"` response has been parsed and snapshots have been appended to the local Tracker.
+- HTTP failures, invalid JSON/status responses and parsing/storage-path exceptions clear only the matching failed slot marker, so a new scan or app reload can retry without suppressing the other daily slot. Legacy date-only markers are not mistaken for a successful slot.
+- Extracted the marker logic into `src/odds-sync-retry.ts` and added four deterministic tests covering independent slots, success-only persistence, matching failure cleanup and legacy marker migration.
+- API-Football Stage 173 behavior remains intact: its date/slot marker is persisted only after the Worker returns a valid response; failures remain retryable. Its odds importer is independent of the optional OddsPapi owner token.
+- Commit `c2521638069daeb40f68db5fe23d30e4854c2d45` passed MONEYBALL rebuild CI run `44496906477`: TypeScript, unit tests and production build all SUCCESS.
+- Dedicated Cloudflare Rebuild workflow `44496906466` successfully completed TypeScript, unit tests, production build, deployment step `Deploy static app to separate Cloudflare Worker`, and production smoke test. The full current-day European source reconciliation was still running when this log entry was written. Deployment target is the isolated Worker `moneyball-global-rebuild`; no deliberate MAIN/TEST/Vercel/Supabase/Lovable deployment was made.
+- Read-only production health check returned `ok:true`, service `moneyball-global-rebuild`, `apiFootballConfigured:true` and `pitchapiConfigured:true`.
+- Read-only `/api/odds/status` returned API-Football and OddsPapi configured, owner-only pilot gate enabled, OddsPapi subscription active with 250/250 requests remaining, and Belgian bookmaker entitlements including `bwin.be`. No billable OddsPapi odds request was made; account request count remained 0.
+- The production OddsPapi daily route still requires the owner token to be stored in the user's local app browser and sent as a Bearer token. This is a deliberate protection for the 250-request monthly allowance; the token is not exposed or bypassed. Physical Android-local Tracker import and authenticated end-to-end coupon/result/settlement acceptance remain unverified without access to that browser storage/session.
+- No historical Tracker records, predictions, coupons, results, settlements or bankroll entries were edited by this stage. Project status remains OPEN pending the authenticated Android acceptance test and real quote import.
