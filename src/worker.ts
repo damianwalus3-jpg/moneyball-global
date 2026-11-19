@@ -634,6 +634,10 @@ export default {
         try { payload = JSON.parse(raw); } catch { return json({ error: "api_football_status_invalid_json", upstreamStatus: upstream.status }, 502, origin); }
         if (!upstream.ok) return json({ error: "api_football_status_http_" + upstream.status }, upstream.status, origin);
         const data = payload as { errors?: unknown; response?: { subscription?: { plan?: string; active?: boolean; end?: string }; requests?: { current?: number; limit_day?: number } } };
+        const statusError = JSON.stringify(data.errors ?? "").toLowerCase();
+        if (/too many requests|rate.?limit|requests per minute|quota exceeded/.test(statusError) || upstream.status === 429) {
+          return json({ provider: "API-Football Pro", error: "api_football_rate_limited", message: "Dostawca ograniczył liczbę zapytań; status planu i limitów nie jest obecnie dostępny.", retryAfterSeconds: Number(upstream.headers.get("Retry-After")) || 60 }, 429, origin);
+        }
         const result = {
           provider: "API-Football Pro",
           checkedAt: new Date().toISOString(),
@@ -767,17 +771,23 @@ export default {
       if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, origin);
       if (origin && origin !== APP_ORIGIN) return json({ error: "forbidden_origin" }, 403, null);
       if (!env.API_FOOTBALL_KEY) return json({ error: "api_football_not_configured" }, 503, origin);
+      const date = url.searchParams.get("date");
       const rawIds = (url.searchParams.get("ids") ?? "").split("-").filter(Boolean);
       const ids = [...new Set(rawIds)];
-      if (!ids.length || ids.length > 20 || ids.some(id => !/^\d{1,12}$/.test(id))) {
-        return json({ error: "invalid_fixture_ids", message: "Provide 1–20 numeric fixture IDs separated by hyphens." }, 400, origin);
+      const validDate = !!date && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        && Number.isFinite(Date.parse(date + "T00:00:00Z"))
+        && new Date(date + "T00:00:00Z").toISOString().slice(0, 10) === date;
+      if ((date && ids.length) || (!date && (!ids.length || ids.length > 20 || ids.some(id => !/^\d{1,12}$/.test(id))))
+        || (date && !validDate)) {
+        return json({ error: "invalid_injury_query", message: "Provide one valid Brussels-local date or 1–20 numeric fixture IDs." }, 400, origin);
       }
-      const cacheKey = new Request(`${APP_ORIGIN}/api/api-football/injuries?ids=${ids.join("-")}`, { method: "GET" });
+      const injuryQuery = date ? "date=" + encodeURIComponent(date) : "ids=" + ids.join("-");
+      const cacheKey = new Request(APP_ORIGIN + "/api/api-football/injuries?" + injuryQuery, { method: "GET" });
       const cache = (globalThis as unknown as { caches: { default: Cache } }).caches.default;
       const cached = await cache.match(cacheKey);
       if (cached) return cached;
       try {
-        const upstream = await fetch("https://v3.football.api-sports.io/injuries?ids=" + ids.join("-") + "&timezone=Europe%2FBrussels", {
+        const upstream = await fetch("https://v3.football.api-sports.io/injuries?" + injuryQuery + "&timezone=Europe%2FBrussels", {
           headers: { Accept: "application/json", "x-apisports-key": env.API_FOOTBALL_KEY },
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
         });
@@ -798,7 +808,7 @@ export default {
           return json({ error: "api_football_injuries_provider_error", details: payload.errors }, 502, origin);
         }
         const response = json({
-          provider: "API-Football Pro", requestedFixtureIds: ids,
+          provider: "API-Football Pro", requestedFixtureIds: date ? null : ids, requestedDate: date ?? null,
           generatedAt: new Date().toISOString(), results: payload.results ?? payload.response?.length ?? 0,
           paging: payload.paging ?? null, injuries: Array.isArray(payload.response) ? payload.response : [],
           note: "Pusta lista nie potwierdza braku kontuzji, jeśli dostawca nie udostępnia pokrycia dla danej ligi.",
