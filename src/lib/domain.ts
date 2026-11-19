@@ -377,7 +377,7 @@ export function canPromoteManualOdds(
 
 /** Persistence-boundary rule: only selected predictions above 75% with verified model evidence may enter a coupon. */
 export function isEligibleCouponPrediction(
-  prediction: Pick<Prediction, "verdict" | "settlement_status" | "probability" | "model_version" | "data_source" | "rationale" | "data_coverage">,
+  prediction: Pick<Prediction, "verdict" | "settlement_status" | "probability" | "model_version" | "data_source" | "rationale" | "data_coverage" | "confidence">,
 ): boolean {
   return prediction.verdict === "WYBRANY"
     && prediction.settlement_status === "pending"
