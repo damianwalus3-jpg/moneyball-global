@@ -25,21 +25,68 @@ Zielone testy jednostkowe, TypeScript i build nie dowodzą kompletności rzeczyw
 6. **Android** — fizycznie sprawdzić na urządzeniu: wejście, skan, automatyczną analizę, nawigację, kupony, kursy, Tracker, eksport/import i czytelność tabel. Nie deklarować testu Android na podstawie samego builda desktop/web.
 7. **Raport i zapis etapu** — zapisać SHA, runy CI/deploy, wyniki smoke testów, datę skanu Europe/Brussels, liczbę fixture/1X2/DC, źródła kursów, stan kuponów/bankrolla, wyniki audytu historii i wynik Android. Otwarta bramka oznacza status NIEUKOŃCZONY.
 
-## Stan ustalony podczas przeglądu 2026-11-19
+## Wykonane i zweryfikowane 2026-11-19
 
-- Wcześniejszy workflow deploy `44471230239` i workflow CI `44471230330` zakończyły się sukcesem dla ówczesnego kodu. Nie traktować ich jako dowodu wdrożenia późniejszego commitu bez zgodności SHA.
-- Poprzedni audyt produkcyjnego skanu: 45 unikalnych meczów, 15 krajów, 25 rozgrywek, 8/9 źródeł zdrowych, zero wykrytych duplikatów kanonicznych, błędnych dat i meczów spoza Europy. API-Football zwrócił 429 mimo diagnostyki wskazującej aktywny plan Pro i pozostały limit; problem pozostaje otwarty. Ten snapshot nie dowodzi kompletności wszystkich europejskich lig i poziomów.
-- `src/worker.ts` ma opcjonalną obsługę OddsPapi po `fixtureId` w chronionej trasie `/api/odds/pilot`, a `/api/odds/status` raportuje wyłącznie obecność konfiguracji sekretu. Aktywny `src/App.tsx` uruchamia jednak automatyczny dzienny odczyt przez `strikerDate` i parsuje snapshoty StrikerAPI; nie pobiera identyfikatorów fixture OddsPapi ani nie wywołuje ścieżki OddsPapi. Zatem istnienie obsługi w Workerze nie dowodzi integracji Bwin w UI ani zapisania kursów Bwin w Trackerze.
-- Commit `064d0519f242b7ed4ed549ad9cde0b22dd91b322` dodaje OddsPapi/Bwin do `supabase/functions/moneyball-movi-odds-sync/index.ts` i wymaga sekretu `ODDSPAPI_API_KEY`. Sam kod tej funkcji nie dowodzi, że jest wdrożona, skonfigurowana ani podłączona do produkcyjnego Cloudflare Workera. Nie wdrażać jej do Supabase ani nie zmieniać architektury bez potwierdzenia, że jest to istniejąca, dozwolona część aktualnej produkcji.
-- `src/odds-value.ts` wycenia obecnie kompletne snapshoty 1X2. Kupon zawierający Double Chance nie otrzymuje wyceny, jeśli brak jawnej obsługi kursów DC; interfejs ma to komunikować, a nie zgadywać.
-- Tracker jest przechowywany w localStorage konkretnej przeglądarki. Do rzeczywistego audytu wymagany jest świeży eksport z Androida; dane z innego urządzenia nie zastępują tego eksportu.
-- `src/market-coverage.ts` sprawdza obecność rekordów rynków, a UI dodatkowo liczy fixture z prawidłowymi wektorami prawdopodobieństw. Testy tej funkcji nie zastępują kontroli rzeczywistego eksportu.
+### Kod, CI i produkcja
 
-## Kolejność dalszych prac
+- Branch HEAD po wdrożeniu: `ac822efd589ad87a30356b3d5d9ad9c3c709ad69`.
+- CI: run `44476556261` — sukces, TypeScript/build/test; **308 testów w 31 plikach**.
+- Deploy: run `44476556051` — sukces; wdrożenie do oddzielnego Cloudflare Worker, smoke test Worker/PitchAPI i pełny source reconciliation zakończone sukcesem.
+- Nie dotknięto MAIN, starego Workera, Vercel, TEST ani Lovable.
 
-1. Ustalić rzeczywisty HEAD i mapowanie: commit → CI → deploy → produkcyjny Worker.
-2. Zamknąć integrację kursów w aktywnej architekturze Cloudflare albo jawnie wykazać, że dostawca nie jest skonfigurowany; nie uznawać niepodłączonej funkcji Supabase za działającą.
-3. Wykonać rzeczywisty skan i audyt par 1X2/DC, w tym jawnych odrzuceń i jakości prawdopodobieństw.
-4. Zweryfikować kupony, bankroll i historię na danych eksportowych.
-5. Wykonać test Android po otrzymaniu świeżego eksportu i fizycznej kontroli urządzenia.
-6. Opublikować końcowy raport dopiero po zamknięciu wszystkich bramek.
+### Aktualny europejski source reconciliation
+
+Snapshot z `2026-11-19T07:04:06Z`, data Europe/Brussels `2026-11-19`:
+
+- 48 unikalnych fixture, 15 krajów, 27 rozgrywek.
+- 9/9 źródeł oznaczonych jako zdrowe; zero błędów źródeł.
+- Zero duplikatów canonical keys, zero meczów z błędną datą i zero meczów spoza Europy.
+- Świeżość: wiek skanu 0 sekund; katalog OpenMatchday 0,3 h; feed timezoneFootball 4,8 h.
+- OpenLigaDB 5 fixture; ESPN 8; FootyNomad 18; Flashscore 21; API-Football 111 surowych fixture, z czego 21 europejskich na wskazaną datę; PitchAPI 8 fixture w dziennym feedzie, 1 europejski.
+- PitchAPI katalog: 39 europejskich lig, wszystkie 39 oznaczone jako bezpłatne; 6 609 nadchodzących fixture w katalogu, 1 fixture na ten dzień.
+- OpenMatchday i OpenFootball zwróciły 0 fixture na ten dzień, ale bez błędów.
+- To jest snapshot pokrycia źródeł na jeden dzień, a nie dowód kompletności wszystkich europejskich lig, poziomów regionalnych, kobiecych i młodzieżowych.
+- Diagnostyka statusu API-Football chwilowo zwróciła 429, natomiast osobny feed fixture zwrócił 111 wpisów. Nie uznawać problemu limitowania API-Football za definitywnie rozwiązany.
+
+### OddsPapi — konfiguracja rzeczywista i aktywny przepływ
+
+- Produkcyjny `/api/odds/status` potwierdził: `oddspapi=true`, `strikerapi=true`, `pilotEnabled=true`.
+- Odczyt konta OddsPapi: limit 250 zapytań, wykorzystane 0, pozostałe 250 w chwili kontroli.
+- Konto udostępnia m.in. feedy: `bwin.be`, `unibet.be`, `betfirst.be`, `bingoal.be`, `goldenpalacesports.be`, `betcenter.be`, `scooore.be`, `starcasino.be`, `napoleonsports.be`, a także wybrane źródła porównawcze, m.in. Pinnacle, bet365, Unibet i Ladbrokes.
+- Sekrety pozostają po stronie Cloudflare Worker; endpoint statusu ujawnia wyłącznie obecność konfiguracji, limit i dozwolone slugi bukmacherów.
+- Dodano `src/oddspapi.ts`: konwersję lokalnej daty Europe/Brussels do zakresu UTC, dopasowanie po nazwach drużyn i czasie, obsługę rynku 1X2 (market 101, outcomes 101/102/103), kontrolę aktywności bukmachera/rynku/cen i timestampów.
+- Dodano chroniony endpoint `POST /api/odds/oddspapi/daily`. Używa istniejącego `ODDSPAPI_API_KEY` oraz `ODDS_PILOT_TOKEN`, sprawdza aktualne saldo zapytań przez `/v4/account`, pobiera dzienną listę fixture i zbiorcze kursy dla rozgrywek, które zostały dopasowane do skanu.
+- Jedna synchronizacja zużywa maksymalnie 2 rozliczane zapytania: `/v4/fixtures` i `/v4/odds-by-tournaments`. Endpoint `/account` jest według dokumentacji niepłatny i służy do odczytu limitu. Odpowiedzi są cache'owane.
+- Aplikacja ma osobne próby OddsPapi i StrikerAPI, aby wcześniejszy odczyt jednego dostawcy nie blokował drugiego. OddsPapi ma dwa okna synchronizacji — przed i po 15:00 czasu belgijskiego; maksymalnie 4 rozliczane zapytania dziennie, około 120 na 30 dni przy pełnym wykorzystaniu obu okien, wobec obecnego limitu 250.
+- Bwin Belgium jest osobnym feedem; pozostałe dostępne feedy .be są używane do porównania. Brak oferty lub zawieszony rynek nie jest traktowany jako kurs.
+- Snapshot 1X2 jest oznaczany jako wycenialny wyłącznie wtedy, gdy wszystkie trzy ceny są aktywne, rynek i bukmacher są aktywni, a timestampy wszystkich cen są dostępne. Wiek całego zestawu liczony jest od najstarszej z trzech cen. Nieświeże snapshoty (powyżej 60 minut) nie są używane do EV.
+- Dodano test integracyjny Worker: dzienny pakiet OddsPapi, dopasowanie Bwin Belgium i trzy rzeczywiste pola cenowe. Testy jednostkowe całego projektu: 308/308.
+- **Ważne ograniczenie odbioru:** potwierdzono konfigurację konta, uprawnienia do bukmacherów, działanie kodu i testy z kontrolowanymi odpowiedziami. Nie potwierdzono jeszcze, że aplikacja Android pobrała i zapisała rzeczywiste kursy dla konkretnych meczów z bieżącego dnia. To wymaga uruchomienia w przeglądarce z lokalnym tokenem i świeżego eksportu Trackera.
+
+### Rozdzielenie prognoz od wyceny kursowej
+
+- `analysis-evidence.ts` wymaga 7 obszarów analizy sportowej. Dostępność kursu i EV została oddzielona jako warstwa wyceny zakładu.
+- Brak kursu nie blokuje zapisu prognozy 1X2 ani Double Chance i nie może samodzielnie powodować statusu ODRZUCONY.
+- Nadal obowiązują pozostałe warunki jakości danych sportowych, minimalnej próbki i progu kandydata. Brak historii, składów, kontuzji lub innych wymaganych danych może nadal jawnie odrzucić kandydata — nie wolno tego mylić z brakiem kursu.
+- Kursy Double Chance nie są syntetyzowane z 1X2. Bez bezpośredniego kursu DC kupon DC pozostaje bez wyceny; nie wolno wyliczać fikcyjnej oferty bukmachera.
+
+## Otwarte bramki — nie ogłaszać ukończenia
+
+1. **Świeży eksport Android Tracker:** potrzebny do porównania każdego rzeczywistego fixture ze skanu z osobnym rekordem 1X2 i DC, walidacji wektorów prawdopodobieństw, uzasadnień ODRZUCONY, braków i duplikatów.
+2. **Rzeczywiste kursy:** po uruchomieniu aplikacji z lokalnie zapisanym tokenem sprawdzić snapshoty OddsPapi/StrikerAPI dla konkretnych meczów, w tym czy Bwin BE faktycznie wystawił aktywną cenę; samo uprawnienie do feedu nie dowodzi dostępności kursu w każdym meczu.
+3. **Kupony i bankroll:** zweryfikować aktywne kupony, dokładnie 3 różne fixture, brak ponownego użycia fixture między nowymi kuponami, wycenę, ekspozycję, rozliczenia i saldo na świeżym eksporcie. Nie zmieniać historii.
+4. **Historia i rozliczenia:** porównać JSON/CSV z zapisami lokalnymi; nie dopisywać brakujących kursów, stawek, wyników ani wypłat bez dowodu.
+5. **Android:** fizyczny test na urządzeniu nie został wykonany. Build i testy automatyczne nie zastępują testu dotyku, nawigacji, tabel i eksportu/importu.
+6. **Double Chance pricing:** bezpośredni feed kursów DC nie jest jeszcze zaimplementowany; nie wyceniać kuponów DC przez przybliżenie.
+7. **API-Football 429:** monitorować rozbieżność pomiędzy diagnostyką limitu a odpowiedzią feedu; nie wykonywać agresywnych retry.
+
+## Następna kolejność
+
+1. Otworzyć aplikację Android, upewnić się, że lokalny token jest zapisany, wykonać skan i obie synchronizacje kursów.
+2. Wyeksportować Tracker JSON i CSV z Androida.
+3. Przeprowadzić audyt par 1X2/DC oraz rzeczywistych snapshotów kursów.
+4. Przeprowadzić audyt kuponów, bankrolla, historii i rozliczeń.
+5. Wykonać fizyczny test interfejsu Android.
+6. Dopiero wtedy sporządzić końcowy raport produkcyjny i ewentualnie zamknąć projekt.
+
+**Status projektu: W TRAKCIE — nieukończony.**
