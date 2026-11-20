@@ -5,6 +5,8 @@ function row(kind: "match" | "prediction", id: string, details: Record<string, s
   return { id: id + kind, kind, title: id, status: "OK", createdAt: "2026-11-18T10:00:00.000Z",
     details: { fixtureId: id, date: "2026-11-18", fixtureDate: "2026-11-18", ...details } };
 }
+const validOne = { market: "1X2", p1: 0.6, px: 0.2, p2: 0.2 };
+const validDC = { market: "DOUBLE_CHANCE", p1x: 0.8, px2: 0.7, p12: 0.5 };
 describe("daily market coverage", () => {
   it("requires a separate 1X2 and Double Chance row for every scanned fixture", () => {
     const records = [
@@ -50,8 +52,8 @@ describe("daily market coverage", () => {
     validEarlier.createdAt = "2026-11-18T10:00:00.000Z";
     const invalidLatest = row("prediction", "a", { market: "1X2", p1: 0.6, px: 0.2, p2: 0.1 });
     invalidLatest.createdAt = "2026-11-18T11:00:00.000Z";
-    const validDc = row("prediction", "a", { ...validDC });
-    const audit = auditMarketCoverage([row("match", "a"), validEarlier, invalidLatest, validDc], "2026-11-18");
+    const validDCRow = row("prediction", "a", { ...validDC });
+    const audit = auditMarketCoverage([row("match", "a"), validEarlier, invalidLatest, validDCRow], "2026-11-18");
     expect(audit.oneXTwoFixtureCount).toBe(0);
     expect(audit.missingOneXTwo).toEqual(["a"]);
     expect(audit.doubleChanceFixtureCount).toBe(1);

@@ -2185,3 +2185,9 @@
 - Live Worker read-only checks: health JSON `ok:true`; `/api/odds/status` returned sanitized configuration/quota metadata. Tracker diagnostics are owner-protected; remote device-local Tracker content was not accessed. The latest device screenshot from 2026-11-19 showed 1,487 local records, 15 matches and 0 missing/invalid probability rows; that is stale and does not verify 2026-11-20 local records. Model audit/calibration and coupon settlement/idempotency cannot be measured without a fresh local Tracker export/device session.
 - Code audit found a reproducible coverage logic defect: `auditMarketCoverage` counted any prediction record as a present market, regardless of whether the latest probability vector for its model was mathematically valid. This violates the requirement that record existence is not proof of valid prediction. Minimal fix: coverage now counts only fixtures for which `hasValidPredictionMarket` returns true for 1X2/DC. Regression test adds a newer invalid 1X2 row after an earlier valid row and verifies 1X2 is missing while valid DC remains counted. No historical Tracker data is changed.
 - Post-fix CI, Rebuild Checks, Cloudflare deployment, smoke and current-day live source audit: pending in this entry; final validation will be appended after workflow completion. No code was merged to MAIN.
+
+
+## 2026-11-20 — Stage 182 validation correction
+
+- The first coverage-fix commit `e834db5a7f3ef37d20279dae6663a40bbc2c3a44` triggered CI, Rebuild Checks and deployment, but TypeScript stopped all three before tests/deploy: the new test referenced `validOne` and `validDC` constants that were not declared. No deployment occurred from that failed commit and no live audit ran.
+- Corrected the test fixture constants and naming in a follow-up commit; no production data or Tracker records were touched. Validation/deployment/live audit are pending.
